@@ -74,6 +74,11 @@
               <span v-if="diary.ai_prediction" class="ai-prediction-badge">AI: {{ diary.ai_prediction }}</span>
             </div>
           </div>
+          
+          <div v-if="diary.ai_comment" class="ai-comment-box">
+             <span class="ai-icon">💌</span>
+             <p class="ai-comment-text">{{ diary.ai_comment }}</p>
+          </div>
         </div>
 
         <!-- 답변들 -->
@@ -396,6 +401,32 @@ export default {
   background-color: rgba(0, 0, 0, 0.05);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+.ai-comment-box {
+  margin-top: var(--spacing-md);
+  padding: 12px;
+  background-color: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-md);
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-start;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.ai-icon {
+  font-size: 20px;
+}
+
+.ai-comment-text {
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.5;
+  text-align: left;
+  flex: 1;
   font-weight: 500;
 }
 

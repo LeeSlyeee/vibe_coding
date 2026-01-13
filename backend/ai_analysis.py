@@ -139,6 +139,30 @@ class EmotionAnalysis:
         finally:
             session.close()
 
+    def generate_comment(self, prediction_text):
+        """
+        Generate a supportive comment based on the prediction label.
+        prediction_text format: "Label (Confidence%)" e.g., "행복해 (90.0%)"
+        """
+        if not prediction_text or "분석 불가" in prediction_text:
+            return "당신의 이야기를 더 들려주세요. 항상 듣고 있을게요."
+
+        try:
+            # Extract label (split by space)
+            label = prediction_text.split()[0]
+            
+            comments = {
+                "행복해": "오늘 하루 정말 행복하셨군요! 이 긍정적인 에너지가 내일도 이어지길 바랄게요. 😊",
+                "평온해": "마음이 편안하다니 다행이에요. 따뜻한 차 한 잔으로 하루를 마무리해보는 건 어떨까요? 🍵",
+                "그저그래": "평범한 하루였군요. 내일은 좀 더 특별한 일이 생길지도 몰라요! 파이팅 💪",
+                "우울해": "많이 힘드셨군요. 오늘 하루는 푹 쉬면서 자신을 토닥여주세요. 당신은 소중한 사람입니다. 💙",
+                "화가나": "속상한 일이 있으셨나 봐요. 잠시 심호흡을 하며 마음을 가라앉혀보면 어떨까요? 힘내세요! 🔥"
+            }
+            
+            return comments.get(label, "당신의 감정을 소중히 간직하세요.")
+        except:
+            return "당신의 감정을 소중히 간직하세요."
+
     def update_keywords(self, text, mood_level):
         """
         Learn new keywords from the text based on the user's provided mood_level.

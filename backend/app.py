@@ -101,6 +101,7 @@ def create_diary():
     # Combine event and emotion_desc for comprehensive analysis
     combined_text = f"{data['event']} {data['emotion_desc']}"
     ai_result = ai_analyzer.predict(combined_text)
+    ai_comment_text = ai_analyzer.generate_comment(ai_result)
     
     new_diary = Diary(
         user_id=current_user_id,
@@ -110,6 +111,7 @@ def create_diary():
         self_talk=data['self_talk'],
         mood_level=data['mood_level'],
         ai_prediction=ai_result,
+        ai_comment=ai_comment_text,
         created_at=created_at
     )
     
@@ -160,6 +162,7 @@ def update_diary(id):
     # 일기 수정 시 감정 다시 분석
     combined_text = f"{diary.event} {diary.emotion_desc}"
     diary.ai_prediction = ai_analyzer.predict(combined_text)
+    diary.ai_comment = ai_analyzer.generate_comment(diary.ai_prediction)
     
     db.session.commit()
     return jsonify(diary.to_dict()), 200

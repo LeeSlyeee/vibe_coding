@@ -32,6 +32,7 @@ class Diary(db.Model):
     self_talk = db.Column(db.Text, nullable=False)       # 4. 자신에게 말해주기
     mood_level = db.Column(db.Integer, nullable=False)   # 5. 감정 5단계
     ai_prediction = db.Column(db.Text, nullable=True)    # AI 감정 분석 결과 (New)
+    ai_comment = db.Column(db.Text, nullable=True)       # AI 코멘트 (New)
     
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -44,6 +45,7 @@ class Diary(db.Model):
             'self_talk': self.self_talk,
             'mood_level': self.mood_level,
             'ai_prediction': self.ai_prediction,
+            'ai_comment': self.ai_comment,
             'created_at': self.created_at.strftime('%Y-%m-%dT%H:%M:%SZ')
         }
 
