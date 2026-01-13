@@ -31,6 +31,7 @@ class Diary(db.Model):
     emotion_meaning = db.Column(db.Text, nullable=False) # 3. 감정 탐색
     self_talk = db.Column(db.Text, nullable=False)       # 4. 자신에게 말해주기
     mood_level = db.Column(db.Integer, nullable=False)   # 5. 감정 5단계
+    ai_prediction = db.Column(db.Text, nullable=True)    # AI 감정 분석 결과 (New)
     
     created_at = db.Column(db.DateTime, default=datetime.now)
 
@@ -42,5 +43,15 @@ class Diary(db.Model):
             'emotion_meaning': self.emotion_meaning,
             'self_talk': self.self_talk,
             'mood_level': self.mood_level,
+            'ai_prediction': self.ai_prediction,
             'created_at': self.created_at.strftime('%Y-%m-%dT%H:%M:%SZ')
         }
+
+class EmotionKeyword(db.Model):
+    __tablename__ = 'emotion_keywords'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    keyword = db.Column(db.String(100), unique=True, nullable=False)
+    emotion_label = db.Column(db.Integer, nullable=False) # 0-4 matching our classes
+    frequency = db.Column(db.Integer, default=1)
+    created_at = db.Column(db.DateTime, default=datetime.now)
