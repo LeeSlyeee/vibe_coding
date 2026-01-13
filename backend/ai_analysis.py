@@ -1,4 +1,5 @@
 import numpy as np
+import os
 import random
 import random
 from sqlalchemy import create_engine
@@ -19,9 +20,10 @@ try:
     from tensorflow.keras.utils import to_categorical
     import pandas as pd
     TENSORFLOW_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     TENSORFLOW_AVAILABLE = False
-    print("Warning: TensorFlow not found. Using simple keyword-based sentiment analysis.")
+    print(f"Warning: TensorFlow not found. Error: {e}")
+    print("Using simple keyword-based sentiment analysis.")
 
 class EmotionAnalysis:
     def __init__(self):
@@ -37,8 +39,7 @@ class EmotionAnalysis:
         self.db_engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
         self.Session = sessionmaker(bind=self.db_engine)
 
-        # Initial Training Data (Hardcoded for LSTM initialization)
-        #Ideally this should also come from DB, but keeping it simple for now
+        # Initial Training Data (Hybrid: Hardcoded + GoEmotions)
         self.train_texts = [
             # 0. 행복해
             "너무 재밌네요", "최고예요", "오늘 정말 행복했다", "기분이 아주 좋습니다", "즐거운 하루",
@@ -66,6 +67,10 @@ class EmotionAnalysis:
             "답답해서 미치겠다", "신경질이 난다", "폭발할 것 같다", "기분 잡쳤다", "말도 안 된다"
         ]
         
+        # Hardcoded Labels
+        labels_list = [0]*15 + [1]*15 + [2]*15 + [3]*15 + [4]*15
+        self.train_labels = np.array(labels_list)
+
         # Fallback Comment Bank
         self.comment_bank = {
             "행복해": [
@@ -129,10 +134,8 @@ class EmotionAnalysis:
                 "당신의 평화를 방해한 것들이 밉네요. 오늘은 일찍 쉬면서 마음을 다스려봐요."
             ]
         }
-        labels_list = [0]*15 + [1]*15 + [2]*15 + [3]*15 + [4]*15
-        self.train_labels = np.array(labels_list)
-
-        # Initialize attributes to None (Safe default)
+        
+        # Initialize attributes
         self.comment_tokenizer = None
         self.comment_model = None
         self.enc_model = None 
@@ -142,33 +145,93 @@ class EmotionAnalysis:
         if TENSORFLOW_AVAILABLE:
             print("Initializing AI Emotion Analysis Model (5-Class LSTM)...")
             self.tokenizer = Tokenizer()
+            
+            if os.environ.get('SKIP_TRAINING'):
+                print("Skipping training logic (SKIP_TRAINING active).")
+                return
+            
+            # --- Load GoEmotions Data & Map Labels ---
+            try:
+                base_dir = os.path.dirname(os.path.abspath(__file__))
+                csv_path = os.path.join(base_dir, 'goemotions_korean_train.csv')
+                
+                if os.path.exists(csv_path):
+                    print(f"Loading extended dataset from {csv_path}...")
+                    df = pd.read_csv(csv_path)
+                    
+                    # Ensure strings
+                    df['text'] = df['text'].astype(str)
+                    
+                    # Mapping Dictionary (28 -> 5)
+                    # 0: 행복해, 1: 평온해, 2: 그저그래, 3: 우울해, 4: 화가나
+                    # GoEmotions: 0-27
+                    label_map = {
+                        0: 0, 1: 0, 5: 0, 13: 0, 15: 0, 17: 0, 18: 0, 20: 0, 21: 0, 23: 0, # Happpy...
+                        4: 1, 8: 1, 22: 1, # Calm/Positive
+                        6: 2, 7: 2, 26: 2, 27: 2, # Neutral/Ambiguous
+                        9: 3, 12: 3, 16: 3, 19: 3, 24: 3, 25: 3, # Depressed/Sad
+                        2: 4, 3: 4, 10: 4, 11: 4, 14: 4 # Angry/Fees/Disgust
+                    }
+                    
+                    # Function to map labels
+                    def map_emotion(label_str):
+                        try:
+                            # Labels in CSV might be "0", or "2,15" (multilabel)
+                            # We take the first label for simplicity in this single-label project
+                            first_label = int(str(label_str).split(',')[0])
+                            return label_map.get(first_label, 2) # Default to Neutral if map fails
+                        except:
+                            return 2
+
+                    df['target'] = df['labels'].apply(map_emotion)
+                    
+                    # Merge with hardcoded data
+                    new_texts = df['text'].tolist()
+                    new_labels = df['target'].tolist()
+                    
+                    self.train_texts.extend(new_texts)
+                    # Combine numpy arrays
+                    self.train_labels = np.concatenate((self.train_labels, np.array(new_labels)))
+                    
+                    print(f"Total training samples: {len(self.train_texts)}")
+                else:
+                    print("GoEmotions CSV not found. Using small hardcoded dataset.")
+            except Exception as e:
+                print(f"Error loading GoEmotions: {e}. Using small hardcoded dataset.")
+
             self._train_initial_model()
             
             # Setup for Comment Generation (Lazy load or init)
-            self.comment_tokenizer = None
-            self.comment_model = None
-            self.enc_model = None # For inference
-            self.dec_model = None # For inference
-            self.comment_max_len = 20
+            # ... (Existing code)
             
             print("AI Model initialized.")
         else:
             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
 
     def _train_initial_model(self):
+        # Increased Vocab size for larger dataset
         self.tokenizer.fit_on_texts(self.train_texts)
         self.vocab_size = len(self.tokenizer.word_index) + 1
+        print(f"Emotion Vocab Size: {self.vocab_size}")
+        
         sequences = self.tokenizer.texts_to_sequences(self.train_texts)
         X_train = pad_sequences(sequences, maxlen=self.max_len)
         y_train = self.train_labels
         
         self.model = Sequential()
-        self.model.add(Embedding(self.vocab_size, 64, input_length=self.max_len)) 
-        self.model.add(LSTM(64)) 
-        self.model.add(Dense(32, activation='relu')) 
+        self.model.add(Embedding(self.vocab_size, 128, input_length=self.max_len)) 
+        self.model.add(LSTM(128, dropout=0.2, recurrent_dropout=0.2)) # Increased capacity & dropout
+        self.model.add(Dense(64, activation='relu')) 
+        self.model.add(Dropout(0.3))
         self.model.add(Dense(5, activation='softmax')) 
+        
         self.model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        self.model.fit(X_train, y_train, epochs=50, verbose=0) 
+        
+        # Train for fewer epochs if dataset is huge, or more? 
+        # 40k samples -> 5 epochs is enough for a prototype to see convergence without waiting too long
+        print("Training Emotion Classifier...")
+        self.model.fit(X_train, y_train, epochs=5, batch_size=32, validation_split=0.1, verbose=1) 
+
 
     def predict(self, text):
         if not text: return "분석 불가"
