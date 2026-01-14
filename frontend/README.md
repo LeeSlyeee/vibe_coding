@@ -1,72 +1,72 @@
 # frontend
 
-This template should help get you started developing with Vue 3 in Vite.
+이 템플릿은 Vite 환경에서 Vue 3 개발을 시작하는 데 도움이 됩니다.
 
-## Recommended IDE Setup
+## 권장 IDE 설정
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (Vetur는 비활성화하세요).
 
-## Recommended Browser Setup
+## 권장 브라우저 설정
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+- Chromium 기반 브라우저 (Chrome, Edge, Brave 등):
   - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+  - [Chrome DevTools에서 Custom Object Formatter 켜기](http://bit.ly/object-formatters)
 - Firefox:
   - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+  - [Firefox DevTools에서 Custom Object Formatters 켜기](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
 
-## Type Support for `.vue` Imports in TS
+## TS에서 `.vue` 임포트에 대한 타입 지원
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+TypeScript는 기본적으로 `.vue` 임포트에 대한 타입 정보를 처리할 수 없으므로, 타입 체크를 위해 `tsc` CLI 대신 `vue-tsc`를 사용합니다. 에디터에서는 TypeScript 언어 서비스가 `.vue` 타입을 인식할 수 있도록 [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)가 필요합니다.
 
-## Customize configuration
+## 설정 사용자 정의
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+[Vite 설정 참조](https://vite.dev/config/)를 확인하세요.
 
-## Project Setup
+## 프로젝트 설정
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### 개발을 위한 컴파일 및 Hot-Reload
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### 프로덕션을 위한 타입 체크, 컴파일 및 미니파이(Minify)
 
 ```sh
 npm run build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+### [Vitest](https://vitest.dev/)를 이용한 유닛 테스트 실행
 
 ```sh
 npm run test:unit
 ```
 
-### Run End-to-End Tests with [Playwright](https://playwright.dev)
+### [Playwright](https://playwright.dev)를 이용한 E2E(End-to-End) 테스트 실행
 
 ```sh
-# Install browsers for the first run
+# 첫 실행 시 브라우저 설치가 필요합니다
 npx playwright install
 
-# When testing on CI, must build the project first
+# CI에서 테스트할 때는 먼저 프로젝트를 빌드해야 합니다
 npm run build
 
-# Runs the end-to-end tests
+# E2E 테스트 실행
 npm run test:e2e
-# Runs the tests only on Chromium
+# Chromium에서만 테스트 실행
 npm run test:e2e -- --project=chromium
-# Runs the tests of a specific file
+# 특정 파일에 대한 테스트 실행
 npm run test:e2e -- tests/example.spec.ts
-# Runs the tests in debug mode
+# 디버그 모드로 테스트 실행
 npm run test:e2e -- --debug
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### [ESLint](https://eslint.org/)를 이용한 린트(Lint) 실행
 
 ```sh
 npm run lint
