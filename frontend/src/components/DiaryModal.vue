@@ -68,7 +68,7 @@
         <!-- 선택된 감정 -->
         <div class="view-emoji">
           <div class="emoji-container">
-            <span class="emoji-large">{{ getMoodEmoji(diary.mood) }}</span>
+            <img :src="getMoodEmoji(diary.mood)" class="emoji-large" alt="mood" />
             <div class="emoji-info">
               <span class="emoji-label">{{ getMoodName(diary.mood) }}</span>
               <span v-if="diary.ai_prediction" class="ai-prediction-badge">AI: {{ diary.ai_prediction }}</span>
@@ -125,6 +125,11 @@ import { ref, computed, watch } from 'vue'
 import EmojiSelector from './EmojiSelector.vue'
 import QuestionAccordion from './QuestionAccordion.vue'
 import { diaryAPI } from '../services/api'
+import happyImg from '../assets/01.png'
+import calmImg from '../assets/02.png'
+import neutralImg from '../assets/03.png'
+import sadImg from '../assets/04.png'
+import angryImg from '../assets/05.png'
 
 export default {
   name: 'DiaryModal',
@@ -169,15 +174,16 @@ export default {
     })
 
     const emojiMap = {
-      'happy': { icon: '😊', name: '행복해' },
-      'calm': { icon: '😌', name: '편안해' },
-      'neutral': { icon: '😐', name: '그저그래' },
-      'sad': { icon: '😢', name: '우울해' },
-      'angry': { icon: '😡', name: '화나' }
+      'happy': { icon: happyImg, name: '행복해' },
+      'calm': { icon: calmImg, name: '편안해' },
+      'neutral': { icon: neutralImg, name: '그저그래' },
+      'sad': { icon: sadImg, name: '우울해' },
+      'angry': { icon: angryImg, name: '화나' }
     }
 
     const getMoodEmoji = (mood) => {
-      return emojiMap[mood]?.icon || '😊'
+      // Return image path or empty string if not found, to handle img src
+      return emojiMap[mood]?.icon || '' 
     }
 
     const getMoodName = (mood) => {
@@ -385,8 +391,9 @@ export default {
 }
 
 .emoji-large {
-  font-size: 48px;
-  line-height: 1;
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
 }
 
 .emoji-label {
@@ -428,6 +435,8 @@ export default {
   text-align: left;
   flex: 1;
   font-weight: 500;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .view-answers {

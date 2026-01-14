@@ -10,7 +10,7 @@
         @click="selectEmoji(emoji.value)"
         type="button"
       >
-        <span class="emoji-icon">{{ emoji.icon }}</span>
+        <img :src="emoji.icon" :alt="emoji.name" class="emoji-img" />
         <span class="emoji-name">{{ emoji.name }}</span>
       </button>
     </div>
@@ -18,6 +18,12 @@
 </template>
 
 <script>
+import happyImg from '../assets/01.png'
+import calmImg from '../assets/02.png'
+import neutralImg from '../assets/03.png'
+import sadImg from '../assets/04.png'
+import angryImg from '../assets/05.png'
+
 export default {
   name: 'EmojiSelector',
   props: {
@@ -33,11 +39,11 @@ export default {
   emits: ['update:modelValue'],
   setup(props, { emit }) {
     const emojis = [
-      { value: 'happy', icon: '😊', name: '행복해' },
-      { value: 'calm', icon: '😌', name: '편안해' },
-      { value: 'neutral', icon: '😐', name: '그저그래' },
-      { value: 'sad', icon: '😢', name: '우울해' },
-      { value: 'angry', icon: '😡', name: '화나' }
+      { value: 'happy', icon: happyImg, name: '행복해' },
+      { value: 'calm', icon: calmImg, name: '편안해' },
+      { value: 'neutral', icon: neutralImg, name: '그저그래' },
+      { value: 'sad', icon: sadImg, name: '우울해' },
+      { value: 'angry', icon: angryImg, name: '화나' }
     ]
 
     const selectEmoji = (value) => {
@@ -66,9 +72,10 @@ export default {
 
 .emoji-options {
   display: flex;
-  gap: var(--spacing-md);
-  justify-content: space-around;
   flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--spacing-md);
+  margin: 0 auto;
 }
 
 .emoji-option {
@@ -82,9 +89,10 @@ export default {
   border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 70px;
+  /* Force 3 items per row: 30% * 3 = 90%, leaving space for gaps */
+  flex: 0 0 30%;
+  max-width: 30%;
 }
-
 .emoji-option:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
@@ -97,9 +105,11 @@ export default {
   transform: scale(1.05);
 }
 
-.emoji-icon {
-  font-size: 32px;
-  line-height: 1;
+.emoji-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  margin-bottom: 4px;
 }
 
 .emoji-name {

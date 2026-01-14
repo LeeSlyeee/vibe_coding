@@ -34,7 +34,7 @@ class Diary(db.Model):
     ai_prediction = db.Column(db.Text, nullable=True)    # AI 감정 분석 결과 (New)
     ai_comment = db.Column(db.Text, nullable=True)       # AI 코멘트 (New)
     
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)
 
     def to_dict(self):
         return {

@@ -24,7 +24,7 @@
         type="button"
       >
         <span class="date-number">{{ date.day }}</span>
-        <span v-if="date.emoji" class="date-emoji">{{ date.emoji }}</span>
+        <img v-if="date.emoji" :src="date.emoji" class="date-emoji" alt="mood" />
         <span v-if="date.aiPrediction" class="date-ai-prediction">{{ date.aiPrediction }}</span>
       </button>
     </div>
@@ -33,6 +33,11 @@
 
 <script>
 import { computed } from 'vue'
+import happyImg from '../assets/01.png'
+import calmImg from '../assets/02.png'
+import neutralImg from '../assets/03.png'
+import sadImg from '../assets/04.png'
+import angryImg from '../assets/05.png'
 
 export default {
   name: 'CalendarGrid',
@@ -59,11 +64,11 @@ export default {
     const weekdays = ['일', '월', '화', '수', '목', '금', '토']
 
     const emojiMap = {
-      'happy': '😊',
-      'calm': '😌',
-      'neutral': '😐',
-      'sad': '😢',
-      'angry': '😡'
+      'happy': happyImg,
+      'calm': calmImg,
+      'neutral': neutralImg,
+      'sad': sadImg,
+      'angry': angryImg
     }
 
     const dates = computed(() => {
@@ -146,6 +151,9 @@ export default {
 <style scoped>
 .calendar-grid {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .weekday-header {
@@ -153,32 +161,22 @@ export default {
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
   margin-bottom: var(--spacing-sm);
+  flex-shrink: 0; /* Header shouldn't shrink */
 }
 
-.weekday {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-light);
-  padding: var(--spacing-sm);
-}
-
-.weekday:first-child {
-  color: #FF6B6B;
-}
-
-.weekday:last-child {
-  color: #4A90E2;
-}
+/* ... */
 
 .dates-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
+  grid-auto-rows: 1fr;
+  gap: 4px; /* Reduce gap */
+  /* flex: 1; Remove flex: 1 to prevent stretching to fill height */
 }
 
 .date-cell {
-  aspect-ratio: 1;
+  /* Remove aspect-ratio, use min-height for better content fit */
+  min-height: 80px; 
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background-color: var(--bg-card);
@@ -186,17 +184,19 @@ export default {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: center; /* Center content vertically */
   gap: 4px;
   transition: all 0.2s ease;
   position: relative;
-  padding: var(--spacing-sm);
+  padding: 4px;
+  overflow: hidden;
 }
 
 .date-cell:hover:not(:disabled):not(.other-month) {
   background-color: var(--color-hover);
   transform: translateY(-2px);
   box-shadow: var(--shadow-sm);
+  z-index: 1;
 }
 
 .date-cell.other-month {
@@ -208,7 +208,11 @@ export default {
 .date-cell.today {
   border-color: var(--color-primary);
   border-width: 2px;
-  font-weight: 600;
+}
+
+.date-cell.today .date-number {
+  color: var(--color-primary);
+  font-weight: 800;
 }
 
 .date-cell.selected {
@@ -217,28 +221,56 @@ export default {
 }
 
 .date-cell.has-diary {
-  background-color: rgba(255, 217, 61, 0.1);
-}
-
-.date-number {
-  font-size: 14px;
-  color: var(--color-text);
+  background-color: rgba(255, 217, 61, 0.08);
 }
 
 .date-emoji {
-  font-size: 24px;
-  line-height: 1;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70%;  /* Fill most of the cell */
+  height: 70%;
+  object-fit: contain;
+  opacity: 0.25; /* Subtle background */
+  z-index: 0;
+  pointer-events: none;
 }
 
 .date-ai-prediction {
-  font-size: 10px;
-  color: var(--color-text-light);
+  position: relative;
+  z-index: 1; /* Above emoji */
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text); /* Darker for readability */
   text-align: center;
-  line-height: 1.2;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  width: 100%;
+  padding: 0 4px;
+  /* margin-top: auto; Remove push to bottom */
+  /* margin-bottom: 4px; */
+  margin: 0; 
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%; /* Take full height to center properly if needed, or let flex parent handle it */
+  white-space: normal;
+  word-break: keep-all; /* Prefer breaking at spaces */
+  overflow: visible;
+  /* text-overflow: ellipsis; Remove ellipsis */
+  text-shadow: 0 1px 2px rgba(255,255,255,0.8); /* readable against bg */
+}
+
+.date-number {
+  align-self: flex-start;
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1;
+  z-index: 1; /* Above emoji */
 }
 
 @media (max-width: 768px) {
@@ -247,11 +279,14 @@ export default {
   }
   
   .date-number {
-    font-size: 12px;
+    font-size: 11px;
+    top: 4px;
+    left: 4px;
   }
   
   .date-emoji {
-    font-size: 20px;
+    font-size: 22px;
+    margin-top: 8px;
   }
   
   .date-ai-prediction {

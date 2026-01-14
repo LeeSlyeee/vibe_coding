@@ -25,7 +25,7 @@
       </div>
 
       <!-- 오른쪽: 일기 작성/상세보기 패널 -->
-      <div class="diary-section">
+      <div class="diary-section" :class="{ 'mobile-active': !!selectedDate }">
         <DiaryModal
           v-if="selectedDate"
           :date="selectedDate"
@@ -220,25 +220,55 @@ export default {
 }
 </script>
 
+<style>
+/* Global override to ensure no scrollbars */
+html, body {
+  overflow: hidden;
+  height: 100%;
+}
+</style>
+
 <style scoped>
+
 .calendar-page {
-  min-height: calc(100vh - 56px);
-  padding: var(--spacing-xl);
+  height: calc(100vh - 56px); /* Fixed height instead of min-height */
+  padding: var(--spacing-lg); /* Reduce padding slightly */
   background-color: var(--bg-primary);
+  overflow: hidden; /* Prevent scroll */
+  box-sizing: border-box;
 }
 
 .calendar-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--spacing-xl);
+  grid-template-columns: 5.5fr 4.5fr;
+  /* Ensure children respect the ratio and don't collapse */
+  min-width: 0; 
+  gap: var(--spacing-lg); /* Reduce gap slightly */
+  width: 100%;
+  height: 100%; /* Fill parent */
   max-width: 1400px;
   margin: 0 auto;
+}
+
+.calendar-section, .diary-section {
+    min-width: 0;
+    width: 100%;
+    /* height: 100%; Remove fixed height forcing 100% stretch */
+    height: auto; 
+    max-height: 100%; /* Allow it to fill but not forced if content is small */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Container itself shouldn't scroll, but its content will */
+}
+
+.diary-section {
+    overflow-y: auto; /* Enable vertical scroll for diary content */
 }
 
 .calendar-section {
   background-color: var(--bg-card);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-xl);
+  padding: var(--spacing-lg); /* Reduce padding inside card */
   box-shadow: var(--shadow-lg);
 }
 
@@ -246,9 +276,6 @@ export default {
   background-color: var(--bg-card);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
-  min-height: 600px;
-  display: flex;
-  flex-direction: column;
 }
 
 .empty-panel {
@@ -299,25 +326,101 @@ export default {
 
 @media (max-width: 1024px) {
   .calendar-layout {
-    grid-template-columns: 1fr;
-  }
-  
-  .diary-section {
-    min-height: 500px;
+    grid-template-columns: 1fr; /* Keep 1 column for tablet but handle stack */
   }
 }
 
 @media (max-width: 768px) {
   .calendar-page {
-    padding: var(--spacing-md);
+    padding: var(--spacing-sm);
   }
   
   .calendar-section {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md);
+    height: 100%;
+    border-radius: var(--radius-lg);
+  }
+  
+  .calendar-layout {
+    display: block; /* No grid on mobile */
+  }
+
+  /* Make Diary Section a Full Screen Modal on Mobile */
+  .diary-section {
+    display: none; /* Hidden by default */
+    position: fixed;
+    top: 56px; /* Below header */
+    left: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    z-index: 1000;
+    margin: 0;
+    border-radius: 0;
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .diary-section.mobile-active {
+    display: flex; /* Show when active */
   }
   
   .current-month {
     font-size: 18px;
   }
+}
+
+/* Mobile Landscape Mode Adjustment */
+@media (max-width: 915px) and (orientation: landscape) {
+  .calendar-page {
+    height: 100vh; /* Full viewport height */
+    padding: var(--spacing-xs);
+    overflow: hidden;
+  }
+
+  .calendar-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Side by side 50:50 */
+    gap: var(--spacing-sm);
+    height: 100%;
+  }
+
+  /* Reset Calendar Section */
+  .calendar-section {
+    height: 100%;
+    overflow-y: auto; /* Scrollable if needed */
+    padding: var(--spacing-sm);
+  }
+
+  /* Reset Diary Section from Mobile Modal to Side Panel */
+  .diary-section {
+    display: flex !important; /* Force display */
+    position: static; /* Not fixed anymore */
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-lg);
+    background-color: var(--bg-card);
+    z-index: 1; /* Reset z-index */
+    animation: none; /* No slide up */
+  }
+  
+  /* Remove mobile active class effect since it's always visible or managed by grid */
+  .diary-section.mobile-active {
+     /* No special handling needed, it's just there */
+  }
+
+  /* Adjust internal spacing for landscape */
+  .nav-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 18px;
+  }
+  
+  .current-month {
+    font-size: 16px;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 </style>

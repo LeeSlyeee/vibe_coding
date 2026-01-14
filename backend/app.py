@@ -99,9 +99,17 @@ def create_diary():
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
 
     # Combine event and emotion_desc for comprehensive analysis
+    # Combine event and emotion_desc for comprehensive analysis
     combined_text = f"{data['event']} {data['emotion_desc']}"
     ai_result = ai_analyzer.predict(combined_text)
-    ai_comment_text = ai_analyzer.generate_comment(ai_result)
+    
+    # Pass structured context for better AI generation
+    context_data = {
+        "event": data['event'],
+        "emotion": data['emotion_desc'],
+        "self_talk": data['emotion_meaning'] # Q3 (Deep Reflection) is more relevant for analysis than Q4 (Self Comfort)
+    }
+    ai_comment_text = ai_analyzer.generate_comment(ai_result, context_data)
     
     new_diary = Diary(
         user_id=current_user_id,
