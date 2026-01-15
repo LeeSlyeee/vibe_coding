@@ -14,12 +14,12 @@ sys.path.append(os.path.join(os.getcwd(), 'backend'))
 try:
     from backend.app import app, db
     from backend.models import Diary
-    from backend.ai_analysis import EmotionAnalysis
+    from backend.ai_brain import EmotionAnalysis
 except ImportError:
     # Fallback if running directly inside backend
     from app import app, db
     from models import Diary
-    from ai_analysis import EmotionAnalysis
+    from ai_brain import EmotionAnalysis
 
 # 1. Procedural Generation Components
 
@@ -189,7 +189,15 @@ def generate_entries(n=100):
             
             # Generate Comment
             # AI uses prediction text to generate comment
-            comment = ai.generate_comment(prediction, full_input)
+            # Note: ai_brain.generate_comment does not exist. It has generate_kogpt2_comment.
+            
+            # Extract label string if prediction is like "Label (80%)"
+            label = prediction
+            
+            comment = ai.generate_kogpt2_comment(full_input, label)
+            if not comment:
+                 # Fallback
+                 comment = ai.generate_keyword_comment(full_input) or "힘내세요."
             
             diary.ai_prediction = prediction
             diary.ai_comment = comment
