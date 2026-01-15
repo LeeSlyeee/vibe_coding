@@ -1173,5 +1173,3 @@ class EmotionAnalysis:
         finally:
             session.close()
 
-# Singleton instance
-ai_analyzer = EmotionAnalysis()
