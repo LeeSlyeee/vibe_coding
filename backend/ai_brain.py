@@ -505,18 +505,26 @@ class EmotionAnalysis:
                     "상담사:"
                 )
             
-            input_ids = self.gpt_tokenizer.encode(prompt, return_tensors='pt')
+            # Encode with attention_mask
+            encoded = self.gpt_tokenizer(prompt, return_tensors='pt')
+            input_ids = encoded['input_ids']
+            attention_mask = encoded['attention_mask']
             
+            # Ensure pad_token_id is set (Polyglot often uses eos as pad)
+            pad_token_id = self.gpt_tokenizer.pad_token_id
+            if pad_token_id is None:
+                pad_token_id = self.gpt_tokenizer.eos_token_id
 
             with torch.no_grad():
                 gen_ids = self.gpt_model.generate(
                     input_ids,
-                    max_length=len(input_ids[0]) + 50, # Shorter limit to reduce drift
+                    attention_mask=attention_mask, # Pass attention mask
+                    max_length=len(input_ids[0]) + 50,
                     do_sample=True,
-                    temperature=0.6, # Focused
+                    temperature=0.6,
                     top_p=0.90,
                     repetition_penalty=1.2,
-                    pad_token_id=self.gpt_tokenizer.pad_token_id,
+                    pad_token_id=pad_token_id,
                     eos_token_id=self.gpt_tokenizer.eos_token_id,
                     bos_token_id=self.gpt_tokenizer.bos_token_id,
                     use_cache=True
