@@ -351,6 +351,10 @@ class EmotionAnalysis:
             text = str(user_input)
             
         for category, content in self.comment_bank.items():
+            # Safety check: content must be a dict
+            if not isinstance(content, dict):
+                continue
+                
             if category in text:
                 return content.get('default', "힘내세요.")
                 
