@@ -11,3 +11,5 @@ pandas
 tensorflow
 torch
 transformers
+celery
+redis

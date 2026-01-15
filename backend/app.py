@@ -4,8 +4,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from flask_migrate import Migrate
 from config import Config
 from models import db, User, Diary
-from ai_brain import EmotionAnalysis
-
+from tasks import process_diary_ai
 from datetime import datetime
 
 app = Flask(__name__)
@@ -98,19 +97,7 @@ def create_diary():
         
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
 
-    # Combine event and emotion_desc for comprehensive analysis
-    # Combine event and emotion_desc for comprehensive analysis
-    combined_text = f"{data['event']} {data['emotion_desc']}"
-    ai_result = ai_analyzer.predict(combined_text)
-    
-    # Pass structured context for better AI generation
-    context_data = {
-        "event": data['event'],
-        "emotion": data['emotion_desc'],
-        "self_talk": data['emotion_meaning'] # Q3 (Deep Reflection) is more relevant for analysis than Q4 (Self Comfort)
-    }
-    ai_comment_text = ai_analyzer.generate_comment(ai_result, context_data)
-    
+    # Create Diary without AI result first
     new_diary = Diary(
         user_id=current_user_id,
         event=data['event'],
@@ -118,20 +105,19 @@ def create_diary():
         emotion_meaning=data['emotion_meaning'],
         self_talk=data['self_talk'],
         mood_level=data['mood_level'],
-        ai_prediction=ai_result,
-        ai_comment=ai_comment_text,
+        ai_prediction="분석 중... (AI가 곧 답변해드려요!)", # Placeholder
+        ai_comment="잠시만 기다려주세요... 🤖", 
         created_at=created_at
     )
     
     db.session.add(new_diary)
     db.session.commit()
     
-    # Trigger AI Learning from this entry
-    # We use the user's provided mood_level (Ground Truth) to teach the AI
+    # Trigger Async AI Task
     try:
-        ai_analyzer.update_keywords(combined_text, data['mood_level'])
+        process_diary_ai.delay(new_diary.id)
     except Exception as e:
-        print(f"AI Learning failed: {e}")
+        print(f"Failed to queue celery task: {e}")
     
     return jsonify(new_diary.to_dict()), 201
 
@@ -167,12 +153,20 @@ def update_diary(id):
     diary.self_talk = data.get('self_talk', diary.self_talk)
     diary.mood_level = data.get('mood_level', diary.mood_level)
     
-    # 일기 수정 시 감정 다시 분석
-    combined_text = f"{diary.event} {diary.emotion_desc}"
-    diary.ai_prediction = ai_analyzer.predict(combined_text)
-    diary.ai_comment = ai_analyzer.generate_comment(diary.ai_prediction)
+    diary.mood_level = data.get('mood_level', diary.mood_level)
+    
+    # Reset AI fields to indicate re-analysis
+    diary.ai_prediction = "재분석 중..."
+    diary.ai_comment = "AI가 다시 생각하고 있어요... 🤔"
     
     db.session.commit()
+    
+    # Trigger Async AI Task
+    try:
+        process_diary_ai.delay(diary.id)
+    except:
+        pass
+        
     return jsonify(diary.to_dict()), 200
 
 # 일기 삭제
