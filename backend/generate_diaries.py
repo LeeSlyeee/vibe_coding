@@ -185,19 +185,18 @@ def generate_entries(n=100):
             # AI Analysis Trigger
             # Combine text for analysis
             full_input = f"{event_part} {emotion_part} {meaning_part} {st}"
-            prediction = ai.predict(full_input)
             
-            # Generate Comment
-            # AI uses prediction text to generate comment
-            # Note: ai_brain.generate_comment does not exist. It has generate_kogpt2_comment.
+            # Now ai.predict returns a dict with 'emotion' and 'comment'
+            result = ai.predict(full_input)
             
-            # Extract label string if prediction is like "Label (80%)"
-            label = prediction
-            
-            comment = ai.generate_kogpt2_comment(full_input, label)
-            if not comment:
-                 # Fallback
-                 comment = ai.generate_keyword_comment(full_input) or "힘내세요."
+            # Safe access just in case
+            if isinstance(result, dict):
+                prediction = result.get('emotion', "분석 불가")
+                comment = result.get('comment', "코멘트 생성 실패")
+            else:
+                # Fallback for legacy return type (string)
+                prediction = str(result)
+                comment = "코멘트를 가져올 수 없습니다."
             
             diary.ai_prediction = prediction
             diary.ai_comment = comment

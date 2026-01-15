@@ -470,8 +470,8 @@ class EmotionAnalysis:
         
         return None
         
-    def generate_kogpt2_comment(self, user_input, emotion_label):
-        """Phase 2: KoGPT-2 Generation (Priority 2)"""
+    def generate_polyglot_comment(self, user_input, emotion_label):
+        """Phase 2: Polyglot-Ko-1.3B Generation (Priority 2)"""
         if not self.gpt_model or not self.gpt_tokenizer:
             return None
             
@@ -710,8 +710,12 @@ class EmotionAnalysis:
 
 
     def predict(self, text):
-        if not text: return "분석 불가"
+        if not text: 
+            return {"emotion": "분석 불가", "comment": "내용이 없습니다."}
 
+        emotion_result = "분석 불가"
+        
+        # 1. Emotion Classification (LSTM or Keyword)
         if TENSORFLOW_AVAILABLE and self.model:
             try:
                 sequences = self.tokenizer.texts_to_sequences([text])
@@ -720,12 +724,29 @@ class EmotionAnalysis:
                 predicted_class_idx = np.argmax(prediction)
                 confidence = prediction[predicted_class_idx]
                 predicted_label = self.classes[predicted_class_idx]
-                return f"{predicted_label} ({(confidence * 100):.1f}%)"
+                emotion_result = f"{predicted_label} ({(confidence * 100):.1f}%)"
             except Exception as e:
                 print(f"Prediction error: {e}")
-                return self._fallback_predict(text)
+                emotion_result = self._fallback_predict(text)
         else:
-            return self._fallback_predict(text)
+            emotion_result = self._fallback_predict(text)
+            
+        # 2. Comment Generation (Polyglot)
+        comment_result = ""
+        try:
+            # Try Polyglot first
+            comment_result = self.generate_polyglot_comment(text, emotion_result)
+        except Exception as e:
+            print(f"Polyglot generation failed: {e}")
+        
+        # Fallback if Polyglot failed or returned nothing
+        if not comment_result:
+            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 수고 많으셨어요."
+            
+        return {
+            "emotion": emotion_result,
+            "comment": comment_result
+        }
 
     def _fallback_predict(self, text):
         # Load keywords from DB dynamically
