@@ -187,6 +187,21 @@ class EmotionAnalysis:
             
             if os.environ.get('SKIP_TRAINING'):
                 print("Skipping training logic (SKIP_TRAINING active).")
+                # Still need to load auxiliary data
+                self.comment_bank = {}
+                self.load_comment_bank()
+                self.load_emotion_bank()
+                # Try loading KoGPT-2 even if skipping training
+                try:
+                    print("Loading KoGPT-2 Model...")
+                    self.gpt_tokenizer = PreTrainedTokenizerFast.from_pretrained("skt/kogpt2-base-v2", 
+                        bos_token='</s>', eos_token='</s>', unk_token='<unk>', 
+                        pad_token='<pad>', mask_token='<mask>')
+                    self.gpt_model = GPT2LMHeadModel.from_pretrained('skt/kogpt2-base-v2')
+                    self.gpt_model.eval()
+                    print("KoGPT-2 Loaded successfully.")
+                except Exception as e:
+                    print(f"KoGPT-2 Load Failed: {e}")
                 return
 
             # Check for saved model
