@@ -258,17 +258,21 @@ class EmotionAnalysis:
             self.load_comment_bank()
             self.load_emotion_bank()
             
-            # Load KoGPT-2 (Phase 2)
+            # Load Polyglot-Ko (Phase 2)
             try:
-                print("Loading KoGPT-2 Model...")
-                self.gpt_tokenizer = PreTrainedTokenizerFast.from_pretrained("skt/kogpt2-base-v2", 
-                    bos_token='</s>', eos_token='</s>', unk_token='<unk>', 
-                    pad_token='<pad>', mask_token='<mask>')
-                self.gpt_model = GPT2LMHeadModel.from_pretrained('skt/kogpt2-base-v2')
+                print("Loading Polyglot-Ko-1.3B Model...")
+                from transformers import AutoTokenizer, AutoModelForCausalLM
+                
+                # Use Polyglot-Ko-1.3B
+                model_name = "EleutherAI/polyglot-ko-1.3b"
+                
+                self.gpt_tokenizer = AutoTokenizer.from_pretrained(model_name)
+                self.gpt_model = AutoModelForCausalLM.from_pretrained(model_name)
+                
                 self.gpt_model.eval() # Set to evaluation mode
-                print("KoGPT-2 Loaded successfully.")
+                print("Polyglot-Ko-1.3B Loaded successfully.")
             except Exception as e:
-                print(f"KoGPT-2 Load Failed: {e}")
+                print(f"Polyglot Load Failed: {e}")
                 self.gpt_model = None
 
         else:
@@ -454,23 +458,26 @@ class EmotionAnalysis:
                 self_talk = user_input.get('self_talk', '')
                 
                 # Few-Shot Prompting to guide the model
+                # Few-Shot Prompting with Persona for Polyglot
                 prompt = (
+                    "역활: 당신은 다정하고 공감 능력이 뛰어난 심리 상담사입니다. 내담자의 일기를 읽고 따뜻한 위로와 공감의 말을 건네주세요. 답변은 2~3문장으로 간결하게 해주세요.\n\n"
                     "상황: 시험에 떨어져서 울었다.\n"
                     "감정: 슬픔 (좌절)\n"
-                    "상담사 답변: 정말 속상하시겠어요. 열심히 준비했을 텐데 결과가 좋지 않아 마음이 아프시죠. 하지만 이번 실패가 당신의 모든 것을 결정하지는 않아요. 오늘은 푹 쉬면서 스스로를 위로해주세요.\n\n"
+                    "상담사: 정말 속상하시겠어요. 열심히 준비했을 텐데 결과가 좋지 않아 마음이 아프시죠. 하지만 이번 실패가 당신의 모든 것을 결정하지는 않아요. 오늘은 푹 쉬면서 스스로를 위로해주세요.\n\n"
                     f"상황: {event} {emotion} {self_talk}\n"
                     f"감정: {emotion_label}\n"
-                    "상담사 답변:"
+                    "상담사:"
                 )
             else:
                 text = str(user_input)
                 prompt = (
+                    "역활: 당신은 다정하고 공감 능력이 뛰어난 심리 상담사입니다. 내담자의 일기를 읽고 따뜻한 위로와 공감의 말을 건네주세요. 답변은 2~3문장으로 간결하게 해주세요.\n\n"
                     "일기: 오늘 하루종일 너무 힘들었다.\n"
                     "감정: 우울 (지침)\n"
-                    "상담사 답변: 오늘 하루 정말 고생 많으셨어요. 지친 몸과 마음을 편안하게 내려놓고 휴식을 취해보세요. 당신은 충분히 잘하고 있습니다.\n\n"
+                    "상담사: 오늘 하루 정말 고생 많으셨어요. 지친 몸과 마음을 편안하게 내려놓고 휴식을 취해보세요. 당신은 충분히 잘하고 있습니다.\n\n"
                     f"일기: {text}\n"
                     f"감정: {emotion_label}\n"
-                    "상담사 답변:"
+                    "상담사:"
                 )
             
             input_ids = self.gpt_tokenizer.encode(prompt, return_tensors='pt')
