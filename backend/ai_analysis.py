@@ -177,6 +177,8 @@ class EmotionAnalysis:
         self.enc_model = None 
         self.dec_model = None
         self.comment_max_len = 20
+        self.gpt_model = None
+        self.gpt_tokenizer = None
 
     
         if TENSORFLOW_AVAILABLE:
