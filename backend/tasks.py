@@ -14,10 +14,18 @@ def create_minimal_app():
     return app
 
 # Initialize AI Brain ONLY in the worker process
-# This will happen when the worker starts, so it loads once and stays in memory.
-print("🔧 Initializing AI Brain in Worker Process...")
-ai_analyzer = EmotionAnalysis()
-print("✅ AI Brain Ready in Worker!")
+# This prevents Flask/Gunicorn from loading the heavy model when importing tasks.py
+ai_analyzer = None
+
+if os.environ.get('MOOD_ROLE') == 'celery':
+    print("🔧 Initializing AI Brain in Worker Process...")
+    try:
+        ai_analyzer = EmotionAnalysis()
+        print("✅ AI Brain Ready in Worker!")
+    except Exception as e:
+        print(f"❌ Failed to load AI Brain: {e}")
+else:
+    print("🚀 Flask Process imported tasks.py (Skipping Heavy AI Loading)")
 
 @celery_app.task(bind=True)
 def process_diary_ai(self, diary_id):
