@@ -4,7 +4,7 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from flask_migrate import Migrate
 from config import Config
 from models import db, User, Diary
-from ai_analysis import ai_analyzer
+from ai_brain import EmotionAnalysis
 
 from datetime import datetime
 
