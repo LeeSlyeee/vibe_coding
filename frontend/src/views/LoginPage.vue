@@ -43,8 +43,7 @@
         </form>
 
         <div class="auth-footer">
-          <p>© 2026 Mood. All rights reserved.</p>
-          <p class="footer-credit">Design by Youngjae</p>
+          <p>© 2026 Slyeee. All rights reserved.</p>
         </div>
       </div>
     </div>

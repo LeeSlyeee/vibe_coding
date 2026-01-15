@@ -51,7 +51,10 @@ def main():
         
         # 2. AI 분석기 초기화 (기존 모델 로드)
         print("\n🤖 AI 분석기 초기화 중...")
+        # Prevent auto-training in __init__ since we are doing manual retraining
+        os.environ['SKIP_TRAINING'] = '1'
         ai = EmotionAnalysis()
+        del os.environ['SKIP_TRAINING'] # Clean up
         
         # 3. 기존 모델 백업
         import shutil
@@ -124,6 +127,14 @@ def main():
             print("✅ 모델 재훈련 완료!")
             print(f"   - 모델 파일: {model_path}")
             print(f"   - 토크나이저: {tokenizer_path}")
+            
+            # Update state for app.py to prevent redundant auto-training
+            try:
+                current_kw = ai._get_keyword_count()
+                ai._save_training_state(current_kw)
+                print(f"✅ Training state updated (Count: {current_kw})")
+            except Exception as e:
+                print(f"⚠️ Warning: perform state update failed: {e}")
             
         except Exception as e:
             print(f"\n❌ 재훈련 중 오류 발생: {e}")

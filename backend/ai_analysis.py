@@ -5,6 +5,8 @@ import random
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from config import Config
+import json
+TRAINING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'training_state.json')
 try:
     from models import EmotionKeyword
     from emotion_codes import EMOTION_CODE_MAP
@@ -192,45 +194,45 @@ class EmotionAnalysis:
             
             # Comment Model Paths
             self.comment_model_path = os.path.join(base_dir, 'comment_model.h5')
-            self.comment_enc_model_path = os.path.join(base_dir, 'comment_enc_model.h5') # Save sub-models? Or simpler to rebuild?
-            # Saving sub-models (encoder/decoder) separately is complex. 
-            # Easier strategy: Save the main 'training' model, and REBUILD the inference models (enc/dec) from the layers of the loaded model.
+            self.comment_enc_model_path = os.path.join(base_dir, 'comment_enc_model.h5')
             self.comment_tokenizer_path = os.path.join(base_dir, 'comment_tokenizer.pickle')
-            
-            if os.path.exists(self.model_path) and os.path.exists(self.tokenizer_path):
-                print("Loading trained emotion model from disk...")
-                try:
-                    import pickle
-                    from tensorflow.keras.models import load_model
-                    
-                    self.model = load_model(self.model_path)
-                    
-                    with open(self.tokenizer_path, 'rb') as handle:
-                        self.tokenizer = pickle.load(handle)
-                        
-                    self.vocab_size = len(self.tokenizer.word_index) + 1
-                    print("Emotion Model loaded.")
-                    
-                    # COMMENT MODEL LOADING
-                    if os.path.exists(self.comment_model_path) and os.path.exists(self.comment_tokenizer_path):
-                        print("Loading comment generation model...")
-                        self.comment_model = load_model(self.comment_model_path)
-                        with open(self.comment_tokenizer_path, 'rb') as ct:
-                            self.comment_tokenizer = pickle.load(ct)
-                        print("Comment Model loaded.")
-                        # Re-construct inference models from loaded model layers
-                        self._rebuild_inference_models()
-                    else:
-                        print("Comment model not found. Retraining...")
-                        self.conversation_pairs = []
-                        self.load_sentiment_corpus() # Need data
-                        self.train_comment_model()
 
-                except Exception as e:
-                    print(f"Error loading models: {e}. Retraining all...")
+            # Check Training Condition
+            current_count = self._get_keyword_count()
+            last_count = self._get_last_trained_count()
+            diff = current_count - last_count
+            
+            print(f"📊 Training Check: Current Keywords={current_count}, Last Trained={last_count}, Diff={diff}")
+            
+            should_train = (diff >= 100)
+            
+            # Force train if models are missing?
+            # User said "Otherwise just run server". But if models missing, we can't run AI.
+            # However, fallback logic exists.
+            # We will follow user strictly: Only train if diff >= 100.
+            # But we must try to load if we don't train.
+            
+            model_exists = os.path.exists(self.model_path) and os.path.exists(self.tokenizer_path)
+
+            if should_train:
+                print(f"🚀 New data detected (+{diff} >= 100). Starting Full Training (LSTM + Seq2Seq)...")
+                try:
                     self._load_and_train()
+                    self._save_training_state(current_count)
+                    print("✅ Training complete and state saved.")
+                except Exception as e:
+                    print(f"❌ Training failed: {e}")
+                    # Try loading existing if training failed
+                    if model_exists:
+                        self._load_existing_models()
+            
+            elif model_exists:
+                print("📦 Models found. Loading existing models...")
+                self._load_existing_models()
+                
             else:
-                self._load_and_train()
+                print("⚠️ No models found and new data < 100. Skipping training.")
+                print("   The server will run in Basic Mode (Keyword Fallback).")
             
             print("AI Model initialized.")
             
@@ -254,6 +256,72 @@ class EmotionAnalysis:
 
         else:
             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
+
+    def _get_keyword_count(self):
+        """Get total count of emotion keywords from DB"""
+        session = self.Session()
+        try:
+            # Need to import inside as it might fail if table doesn't exist?
+            # Actually models is imported at top level, but table creation happens later.
+            # If table doesn't exist, this query will fail.
+            from models import EmotionKeyword
+            # Check if table exists (raw SQL for safety if ORM fails?)
+            # But let's try ORM first.
+            count = session.query(EmotionKeyword).count()
+            return count
+        except Exception as e:
+            # Table likely doesn't exist yet
+            return 0
+        finally:
+            session.close()
+
+    def _get_last_trained_count(self):
+        """Read last trained count from JSON"""
+        if os.path.exists(TRAINING_STATE_FILE):
+            try:
+                with open(TRAINING_STATE_FILE, 'r') as f:
+                    data = json.load(f)
+                    return data.get('last_keyword_count', 0)
+            except:
+                return 0
+        return 0
+
+    def _save_training_state(self, count):
+        """Save current keyword count to JSON"""
+        try:
+            with open(TRAINING_STATE_FILE, 'w') as f:
+                json.dump({'last_keyword_count': count}, f)
+        except Exception as e:
+            print(f"Error saving training state: {e}")
+
+    def _load_existing_models(self):
+        """Helper to load existing models"""
+        try:
+            import pickle
+            from tensorflow.keras.models import load_model
+            
+            self.model = load_model(self.model_path)
+            
+            with open(self.tokenizer_path, 'rb') as handle:
+                self.tokenizer = pickle.load(handle)
+                
+            self.vocab_size = len(self.tokenizer.word_index) + 1
+            print("Emotion Model loaded.")
+            
+            # COMMENT MODEL LOADING
+            if os.path.exists(self.comment_model_path) and os.path.exists(self.comment_tokenizer_path):
+                print("Loading comment generation model...")
+                self.comment_model = load_model(self.comment_model_path)
+                with open(self.comment_tokenizer_path, 'rb') as ct:
+                    self.comment_tokenizer = pickle.load(ct)
+                print("Comment Model loaded.")
+                self._rebuild_inference_models()
+            else:
+                print("Comment model not found (skipping auto-train as per policy).")
+                
+        except Exception as e:
+            print(f"Error loading models: {e}.")
+            # Assuming fallback will take over
 
     def load_comment_bank(self):
         """Load curated advice from JSON"""
