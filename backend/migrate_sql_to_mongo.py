@@ -11,8 +11,8 @@ def migrate():
     # 1. SQL Connection
     # Use the legacy connection string from Config or ENV
     # Note: We commented out SQLALCHEMY_DATABASE_URI in config.py, so we need to fetch it manually or uncomment temporarily.
-    # For now, let's try to get it from ENV or use the fallback string.
-    sql_uri = os.environ.get('DATABASE_URL') or 'mysql+pymysql://root:1q2w3e4r@127.0.0.1:3306/mood_diary'
+    # Use explicit connection string with utf8mb4
+    sql_uri = 'mysql+pymysql://root:1q2w3e4r@127.0.0.1:3306/mood_diary?charset=utf8mb4'
     
     try:
         sql_engine = create_engine(sql_uri)
@@ -39,9 +39,9 @@ def migrate():
     print(f"Found SQL Tables: {tables}")
 
     # --- Migrate Users ---
-    if 'user' in tables:
+    if 'users' in tables:
         print("\nmigrating users...")
-        user_table = Table('user', metadata, autoload_with=sql_engine)
+        user_table = Table('users', metadata, autoload_with=sql_engine)
         users = connection.execute(user_table.select()).fetchall()
         
         count = 0
@@ -65,9 +65,9 @@ def migrate():
         print(f"✨ Migrated {count} users.")
 
     # --- Migrate Diaries ---
-    if 'diary' in tables:
+    if 'diaries' in tables:
         print("\nmigrating diaries...")
-        diary_table = Table('diary', metadata, autoload_with=sql_engine)
+        diary_table = Table('diaries', metadata, autoload_with=sql_engine)
         diaries = connection.execute(diary_table.select()).fetchall()
         
         count = 0
@@ -90,7 +90,7 @@ def migrate():
             # This is hard without ORM. Let's assume single user for now or simple mapping.
             # Better way: Look up the user in SQL user table by d.user_id -> get username -> find Mongo user by username -> get Mongo ID.
             
-            if 'user' in tables:
+            if 'users' in tables:
                  user_query = user_table.select().where(user_table.c.id == d.user_id)
                  sql_user = connection.execute(user_query).first()
                  if sql_user:
