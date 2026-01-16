@@ -530,8 +530,11 @@ class EmotionAnalysis:
                     use_cache=True
                 )
                 
-            generated = self.gpt_tokenizer.decode(gen_ids[0])
+            generated = self.gpt_tokenizer.decode(gen_ids[0], skip_special_tokens=True)
             
+            # Explicitly remove specific tokens just in case
+            generated = generated.replace("<|endoftext|>", "").replace("<s>", "").replace("</s>", "")
+
             # Extract response
             if "상담사 답변:" in generated:
                 response = generated.split("상담사 답변:")[-1].strip()
@@ -542,7 +545,15 @@ class EmotionAnalysis:
                 
             # Post-process: Take first 2 sentences only to avoid hallucination
             sentences = response.split('.')
-            clean_response = '. '.join(sentences[:2]).strip() + "."
+            # Filter out empty strings
+            sentences = [s.strip() for s in sentences if s.strip()]
+            
+            if len(sentences) > 0:
+                clean_response = '. '.join(sentences[:2]).strip()
+                if not clean_response.endswith(('!', '?', '.')):
+                    clean_response += "."
+            else:
+                clean_response = ""
             
             return clean_response
             
