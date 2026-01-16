@@ -11,8 +11,8 @@ def migrate():
     # 1. SQL Connection
     # Use the legacy connection string from Config or ENV
     # Note: We commented out SQLALCHEMY_DATABASE_URI in config.py, so we need to fetch it manually or uncomment temporarily.
-    # Use explicit connection string with utf8mb4
-    sql_uri = 'mysql+pymysql://root:1q2w3e4r@127.0.0.1:3306/mood_diary?charset=utf8mb4'
+    # Connect to local temp-mariadb (Restored from OCI backup)
+    sql_uri = 'mysql+pymysql://root:1234@127.0.0.1:3308/mood_diary?charset=utf8mb4'
     
     try:
         sql_engine = create_engine(sql_uri)
@@ -128,7 +128,34 @@ def migrate():
                 mongo_db.diaries.insert_one(diary_doc)
                 count += 1
                 
+                
         print(f"✨ Migrated {count} diaries.")
+
+    # --- Migrate Emotion Keywords ---
+    if 'emotion_keywords' in tables:
+        print("\nmigrating emotion_keywords...")
+        # reflection이 실패할 수도 있으므로 명시적 컬럼 사용 대신 select * 
+        keyword_table = Table('emotion_keywords', metadata, autoload_with=sql_engine)
+        keywords = connection.execute(keyword_table.select()).fetchall()
+        
+        count = 0
+        for k in keywords:
+            # Columns: id, keyword, emotion_label, frequency
+            
+            kw_doc = {
+                'keyword': k.keyword,
+                'emotion_label': k.emotion_label,
+                'frequency': k.frequency
+            }
+            
+            # Upsert based on keyword to avoid duplicates
+            mongo_db.emotion_keywords.update_one(
+                {'keyword': k.keyword},
+                {'$set': kw_doc},
+                upsert=True
+            )
+            count += 1
+        print(f"✨ Migrated {count} emotion keywords.")
 
     connection.close()
     print("\n✅ Migration Completed!")

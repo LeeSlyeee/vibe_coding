@@ -31,6 +31,11 @@ def serialize_doc(doc):
     if not doc:
         return None
     doc['id'] = str(doc['_id'])
+    
+    # Datetime Serialization
+    if 'created_at' in doc and isinstance(doc['created_at'], datetime):
+        doc['created_at'] = doc['created_at'].isoformat()
+        
     del doc['_id']
     return doc
 
