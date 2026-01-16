@@ -9,3 +9,5 @@ backend/model_backups/
 ssh-key
 *.log
 backend/server.log
+
+mood_diary_backup.json
