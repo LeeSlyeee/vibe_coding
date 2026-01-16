@@ -1,7 +1,9 @@
 import axios from 'axios'
 
 // API 베이스 URL 설정
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
+// API 베이스 URL 설정
+// 환경변수가 없으면 현재 브라우저의 호스트명 + 5001 포트 사용 (배포 환경 대응)
+const API_BASE_URL = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:5001/api`
 
 // axios 인스턴스 생성
 const api = axios.create({
