@@ -6,7 +6,7 @@
           {{ isViewMode ? '기록 내용' : `${formattedDate}` }}
         </h3>
         <div v-if="isViewMode" class="diary-timestamp">
-          {{ diary.createdAt ? formatDateTime(diary.createdAt) : '' }}
+          {{ displayDiary.created_at ? formatDateTime(displayDiary.created_at) : (diary?.created_at ? formatDateTime(diary.created_at) : '') }}
         </div>
       </div>
 
@@ -68,10 +68,10 @@
         <!-- 선택된 감정 -->
         <div class="view-emoji">
           <div class="emoji-container">
-            <img :src="getMoodEmoji(diary.mood)" class="emoji-large" alt="mood" />
+            <img :src="getMoodEmoji(displayDiary.mood_level)" class="emoji-large" alt="mood" />
             <div class="emoji-info">
-              <span class="emoji-label">{{ getMoodName(diary.mood) }}</span>
-              <span v-if="diary.ai_prediction && !progressData.isAnalyzing" class="ai-prediction-badge">AI: {{ diary.ai_prediction }}</span>
+              <span class="emoji-label">{{ getMoodName(displayDiary.mood_level) }}</span>
+              <span v-if="displayDiary.ai_prediction && !progressData.isAnalyzing" class="ai-prediction-badge">AI: {{ displayDiary.ai_prediction }}</span>
             </div>
           </div>
           
@@ -86,32 +86,32 @@
             </div>
           </div>
           
-          <div v-if="diary.ai_comment && !progressData.isAnalyzing" class="ai-comment-box">
+          <div v-if="displayDiary.ai_comment && !progressData.isAnalyzing" class="ai-comment-box">
              <span class="ai-icon">💌</span>
-             <p class="ai-comment-text">{{ diary.ai_comment }}</p>
+             <p class="ai-comment-text">{{ displayDiary.ai_comment }}</p>
           </div>
         </div>
 
         <!-- 답변들 -->
         <div class="view-answers">
-          <div v-if="diary.question1" class="answer-item">
+          <div v-if="displayDiary.event" class="answer-item">
             <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
-            <p class="answer-text">{{ diary.question1 }}</p>
+            <p class="answer-text">{{ displayDiary.event }}</p>
           </div>
 
-          <div v-if="diary.question2" class="answer-item">
+          <div v-if="displayDiary.emotion_desc" class="answer-item">
             <h4 class="answer-question">어떤 감정이 들었나요?</h4>
-            <p class="answer-text">{{ diary.question2 }}</p>
+            <p class="answer-text">{{ displayDiary.emotion_desc }}</p>
           </div>
 
-          <div v-if="diary.question3" class="answer-item">
+          <div v-if="displayDiary.emotion_meaning" class="answer-item">
             <h4 class="answer-question">마지막으로 더 깊게 자신의 감정을 써보세요.</h4>
-            <p class="answer-text">{{ diary.question3 }}</p>
+            <p class="answer-text">{{ displayDiary.emotion_meaning }}</p>
           </div>
 
-          <div v-if="diary.question4" class="answer-item">
+          <div v-if="displayDiary.self_talk" class="answer-item">
             <h4 class="answer-question">나에게 따듯한 위로를 보내세요.</h4>
-            <p class="answer-text">{{ diary.question4 }}</p>
+            <p class="answer-text">{{ displayDiary.self_talk }}</p>
           </div>
         </div>
 
@@ -161,8 +161,9 @@ export default {
   emits: ['close', 'saved'],
   setup(props, { emit }) {
     const isViewMode = ref(!!props.diary)
-    const showForm = ref(false) // 작성 폼 표시 여부
+    const showForm = ref(false) 
     const saving = ref(false)
+    const localSavedDiary = ref(null) 
     
     // Polling State
     const progressData = ref({
@@ -173,18 +174,38 @@ export default {
       timerIds: []
     })
     
+    // mood mapping helper
+    const moodLevels = {
+        'angry': 1, 'sad': 2, 'neutral': 3, 'calm': 4, 'happy': 5
+    }
+    const moodLevelToName = {
+        1: 'angry', 2: 'sad', 3: 'neutral', 4: 'calm', 5: 'happy'
+    }
+
     const formData = ref({
-      mood: props.diary?.mood || '',
-      question1: props.diary?.question1 || '',
-      question2: props.diary?.question2 || '',
-      question3: props.diary?.question3 || '',
-      question4: props.diary?.question4 || ''
+      mood: props.diary ? moodLevelToName[props.diary.mood_level] || 'neutral' : '',
+      question1: props.diary?.event || '',
+      question2: props.diary?.emotion_desc || '',
+      question3: props.diary?.emotion_meaning || '',
+      question4: props.diary?.self_talk || ''
     })
 
     const formattedDate = computed(() => {
       if (!props.date) return ''
-      const [year, month, day] = props.date.split('-')
+      const parts = props.date.split('-')
+      if (parts.length < 3) return props.date
+      const [year, month, day] = parts
       return `${parseInt(month)}월 ${parseInt(day)}일`
+    })
+
+    // Compute which diary to display
+    const displayDiary = computed(() => {
+      // Prioritize localSavedDiary (newly saved result)
+      if (localSavedDiary.value) return localSavedDiary.value
+      // Then props.diary (existing entry)
+      if (props.diary) return props.diary
+      // Fallback empty
+      return {}
     })
 
     const isValid = computed(() => {
@@ -194,15 +215,20 @@ export default {
     })
 
     const emojiMap = {
-      'happy': { icon: happyImg, name: '행복해' },
-      'calm': { icon: calmImg, name: '편안해' },
-      'neutral': { icon: neutralImg, name: '그저그래' },
+      1: { icon: angryImg, name: '화나' },
+      2: { icon: sadImg, name: '우울해' },
+      3: { icon: neutralImg, name: '그저그래' },
+      4: { icon: calmImg, name: '편안해' },
+      5: { icon: happyImg, name: '행복해' },
+      // Support string keys just in case
+      'angry': { icon: angryImg, name: '화나' },
       'sad': { icon: sadImg, name: '우울해' },
-      'angry': { icon: angryImg, name: '화나' }
+      'neutral': { icon: neutralImg, name: '그저그래' },
+      'calm': { icon: calmImg, name: '편안해' },
+      'happy': { icon: happyImg, name: '행복해' }
     }
 
     const getMoodEmoji = (mood) => {
-      // Return image path or empty string if not found, to handle img src
       return emojiMap[mood]?.icon || '' 
     }
 
@@ -211,6 +237,7 @@ export default {
     }
 
     const formatDateTime = (datetime) => {
+      if(!datetime) return ''
       const date = new Date(datetime)
       return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     }
@@ -222,14 +249,12 @@ export default {
       progressData.value.message = 'AI 분석 준비 중...';
       progressData.value.eta = 15;
       
-      // Countdown Timer
       const countdownInterval = setInterval(() => {
         if (progressData.value.eta > 0) {
           progressData.value.eta--;
         }
       }, 1000);
       
-      // Status Check Timer
       const pollInterval = setInterval(async () => {
         try {
           const status = await diaryAPI.getTaskStatus(taskId);
@@ -237,7 +262,6 @@ export default {
           if (status.state === 'PROGRESS') {
             progressData.value.percent = status.process_percent;
             progressData.value.message = status.message;
-            // Update ETA if backend provides a new estimate
             if (status.eta_seconds > 0) { 
                  progressData.value.eta = status.eta_seconds; 
             }
@@ -245,7 +269,12 @@ export default {
             stopPolling();
             progressData.value.isAnalyzing = false;
             progressData.value.percent = 100;
-            emit('saved'); // Refresh parent to get full AI result
+            
+            // Reload the local saved diary
+            const updatedDiary = await diaryAPI.getDiary(displayDiary.value.id);
+            localSavedDiary.value = updatedDiary;
+            
+            emit('saved');
           } else if (status.state === 'FAILURE' || status.state === 'REVOKED') {
             stopPolling();
             progressData.value.isAnalyzing = false;
@@ -285,34 +314,26 @@ export default {
         let result = null;
 
         if (props.diary) {
-          // 일기 수정
+          // Update
           result = await diaryAPI.updateDiary(props.diary.id, data)
-          
-          // 수정 후 상세보기 모드로 전환
-          isViewMode.value = true
-          showForm.value = false
-          
-          // 부모 컴포넌트에 saved 이벤트만 전송 (모달은 닫지 않음)
-          emit('saved')
         } else {
-          // 일기 생성
+          // Create
           result = await diaryAPI.createDiary(data)
-          
-          // 생성 후에는 모달 닫기 -> 
-          // WAIT! We want to show progress. So Do NOT Close. 
-          // Switch to view mode instead.
-          isViewMode.value = true
-          showForm.value = false
-          
-          // Emit saved to refresh list in background
-          emit('saved')
         }
         
-        // Start Polling if task_id exists
-        if (result && result.task_id) {
+         // Update local state to show View Mode immediately
+         localSavedDiary.value = result;
+         isViewMode.value = true;
+         showForm.value = false;
+         
+         // Start Polling if task_id exists
+         if (result && result.task_id) {
            startPolling(result.task_id);
-        }
-        
+         }
+         
+         // Notify parent list (background refresh)
+         emit('saved')
+         
       } catch (error) {
         console.error('Failed to save diary:', error)
         alert('저장에 실패했습니다.')
@@ -324,6 +345,17 @@ export default {
     const handleEdit = () => {
       isViewMode.value = false
       showForm.value = true
+      // Pre-fill form with displayed data
+      const current = displayDiary.value;
+      if (current) {
+          formData.value = {
+            mood: moodLevelToName[current.mood_level] || 'neutral',
+            question1: current.event || '',
+            question2: current.emotion_desc || '',
+            question3: current.emotion_meaning || '',
+            question4: current.self_talk || ''
+          }
+      }
     }
 
     const startWriting = () => {
@@ -336,13 +368,14 @@ export default {
     }
 
     const handleDelete = async () => {
-      if (!props.diary?.id) return
+      const targetId = displayDiary.value.id || props.diary?.id;
+      if (!targetId) return
       
       if (confirm('정말 이 일기를 삭제하시겠습니까?')) {
         try {
-          await diaryAPI.deleteDiary(props.diary.id)
+          await diaryAPI.deleteDiary(targetId)
           alert('일기가 삭제되었습니다.')
-          emit('saved') // 삭제 후 목록 새로고침
+          emit('saved') 
           emit('close')
         } catch (error) {
           console.error('Failed to delete diary:', error)
@@ -353,13 +386,14 @@ export default {
 
     watch(() => props.diary, (newDiary) => {
       isViewMode.value = !!newDiary
+      localSavedDiary.value = null; 
       if (newDiary) {
         formData.value = {
-          mood: newDiary.mood || '',
-          question1: newDiary.question1 || '',
-          question2: newDiary.question2 || '',
-          question3: newDiary.question3 || '',
-          question4: newDiary.question4 || ''
+          mood: moodLevelToName[newDiary.mood_level] || 'neutral',
+          question1: newDiary.event || '',
+          question2: newDiary.emotion_desc || '',
+          question3: newDiary.emotion_meaning || '',
+          question4: newDiary.self_talk || ''
         }
       }
     })
@@ -371,6 +405,8 @@ export default {
       formData,
       formattedDate,
       isValid,
+      displayDiary,
+      progressData,
       getMoodEmoji,
       getMoodName,
       formatDateTime,
@@ -526,32 +562,6 @@ export default {
   word-break: break-word;
 }
 
-.view-answers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-.answer-item {
-  padding: var(--spacing-md);
-  background-color: var(--bg-primary);
-  border-radius: var(--radius-md);
-}
-
-.answer-question {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-sm);
-}
-
-.answer-text {
-  font-size: 14px;
-  color: var(--color-text-light);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
 
 .ai-progress-container {
   margin-top: var(--spacing-md);
@@ -590,6 +600,32 @@ export default {
   background-color: var(--color-primary); /* Yellow/Orange theme */
   border-radius: 4px;
   transition: width 0.5s ease-in-out;
+}
+
+.view-answers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.answer-item {
+  padding: var(--spacing-md);
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-md);
+}
+
+.answer-question {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.answer-text {
+  font-size: 14px;
+  color: var(--color-text-light);
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 640px) {
