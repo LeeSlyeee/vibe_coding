@@ -139,11 +139,26 @@ export const diaryAPI = {
     return response.data
   },
 
+  // 통계 조회
+  getStatistics: async () => {
+    const response = await api.get('/statistics')
+    return response.data
+  },
+
   // 일기 검색
   searchDiaries: async (query) => {
     const response = await api.get('/diaries/search', {
       params: { q: query }
     })
+    return response.data
+  },
+
+  // 날씨 인사이트
+  getWeatherInsight: async (weather, date = null) => {
+    const params = { weather }
+    if (date) params.date = date
+    
+    const response = await api.get('/weather-insight', { params })
     return response.data
   }
 }

@@ -24,6 +24,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/stats',
+      name: 'stats',
+      component: () => import('../views/StatsPage.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/guide',
+      name: 'guide',
+      component: () => import('../views/GuidePage.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/diary/write/:date?',
       name: 'diary-write',
       component: () => import('../views/DiaryWritePage.vue'),

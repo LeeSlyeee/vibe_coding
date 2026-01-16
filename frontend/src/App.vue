@@ -3,15 +3,33 @@
     <!-- 네비게이션 바 -->
     <header class="navbar" v-if="showNavbar">
       <div class="navbar-content">
-        <h1 class="logo">MOOD DIARY</h1>
-        <button 
-          v-if="isAuthenticated" 
-          @click="handleLogout"
-          class="logout-btn"
-          title="로그아웃"
-        >
-          👤 로그아웃
-        </button>
+        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+        <div class="nav-actions">
+          <button 
+            v-if="isAuthenticated" 
+            @click="$router.push('/guide')"
+            class="stats-btn"
+            title="사용 방법"
+          >
+            📘 가이드
+          </button>
+          <button 
+            v-if="isAuthenticated" 
+            @click="$router.push('/stats')"
+            class="stats-btn"
+            title="통계 분석"
+          >
+            📊 분석
+          </button>
+          <button 
+            v-if="isAuthenticated" 
+            @click="handleLogout"
+            class="logout-btn"
+            title="로그아웃"
+          >
+            👤 로그아웃
+          </button>
+        </div>
       </div>
     </header>
 
@@ -51,22 +69,37 @@ export default {
       router.push('/login')
     }
 
+    const goHome = () => {
+      if (isAuthenticated.value) {
+        router.push('/calendar')
+      } else {
+        router.push('/login')
+      }
+    }
+
     return {
       showNavbar,
       isAuthenticated,
-      handleLogout
+      handleLogout,
+      goHome
     }
   }
 }
 </script>
 
 <style scoped>
+#app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .navbar {
   background-color: var(--color-primary);
   color: white;
   padding: 0;
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 100;
   box-shadow: var(--shadow-md);
 }
@@ -80,11 +113,36 @@ export default {
   justify-content: space-between;
 }
 
+.nav-actions {
+  display: flex;
+  align-items: center;
+}
+
 .logo {
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.5px;
   margin: 0;
+  cursor: pointer;
+}
+
+.stats-btn {
+  background-color: transparent;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.stats-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .logout-btn {
@@ -106,6 +164,8 @@ export default {
 }
 
 .main-content {
-  min-height: calc(100vh - 48px);
+  flex: 1;
+  overflow: hidden;
+  position: relative;
 }
 </style>

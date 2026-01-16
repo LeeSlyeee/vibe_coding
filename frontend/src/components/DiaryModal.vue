@@ -1,5 +1,5 @@
 <template>
-  <div class="diary-panel">
+  <div class="diary-panel" ref="panelRef">
       <!-- 1. 헤더 영역 -->
       <div class="modal-header">
         <h3 class="modal-title">
@@ -25,7 +25,13 @@
           <button @click="startWriting" class="btn btn-primary btn-large shadow-hover" type="button">
             오늘의 감정 기록하기
           </button>
-          <p class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
+          
+          <!-- 날씨/감정 인사이트 말풍선 -->
+          <div v-if="weatherInsight" class="insight-bubble fade-in">
+             <span class="insight-icon">🌥️</span>
+             {{ weatherInsight }}
+          </div>
+          <p v-else class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
         </div>
       </div>
 
@@ -140,7 +146,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
+import { ref, computed, watch, onUnmounted, onMounted, nextTick } from 'vue'
 import EmojiSelector from './EmojiSelector.vue'
 import QuestionAccordion from './QuestionAccordion.vue'
 import { diaryAPI } from '../services/api'
@@ -169,10 +175,12 @@ export default {
     const isViewMode = ref(!!props.diary)
     const showForm = ref(false)
     const saving = ref(false)
-    const localDiary = ref(null) 
+    const localDiary = ref(null)
+    const panelRef = ref(null)
     
     // === Weather State ===
     const weatherInfo = ref(null) 
+    const weatherInsight = ref('')
     
     // 서울 시청 좌표 (기본값)
     const DEFAULT_LAT = 37.5665;
@@ -201,15 +209,24 @@ export default {
     const getWeatherFromAPI = async (lat, lon, date = null) => {
         try {
             console.log(`🌦️ Call Weather API: ${lat}, ${lon}, ${date || 'Today'}`);
-            let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+            let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
             let isPast = false;
+            let targetDate = date;
 
-            if (date) {
-                const today = new Date().toISOString().split('T')[0];
-                if (date !== today) {
-                    isPast = true;
-                    url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max`;
-                }
+            // Date comparison (Local)
+            // Date comparison (Local)
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth()+1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${year}-${month}-${day}`;
+
+            console.log(`📅 Date Check: Target(${date}) vs Today(${todayStr})`);
+
+            if (date && date < todayStr) {
+                // Past Date -> Use Archive API
+                isPast = true;
+                url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max&timezone=auto`;
             }
 
             const res = await fetch(url);
@@ -232,9 +249,18 @@ export default {
                     45: '안개 🌫️', 48: '안개 🌫️', 51: '이슬비 🌧️', 53: '이슬비 🌧️', 55: '이슬비 🌧️',
                     61: '비 ☔', 63: '비 ☔', 65: '비 ☔', 80: '소나기 ☔', 95: '뇌우 ⚡'
                 };
-                // 값 갱신
                 weatherInfo.value = { temp, desc: map[code] || '흐림' };
                 console.log("✅ Weather Updated:", weatherInfo.value);
+
+                // 날씨 인사이트 가져오기 (작성 모드일 때만)
+                if (!props.diary && weatherInfo.value.desc) {
+                    try {
+                        const insightData = await diaryAPI.getWeatherInsight(weatherInfo.value.desc, date);
+                        weatherInsight.value = insightData.message;
+                    } catch (err) {
+                        console.error("Insight Fail:", err);
+                    }
+                }
             }
         } catch (e) {
             console.error("Weather Fail:", e);
@@ -355,6 +381,9 @@ export default {
             question1: d.event||'', question2: d.emotion_desc||'',
             question3: d.emotion_meaning||'', question4: d.self_talk||''
         }
+        nextTick(() => {
+            if (panelRef.value) panelRef.value.scrollTop = 0;
+        })
     }
     const handleDelete = async () => {
         if(!confirm('삭제?')) return;
@@ -362,33 +391,43 @@ export default {
     }
 
     // === Lifecycle & Watch ===
-    watch(() => props.diary, (newVal) => {
-        isViewMode.value = !!newVal
+    // === Lifecycle & Watch ===
+    watch([() => props.diary, () => props.date], ([newDiary, newDate]) => {
+        isViewMode.value = !!newDiary
         localDiary.value = null
         clearTimers()
         isProcessing.value = false
         weatherInfo.value = null // Reset
 
-        if (newVal) {
+        if (newDiary) {
             // 수정/보기 모드
             formData.value = {
-                mood: moodLevelToName[newVal.mood_level] || 'neutral',
-                question1: newVal.event||'', question2: newVal.emotion_desc||'',
-                question3: newVal.emotion_meaning||'', question4: newVal.self_talk||''
+                mood: moodLevelToName[newDiary.mood_level] || 'neutral',
+                question1: newDiary.event||'', question2: newDiary.emotion_desc||'',
+                question3: newDiary.emotion_meaning||'', question4: newDiary.self_talk||''
             }
             
-            if (newVal.weather) {
-                weatherInfo.value = { desc: newVal.weather, temp: newVal.temperature }
+            if (newDiary.weather) {
+                weatherInfo.value = { desc: newDiary.weather, temp: newDiary.temperature }
             } else {
-                checkWeather(props.date)
+                checkWeather(newDate)
             }
 
-            if (newVal.ai_prediction && newVal.ai_prediction.includes('분석 중')) {
+            if (newDiary.ai_prediction && newDiary.ai_prediction.includes('분석 중')) {
                 startFakePolling()
             }
         } else {
             // 새 글 작성 모드
-            checkWeather(null)
+            checkWeather(newDate)
+            
+            // 폼 초기화 (이전 데이터 잔상 제거)
+            formData.value = { 
+                mood: 'neutral', 
+                question1: '', 
+                question2: '', 
+                question3: '', 
+                question4: '' 
+            }
         }
     }, { immediate: true })
 
@@ -409,7 +448,7 @@ export default {
     }
 
     return {
-        isViewMode, showForm, saving, formData, weatherInfo,
+        isViewMode, showForm, saving, formData, weatherInfo, weatherInsight, panelRef,
         currentDiary, formattedDate, formattedDateTime, isValid, getMoodEmoji, getMoodName,
         handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
         isProcessing, progressPercent, loadingMessage, eta,
@@ -424,10 +463,11 @@ export default {
 .modal-header { 
   position: sticky; 
   top: 0; 
-  z-index: 1; /* 컨텐츠(z-index: 2)보다 낮게 설정하여 스크롤 시 가려지도록 함 */
+  z-index: 10; /* 헤더가 컨텐츠 위에 오도록 충분히 높게 설정 */
   padding-top: 32px;
-  padding-bottom: 40px; 
-  background: transparent; /* 배경을 투명하게 하여 스크롤 시 가리는 효과 극대화 */
+  padding-bottom: 24px; /* 패딩 약간 축소 */
+  background: #fafafa; /* 투명 배경 제거하고 불투명 배경색 적용하여 겹침 방지 */
+  border-bottom: 1px solid rgba(0,0,0,0.03); /* 스크롤 시 구분을 위한 미세한 경계선 */
 }
 .modal-title { font-size: 24px; font-weight: 800; color: #1d1d1f; display: flex; align-items: center; justify-content: space-between; }
 .diary-timestamp { font-size: 13px; color: #999; margin-top: 4px; }
@@ -443,6 +483,37 @@ export default {
 .diary-empty { text-align: center; padding: 60px 20px; }
 .empty-message { display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .empty-hint { font-size: 14px; color: #aaa; margin-top: 8px; }
+
+.insight-bubble { 
+  background: white; 
+  padding: 16px 24px; 
+  border-radius: 20px; 
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06); 
+  border: 1px solid rgba(0,0,0,0.04);
+  font-size: 15px; 
+  color: #444; 
+  font-weight: 600; 
+  max-width: 320px;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  position: relative;
+}
+.insight-bubble::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid white;
+}
+.insight-icon { font-size: 20px; }
+.fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; transform: translateY(10px); }
+@keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
 
 .btn { padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
 .btn-primary { background: #1d1d1f; color: white; }

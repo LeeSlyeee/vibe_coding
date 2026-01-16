@@ -14,10 +14,24 @@ app.config.from_object(Config)
 # MongoDB Setup
 mongo = PyMongo(app)
 
+# Check DB Connection
+# try:
+#     # Trigger a connection to verify
+#     mongo.cx.server_info()
+#     print("✅ MongoDB Connected via PyMongo")
+# except Exception as e:
+#     print(f"❌ MongoDB Connection Failed: {e}")
+
 # CORS Setup
+# CORS Setup
+allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+client_url = os.environ.get('CLIENT_URL')
+if client_url:
+    allowed_origins.append(client_url)
+
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "origins": allowed_origins,
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"],
         "supports_credentials": True
@@ -36,7 +50,8 @@ def serialize_doc(doc):
     if 'created_at' in doc and isinstance(doc['created_at'], datetime):
         doc['created_at'] = doc['created_at'].isoformat()
         
-    del doc['_id']
+    if '_id' in doc:
+        del doc['_id']
     return doc
 
 # -------------------- Auth Routes --------------------
@@ -291,6 +306,74 @@ def search_diaries():
     
     return jsonify(results), 200
 
+@app.route('/api/weather-insight', methods=['GET'])
+@jwt_required()
+def weather_insight():
+    current_user_id = get_jwt_identity()
+    weather_str = request.args.get('weather', '')
+    date_str = request.args.get('date', '') # Optional date param
+    
+    if not weather_str:
+        return jsonify({'message': '날씨 정보가 없어요. 창밖을 한 번 봐주시겠어요?'}), 200
+
+    # 1. Normalize Weather Keyword
+    keywords = ["비", "눈", "맑음", "흐림", "구름"]
+    target_keyword = "맑음" # Default
+    for k in keywords:
+        if k in weather_str:
+            target_keyword = k
+            break
+            
+    # 2. Aggregation Query
+    pipeline = [
+        {"$match": {
+            "user_id": current_user_id,
+            "weather": {"$regex": target_keyword}
+        }},
+        {"$group": {"_id": "$mood_level", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 1}
+    ]
+    
+    # Check if date is today to adjust wording
+    is_today = True
+    if date_str:
+        try:
+            input_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            if input_date != datetime.utcnow().date(): # Approximate check
+                is_today = False
+        except:
+            pass
+            
+    time_ref = "오늘" if is_today else "이 날"
+    
+    try:
+        result = list(mongo.db.diaries.aggregate(pipeline))
+        
+        if not result:
+            return jsonify({'message': f"{weather_str}, {time_ref}은 어떤 하루가 될까요?"}), 200
+            
+        top_mood = result[0]['_id']
+        
+        # Mood Mapping
+        mood_msg_map = {
+            1: "조금 예민해지거나 화가 나는 날이 많으셨어요.",
+            2: "마음이 차분해지거나 혹은 조금 우울해지곤 하셨어요.",
+            3: "평범하고 무난한 하루를 보내시는 편이에요.",
+            4: "평온하고 여유로운 기분을 느끼셨어요.",
+            5: "기분이 아주 좋고 행복한 에너지가 넘치셨어요!"
+        }
+        
+        mood_desc = mood_msg_map.get(top_mood, "다양한 감정을 느끼셨어요.")
+        
+        insight_message = f"'{target_keyword}' 날씨에는 주로 {mood_desc} {time_ref} 당신의 마음 날씨는 어떤가요?"
+        
+        return jsonify({'message': insight_message}), 200
+        
+    except Exception as e:
+        print(f"Insight Error: {e}")
+        return jsonify({'message': f"{time_ref} 날씨는 '{weather_str}'이네요. 기분 좋은 하루 보내세요!"}), 200
+
 # Task Status API (Maintained as is, using Celery backend)
 @app.route('/api/tasks/status/<task_id>', methods=['GET'])
 @jwt_required()
@@ -316,6 +399,67 @@ def get_task_status(task_id):
         
     return jsonify(response), 200
 
+@app.route('/api/statistics', methods=['GET'])
+@jwt_required()
+def get_statistics():
+    user_id = get_jwt_identity()
+    
+    pipeline = [
+        {'$match': {'user_id': user_id}},
+        {
+            '$facet': {
+                'monthly': [
+                    {
+                        '$project': {
+                            'month': {'$dateToString': {'format': '%Y-%m', 'date': '$created_at'}}
+                        }
+                    },
+                    {'$group': {'_id': '$month', 'count': {'$sum': 1}}},
+                    {'$sort': {'_id': 1}}
+                ],
+                'moods': [
+                    {'$group': {'_id': '$mood_level', 'count': {'$sum': 1}}},
+                    {'$sort': {'_id': 1}}
+                ],
+                'weather': [
+                     {'$match': {'weather': {'$ne': None}}},
+                     {'$group': {
+                         '_id': {'weather': '$weather', 'mood': '$mood_level'},
+                         'count': {'$sum': 1}
+                     }},
+                     {'$group': {
+                         '_id': '$_id.weather',
+                         'moods': {
+                             '$push': {
+                                 'mood': '$_id.mood',
+                                 'count': '$count'
+                             }
+                         },
+                         'total_count': {'$sum': '$count'}
+                     }},
+                     {'$sort': {'total_count': -1}}
+                ],
+                'daily': [
+                    {
+                        '$project': {
+                            'day': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$created_at'}}
+                        }
+                    },
+                    {'$group': {'_id': '$day', 'count': {'$sum': 1}}},
+                    {'$sort': {'_id': 1}}
+                ]
+            }
+        }
+    ]
+    
+    try:
+        results = list(mongo.db.diaries.aggregate(pipeline))
+        stats = results[0] if results else {'monthly': [], 'moods': [], 'weather': []}
+        return jsonify(stats), 200
+    except Exception as e:
+        print(f"Stats Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # No SQL create_all() needed
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5001)
