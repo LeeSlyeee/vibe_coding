@@ -125,6 +125,12 @@ export const diaryAPI = {
   deleteDiary: async (id) => {
     const response = await api.delete(`/diaries/${id}`)
     return response.data
+  },
+
+  // Task 상태 조회
+  getTaskStatus: async (taskId) => {
+    const response = await api.get(`/tasks/status/${taskId}`)
+    return response.data
   }
 }
 

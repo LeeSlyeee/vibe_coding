@@ -71,11 +71,22 @@
             <img :src="getMoodEmoji(diary.mood)" class="emoji-large" alt="mood" />
             <div class="emoji-info">
               <span class="emoji-label">{{ getMoodName(diary.mood) }}</span>
-              <span v-if="diary.ai_prediction" class="ai-prediction-badge">AI: {{ diary.ai_prediction }}</span>
+              <span v-if="diary.ai_prediction && !progressData.isAnalyzing" class="ai-prediction-badge">AI: {{ diary.ai_prediction }}</span>
             </div>
           </div>
           
-          <div v-if="diary.ai_comment" class="ai-comment-box">
+          <!-- AI Progress Bar (Analysis in Progress) -->
+          <div v-if="progressData.isAnalyzing" class="ai-progress-container">
+            <div class="progress-info">
+              <span class="progress-message">{{ progressData.message }}</span>
+              <span class="progress-eta" v-if="progressData.eta > 0">{{ progressData.eta }}초 남음</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" :style="{ width: progressData.percent + '%' }"></div>
+            </div>
+          </div>
+          
+          <div v-if="diary.ai_comment && !progressData.isAnalyzing" class="ai-comment-box">
              <span class="ai-icon">💌</span>
              <p class="ai-comment-text">{{ diary.ai_comment }}</p>
           </div>
@@ -121,7 +132,7 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import EmojiSelector from './EmojiSelector.vue'
 import QuestionAccordion from './QuestionAccordion.vue'
 import { diaryAPI } from '../services/api'
@@ -152,6 +163,15 @@ export default {
     const isViewMode = ref(!!props.diary)
     const showForm = ref(false) // 작성 폼 표시 여부
     const saving = ref(false)
+    
+    // Polling State
+    const progressData = ref({
+      isAnalyzing: false,
+      percent: 0,
+      message: '',
+      eta: 0,
+      timerIds: []
+    })
     
     const formData = ref({
       mood: props.diary?.mood || '',
@@ -195,6 +215,59 @@ export default {
       return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
     }
 
+    // Polling Logic
+    const startPolling = (taskId) => {
+      progressData.value.isAnalyzing = true;
+      progressData.value.percent = 0;
+      progressData.value.message = 'AI 분석 준비 중...';
+      progressData.value.eta = 15;
+      
+      // Countdown Timer
+      const countdownInterval = setInterval(() => {
+        if (progressData.value.eta > 0) {
+          progressData.value.eta--;
+        }
+      }, 1000);
+      
+      // Status Check Timer
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await diaryAPI.getTaskStatus(taskId);
+          
+          if (status.state === 'PROGRESS') {
+            progressData.value.percent = status.process_percent;
+            progressData.value.message = status.message;
+            // Update ETA if backend provides a new estimate
+            if (status.eta_seconds > 0) { 
+                 progressData.value.eta = status.eta_seconds; 
+            }
+          } else if (status.state === 'SUCCESS') {
+            stopPolling();
+            progressData.value.isAnalyzing = false;
+            progressData.value.percent = 100;
+            emit('saved'); // Refresh parent to get full AI result
+          } else if (status.state === 'FAILURE' || status.state === 'REVOKED') {
+            stopPolling();
+            progressData.value.isAnalyzing = false;
+            progressData.value.message = '분석 실패';
+          }
+        } catch (e) {
+          console.error("Polling error", e);
+        }
+      }, 1000);
+      
+      progressData.value.timerIds = [countdownInterval, pollInterval];
+    };
+    
+    const stopPolling = () => {
+      progressData.value.timerIds.forEach(id => clearInterval(id));
+      progressData.value.timerIds = [];
+    };
+    
+    onUnmounted(() => {
+      stopPolling();
+    });
+
     const handleSave = async () => {
       if (!isValid.value) return
 
@@ -208,10 +281,12 @@ export default {
           question3: formData.value.question3,
           question4: formData.value.question4
         }
+        
+        let result = null;
 
         if (props.diary) {
           // 일기 수정
-          await diaryAPI.updateDiary(props.diary.id, data)
+          result = await diaryAPI.updateDiary(props.diary.id, data)
           
           // 수정 후 상세보기 모드로 전환
           isViewMode.value = true
@@ -221,11 +296,23 @@ export default {
           emit('saved')
         } else {
           // 일기 생성
-          await diaryAPI.createDiary(data)
+          result = await diaryAPI.createDiary(data)
           
-          // 생성 후에는 모달 닫기
+          // 생성 후에는 모달 닫기 -> 
+          // WAIT! We want to show progress. So Do NOT Close. 
+          // Switch to view mode instead.
+          isViewMode.value = true
+          showForm.value = false
+          
+          // Emit saved to refresh list in background
           emit('saved')
         }
+        
+        // Start Polling if task_id exists
+        if (result && result.task_id) {
+           startPolling(result.task_id);
+        }
+        
       } catch (error) {
         console.error('Failed to save diary:', error)
         alert('저장에 실패했습니다.')
@@ -463,6 +550,46 @@ export default {
   color: var(--color-text-light);
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+
+.ai-progress-container {
+  margin-top: var(--spacing-md);
+  width: 100%;
+  max-width: 400px;
+  background-color: rgba(255, 255, 255, 0.6);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.progress-eta {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--color-primary); /* Yellow/Orange theme */
+  border-radius: 4px;
+  transition: width 0.5s ease-in-out;
 }
 
 @media (max-width: 640px) {

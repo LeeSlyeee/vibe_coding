@@ -114,12 +114,17 @@ def create_diary():
     db.session.commit()
     
     # Trigger Async AI Task
+    task_id = None
     try:
-        process_diary_ai.delay(new_diary.id)
+        task = process_diary_ai.delay(new_diary.id)
+        task_id = task.id
     except Exception as e:
         print(f"Failed to queue celery task: {e}")
     
-    return jsonify(new_diary.to_dict()), 201
+    response_data = new_diary.to_dict()
+    response_data['task_id'] = task_id
+    
+    return jsonify(response_data), 201
 
 # 개별 일기 조회
 @app.route('/api/diaries/<int:id>', methods=['GET'])
@@ -162,12 +167,17 @@ def update_diary(id):
     db.session.commit()
     
     # Trigger Async AI Task
+    task_id = None
     try:
-        process_diary_ai.delay(diary.id)
+        task = process_diary_ai.delay(diary.id)
+        task_id = task.id
     except:
         pass
         
-    return jsonify(diary.to_dict()), 200
+    response_data = diary.to_dict()
+    response_data['task_id'] = task_id
+        
+    return jsonify(response_data), 200
 
 # 일기 삭제
 @app.route('/api/diaries/<int:id>', methods=['DELETE'])
@@ -183,6 +193,39 @@ def delete_diary(id):
     db.session.delete(diary)
     db.session.commit()
     return jsonify({"message": "Diary deleted successfully"}), 200
+
+# Task Status Check API
+@app.route('/api/tasks/status/<task_id>', methods=['GET'])
+@jwt_required()
+def get_task_status(task_id):
+    task = process_diary_ai.AsyncResult(task_id)
+    
+    response = {
+        'state': task.state,
+        'process_percent': 0,
+        'message': '대기 중...',
+        'eta_seconds': 0
+    }
+    
+    if task.state == 'PENDING':
+        response['message'] = '작업 대기 중...'
+        response['eta_seconds'] = 15
+    elif task.state == 'PROGRESS':
+        response['process_percent'] = task.info.get('process_percent', 0)
+        response['message'] = task.info.get('message', '')
+        response['eta_seconds'] = task.info.get('eta_seconds', 0)
+    elif task.state == 'SUCCESS':
+        response['process_percent'] = 100
+        response['message'] = '분석 완료!'
+        response['eta_seconds'] = 0
+        if isinstance(task.result, dict):
+             # If result contains more info
+             pass
+    else:
+        # FAILURE, REVOKED, etc.
+        response['message'] = '오류 발생'
+        
+    return jsonify(response), 200
 
 if __name__ == '__main__':
     with app.app_context():

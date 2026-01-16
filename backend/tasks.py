@@ -37,19 +37,28 @@ def process_diary_ai(self, diary_id):
     app = create_minimal_app()
     
     with app.app_context():
-        # 1. Fetch the diary from DB
+        # 1. Fetch the diary from DB (Progress: 10%)
+        self.update_state(state='PROGRESS', meta={'process_percent': 10, 'message': '일기장을 펼치는 중...', 'eta_seconds': 15})
         diary = Diary.query.get(diary_id)
         if not diary:
             print(f"❌ [Worker] Diary {diary_id} not found!")
             return "Diary Not Found"
             
-        # 2. Prepare text for analysis
+        # 2. Prepare text for analysis (Progress: 20%)
         combined_text = f"사건: {diary.event}\n감정: {diary.emotion_desc}\n생각: {diary.emotion_meaning}"
         
         try:
             # 3. Perform AI Analysis (Heavy Task)
-            # Since ai_analyzer is loaded globally in this worker, it's fast.
+            # update_state can be tricky inside synchronous predict call, so we update BEFORE call.
+            self.update_state(state='PROGRESS', meta={'process_percent': 30, 'message': '감정을 깊이 분석하고 있습니다...', 'eta_seconds': 12})
+            
+            # Since ai_analyzer might take time, we ideally want callbacks inside it, but for now, step-based updates are enough.
+            # Emotion Analysis (LSTM) is fast. Comment Gen (Polyglot) is slow.
+            
             result = ai_analyzer.predict(combined_text)
+            
+            # 3.5. Finished Analysis, Saving result (Progress: 90%)
+            self.update_state(state='PROGRESS', meta={'process_percent': 90, 'message': '분석 완료! 결과 저장 중...', 'eta_seconds': 1})
             
             # 4. Update DB
             diary.ai_prediction = result.get('emotion', '분석 실패')
@@ -57,7 +66,7 @@ def process_diary_ai(self, diary_id):
             
             db.session.commit()
             print(f"✅ [Worker] Analysis Complete for Diary {diary_id}")
-            return "Success"
+            return {'process_percent': 100, 'message': '완료', 'result': 'Success'}
             
         except Exception as e:
             print(f"💥 [Worker] Error processing diary {diary_id}: {e}")
