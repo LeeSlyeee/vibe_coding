@@ -4,6 +4,15 @@
       <div class="modal-header">
         <h3 class="modal-title">
           {{ isViewMode ? '기록 내용' : `${formattedDate}` }}
+          <!-- 날씨 뱃지 -->
+          <div v-if="weatherInfo" class="weather-badge-premium">
+              <span class="weather-icon">{{ getWeatherIcon(weatherInfo.desc) }}</span>
+              <span class="weather-text">{{ weatherInfo.desc }} {{ weatherInfo.temp }}°C</span>
+          </div>
+          <!-- 로딩 인디케이터 (빨간색) -->
+          <span v-else class="weather-loading">
+              <span class="pulse"></span> 날씨 확인 중...
+          </span>
         </h3>
         <div v-if="isViewMode" class="diary-timestamp">
           {{ formattedDateTime }}
@@ -13,9 +22,10 @@
       <!-- 2. 초기 화면 (작성 전) -->
       <div v-if="!isViewMode && !showForm" class="diary-empty">
         <div class="empty-message">
-          <button @click="startWriting" class="btn btn-primary" type="button">
-            오늘 기록 남기기
+          <button @click="startWriting" class="btn btn-primary btn-large shadow-hover" type="button">
+            오늘의 감정 기록하기
           </button>
+          <p class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
         </div>
       </div>
 
@@ -50,81 +60,87 @@
           placeholder="앞으로 어떻게 하면 좋을지 생각해보세요..."
         />
 
-        <div class="modal-actions">
+        <!-- 작성 모드 하단 버튼 (인라인으로 변경) -->
+        <div class="modal-actions-inline">
           <button @click="cancelWriting" class="btn btn-secondary" type="button">
             취소
           </button>
           <button @click="handleSave" class="btn btn-primary" type="button" :disabled="!isValid || saving">
-            {{ saving ? '저장 중...' : '오늘 기록하기' }}
+            {{ saving ? '저장 중...' : '오늘 기록 완료' }}
           </button>
         </div>
       </div>
 
       <!-- 4. 상세보기 모드 (결과 화면) -->
       <div v-else class="diary-view">
-        <!-- 감정 아이콘 -->
-        <div class="view-emoji">
-          <div class="emoji-container">
-            <img :src="getMoodEmoji(currentDiary.mood_level)" class="emoji-large" alt="mood" />
-            <div class="emoji-info">
-              <span class="emoji-label">{{ getMoodName(currentDiary.mood_level) }}</span>
-              <!-- AI 뱃지는 분석 완료 시에만 보여줌 -->
-              <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge">
-                AI: {{ currentDiary.ai_prediction }}
-              </span>
+        <div class="view-content-wrapper">
+          <!-- 감성적인 감정 카드 -->
+          <div class="view-emoji-premium" :class="getMoodColorClass(currentDiary.mood_level)">
+            <div class="emoji-container">
+              <img :src="getMoodEmoji(currentDiary.mood_level)" class="emoji-large anim-float" alt="mood" />
+              <div class="emoji-info">
+                <span class="emoji-label">{{ getMoodName(currentDiary.mood_level) }}</span>
+                <!-- AI 뱃지는 분석 완료 시에만 보여줌 -->
+                <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge-premium">
+                  AI 분석: {{ currentDiary.ai_prediction }}
+                </span>
+              </div>
             </div>
-          </div>
-          
-          <!-- [핵심] AI 진행 상황 표시 (분석 중일 때) -->
-          <div v-if="isProcessing" class="ai-loading-section">
-            <div class="loading-header">
-               <span class="loading-msg">{{ loadingMessage }}</span>
-               <span class="loading-timer" v-if="eta > 0">{{ eta }}초 남음</span>
+            
+            <!-- AI 진행 상황 표시 (분석 중일 때) -->
+            <div v-if="isProcessing" class="ai-loading-section">
+              <div class="loading-header">
+                 <span class="loading-msg">{{ loadingMessage }}</span>
+                 <span class="loading-timer" v-if="eta > 0">{{ eta }}초 남음</span>
+              </div>
+              <div class="progress-track">
+                 <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+              </div>
             </div>
-            <div class="progress-track">
-               <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+
+            <!-- AI 코멘트 표시 (분석 완료 시) -->
+            <div v-else-if="currentDiary.ai_comment" class="ai-letter-box">
+               <div class="letter-header">
+                  <span class="ai-icon">💌</span>
+                  <span class="ai-sender">AI 심리 상담사의 편지</span>
+               </div>
+               <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
             </div>
           </div>
 
-          <!-- [핵심] AI 코멘트 표시 (분석 완료 시) -->
-          <div v-else-if="currentDiary.ai_comment" class="ai-comment-box">
-             <span class="ai-icon">💌</span>
-             <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
+          <!-- 질문 답변 리스트 -->
+          <div class="view-answers">
+            <div v-if="currentDiary.event" class="answer-item-premium">
+              <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
+              <p class="answer-text">{{ currentDiary.event }}</p>
+            </div>
+            <div v-if="currentDiary.emotion_desc" class="answer-item-premium">
+              <h4 class="answer-question">어떤 감정이 들었나요?</h4>
+              <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
+            </div>
+            <div v-if="currentDiary.emotion_meaning" class="answer-item-premium">
+              <h4 class="answer-question">자신의 감정을 깊게 탐색해보면...</h4>
+              <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
+            </div>
+            <div v-if="currentDiary.self_talk" class="answer-item-premium">
+              <h4 class="answer-question">나에게 보내는 따뜻한 위로</h4>
+              <p class="answer-text">{{ currentDiary.self_talk }}</p>
+            </div>
           </div>
-        </div>
 
-        <!-- 질문 답변 리스트 -->
-        <div class="view-answers">
-          <div v-if="currentDiary.event" class="answer-item">
-            <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
-            <p class="answer-text">{{ currentDiary.event }}</p>
+          <!-- 보기 모드 하단 버튼 (인라인으로 이동 및 시원한 스타일링) -->
+          <div class="modal-actions-inline">
+            <button @click="handleDelete" class="btn btn-danger btn-ghost" type="button">삭제</button>
+            <button @click="handleEdit" class="btn btn-secondary" type="button">수정하기</button>
+            <button @click="$emit('close')" class="btn btn-primary" type="button">닫기</button>
           </div>
-          <div v-if="currentDiary.emotion_desc" class="answer-item">
-            <h4 class="answer-question">어떤 감정이 들었나요?</h4>
-            <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
-          </div>
-          <div v-if="currentDiary.emotion_meaning" class="answer-item">
-            <h4 class="answer-question">마지막으로 더 깊게 자신의 감정을 써보세요.</h4>
-            <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
-          </div>
-          <div v-if="currentDiary.self_talk" class="answer-item">
-            <h4 class="answer-question">나에게 따듯한 위로를 보내세요.</h4>
-            <p class="answer-text">{{ currentDiary.self_talk }}</p>
-          </div>
-        </div>
-
-        <!-- 하단 버튼 -->
-        <div class="modal-actions">
-          <button @click="handleDelete" class="btn btn-danger" type="button">삭제하기</button>
-          <button @click="handleEdit" class="btn btn-secondary" type="button">수정하기</button>
-          <button @click="$emit('close')" class="btn btn-primary" type="button">닫기</button>
         </div>
       </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, onMounted } from 'vue'
 import EmojiSelector from './EmojiSelector.vue'
 import QuestionAccordion from './QuestionAccordion.vue'
 import { diaryAPI } from '../services/api'
@@ -145,28 +161,33 @@ export default {
   },
   emits: ['close', 'saved'],
   setup(props, { emit }) {
+    // [DEBUG]
+    // alert("🎉 VERSION 3.0 LOADED! 확인을 누르면 날씨를 가져옵니다.");
+    console.log("🔥 DiaryModal V3.0 SETUP 🔥");
+
     // === Utils & Data ===
     const isViewMode = ref(!!props.diary)
     const showForm = ref(false)
     const saving = ref(false)
-    
-    // 이 변수가 화면에 보여지는 실제 데이터입니다.
-    // 처음엔 props.diary를 쓰지만, 저장 후에는 서버 응답값을 씁니다.
     const localDiary = ref(null) 
+    
+    // === Weather State ===
+    const weatherInfo = ref(null) 
+    
+    // 서울 시청 좌표 (기본값)
+    const DEFAULT_LAT = 37.5665;
+    const DEFAULT_LON = 126.9780;
 
-    const currentDiary = computed(() => {
-        return localDiary.value || props.diary || {}
-    })
+    const currentDiary = computed(() => localDiary.value || props.diary || {})
 
-    // === AI Progress State ===
+    // === AI State ===
     const isProcessing = ref(false)
     const progressPercent = ref(0)
     const loadingMessage = ref('AI 분석 준비 중...')
     const eta = ref(0)
-    const timerIds = ref([]) // interval ID 관리
+    const timerIds = ref([]) 
 
     // === Constants ===
-    const moodLevels = { 'angry': 1, 'sad': 2, 'neutral': 3, 'calm': 4, 'happy': 5 }
     const moodLevelToName = { 1: 'angry', 2: 'sad', 3: 'neutral', 4: 'calm', 5: 'happy' }
     const emojiMap = {
       1: { icon: angryImg, name: '화나' }, 2: { icon: sadImg, name: '우울해' },
@@ -174,11 +195,84 @@ export default {
       5: { icon: happyImg, name: '행복해' }
     }
 
-    // === Form Data ===
-    const formData = ref({
-      mood: 'neutral',
-      question1: '', question2: '', question3: '', question4: ''
-    })
+    const formData = ref({ mood: 'neutral', question1: '', question2: '', question3: '', question4: '' })
+
+    // === Weather Helper Function ===
+    const getWeatherFromAPI = async (lat, lon, date = null) => {
+        try {
+            console.log(`🌦️ Call Weather API: ${lat}, ${lon}, ${date || 'Today'}`);
+            let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+            let isPast = false;
+
+            if (date) {
+                const today = new Date().toISOString().split('T')[0];
+                if (date !== today) {
+                    isPast = true;
+                    url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max`;
+                }
+            }
+
+            const res = await fetch(url);
+            if(!res.ok) throw new Error('API Res Error');
+            const data = await res.json();
+            console.log("📦 Weather Data:", data);
+
+            let code, temp;
+            if (isPast && data.daily) {
+                code = data.daily.weathercode[0];
+                temp = data.daily.temperature_2m_max[0];
+            } else if (data.current_weather) {
+                code = data.current_weather.weathercode;
+                temp = data.current_weather.temperature;
+            }
+
+            if (code !== undefined) {
+                const map = {
+                    0: '맑음 ☀️', 1: '대체로 맑음 🌤️', 2: '구름 조금 ⛅', 3: '흐림 ☁️',
+                    45: '안개 🌫️', 48: '안개 🌫️', 51: '이슬비 🌧️', 53: '이슬비 🌧️', 55: '이슬비 🌧️',
+                    61: '비 ☔', 63: '비 ☔', 65: '비 ☔', 80: '소나기 ☔', 95: '뇌우 ⚡'
+                };
+                // 값 갱신
+                weatherInfo.value = { temp, desc: map[code] || '흐림' };
+                console.log("✅ Weather Updated:", weatherInfo.value);
+            }
+        } catch (e) {
+            console.error("Weather Fail:", e);
+        }
+    }
+
+    // === Main Weather Logic ===
+    const checkWeather = async (date = null) => {
+        console.log("📡 checkWeather Start...", date);
+        // 1. 일단 서울 날씨로 즉시 시도 (Fallback 먼저)
+        if (!weatherInfo.value) {
+             console.log("🏙️ Using Default Seoul Weather first...");
+             getWeatherFromAPI(DEFAULT_LAT, DEFAULT_LON, date);
+        }
+
+        // 2. 실제 위치 찾기 시도 (비동기)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    console.log("📍 Geo Success:", pos.coords.latitude, pos.coords.longitude);
+                    getWeatherFromAPI(pos.coords.latitude, pos.coords.longitude, date);
+                },
+                (err) => {
+                    console.warn("⚠️ Geo Failed, trying IP...", err.code);
+                    fetch('https://ipapi.co/json/')
+                        .then(r => r.json())
+                        .then(d => {
+                            console.log("📍 IP Success:", d.latitude);
+                            if(d.latitude) getWeatherFromAPI(d.latitude, d.longitude, date);
+                        })
+                        .catch(e => console.error(e));
+                },
+                { timeout: 3000 }
+            );
+        } else {
+             console.warn("❌ Geo Not Supported in Browser");
+        }
+    }
 
     // === Computed Helpers ===
     const formattedDate = computed(() => {
@@ -194,139 +288,67 @@ export default {
         const d = new Date(dStr)
         return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
     })
-
+    
     const isValid = computed(() => formData.value.mood && formData.value.question1.trim())
-
-    // === Methods ===
     const getMoodEmoji = (lvl) => emojiMap[lvl]?.icon || ''
     const getMoodName = (lvl) => emojiMap[lvl]?.name || ''
 
-    // === AI Polling Logic (The Core) ===
-    const clearTimers = () => {
-        timerIds.value.forEach(id => clearInterval(id))
-        timerIds.value = []
+    // === Polling & Save Handlers ===
+    const clearTimers = () => { timerIds.value.forEach(id => clearInterval(id)); timerIds.value = []; }
+
+    const finishPolling = async () => {
+        clearTimers(); isProcessing.value = false; progressPercent.value = 100; emit('saved');
+        if (currentDiary.value.id) localDiary.value = await diaryAPI.getDiary(currentDiary.value.id)
     }
-
-    // 1. 진짜 Polling (Task ID 있을 때)
+    
     const startRealPolling = (taskId) => {
-        console.log("🚀 Starting Real Polling for Task:", taskId)
-        isProcessing.value = true
-        progressPercent.value = 5
-        loadingMessage.value = "AI가 일기를 읽고 있습니다..."
-        eta.value = 15
-
-        // Countdown
-        const cdTimer = setInterval(() => { if(eta.value > 0) eta.value-- }, 1000)
-        timerIds.value.push(cdTimer)
-
-        // Status Check
-        const pollTimer = setInterval(async () => {
+        isProcessing.value = true; progressPercent.value = 5; loadingMessage.value = "AI 분석 중..."; eta.value = 15;
+        timerIds.value.push(setInterval(() => { if(eta.value > 0) eta.value-- }, 1000));
+        timerIds.value.push(setInterval(async () => {
             try {
                 const status = await diaryAPI.getTaskStatus(taskId)
-                console.log("Polling Status:", status)
-
-                if (status.state === 'PROGRESS') {
-                    progressPercent.value = status.process_percent
-                    loadingMessage.value = status.message
-                    if(status.eta_seconds > 0) eta.value = status.eta_seconds
-                } 
-                else if (status.state === 'SUCCESS') {
-                    console.log("✅ Analysis Complete!")
-                    finishPolling()
-                } 
-                else if (status.state === 'FAILURE') {
-                    console.error("❌ Analysis Failed")
-                    isProcessing.value = false
-                    loadingMessage.value = "분석 실패"
-                    clearTimers()
-                }
-            } catch (e) { console.error(e) }
-        }, 1000)
-        timerIds.value.push(pollTimer)
+                if (status.state === 'PROGRESS') { progressPercent.value = status.process_percent; loadingMessage.value = status.message; } 
+                else if (status.state === 'SUCCESS') { finishPolling() } 
+                else if (status.state === 'FAILURE') { isProcessing.value = false; clearTimers(); }
+            } catch (e) {}
+        }, 1000));
     }
 
-    // 2. 가짜 Polling (Task ID 없을 때, 재접속 시)
     const startFakePolling = () => {
-        console.log("👻 Starting Fallback Polling")
-        isProcessing.value = true
-        loadingMessage.value = "이전 분석 작업을 확인 중입니다..."
-        progressPercent.value = 30
-        eta.value = 10
-
-        const interval = setInterval(async () => {
-            // Fake Progress Animation
-            if (progressPercent.value < 90) progressPercent.value += 5
-            if (eta.value > 0) eta.value--
-
-            // Check DB directly
+        isProcessing.value = true; loadingMessage.value = "이전 분석 확인..."; progressPercent.value = 30; eta.value = 10;
+        timerIds.value.push(setInterval(async () => {
+            if (progressPercent.value < 90) progressPercent.value += 5; if (eta.value > 0) eta.value--;
             if (currentDiary.value.id) {
                 try {
                     const fresh = await diaryAPI.getDiary(currentDiary.value.id)
-                    // 만약 '분석 중' 텍스트가 사라졌다면 완료된 것!
-                    if (fresh.ai_prediction && !fresh.ai_prediction.includes('분석 중')) {
-                        console.log("✅ DB Check: Analysis Finished!")
-                        localDiary.value = fresh 
-                        finishPolling()
-                    }
-                } catch (e) {}
+                    if (fresh.ai_prediction && !fresh.ai_prediction.includes('분석 중')) { localDiary.value = fresh; finishPolling(); }
+                } catch(e) {}
             }
-        }, 2000)
-        timerIds.value.push(interval)
+        }, 2000));
     }
 
-    const finishPolling = async () => {
-        clearTimers()
-        isProcessing.value = false
-        progressPercent.value = 100
-        
-        // 최종 데이터 갱신
-        if (currentDiary.value.id) {
-            const finalData = await diaryAPI.getDiary(currentDiary.value.id)
-            localDiary.value = finalData
-        }
-        emit('saved')
-    }
-
-    // === Handlers ===
     const handleSave = async () => {
         saving.value = true
         try {
             const payload = {
                 date: props.date,
                 mood: formData.value.mood,
-                question1: formData.value.question1, 
-                question2: formData.value.question2,
-                question3: formData.value.question3, 
-                question4: formData.value.question4
+                question1: formData.value.question1, question2: formData.value.question2,
+                question3: formData.value.question3, question4: formData.value.question4,
+                weather: weatherInfo.value ? weatherInfo.value.desc : null,
+                temperature: weatherInfo.value ? weatherInfo.value.temp : null
             }
-
-            let result = null
-            if (props.diary) result = await diaryAPI.updateDiary(props.diary.id, payload)
-            else result = await diaryAPI.createDiary(payload)
-
-            // 즉시 화면 갱신 (로딩 상태)
-            localDiary.value = result
-            isViewMode.value = true
-            showForm.value = false
-
-            // Polling 시작
-            if (result.task_id) startRealPolling(result.task_id)
-            else startFakePolling() // Task ID 없으면 Fallback
-
+            let result = props.diary ? await diaryAPI.updateDiary(props.diary.id, payload) : await diaryAPI.createDiary(payload)
+            localDiary.value = result; isViewMode.value = true; showForm.value = false;
+            if (result.task_id) startRealPolling(result.task_id); else startFakePolling();
             emit('saved')
-        } catch (e) {
-            alert('저장 실패: ' + e.message)
-        } finally {
-            saving.value = false
-        }
+        } catch (e) { alert('저장 실패: ' + e.message) } finally { saving.value = false }
     }
 
     const startWriting = () => { showForm.value = true }
     const cancelWriting = () => { showForm.value = false; emit('close') }
     const handleEdit = () => {
-        isViewMode.value = false
-        showForm.value = true
-        // 데이터 채우기
+        isViewMode.value = false; showForm.value = true;
         const d = currentDiary.value
         formData.value = {
             mood: moodLevelToName[d.mood_level] || 'neutral',
@@ -335,87 +357,150 @@ export default {
         }
     }
     const handleDelete = async () => {
-        if(!confirm('삭제하시겠습니까?')) return
-        try {
-            await diaryAPI.deleteDiary(currentDiary.value.id)
-            emit('saved'); emit('close')
-        } catch(e) { alert('삭제 실패') }
+        if(!confirm('삭제?')) return;
+        try { await diaryAPI.deleteDiary(currentDiary.value.id); emit('saved'); emit('close'); } catch(e) {}
     }
 
-    // === Watchers ===
-    // 1. Props 변경 시 초기화
+    // === Lifecycle & Watch ===
     watch(() => props.diary, (newVal) => {
         isViewMode.value = !!newVal
-        localDiary.value = null 
+        localDiary.value = null
         clearTimers()
         isProcessing.value = false
-        
+        weatherInfo.value = null // Reset
+
         if (newVal) {
-             // 폼 데이터 초기화
-             formData.value = {
+            // 수정/보기 모드
+            formData.value = {
                 mood: moodLevelToName[newVal.mood_level] || 'neutral',
                 question1: newVal.event||'', question2: newVal.emotion_desc||'',
                 question3: newVal.emotion_meaning||'', question4: newVal.self_talk||''
             }
-            // 2. 이미 열었을 때 '분석 중'이면 Fallback Polling 시작
+            
+            if (newVal.weather) {
+                weatherInfo.value = { desc: newVal.weather, temp: newVal.temperature }
+            } else {
+                checkWeather(props.date)
+            }
+
             if (newVal.ai_prediction && newVal.ai_prediction.includes('분석 중')) {
                 startFakePolling()
             }
+        } else {
+            // 새 글 작성 모드
+            checkWeather(null)
         }
     }, { immediate: true })
 
     onUnmounted(() => clearTimers())
 
+    const getWeatherIcon = (desc) => {
+        if (!desc) return '✨';
+        if (desc.includes('맑음')) return '☀️';
+        if (desc.includes('구름') || desc.includes('흐림')) return '☁️';
+        if (desc.includes('비')) return '🌧️';
+        if (desc.includes('눈')) return '❄️';
+        return '✨';
+    }
+
+    const getMoodColorClass = (lvl) => {
+        const map = { 1: 'mood-angry', 2: 'mood-sad', 3: 'mood-neutral', 4: 'mood-calm', 5: 'mood-happy' }
+        return map[lvl] || 'mood-neutral'
+    }
+
     return {
-        isViewMode, showForm, saving, formData,
-        currentDiary, formattedDate, formattedDateTime, isValid,
-        getMoodEmoji, getMoodName,
+        isViewMode, showForm, saving, formData, weatherInfo,
+        currentDiary, formattedDate, formattedDateTime, isValid, getMoodEmoji, getMoodName,
         handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
-        // AI State
-        isProcessing, progressPercent, loadingMessage, eta
+        isProcessing, progressPercent, loadingMessage, eta,
+        getWeatherIcon, getMoodColorClass
     }
   }
 }
 </script>
 
 <style scoped>
-/* 기존 스타일 유지 + AI Progress Bar 스타일 추가 */
-.diary-panel { height: 100%; overflow-y: auto; padding: 24px; background: #fff; }
-.modal-header { border-bottom: 2px solid #eee; padding-bottom: 16px; margin-bottom: 24px; }
-.modal-title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
-.diary-timestamp { font-size: 13px; color: #888; }
+.diary-panel { height: 100%; overflow-y: auto; padding: 0 32px 32px 32px; background: #fafafa; scroll-behavior: smooth; }
+.modal-header { 
+  position: sticky; 
+  top: 0; 
+  z-index: 1; /* 컨텐츠(z-index: 2)보다 낮게 설정하여 스크롤 시 가려지도록 함 */
+  padding-top: 32px;
+  padding-bottom: 40px; 
+  background: transparent; /* 배경을 투명하게 하여 스크롤 시 가리는 효과 극대화 */
+}
+.modal-title { font-size: 24px; font-weight: 800; color: #1d1d1f; display: flex; align-items: center; justify-content: space-between; }
+.diary-timestamp { font-size: 13px; color: #999; margin-top: 4px; }
 
-.diary-empty, .diary-form { display: flex; flex-direction: column; gap: 20px; }
-.empty-message { text-align: center; padding: 40px 0; }
-.btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
-.btn-primary { background: #FFD93D; color: #333; } /* Yellow Theme */
-.btn-primary:hover { background: #FFC107; }
-.btn-primary:disabled { background: #eee; cursor: not-allowed; }
-.btn-secondary { background: #717171; color: white; display: inline-block; margin-right: 8px;}
-.btn-danger { background: #ff4757; color: white; display: inline-block; margin-right: 8px;}
-.modal-actions { margin-top: 24px; border-top: 1px solid #eee; padding-top: 16px; display: flex; justify-content: flex-end; }
+.weather-badge-premium { display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.03); }
+.weather-icon { font-size: 16px; }
+.weather-text { font-size: 12px; font-weight: 600; color: #555; }
 
-/* View Mode */
-.view-emoji { background: #FFF9C4; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; }
-.emoji-container { display: flex; align-items: center; gap: 16px; }
-.emoji-large { width: 80px; height: 80px; }
-.emoji-info { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.emoji-label { font-size: 18px; font-weight: bold; }
-.ai-prediction-badge { font-size: 12px; background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; }
+.weather-loading { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
+.pulse { width: 8px; height: 8px; background: #ff4757; border-radius: 50%; display: inline-block; animation: pulse-anim 1.5s infinite; }
+@keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
 
-.ai-comment-box { background: rgba(255,255,255,0.8); padding: 16px; border-radius: 8px; width: 100%; display: flex; gap: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.ai-comment-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.diary-empty { text-align: center; padding: 60px 20px; }
+.empty-message { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.empty-hint { font-size: 14px; color: #aaa; margin-top: 8px; }
 
-/* [NEW] AI Loading Section Style */
-.ai-loading-section { width: 100%; background: rgba(255,255,255,0.6); padding: 16px; border-radius: 8px; margin-top: 12px; }
-.loading-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
-.loading-msg { color: #333; }
-.loading-timer { color: #FF9800; }
-.progress-track { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
-.progress-fill { height: 100%; background: #FFD93D; transition: width 0.5s ease; }
+.btn { padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+.btn-primary { background: #1d1d1f; color: white; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+.btn-large { padding: 16px 40px; font-size: 16px; }
+.btn-secondary { background: #f2f2f7; color: #1d1d1f; }
+.btn-danger { background: #ff3b30; color: white; }
+.btn-ghost { background: transparent; color: #ff3b30; border: 1px solid rgba(255, 59, 48, 0.15); }
+.btn-ghost:hover { background: rgba(255, 59, 48, 0.05); border-color: #ff3b30; }
 
-.view-answers { display: flex; flex-direction: column; gap: 20px; }
-.answer-item { background: #f8f9fa; padding: 16px; border-radius: 8px; }
-.answer-question { font-size: 14px; color: #333; margin-bottom: 8px; font-weight: bold; }
-.answer-text { font-size: 14px; color: #666; line-height: 1.6; white-space: pre-wrap; }
+.modal-actions-inline { 
+  display: flex; 
+  justify-content: flex-end; 
+  gap: 16px; 
+  margin-top: 60px; 
+  padding: 40px 0 20px; 
+  border-top: 1px solid rgba(0,0,0,0.06);
+  position: relative;
+  z-index: 5;
+}
+
+.diary-view { position: relative; }
+.view-content-wrapper { 
+  position: relative; 
+  z-index: 2; /* 헤더를 덮기 위해 더 높은 z-index 부여 */
+  background: #fafafa; /* 헤더를 가릴 solid 배경색 */
+  margin-top: -20px; /* 자연스러운 겹침을 위한 마진 조절 */
+  padding-top: 1px; /* 마진 상쇄 방지 */
+}
+
+.view-emoji-premium { border-radius: 28px; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 24px; margin-bottom: 32px; transition: all 0.4s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+.mood-happy { background: linear-gradient(135deg, #FFFDE7 0%, #FFE082 100%); }
+.mood-calm { background: linear-gradient(135deg, #F1F8E9 0%, #A5D6A7 100%); }
+.mood-neutral { background: linear-gradient(135deg, #FAFAFA 0%, #E0E0E0 100%); }
+.mood-sad { background: linear-gradient(135deg, #E3F2FD 0%, #90CAF9 100%); }
+.mood-angry { background: linear-gradient(135deg, #FFEBEE 0%, #EF9A9A 100%); }
+
+.emoji-container { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 8px; }
+.emoji-large { width: 110px; height: 110px; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.12)); }
+.anim-float { animation: float 4s ease-in-out infinite; }
+@keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0); } }
+
+.emoji-label { font-size: 26px; font-weight: 800; color: rgba(0,0,0,0.8); letter-spacing: -0.5px; }
+.ai-prediction-badge-premium { font-size: 13px; font-weight: 700; color: white; background: rgba(0,0,0,0.25); padding: 7px 16px; border-radius: 24px; backdrop-filter: blur(8px); }
+
+.ai-letter-box { background: rgba(255,255,255,0.96); padding: 28px; border-radius: 24px; width: 100%; box-shadow: 0 12px 32px rgba(0,0,0,0.06); border: 1px solid rgba(255,255,255,0.8); }
+.letter-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.ai-icon { font-size: 22px; }
+.ai-sender { font-size: 15px; font-weight: 700; color: #222; }
+.ai-comment-text { font-size: 16px; line-height: 1.8; color: #444; white-space: pre-wrap; font-weight: 500; }
+
+.ai-loading-section { width: 100%; background: rgba(255,255,255,0.6); padding: 24px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.3); }
+.progress-track { width: 100%; height: 8px; background: rgba(0,0,0,0.06); border-radius: 10px; overflow: hidden; margin-top: 12px; }
+.progress-fill { height: 100%; background: #1d1d1f; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+
+.view-answers { display: flex; flex-direction: column; gap: 28px; padding-bottom: 60px; }
+.answer-item-premium { background: white; padding: 32px; border-radius: 24px; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 6px 20px rgba(0,0,0,0.03); transition: transform 0.3s ease; }
+.answer-item-premium:hover { transform: translateY(-4px); }
+.answer-question { font-size: 14px; color: #999; margin-bottom: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.answer-text { font-size: 17px; color: #1d1d1f; line-height: 1.7; white-space: pre-wrap; font-weight: 500; }
 </style>

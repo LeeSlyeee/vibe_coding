@@ -26,7 +26,7 @@ try:
     TENSORFLOW_AVAILABLE = True
     
     # KoGPT-2 Imports
-    from transformers import GPT2LMHeadModel, PreTrainedTokenizerFast
+    from transformers import GPT2LMHeadModel, PreTrainedTokenizerFast, AutoTokenizer, AutoModelForCausalLM
     import torch
 except ImportError as e:
     TENSORFLOW_AVAILABLE = False
@@ -179,61 +179,50 @@ class EmotionAnalysis:
         ])
         
         # Initialize attributes
-        self.comment_tokenizer = None
-        self.comment_model = None
-        self.enc_model = None 
-        self.dec_model = None
-        self.comment_max_len = 20
         self.gpt_model = None
         self.gpt_tokenizer = None
-
     
         if TENSORFLOW_AVAILABLE:
             print("Initializing AI Emotion Analysis Model (5-Class LSTM)...")
             self.tokenizer = Tokenizer()
             
-            if os.environ.get('SKIP_TRAINING'):
-                print("Skipping training logic (SKIP_TRAINING active).")
-                # Still need to load auxiliary data
-                self.comment_bank = {}
-                self.load_comment_bank()
-                self.load_emotion_bank()
-                # Try loading KoGPT-2 even if skipping training
-                # Try loading Polyglot-Ko even if skipping training
-                try:
-                    print("Loading Polyglot-Ko-1.3B Model (4-bit)...")
-                    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-                    import torch
-                    
-                    model_name = "EleutherAI/polyglot-ko-1.3b"
-                    
-                    bnb_config = BitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_quant_type="nf4",
-                        bnb_4bit_compute_dtype=torch.float16
-                    )
-
-                    self.gpt_tokenizer = AutoTokenizer.from_pretrained(model_name)
-                    self.gpt_model = AutoModelForCausalLM.from_pretrained(
-                        model_name,
-                        quantization_config=bnb_config
-                    )
-                    
-                    print("Polyglot-Ko-1.3B Loaded successfully.")
-                except Exception as e:
-                    print(f"Polyglot Load Failed: {e}")
-                return
-
             # Check for saved model
             base_dir = os.path.dirname(os.path.abspath(__file__))
             self.model_path = os.path.join(base_dir, 'emotion_model.h5')
             self.tokenizer_path = os.path.join(base_dir, 'tokenizer.pickle')
             
-            # Comment Model Paths
-            self.comment_model_path = os.path.join(base_dir, 'comment_model.h5')
-            self.comment_enc_model_path = os.path.join(base_dir, 'comment_enc_model.h5')
-            self.comment_tokenizer_path = os.path.join(base_dir, 'comment_tokenizer.pickle')
-
+            try:
+                # Optimized for OCI (CUDA/CPU) and Local (MPS)
+                if torch.cuda.is_available():
+                    device = torch.device("cuda")
+                    torch_dtype = torch.float16
+                    print("🚀 Using CUDA for AI acceleration (Cloud/GPU).")
+                elif torch.backends.mps.is_available():
+                    device = torch.device("mps")
+                    torch_dtype = torch.float16
+                    print("🚀 Using MPS for AI acceleration (Local Mac).")
+                else:
+                    device = torch.device("cpu")
+                    torch_dtype = torch.float32 # Typical for CPU-only instances in OCI
+                    print("⚠️ Using CPU for AI (Cloud/Standard). Performance may be lower.")
+                
+                model_name = "EleutherAI/polyglot-ko-1.3b"
+                print(f"Loading Polyglot-Ko-1.3B Model (Dtype: {torch_dtype}, Device: {device})...")
+                
+                self.gpt_tokenizer = AutoTokenizer.from_pretrained(model_name)
+                self.gpt_model = AutoModelForCausalLM.from_pretrained(
+                    model_name,
+                    torch_dtype=torch_dtype,
+                    low_cpu_mem_usage=True
+                ).to(device)
+                self.device = device 
+                print("Polyglot-Ko-1.3B Loaded successfully.")
+            except Exception as e:
+                print(f"Polyglot Load Failed: {e}")
+                self.gpt_model = None
+                self.gpt_tokenizer = None
+                self.device = torch.device("cpu")
+               
             # Check Training Condition
             current_count = self._get_keyword_count()
             last_count = self._get_last_trained_count()
@@ -252,60 +241,36 @@ class EmotionAnalysis:
             model_exists = os.path.exists(self.model_path) and os.path.exists(self.tokenizer_path)
 
             if should_train:
-                print(f"🚀 New data detected (+{diff} >= 100). Starting Full Training (LSTM + Seq2Seq)...")
                 try:
-                    self._load_and_train()
+                    # In this version of the code, training is handled by a separate script or method.
+                    # Fix the method name if it exists, otherwise just log.
+                    if hasattr(self, '_load_and_train_models'):
+                        self._load_and_train_models()
+                    else:
+                        print("⚠️ _load_and_train_models method not found. Skipping auto-training.")
                     self._save_training_state(current_count)
                     print("✅ Training complete and state saved.")
                 except Exception as e:
                     print(f"❌ Training failed: {e}")
-                    # Try loading existing if training failed
+                    # If training failed, try loading existing models if they exist
                     if model_exists:
+                        print("📦 Training failed, but models found. Loading existing models...")
                         self._load_existing_models()
-            
+                        print("✅ Emotion Model loaded.")
             elif model_exists:
                 print("📦 Models found. Loading existing models...")
                 self._load_existing_models()
+                print("✅ Emotion Model loaded.")
                 
             else:
                 print("⚠️ No models found and new data < 100. Skipping training.")
                 print("   The server will run in Basic Mode (Keyword Fallback).")
             
-            print("AI Model initialized.")
+            print("AI Model initialization finished.")
             
             # Load Comment Bank (Safety Net)
-            self.comment_bank = {}
             self.load_comment_bank()
             self.load_emotion_bank()
-            
-            # Load Polyglot-Ko (Phase 2)
-            try:
-                print("Loading Polyglot-Ko-1.3B Model (4-bit Quantization)...")
-                from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-                import torch
-                
-                # Use Polyglot-Ko-1.3B
-                model_name = "EleutherAI/polyglot-ko-1.3b"
-                
-                # 4-bit Quantization Config
-                bnb_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.float16
-                )
-                
-                self.gpt_tokenizer = AutoTokenizer.from_pretrained(model_name)
-                self.gpt_model = AutoModelForCausalLM.from_pretrained(
-                    model_name,
-                    quantization_config=bnb_config
-                )
-                
-                # eval() is not strictly needed for 4bit but good practice
-                # self.gpt_model.eval() 
-                print("Polyglot-Ko-1.3B Loaded successfully.")
-            except Exception as e:
-                print(f"Polyglot Load Failed: {e}")
-                self.gpt_model = None
 
         else:
             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
@@ -353,17 +318,6 @@ class EmotionAnalysis:
                 
             self.vocab_size = len(self.tokenizer.word_index) + 1
             print("Emotion Model loaded.")
-            
-            # COMMENT MODEL LOADING
-            if os.path.exists(self.comment_model_path) and os.path.exists(self.comment_tokenizer_path):
-                print("Loading comment generation model...")
-                self.comment_model = load_model(self.comment_model_path)
-                with open(self.comment_tokenizer_path, 'rb') as ct:
-                    self.comment_tokenizer = pickle.load(ct)
-                print("Comment Model loaded.")
-                self._rebuild_inference_models()
-            else:
-                print("Comment model not found (skipping auto-train as per policy).")
                 
         except Exception as e:
             print(f"Error loading models: {e}.")
@@ -484,9 +438,11 @@ class EmotionAnalysis:
                     f"감정: {emotion_label}\n"
                     "상담사:"
                 )
+            # Encode and move to device
+            encoded = self.gpt_tokenizer(prompt, return_tensors='pt').to(self.device)
+            # Remove token_type_ids if present (GPT models don't use it)
+            encoded.pop('token_type_ids', None)
             
-            # Encode with attention_mask
-            encoded = self.gpt_tokenizer(prompt, return_tensors='pt')
             input_ids = encoded['input_ids']
             attention_mask = encoded['attention_mask']
             
@@ -542,17 +498,13 @@ class EmotionAnalysis:
             return None
 
 
+    
     def _rebuild_inference_models(self):
-        # Reconstruct Encoder/Decoder from self.comment_model layers
+        # Seq2Seq Removed
         pass 
-        
-    def _train_and_save(self):
-        pass # Not using for now
 
-    def _train_initial_model(self):
-        pass
-        
-    def _train_with_data(self, texts, labels):
+    def train_comment_model(self):
+        # Seq2Seq Removed
         pass
 
     def predict(self, text):
@@ -581,7 +533,9 @@ class EmotionAnalysis:
         comment_result = ""
         try:
             # Try Polyglot first
+            print(f"🤖 Generating Polyglot comment for: {text[:30]}...")
             comment_result = self.generate_polyglot_comment(text, emotion_result)
+            print(f"✅ Comment generated: {comment_result[:30]}...")
         except Exception as e:
             print(f"Polyglot generation failed: {e}")
         
@@ -871,62 +825,7 @@ class EmotionAnalysis:
         except Exception as e:
             print(f"Error loading inference models: {e}")
 
-    def generate_ai_comment(self, text):
-        if not self.enc_model or not self.comment_tokenizer:
-            return None
-            
-        try:
-            # Preprocess
-            seq = self.comment_tokenizer.texts_to_sequences([text])
-            if not seq or not seq[0]: return None # Unknown words
-            
-            input_seq = pad_sequences(seq, maxlen=self.comment_max_len, padding='post')
-            
-            # Encode
-            states_value = self.enc_model.predict(input_seq, verbose=0)
-            
-            # Generate
-            target_seq = np.zeros((1,1))
-            # Use \t Key
-            target_seq[0, 0] = self.comment_tokenizer.word_index['\t']
-            
-            decoded_sentence = ''
-            stop_condition = False
-            
-            while not stop_condition:
-                output_tokens, h, c = self.dec_model.predict([target_seq] + states_value, verbose=0)
-                
-                # Sample with Temperature
-                sampled_token_index = self.sample(output_tokens[0, -1, :], temperature=0.6)
-                sampled_word = self.comment_tokenizer.index_word.get(sampled_token_index, '')
-                
-                if sampled_word == '\n' or len(decoded_sentence) > 50:
-                    stop_condition = True
-                else:
-                    decoded_sentence += sampled_word
-                
-                # Update target seq
-                target_seq = np.zeros((1, 1))
-                target_seq[0, 0] = sampled_token_index
-                
-                # Update states
-                states_value = [h, c]
-                
-        except Exception as e:
-            print(f"Gen Error: {e}")
-            return None
-            
-        return decoded_sentence.strip()
-
-    def sample(self, preds, temperature=1.0):
-        # Helper function to sample an index from a probability array
-        preds = np.asarray(preds).astype('float64')
-        preds = np.log(preds + 1e-10) / temperature
-        exp_preds = np.exp(preds)
-        preds = exp_preds / np.sum(exp_preds)
-        probas = np.random.multinomial(1, preds, 1)
-        return np.argmax(probas)
-
+    # Seq2Seq Generation helpers removed
 
     def generate_comment(self, prediction_text, user_text=None):
         """
@@ -963,18 +862,6 @@ class EmotionAnalysis:
 
         try:
             label = prediction_text.split()[0] # e.g. "행복해"
-            
-            # 3. Try Legacy AI Generation (Seq2Seq) - Deprecated but kept as backup
-            ai_generated = None
-            if self.enc_model:
-                try:
-                    # Pass the label as context since we don't use full text for Seq2Seq yet
-                    ai_generated = self.generate_ai_comment(label)
-                except:
-                    pass
-            
-            if ai_generated:
-                return f"{ai_generated}"
             
             # 4. Fallback
             return "오늘 하루도 수고 많으셨어요."

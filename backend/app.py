@@ -44,17 +44,19 @@ def serialize_doc(doc):
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
-    username = data.get('username')
+    email = data.get('email') # Changed from username to email
     password = data.get('password')
+    username = data.get('username') # Keep username for display if desired
 
-    if mongo.db.users.find_one({'username': username}):
-        return jsonify({"message": "Username already exists"}), 400
+    if mongo.db.users.find_one({'email': email}):
+        return jsonify({"message": "User already exists"}), 400
 
     from werkzeug.security import generate_password_hash
-    hashed_password = generate_password_hash(password)
+    hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
     user_id = mongo.db.users.insert_one({
-        'username': username,
+        'email': email, # Storing email as the primary identifier
+        'username': username, # Storing username as well
         'password_hash': hashed_password,
         'created_at': datetime.utcnow()
     }).inserted_id
@@ -135,6 +137,10 @@ def create_diary():
         'emotion_meaning': data.get('emotion_meaning', ''),
         'self_talk': data.get('self_talk', ''),
         'mood_level': data.get('mood_level', 3),
+        # Optional Weather Data
+        'weather': data.get('weather'),
+        'temperature': data.get('temperature'),
+
         'ai_prediction': "분석 중... (AI가 곧 답변해드려요!)",
         'ai_comment': "잠시만 기다려주세요... 🤖",
         'created_at': created_at
@@ -158,6 +164,7 @@ def create_diary():
         except Exception as e:
             print(f"Failed to queue celery task: {e}")
         
+        # Prepare response
         # Prepare response
         new_diary['_id'] = result.inserted_id
         response_data = serialize_doc(new_diary)
@@ -195,11 +202,12 @@ def update_diary(id):
     if not ObjectId.is_valid(id):
         return jsonify({"message": "Invalid ID format"}), 400
 
+    # Check ownership
     diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
     if not diary:
          return jsonify({"message": "Diary not found"}), 404
          
-    if diary.get('user_id') != current_user_id:
+    if diary.get('user_id') != current_user_id: # Use .get() for safety, current_user_id is already string
         return jsonify({"message": "Unauthorized"}), 403
     
     data = request.get_json()
@@ -210,7 +218,11 @@ def update_diary(id):
         'emotion_meaning': data.get('emotion_meaning', diary.get('emotion_meaning')),
         'self_talk': data.get('self_talk', diary.get('self_talk')),
         'mood_level': data.get('mood_level', diary.get('mood_level')),
-        # Reset AI status
+        # Update weather if provided
+        'weather': data.get('weather', diary.get('weather')),
+        'temperature': data.get('temperature', diary.get('temperature')),
+        
+        # Reset AI
         'ai_prediction': "재분석 중...",
         'ai_comment': "AI가 다시 생각하고 있어요... 🤔"
     }
@@ -254,6 +266,30 @@ def delete_diary(id):
     
     mongo.db.diaries.delete_one({'_id': ObjectId(id)})
     return jsonify({"message": "Diary deleted successfully"}), 200
+
+@app.route('/api/diaries/search', methods=['GET'])
+@jwt_required()
+def search_diaries():
+    current_user_id = get_jwt_identity()
+    query = request.args.get('q', '')
+    
+    if not query:
+        return jsonify([]), 200
+        
+    filter_query = {
+        'user_id': current_user_id,
+        '$or': [
+            {'event': {'$regex': query, '$options': 'i'}},
+            {'emotion_desc': {'$regex': query, '$options': 'i'}},
+            {'emotion_meaning': {'$regex': query, '$options': 'i'}},
+            {'self_talk': {'$regex': query, '$options': 'i'}}
+        ]
+    }
+    
+    cursor = mongo.db.diaries.find(filter_query).sort('created_at', -1).limit(50)
+    results = [serialize_doc(doc) for doc in cursor]
+    
+    return jsonify(results), 200
 
 # Task Status API (Maintained as is, using Celery backend)
 @app.route('/api/tasks/status/<task_id>', methods=['GET'])

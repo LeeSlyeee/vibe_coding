@@ -94,7 +94,9 @@ export const diaryAPI = {
       emotion_desc: data.question2 || '', // 어떤 감정이 들었나요?
       emotion_meaning: data.question3 || '', // 마지막으로 더 깊게 자신의 감정을 써보세요.
       self_talk: data.question4 || '', // 나에게 따듯한 위로를 보내세요.
-      mood_level: moodToLevel[data.mood] || 3 // 감정 이모지 (문자열 → 숫자 변환)
+      mood_level: moodToLevel[data.mood] || 3, // 감정 이모지 (문자열 → 숫자 변환)
+      weather: data.weather || null,
+      temperature: data.temperature || null
     }
     const response = await api.post('/diaries', mappedData)
     return response.data
@@ -117,7 +119,9 @@ export const diaryAPI = {
       emotion_desc: data.question2 || '',
       emotion_meaning: data.question3 || '',
       self_talk: data.question4 || '',
-      mood_level: moodToLevel[data.mood] || 3 // 감정 이모지 (문자열 → 숫자 변환)
+      mood_level: moodToLevel[data.mood] || 3, // 감정 이모지 (문자열 → 숫자 변환)
+      weather: data.weather || null,
+      temperature: data.temperature || null
     }
     const response = await api.put(`/diaries/${id}`, mappedData)
     return response.data
@@ -132,6 +136,14 @@ export const diaryAPI = {
   // Task 상태 조회
   getTaskStatus: async (taskId) => {
     const response = await api.get(`/tasks/status/${taskId}`)
+    return response.data
+  },
+
+  // 일기 검색
+  searchDiaries: async (query) => {
+    const response = await api.get('/diaries/search', {
+      params: { q: query }
+    })
     return response.data
   }
 }
