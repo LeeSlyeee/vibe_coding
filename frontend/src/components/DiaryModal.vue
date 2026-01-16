@@ -71,22 +71,22 @@
             <img :src="getMoodEmoji(displayDiary.mood_level)" class="emoji-large" alt="mood" />
             <div class="emoji-info">
               <span class="emoji-label">{{ getMoodName(displayDiary.mood_level) }}</span>
-              <span v-if="displayDiary.ai_prediction && !progressData.isAnalyzing" class="ai-prediction-badge">AI: {{ displayDiary.ai_prediction }}</span>
+              <span v-if="displayDiary.ai_prediction && !showProgressBar" class="ai-prediction-badge">AI: {{ displayDiary.ai_prediction }}</span>
             </div>
           </div>
           
           <!-- AI Progress Bar (Analysis in Progress) -->
-          <div v-if="progressData.isAnalyzing" class="ai-progress-container">
+          <div v-if="showProgressBar" class="ai-progress-container">
             <div class="progress-info">
-              <span class="progress-message">{{ progressData.message }}</span>
+              <span class="progress-message">{{ progressData.message || 'AI가 열심히 분석하고 있어요...' }}</span>
               <span class="progress-eta" v-if="progressData.eta > 0">{{ progressData.eta }}초 남음</span>
             </div>
             <div class="progress-bar-bg">
-              <div class="progress-bar-fill" :style="{ width: progressData.percent + '%' }"></div>
+              <div class="progress-bar-fill" :style="{ width: (progressData.percent > 0 ? progressData.percent : 15) + '%' }"></div>
             </div>
           </div>
           
-          <div v-if="displayDiary.ai_comment && !progressData.isAnalyzing" class="ai-comment-box">
+          <div v-if="displayDiary.ai_comment && !showProgressBar" class="ai-comment-box">
              <span class="ai-icon">💌</span>
              <p class="ai-comment-text">{{ displayDiary.ai_comment }}</p>
           </div>
@@ -206,6 +206,14 @@ export default {
       if (props.diary) return props.diary
       // Fallback empty
       return {}
+    })
+    
+    // Force show progress bar if text says "Analyzing..."
+    const showProgressBar = computed(() => {
+        const isAnalyzingState = progressData.value.isAnalyzing;
+        const hasAnalyzingText = displayDiary.value.ai_prediction && 
+                                 displayDiary.value.ai_prediction.includes('분석 중');
+        return isAnalyzingState || hasAnalyzingText;
     })
 
     const isValid = computed(() => {
@@ -384,9 +392,46 @@ export default {
       }
     }
 
+    const startFallbackPolling = () => {
+      // Fake Polling for when we don't have task_id (e.g. re-opened modal)
+      progressData.value.isAnalyzing = true;
+      progressData.value.message = 'AI가 분석하고 있습니다...';
+      progressData.value.percent = 30; 
+      progressData.value.eta = 10;
+      
+      const interval = setInterval(async () => {
+         // 1. Fake Progress
+         if (progressData.value.percent < 90) {
+            progressData.value.percent += 5;
+         }
+         if (progressData.value.eta > 0) {
+            progressData.value.eta--;
+         }
+         
+         // 2. Check DB if finished (Blind Check)
+         if (displayDiary.value.id) {
+             try {
+                const check = await diaryAPI.getDiary(displayDiary.value.id);
+                if (check.ai_prediction && !check.ai_prediction.includes('분석 중')) {
+                    // Finished!
+                    clearInterval(interval);
+                    progressData.value.isAnalyzing = false;
+                    localSavedDiary.value = check; // Refresh View
+                    emit('saved');
+                }
+             } catch(e) {}
+         }
+      }, 2000); // Check every 2 seconds
+      
+      progressData.value.timerIds.push(interval);
+    }
+
     watch(() => props.diary, (newDiary) => {
       isViewMode.value = !!newDiary
       localSavedDiary.value = null; 
+      // Reset Polling
+      stopPolling();
+      
       if (newDiary) {
         formData.value = {
           mood: moodLevelToName[newDiary.mood_level] || 'neutral',
@@ -397,6 +442,16 @@ export default {
         }
       }
     })
+    
+    // Watch displayDiary to trigger fallback polling if needed
+    watch(() => displayDiary.value, (newVal) => {
+        if (newVal.ai_prediction && 
+            newVal.ai_prediction.includes('분석 중') && 
+            !progressData.value.isAnalyzing) {
+            console.log("Triggering Fallback Polling...");
+            startFallbackPolling();
+        }
+    }, { immediate: true, deep: true })
 
     return {
       isViewMode,
@@ -409,6 +464,7 @@ export default {
       progressData,
       getMoodEmoji,
       getMoodName,
+      showProgressBar,
       formatDateTime,
       handleSave,
       handleEdit,
