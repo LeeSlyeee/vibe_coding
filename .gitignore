@@ -7,3 +7,5 @@ node_modules
 venv
 backend/model_backups/
 ssh-key
+*.log
+backend/server.log
