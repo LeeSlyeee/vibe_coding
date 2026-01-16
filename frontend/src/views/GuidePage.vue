@@ -46,13 +46,21 @@
                 <h3>🤖 AI 감정 분석 & 코멘트</h3>
                 <div class="feature-card ai-feature">
                     <div class="text-content">
-                        <h4>나보다 내 마음을 더 잘 아는 AI</h4>
+                        <h4>60가지 섬세한 감정의 언어</h4>
                         <p>
-                            일기를 저장하면, AI가 당신의 글을 읽고 <strong>오늘의 감정 농도</strong>를 분석해줍니다.
-                            또한, 따뜻하거나 통찰력 있는 <strong>한 줄 코멘트</strong>를 통해 하루를 정리할 수 있도록 도와줍니다.
+                            단순히 '좋다', '나쁘다'가 아닌, <strong>60가지의 세분화된 감정</strong>(비통함, 홀가분함, 설렘, 억울함 등)으로 당신의 마음을 정확하게 읽어냅니다.
+                        </p>
+                        <br>
+                        <h4>전문 심리 상담사 같은 코멘트</h4>
+                        <p>
+                             국내 최고 수준의 한국어 AI 모델(Polyglot-Ko)이 당신의 일기 속 <strong>문맥과 숨겨진 의미</strong>를 파악하여, 
+                             마치 상담사가 옆에서 이야기하듯 따뜻하고 깊이 있는 위로를 건넵니다.
+                        </p>
+                        <p class="tip-text">
+                             💡 일기 내용을 수정하면 AI가 다시 깊게 고민하여 새로운 답변을 준비해요!
                         </p>
                     </div>
-                    <div class="icon-visual">✨</div>
+                    <div class="icon-visual">🧠</div>
                 </div>
             </section>
 
@@ -61,7 +69,7 @@
                 <div class="feature-card">
                     <h3>📊 감정 통계</h3>
                     <p>
-                        <strong>[분석]</strong> 페이지에서 나의 월별 기록 습관, 감정 분포, 날씨와의 상관관계를 시각적인 차트로 확인할 수 있습니다.
+                        <strong>[분석]</strong> 페이지에서 AI가 분석한 <strong>감정 흐름</strong>, 나의 <strong>월별 기록 습관</strong>, 그리고 <strong>날씨와 기분의 상관관계</strong>를 직관적인 차트로 확인해보세요.
                     </p>
                 </div>
                 <div class="feature-card">

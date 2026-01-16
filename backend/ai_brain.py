@@ -9,10 +9,15 @@ import json
 TRAINING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'training_state.json')
 try:
     from models import EmotionKeyword
+except ImportError:
+    pass
+
+try:
     from emotion_codes import EMOTION_CODE_MAP
 except ImportError:
-    # Handle possible circular import dynamically if needed, or rely on caller context
-    pass
+    # If this fails, we are in trouble for __init__, so let's define a fallback or print error
+    print("Warning: Could not import EMOTION_CODE_MAP from emotion_codes")
+    EMOTION_CODE_MAP = {}
 
 # Try to import TensorFlow/Keras, but provide fallback if not installed
 try:

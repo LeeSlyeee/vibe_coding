@@ -84,13 +84,13 @@
           <div class="view-emoji-premium" :class="getMoodColorClass(currentDiary.mood_level)">
             <div class="emoji-container">
               <img :src="getMoodEmoji(currentDiary.mood_level)" class="emoji-large anim-float" alt="mood" />
-              <div class="emoji-info">
-                <span class="emoji-label">{{ getMoodName(currentDiary.mood_level) }}</span>
-                <!-- AI 뱃지는 분석 완료 시에만 보여줌 -->
-                <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge-premium">
-                  AI 분석: {{ currentDiary.ai_prediction }}
-                </span>
-              </div>
+              <!-- 감정 이름 위로 배치 -->
+              <span class="emoji-label primary-label">{{ getMoodName(currentDiary.mood_level) }}</span>
+              
+              <!-- AI 분석 결과 아래로 배치 -->
+              <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge-premium">
+                {{ currentDiary.ai_prediction }}
+              </span>
             </div>
             
             <!-- AI 진행 상황 표시 (분석 중일 때) -->
@@ -557,6 +557,7 @@ export default {
 @keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0); } }
 
 .emoji-label { font-size: 26px; font-weight: 800; color: rgba(0,0,0,0.8); letter-spacing: -0.5px; }
+.primary-label { margin-bottom: 8px; }
 .ai-prediction-badge-premium { font-size: 13px; font-weight: 700; color: white; background: rgba(0,0,0,0.25); padding: 7px 16px; border-radius: 24px; backdrop-filter: blur(8px); }
 
 .ai-letter-box { background: rgba(255,255,255,0.96); padding: 28px; border-radius: 24px; width: 100%; box-shadow: 0 12px 32px rgba(0,0,0,0.06); border: 1px solid rgba(255,255,255,0.8); }

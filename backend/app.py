@@ -59,19 +59,17 @@ def serialize_doc(doc):
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
-    email = data.get('email') # Changed from username to email
+    username = data.get('username')
     password = data.get('password')
-    username = data.get('username') # Keep username for display if desired
 
-    if mongo.db.users.find_one({'email': email}):
+    if mongo.db.users.find_one({'username': username}):
         return jsonify({"message": "User already exists"}), 400
 
     from werkzeug.security import generate_password_hash
     hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
     user_id = mongo.db.users.insert_one({
-        'email': email, # Storing email as the primary identifier
-        'username': username, # Storing username as well
+        'username': username,
         'password_hash': hashed_password,
         'created_at': datetime.utcnow()
     }).inserted_id
@@ -399,66 +397,122 @@ def get_task_status(task_id):
         
     return jsonify(response), 200
 
+# --- Helper to map AI string to Mood Level (1-5) ---
+def map_ai_to_mood(ai_str):
+    if not ai_str or not isinstance(ai_str, str):
+        return None
+        
+    # Extract label part (before parenthesis if exists)
+    # Ex: "슬픔 (비통함) (85.2%)" -> "슬픔 (비통함)"
+    clean_str = ai_str.split('(')[0].strip() if '(' in ai_str else ai_str
+    
+    # Keywords Mapping
+    # 1: 화남 😠
+    # 2: 우울 😢
+    # 3: 보통 😐
+    # 4: 편안 😌
+    # 5: 행복 😊
+    
+    if any(k in ai_str for k in ['분노', '짜증', '배신', '혐오', '화가', '불쾌', '억울']):
+        return 1
+    elif any(k in ai_str for k in ['슬픔', '우울', '외로움', '무기력', '후회', '비참', '괴로움', '지침', '죄책', '부끄', '한심', '불안', '당황', '두려움', '혼란', '걱정', '긴장', '고독', '상실', '좌절']):
+        return 2
+    elif any(k in ai_str for k in ['보통', '무난', '평범']):
+        return 3
+    elif any(k in ai_str for k in ['편안', '감사', '만족', '홀가분', '안정', '여유']):
+        return 4
+    elif any(k in ai_str for k in ['기쁨', '설렘', '신남', '자신', '뿌듯', '행복', '환희', '성취']):
+        return 5
+        
+    return None
+
 @app.route('/api/statistics', methods=['GET'])
 @jwt_required()
 def get_statistics():
     user_id = get_jwt_identity()
     
-    pipeline = [
-        {'$match': {'user_id': user_id}},
-        {
-            '$facet': {
-                'monthly': [
-                    {
-                        '$project': {
-                            'month': {'$dateToString': {'format': '%Y-%m', 'date': '$created_at'}}
-                        }
-                    },
-                    {'$group': {'_id': '$month', 'count': {'$sum': 1}}},
-                    {'$sort': {'_id': 1}}
-                ],
-                'moods': [
-                    {'$group': {'_id': '$mood_level', 'count': {'$sum': 1}}},
-                    {'$sort': {'_id': 1}}
-                ],
-                'weather': [
-                     {'$match': {'weather': {'$ne': None}}},
-                     {'$group': {
-                         '_id': {'weather': '$weather', 'mood': '$mood_level'},
-                         'count': {'$sum': 1}
-                     }},
-                     {'$group': {
-                         '_id': '$_id.weather',
-                         'moods': {
-                             '$push': {
-                                 'mood': '$_id.mood',
-                                 'count': '$count'
-                             }
-                         },
-                         'total_count': {'$sum': '$count'}
-                     }},
-                     {'$sort': {'total_count': -1}}
-                ],
-                'daily': [
-                    {
-                        '$project': {
-                            'day': {'$dateToString': {'format': '%Y-%m-%d', 'date': '$created_at'}}
-                        }
-                    },
-                    {'$group': {'_id': '$day', 'count': {'$sum': 1}}},
-                    {'$sort': {'_id': 1}}
-                ]
-            }
-        }
-    ]
+    # Fetch all diaries to process in Python (more flexible for string parsing)
+    diaries = list(mongo.db.diaries.find({'user_id': user_id}).sort('created_at', 1))
     
-    try:
-        results = list(mongo.db.diaries.aggregate(pipeline))
-        stats = results[0] if results else {'monthly': [], 'moods': [], 'weather': []}
-        return jsonify(stats), 200
-    except Exception as e:
-        print(f"Stats Error: {e}")
-        return jsonify({'error': str(e)}), 500
+    stats = {
+        'monthly': {},
+        'moods': {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+        'weather': {},
+        'daily': {},
+        'timeline': []
+    }
+    
+    for d in diaries:
+        # Determine Mood Level: AI > User Input
+        ai_mood = map_ai_to_mood(d.get('ai_prediction'))
+        mood = ai_mood if ai_mood else d.get('mood_level', 3)
+        
+        # Ensure mood is int
+        try:
+            mood = int(mood)
+        except:
+            mood = 3
+            
+        date = d.get('created_at')
+        if not date: continue
+        
+        date_str = date.strftime('%Y-%m-%d')
+        month_str = date.strftime('%Y-%m')
+        
+        # 1. Monthly Count
+        stats['monthly'][month_str] = stats['monthly'].get(month_str, 0) + 1
+        
+        # 2. Mood Count
+        stats['moods'][mood] = stats['moods'].get(mood, 0) + 1
+        
+        # 3. Weather-Mood Stats
+        weather = d.get('weather')
+        if weather:
+            if weather not in stats['weather']:
+                stats['weather'][weather] = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, 'total': 0}
+            stats['weather'][weather][str(mood)] += 1
+            stats['weather'][weather]['total'] += 1
+            
+        # 4. Daily Count
+        stats['daily'][date_str] = stats['daily'].get(date_str, 0) + 1
+        
+        # 5. Timeline
+        stats['timeline'].append({
+            'date': date_str,
+            'mood_level': mood,
+            'ai_label': d.get('ai_prediction', '')
+        })
+        
+    # Format for Frontend
+    response_data = {
+        'monthly': [{'month': k, 'count': v} for k, v in stats['monthly'].items()],
+        'moods': [{'_id': k, 'count': v} for k, v in stats['moods'].items()],
+        'daily': [{'_id': k, 'count': v} for k, v in stats['daily'].items()],
+        'timeline': stats['timeline'],
+        'weather': []
+    }
+    
+    # Sort Lists
+    response_data['monthly'].sort(key=lambda x: x['month'])
+    response_data['moods'].sort(key=lambda x: x['_id'])
+    response_data['daily'].sort(key=lambda x: x['_id'])
+    
+    # Format Weather
+    for w, counts in stats['weather'].items():
+        moods_list = []
+        for m in range(1, 6):
+            if counts[str(m)] > 0:
+                moods_list.append({'mood': m, 'count': counts[str(m)]})
+        
+        response_data['weather'].append({
+            '_id': w,
+            'moods': moods_list,
+            'total_count': counts['total']
+        })
+    
+    response_data['weather'].sort(key=lambda x: x['total_count'], reverse=True)
+
+    return jsonify(response_data), 200
 
 if __name__ == '__main__':
     # No SQL create_all() needed

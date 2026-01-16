@@ -32,9 +32,19 @@
         </div>
 
         <div v-else class="content-body">
-            <!-- 1. 월별 기록 추이 (Monthly Daily Charts) -->
+            <!-- 0. 감정 흐름 (Flow) -->
             <transition name="fade" mode="out-in">
-                <div v-if="currentTab === 'monthly'" key="monthly" class="chart-section">
+                <div v-if="currentTab === 'flow'" key="flow" class="chart-section">
+                     <div class="section-info">
+                         <h3>📈 감정 흐름</h3>
+                         <p>나의 기분이 시간의 흐름에 따라 어떻게 변해왔는지 확인해보세요.</p>
+                     </div>
+                     <div class="chart-wrapper main-chart">
+                         <Line :data="flowChartData" :options="flowChartOptions" />
+                     </div>
+                </div>
+
+                <div v-else-if="currentTab === 'monthly'" key="monthly" class="chart-section">
                     <div class="section-info">
                         <h3>📅 월별 상세 기록</h3>
                         <p>각 달마다 나의 기록 습관을 확인해보세요.</p>
@@ -102,22 +112,25 @@ import {
   BarElement,
   CategoryScale,
   LinearScale,
-  ArcElement
+  ArcElement,
+  PointElement,
+  LineElement
 } from 'chart.js'
-import { Bar, Doughnut } from 'vue-chartjs'
+import { Bar, Doughnut, Line } from 'vue-chartjs'
 
 // Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement)
 
 export default {
   name: 'StatsPage',
-  components: { Bar, Doughnut },
+  components: { Bar, Doughnut, Line },
   setup() {
     const loading = ref(true)
-    const currentTab = ref('monthly')
-    const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [] })
+    const currentTab = ref('flow') // Default to 'flow'
+    const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [], timeline: [] })
 
     const tabs = [
+        { id: 'flow', label: '감정 흐름', icon: '📈' },
         { id: 'monthly', label: '월별 기록', icon: '📅' },
         { id: 'mood', label: '감정 분포', icon: '🎨' },
         { id: 'weather', label: '날씨 통계', icon: '☁️' }
@@ -140,7 +153,7 @@ export default {
             y: {
                 beginAtZero: true,
                 grid: { color: '#f0f0f0' },
-                ticks: { display: false } // Hide Y axis labels for cleaner look in small charts
+                ticks: { display: false } 
             },
             x: {
                 grid: { display: false },
@@ -148,6 +161,50 @@ export default {
             }
         },
         animation: { duration: 1000 }
+    }
+
+    // Flow Chart Options (Line)
+    const flowChartOptions = {
+        ...commonOptions,
+        scales: {
+            y: {
+                min: 0,
+                max: 6,
+                grid: { color: '#f0f0f0' },
+                ticks: {
+                    stepSize: 1,
+                    callback: function(value) {
+                         const map = { 1: '😠', 2: '😢', 3: '😐', 4: '😌', 5: '😊' }
+                         return map[value] || ''
+                    },
+                    font: { size: 20 }
+                }
+            },
+            x: {
+                grid: { display: false },
+                ticks: { display: false } // Hide Date Labels
+            }
+        },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const index = context.dataIndex
+                        const timelineItem = rawStats.value.timeline[index]
+                        const map = { 1: '화남/부정', 2: '우울/슬픔', 3: '보통', 4: '편안/안정', 5: '행복/기쁨' }
+                        
+                        let label = `기분: ${map[context.raw] || context.raw}`
+                        if (timelineItem && timelineItem.ai_label) {
+                            // "슬픔 (비통함) (85.2%)" -> "슬픔 (비통함)" for cleaner tooltip
+                            const cleanLabel = timelineItem.ai_label.split('(')[0] + (timelineItem.ai_label.includes('(') ? '(' + timelineItem.ai_label.split('(')[1].split(')')[0] + ')' : '')
+                            label += ` | AI 분석: ${cleanLabel}`
+                        }
+                        return label
+                    }
+                }
+            }
+        }
     }
 
     const weatherBarOptions = {
@@ -181,6 +238,30 @@ export default {
 
     // === Computed Data for Charts ===
     
+    // 0. Flow Data (Timeline)
+    const flowChartData = computed(() => {
+        const timeline = rawStats.value.timeline || []
+        
+        // 데이터가 너무 많으면 적당히 샘플링하거나 최근 30~50개만 보여주기? 일단 전체 보여줌.
+        // UI가 깨지지 않게 Chart.js가 알아서 처리해주길 기대.
+        
+        return {
+            labels: timeline.map(t => t.date.slice(5)), // MM-DD만 표시
+            datasets: [{
+                label: '기분 흐름',
+                data: timeline.map(t => t.mood_level),
+                borderColor: '#1d1d1f',
+                backgroundColor: 'rgba(29, 29, 31, 0.1)',
+                tension: 0.4, // 곡선
+                pointBackgroundColor: '#1d1d1f',
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                fill: true
+            }]
+        }
+    })
+
+
     // 1. Monthly Daily Charts (NEW) (unchanged)
     const monthlyCharts = computed(() => {
         if (!rawStats.value.daily) return []
@@ -318,7 +399,7 @@ export default {
     onMounted(async () => {
         try {
             const res = await diaryAPI.getStatistics()
-            rawStats.value = { ...res, daily: res.daily || [] }
+            rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
         } catch (e) {
             console.error(e)
         } finally {
@@ -330,7 +411,7 @@ export default {
         loading,
         currentTab,
         tabs,
-        monthlyCharts, 
+        monthlyCharts, flowChartData, flowChartOptions,
         moodChartData, doughnutOptions, moodLegendData,
         weatherChartData, weatherBarOptions
     }

@@ -2,6 +2,7 @@
 import os
 import sys
 import time
+import multiprocessing
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 
@@ -11,76 +12,109 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from ai_brain import EmotionAnalysis
 from config import Config
 
-def batch_update(limit=None, target_user_id="6969bc2a7bc218506b52ab05"):
-    print(f"🚀 [Batch Update] Starting AI analysis for user: {target_user_id}")
+# Global variables for worker processes
+worker_ai = None
+worker_db = None
+
+def init_worker():
+    """Initialize AI and DB connection in each worker process"""
+    global worker_ai, worker_db
     
-    # 1. Mongo Connection
+    # Identify as worker
+    os.environ['MOOD_ROLE'] = 'celery' 
+    
+    print(f"🔧 Worker {os.getpid()} initializing...")
+    try:
+        # Initialize AI (each worker gets its own instance)
+        worker_ai = EmotionAnalysis()
+        
+        # Initialize DB connection
+        client = MongoClient(Config.MONGO_URI)
+        worker_db = client.get_database()
+        print(f"✅ Worker {os.getpid()} ready.")
+    except Exception as e:
+        print(f"❌ Worker {os.getpid()} failed to init: {e}")
+
+def process_entry(doc):
+    """Process a single diary entry"""
+    global worker_ai, worker_db
+    
+    if worker_ai is None or worker_db is None:
+        return {'id': str(doc['_id']), 'status': 'error', 'msg': 'Worker not initialized'}
+
+    combined_text = f"사건: {doc.get('event', '')}\n감정: {doc.get('emotion_desc', '')}\n생각: {doc.get('emotion_meaning', '')}"
+    
+    try:
+        # Predict
+        result = worker_ai.predict(combined_text)
+        
+        # Update DB
+        worker_db.diaries.update_one(
+            {'_id': doc['_id']},
+            {'$set': {
+                'ai_prediction': result.get('emotion', '분석 실패'),
+                'ai_comment': result.get('comment', '분석 중 오류 발생')
+            }}
+        )
+        return {'id': str(doc['_id']), 'status': 'success'}
+        
+    except Exception as e:
+        return {'id': str(doc['_id']), 'status': 'error', 'msg': str(e)}
+
+def batch_update(username="test"):
+    print(f"🚀 [Batch Parallel] Starting AI analysis for user: {username}")
+    
+    start_main = time.time()
+    
+    # 1. Main Process DB Connection to fetch IDs
     try:
         client = MongoClient(Config.MONGO_URI)
         db = client.get_database()
-        print("✅ Connected to MongoDB")
     except Exception as e:
-        print(f"❌ MongoDB Connection Failed: {e}")
+        print(f"❌ DB Connection Failed: {e}")
         return
 
-    # 2. Initialize AI
-    print("🧠 Initializing AI Brain (Loading Polyglot-Ko-1.3B)...")
-    os.environ['MOOD_ROLE'] = 'celery'
-    ai = EmotionAnalysis()
+    # 2. Find User
+    user = db.users.find_one({"username": username})
+    if not user:
+        print(f"❌ User '{username}' not found.")
+        return
+        
+    target_user_id = str(user['_id'])
     
-    if hasattr(ai, 'gpt_model') and ai.gpt_model:
-        print("✨ PRECISE MODE ACTIVATED (GPU/LLM)")
-    else:
-        print("⚠️ FALLBACK MODE (Keyword based)")
-
-    # 3. Fetch diaries (focus on pending ones)
-    query = {
-        "user_id": target_user_id,
-        "ai_comment": {"$regex": "^분석 (대기|중|오류).*"}
-    }
-    
+    # 3. Fetch Diaries
+    query = {"user_id": target_user_id}
     diaries = list(db.diaries.find(query).sort('created_at', -1))
-    if limit:
-        diaries = diaries[:limit]
-        
     total = len(diaries)
+    
     if total == 0:
-        print("✨ No pending diaries found. Everything is already analyzed!")
+        print("✨ No diaries found.")
         return
 
-    print(f"📦 Found {total} pending diaries to process.")
+    print(f"📦 Found {total} diaries. Spawning workers...")
 
-    start_time = time.time()
-    count = 0
+    # 4. multiprocessing Pool
+    # Use 2-3 processes to avoid OOM (1.3B model is ~3GB RAM per process)
+    # Mac M-series usually has unified memory, but still safer to be conservative.
+    num_processes = 2 
     
-    for doc in diaries:
-        combined_text = f"사건: {doc.get('event', '')}\n감정: {doc.get('emotion_desc', '')}\n생각: {doc.get('emotion_meaning', '')}"
+    with multiprocessing.Pool(processes=num_processes, initializer=init_worker) as pool:
+        print(f"🔥 Processing with {num_processes} parallel workers...")
         
-        try:
-            # Predict
-            result = ai.predict(combined_text)
+        results = []
+        for i, res in enumerate(pool.imap_unordered(process_entry, diaries)):
+            results.append(res)
             
-            # Update DB
-            db.diaries.update_one(
-                {'_id': doc['_id']},
-                {'$set': {
-                    'ai_prediction': result.get('emotion', '분석 실패'),
-                    'ai_comment': result.get('comment', '분석 중 오류 발생')
-                }}
-            )
-            
-            count += 1
-            if count % 5 == 0:
-                elapsed = time.time() - start_time
-                avg_time = elapsed / count
-                eta = (total - count) * avg_time
-                print(f"⏳ [{count}/{total}] | Avg: {avg_time:.2f}s | ETA: {int(eta//60)}m {int(eta%60)}s")
-                
-        except Exception as e:
-            print(f"❌ Error at {doc['_id']}: {e}")
+            if (i + 1) % 5 == 0:
+                elapsed = time.time() - start_main
+                avg = elapsed / (i + 1)
+                eta = (total - (i + 1)) * avg
+                print(f"⏳ [{i + 1}/{total}] Processed | Avg: {avg:.2f}s/item (Parallel) | ETA: {int(eta)}s")
 
-    print(f"\n✅ Batch Update Complete! Processed {count} entries.")
+    total_time = time.time() - start_main
+    print(f"\n✅ Batch Update Complete! Processed {total} entries in {total_time:.1f} seconds.")
 
 if __name__ == "__main__":
-    # Process all pending entries
-    batch_update()
+    # Required for macOS/Windows
+    multiprocessing.set_start_method('spawn', force=True)
+    batch_update("test")
