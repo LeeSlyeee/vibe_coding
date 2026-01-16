@@ -5,28 +5,23 @@
       <div class="navbar-content">
         <h1 class="logo" @click="goHome">MOOD DIARY</h1>
         <div class="nav-actions">
-          <button 
-            v-if="isAuthenticated" 
+          <button
+            v-if="isAuthenticated"
             @click="$router.push('/guide')"
             class="stats-btn"
             title="사용 방법"
           >
             📘 가이드
           </button>
-          <button 
-            v-if="isAuthenticated" 
+          <button
+            v-if="isAuthenticated"
             @click="$router.push('/stats')"
             class="stats-btn"
             title="통계 분석"
           >
             📊 분석
           </button>
-          <button 
-            v-if="isAuthenticated" 
-            @click="handleLogout"
-            class="logout-btn"
-            title="로그아웃"
-          >
+          <button v-if="isAuthenticated" @click="handleLogout" class="logout-btn" title="로그아웃">
             👤 로그아웃
           </button>
         </div>
@@ -41,50 +36,60 @@
 </template>
 
 <script>
-import { RouterView } from 'vue-router'
-import { computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterView } from "vue-router";
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 export default {
-  name: 'App',
+  name: "App",
   components: {
-    RouterView
+    RouterView,
   },
   setup() {
-    const route = useRoute()
-    const router = useRouter()
+    const route = useRoute();
+    const router = useRouter();
 
     const showNavbar = computed(() => {
-      return route.name !== 'login' && route.name !== 'signup'
-    })
+      return route.name !== "login" && route.name !== "signup";
+    });
 
-    const isAuthenticated = computed(() => {
-      // 'token' 또는 'authToken' 둘 다 확인
-      return localStorage.getItem('token') !== null || localStorage.getItem('authToken') !== null
-    })
+    const isAuthenticated = ref(false);
+
+    const checkAuth = () => {
+      isAuthenticated.value =
+        localStorage.getItem("token") !== null || localStorage.getItem("authToken") !== null;
+    };
+
+    watch(
+      route,
+      () => {
+        checkAuth();
+      },
+      { immediate: true }
+    );
 
     const handleLogout = () => {
-      localStorage.removeItem('token')
-      localStorage.removeItem('authToken')
-      router.push('/login')
-    }
+      localStorage.removeItem("token");
+      localStorage.removeItem("authToken");
+      router.push("/login");
+    };
 
     const goHome = () => {
       if (isAuthenticated.value) {
-        router.push('/calendar')
+        router.push("/calendar");
       } else {
-        router.push('/login')
+        router.push("/login");
       }
-    }
+    };
 
     return {
       showNavbar,
       isAuthenticated,
       handleLogout,
-      goHome
-    }
-  }
-}
+      goHome,
+    };
+  },
+};
 </script>
 
 <style scoped>
