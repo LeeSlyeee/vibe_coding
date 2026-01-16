@@ -1,16 +1,16 @@
 <template>
   <div class="diary-panel">
-      <!-- 헤더 -->
+      <!-- 1. 헤더 영역 -->
       <div class="modal-header">
         <h3 class="modal-title">
           {{ isViewMode ? '기록 내용' : `${formattedDate}` }}
         </h3>
         <div v-if="isViewMode" class="diary-timestamp">
-          {{ displayDiary.created_at ? formatDateTime(displayDiary.created_at) : (diary?.created_at ? formatDateTime(diary.created_at) : '') }}
+          {{ formattedDateTime }}
         </div>
       </div>
 
-      <!-- 일기 작성 모드 - 폼 시작 전 초기 화면 -->
+      <!-- 2. 초기 화면 (작성 전) -->
       <div v-if="!isViewMode && !showForm" class="diary-empty">
         <div class="empty-message">
           <button @click="startWriting" class="btn btn-primary" type="button">
@@ -19,12 +19,10 @@
         </div>
       </div>
 
-      <!-- 일기 작성 모드 - 폼 표시 -->
+      <!-- 3. 작성 폼 -->
       <div v-else-if="!isViewMode && showForm" class="diary-form">
-        <!-- 감정 선택 -->
         <EmojiSelector v-model="formData.mood" />
 
-        <!-- 질문들 -->
         <QuestionAccordion
           question="오늘 무슨일이 있었나요?"
           v-model="formData.question1"
@@ -52,7 +50,6 @@
           placeholder="앞으로 어떻게 하면 좋을지 생각해보세요..."
         />
 
-        <!-- 버튼들 -->
         <div class="modal-actions">
           <button @click="cancelWriting" class="btn btn-secondary" type="button">
             취소
@@ -63,69 +60,64 @@
         </div>
       </div>
 
-      <!-- 일기 상세보기 모드 -->
+      <!-- 4. 상세보기 모드 (결과 화면) -->
       <div v-else class="diary-view">
-        <!-- 선택된 감정 -->
+        <!-- 감정 아이콘 -->
         <div class="view-emoji">
           <div class="emoji-container">
-            <img :src="getMoodEmoji(displayDiary.mood_level)" class="emoji-large" alt="mood" />
+            <img :src="getMoodEmoji(currentDiary.mood_level)" class="emoji-large" alt="mood" />
             <div class="emoji-info">
-              <span class="emoji-label">{{ getMoodName(displayDiary.mood_level) }}</span>
-              <span v-if="displayDiary.ai_prediction && !showProgressBar" class="ai-prediction-badge">AI: {{ displayDiary.ai_prediction }}</span>
+              <span class="emoji-label">{{ getMoodName(currentDiary.mood_level) }}</span>
+              <!-- AI 뱃지는 분석 완료 시에만 보여줌 -->
+              <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge">
+                AI: {{ currentDiary.ai_prediction }}
+              </span>
             </div>
           </div>
           
-          <!-- AI Progress Bar (Analysis in Progress) -->
-          <div v-if="showProgressBar" class="ai-progress-container">
-            <div class="progress-info">
-              <span class="progress-message">{{ progressData.message || 'AI가 열심히 분석하고 있어요...' }}</span>
-              <span class="progress-eta" v-if="progressData.eta > 0">{{ progressData.eta }}초 남음</span>
+          <!-- [핵심] AI 진행 상황 표시 (분석 중일 때) -->
+          <div v-if="isProcessing" class="ai-loading-section">
+            <div class="loading-header">
+               <span class="loading-msg">{{ loadingMessage }}</span>
+               <span class="loading-timer" v-if="eta > 0">{{ eta }}초 남음</span>
             </div>
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill" :style="{ width: (progressData.percent > 0 ? progressData.percent : 15) + '%' }"></div>
+            <div class="progress-track">
+               <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
             </div>
           </div>
-          
-          <div v-if="displayDiary.ai_comment && !showProgressBar" class="ai-comment-box">
+
+          <!-- [핵심] AI 코멘트 표시 (분석 완료 시) -->
+          <div v-else-if="currentDiary.ai_comment" class="ai-comment-box">
              <span class="ai-icon">💌</span>
-             <p class="ai-comment-text">{{ displayDiary.ai_comment }}</p>
+             <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
           </div>
         </div>
 
-        <!-- 답변들 -->
+        <!-- 질문 답변 리스트 -->
         <div class="view-answers">
-          <div v-if="displayDiary.event" class="answer-item">
+          <div v-if="currentDiary.event" class="answer-item">
             <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
-            <p class="answer-text">{{ displayDiary.event }}</p>
+            <p class="answer-text">{{ currentDiary.event }}</p>
           </div>
-
-          <div v-if="displayDiary.emotion_desc" class="answer-item">
+          <div v-if="currentDiary.emotion_desc" class="answer-item">
             <h4 class="answer-question">어떤 감정이 들었나요?</h4>
-            <p class="answer-text">{{ displayDiary.emotion_desc }}</p>
+            <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
           </div>
-
-          <div v-if="displayDiary.emotion_meaning" class="answer-item">
+          <div v-if="currentDiary.emotion_meaning" class="answer-item">
             <h4 class="answer-question">마지막으로 더 깊게 자신의 감정을 써보세요.</h4>
-            <p class="answer-text">{{ displayDiary.emotion_meaning }}</p>
+            <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
           </div>
-
-          <div v-if="displayDiary.self_talk" class="answer-item">
+          <div v-if="currentDiary.self_talk" class="answer-item">
             <h4 class="answer-question">나에게 따듯한 위로를 보내세요.</h4>
-            <p class="answer-text">{{ displayDiary.self_talk }}</p>
+            <p class="answer-text">{{ currentDiary.self_talk }}</p>
           </div>
         </div>
 
-        <!-- 버튼들 -->
+        <!-- 하단 버튼 -->
         <div class="modal-actions">
-          <button @click="handleDelete" class="btn btn-danger" type="button">
-            삭제하기
-          </button>
-          <button @click="handleEdit" class="btn btn-secondary" type="button">
-            수정하기
-          </button>
-          <button @click="$emit('close')" class="btn btn-primary" type="button">
-            닫기
-          </button>
+          <button @click="handleDelete" class="btn btn-danger" type="button">삭제하기</button>
+          <button @click="handleEdit" class="btn btn-secondary" type="button">수정하기</button>
+          <button @click="$emit('close')" class="btn btn-primary" type="button">닫기</button>
         </div>
       </div>
   </div>
@@ -136,6 +128,8 @@ import { ref, computed, watch, onUnmounted } from 'vue'
 import EmojiSelector from './EmojiSelector.vue'
 import QuestionAccordion from './QuestionAccordion.vue'
 import { diaryAPI } from '../services/api'
+
+// Images
 import happyImg from '../assets/01.png'
 import calmImg from '../assets/02.png'
 import neutralImg from '../assets/03.png'
@@ -144,553 +138,284 @@ import angryImg from '../assets/05.png'
 
 export default {
   name: 'DiaryModal',
-  components: {
-    EmojiSelector,
-    QuestionAccordion
-  },
+  components: { EmojiSelector, QuestionAccordion },
   props: {
-    date: {
-      type: String,
-      required: true
-    },
-    diary: {
-      type: Object,
-      default: null
-    }
+    date: { type: String, required: true },
+    diary: { type: Object, default: null }
   },
   emits: ['close', 'saved'],
   setup(props, { emit }) {
+    // === Utils & Data ===
     const isViewMode = ref(!!props.diary)
-    const showForm = ref(false) 
+    const showForm = ref(false)
     const saving = ref(false)
-    const localSavedDiary = ref(null) 
     
-    // Polling State
-    const progressData = ref({
-      isAnalyzing: false,
-      percent: 0,
-      message: '',
-      eta: 0,
-      timerIds: []
-    })
-    
-    // mood mapping helper
-    const moodLevels = {
-        'angry': 1, 'sad': 2, 'neutral': 3, 'calm': 4, 'happy': 5
-    }
-    const moodLevelToName = {
-        1: 'angry', 2: 'sad', 3: 'neutral', 4: 'calm', 5: 'happy'
-    }
+    // 이 변수가 화면에 보여지는 실제 데이터입니다.
+    // 처음엔 props.diary를 쓰지만, 저장 후에는 서버 응답값을 씁니다.
+    const localDiary = ref(null) 
 
-    const formData = ref({
-      mood: props.diary ? moodLevelToName[props.diary.mood_level] || 'neutral' : '',
-      question1: props.diary?.event || '',
-      question2: props.diary?.emotion_desc || '',
-      question3: props.diary?.emotion_meaning || '',
-      question4: props.diary?.self_talk || ''
+    const currentDiary = computed(() => {
+        return localDiary.value || props.diary || {}
     })
 
-    const formattedDate = computed(() => {
-      if (!props.date) return ''
-      const parts = props.date.split('-')
-      if (parts.length < 3) return props.date
-      const [year, month, day] = parts
-      return `${parseInt(month)}월 ${parseInt(day)}일`
-    })
+    // === AI Progress State ===
+    const isProcessing = ref(false)
+    const progressPercent = ref(0)
+    const loadingMessage = ref('AI 분석 준비 중...')
+    const eta = ref(0)
+    const timerIds = ref([]) // interval ID 관리
 
-    // Compute which diary to display
-    const displayDiary = computed(() => {
-      // Prioritize localSavedDiary (newly saved result)
-      if (localSavedDiary.value) return localSavedDiary.value
-      // Then props.diary (existing entry)
-      if (props.diary) return props.diary
-      // Fallback empty
-      return {}
-    })
-    
-    // Force show progress bar if text says "Analyzing..."
-    const showProgressBar = computed(() => {
-        const isAnalyzingState = progressData.value.isAnalyzing;
-        const hasAnalyzingText = displayDiary.value.ai_prediction && 
-                                 displayDiary.value.ai_prediction.includes('분석 중');
-        return isAnalyzingState || hasAnalyzingText;
-    })
-
-    const isValid = computed(() => {
-      return formData.value.mood && 
-             formData.value.question1.trim() && 
-             formData.value.question2.trim()
-    })
-
+    // === Constants ===
+    const moodLevels = { 'angry': 1, 'sad': 2, 'neutral': 3, 'calm': 4, 'happy': 5 }
+    const moodLevelToName = { 1: 'angry', 2: 'sad', 3: 'neutral', 4: 'calm', 5: 'happy' }
     const emojiMap = {
-      1: { icon: angryImg, name: '화나' },
-      2: { icon: sadImg, name: '우울해' },
-      3: { icon: neutralImg, name: '그저그래' },
-      4: { icon: calmImg, name: '편안해' },
-      5: { icon: happyImg, name: '행복해' },
-      // Support string keys just in case
-      'angry': { icon: angryImg, name: '화나' },
-      'sad': { icon: sadImg, name: '우울해' },
-      'neutral': { icon: neutralImg, name: '그저그래' },
-      'calm': { icon: calmImg, name: '편안해' },
-      'happy': { icon: happyImg, name: '행복해' }
+      1: { icon: angryImg, name: '화나' }, 2: { icon: sadImg, name: '우울해' },
+      3: { icon: neutralImg, name: '그저그래' }, 4: { icon: calmImg, name: '편안해' },
+      5: { icon: happyImg, name: '행복해' }
     }
 
-    const getMoodEmoji = (mood) => {
-      return emojiMap[mood]?.icon || '' 
-    }
-
-    const getMoodName = (mood) => {
-      return emojiMap[mood]?.name || ''
-    }
-
-    const formatDateTime = (datetime) => {
-      if(!datetime) return ''
-      const date = new Date(datetime)
-      return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
-    }
-
-    // Polling Logic
-    const startPolling = (taskId) => {
-      progressData.value.isAnalyzing = true;
-      progressData.value.percent = 0;
-      progressData.value.message = 'AI 분석 준비 중...';
-      progressData.value.eta = 15;
-      
-      const countdownInterval = setInterval(() => {
-        if (progressData.value.eta > 0) {
-          progressData.value.eta--;
-        }
-      }, 1000);
-      
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await diaryAPI.getTaskStatus(taskId);
-          
-          if (status.state === 'PROGRESS') {
-            progressData.value.percent = status.process_percent;
-            progressData.value.message = status.message;
-            if (status.eta_seconds > 0) { 
-                 progressData.value.eta = status.eta_seconds; 
-            }
-          } else if (status.state === 'SUCCESS') {
-            stopPolling();
-            progressData.value.isAnalyzing = false;
-            progressData.value.percent = 100;
-            
-            // Reload the local saved diary
-            const updatedDiary = await diaryAPI.getDiary(displayDiary.value.id);
-            localSavedDiary.value = updatedDiary;
-            
-            emit('saved');
-          } else if (status.state === 'FAILURE' || status.state === 'REVOKED') {
-            stopPolling();
-            progressData.value.isAnalyzing = false;
-            progressData.value.message = '분석 실패';
-          }
-        } catch (e) {
-          console.error("Polling error", e);
-        }
-      }, 1000);
-      
-      progressData.value.timerIds = [countdownInterval, pollInterval];
-    };
-    
-    const stopPolling = () => {
-      progressData.value.timerIds.forEach(id => clearInterval(id));
-      progressData.value.timerIds = [];
-    };
-    
-    onUnmounted(() => {
-      stopPolling();
-    });
-
-    const handleSave = async () => {
-      if (!isValid.value) return
-
-      saving.value = true
-      try {
-        const data = {
-          date: props.date,
-          mood: formData.value.mood,
-          question1: formData.value.question1,
-          question2: formData.value.question2,
-          question3: formData.value.question3,
-          question4: formData.value.question4
-        }
-        
-        let result = null;
-
-        if (props.diary) {
-          // Update
-          result = await diaryAPI.updateDiary(props.diary.id, data)
-        } else {
-          // Create
-          result = await diaryAPI.createDiary(data)
-        }
-        
-         // Update local state to show View Mode immediately
-         localSavedDiary.value = result;
-         isViewMode.value = true;
-         showForm.value = false;
-         
-         // Start Polling if task_id exists
-         if (result && result.task_id) {
-           startPolling(result.task_id);
-         }
-         
-         // Notify parent list (background refresh)
-         emit('saved')
-         
-      } catch (error) {
-        console.error('Failed to save diary:', error)
-        alert('저장에 실패했습니다.')
-      } finally {
-        saving.value = false
-      }
-    }
-
-    const handleEdit = () => {
-      isViewMode.value = false
-      showForm.value = true
-      // Pre-fill form with displayed data
-      const current = displayDiary.value;
-      if (current) {
-          formData.value = {
-            mood: moodLevelToName[current.mood_level] || 'neutral',
-            question1: current.event || '',
-            question2: current.emotion_desc || '',
-            question3: current.emotion_meaning || '',
-            question4: current.self_talk || ''
-          }
-      }
-    }
-
-    const startWriting = () => {
-      showForm.value = true
-    }
-
-    const cancelWriting = () => {
-      showForm.value = false
-      emit('close')
-    }
-
-    const handleDelete = async () => {
-      const targetId = displayDiary.value.id || props.diary?.id;
-      if (!targetId) return
-      
-      if (confirm('정말 이 일기를 삭제하시겠습니까?')) {
-        try {
-          await diaryAPI.deleteDiary(targetId)
-          alert('일기가 삭제되었습니다.')
-          emit('saved') 
-          emit('close')
-        } catch (error) {
-          console.error('Failed to delete diary:', error)
-          alert('삭제에 실패했습니다.')
-        }
-      }
-    }
-
-    const startFallbackPolling = () => {
-      // Fake Polling for when we don't have task_id (e.g. re-opened modal)
-      progressData.value.isAnalyzing = true;
-      progressData.value.message = 'AI가 분석하고 있습니다...';
-      progressData.value.percent = 30; 
-      progressData.value.eta = 10;
-      
-      const interval = setInterval(async () => {
-         // 1. Fake Progress
-         if (progressData.value.percent < 90) {
-            progressData.value.percent += 5;
-         }
-         if (progressData.value.eta > 0) {
-            progressData.value.eta--;
-         }
-         
-         // 2. Check DB if finished (Blind Check)
-         if (displayDiary.value.id) {
-             try {
-                const check = await diaryAPI.getDiary(displayDiary.value.id);
-                if (check.ai_prediction && !check.ai_prediction.includes('분석 중')) {
-                    // Finished!
-                    clearInterval(interval);
-                    progressData.value.isAnalyzing = false;
-                    localSavedDiary.value = check; // Refresh View
-                    emit('saved');
-                }
-             } catch(e) {}
-         }
-      }, 2000); // Check every 2 seconds
-      
-      progressData.value.timerIds.push(interval);
-    }
-
-    watch(() => props.diary, (newDiary) => {
-      isViewMode.value = !!newDiary
-      localSavedDiary.value = null; 
-      // Reset Polling
-      stopPolling();
-      
-      if (newDiary) {
-        formData.value = {
-          mood: moodLevelToName[newDiary.mood_level] || 'neutral',
-          question1: newDiary.event || '',
-          question2: newDiary.emotion_desc || '',
-          question3: newDiary.emotion_meaning || '',
-          question4: newDiary.self_talk || ''
-        }
-      }
+    // === Form Data ===
+    const formData = ref({
+      mood: 'neutral',
+      question1: '', question2: '', question3: '', question4: ''
     })
-    
-    // Watch displayDiary to trigger fallback polling if needed
-    watch(() => displayDiary.value, (newVal) => {
-        if (newVal.ai_prediction && 
-            newVal.ai_prediction.includes('분석 중') && 
-            !progressData.value.isAnalyzing) {
-            console.log("Triggering Fallback Polling...");
-            startFallbackPolling();
+
+    // === Computed Helpers ===
+    const formattedDate = computed(() => {
+        if (!props.date) return ''
+        const parts = props.date.split('-')
+        if (parts.length < 3) return props.date
+        return `${parseInt(parts[1])}월 ${parseInt(parts[2])}일`
+    })
+
+    const formattedDateTime = computed(() => {
+        const dStr = currentDiary.value.created_at || props.diary?.created_at
+        if (!dStr) return ''
+        const d = new Date(dStr)
+        return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+    })
+
+    const isValid = computed(() => formData.value.mood && formData.value.question1.trim())
+
+    // === Methods ===
+    const getMoodEmoji = (lvl) => emojiMap[lvl]?.icon || ''
+    const getMoodName = (lvl) => emojiMap[lvl]?.name || ''
+
+    // === AI Polling Logic (The Core) ===
+    const clearTimers = () => {
+        timerIds.value.forEach(id => clearInterval(id))
+        timerIds.value = []
+    }
+
+    // 1. 진짜 Polling (Task ID 있을 때)
+    const startRealPolling = (taskId) => {
+        console.log("🚀 Starting Real Polling for Task:", taskId)
+        isProcessing.value = true
+        progressPercent.value = 5
+        loadingMessage.value = "AI가 일기를 읽고 있습니다..."
+        eta.value = 15
+
+        // Countdown
+        const cdTimer = setInterval(() => { if(eta.value > 0) eta.value-- }, 1000)
+        timerIds.value.push(cdTimer)
+
+        // Status Check
+        const pollTimer = setInterval(async () => {
+            try {
+                const status = await diaryAPI.getTaskStatus(taskId)
+                console.log("Polling Status:", status)
+
+                if (status.state === 'PROGRESS') {
+                    progressPercent.value = status.process_percent
+                    loadingMessage.value = status.message
+                    if(status.eta_seconds > 0) eta.value = status.eta_seconds
+                } 
+                else if (status.state === 'SUCCESS') {
+                    console.log("✅ Analysis Complete!")
+                    finishPolling()
+                } 
+                else if (status.state === 'FAILURE') {
+                    console.error("❌ Analysis Failed")
+                    isProcessing.value = false
+                    loadingMessage.value = "분석 실패"
+                    clearTimers()
+                }
+            } catch (e) { console.error(e) }
+        }, 1000)
+        timerIds.value.push(pollTimer)
+    }
+
+    // 2. 가짜 Polling (Task ID 없을 때, 재접속 시)
+    const startFakePolling = () => {
+        console.log("👻 Starting Fallback Polling")
+        isProcessing.value = true
+        loadingMessage.value = "이전 분석 작업을 확인 중입니다..."
+        progressPercent.value = 30
+        eta.value = 10
+
+        const interval = setInterval(async () => {
+            // Fake Progress Animation
+            if (progressPercent.value < 90) progressPercent.value += 5
+            if (eta.value > 0) eta.value--
+
+            // Check DB directly
+            if (currentDiary.value.id) {
+                try {
+                    const fresh = await diaryAPI.getDiary(currentDiary.value.id)
+                    // 만약 '분석 중' 텍스트가 사라졌다면 완료된 것!
+                    if (fresh.ai_prediction && !fresh.ai_prediction.includes('분석 중')) {
+                        console.log("✅ DB Check: Analysis Finished!")
+                        localDiary.value = fresh 
+                        finishPolling()
+                    }
+                } catch (e) {}
+            }
+        }, 2000)
+        timerIds.value.push(interval)
+    }
+
+    const finishPolling = async () => {
+        clearTimers()
+        isProcessing.value = false
+        progressPercent.value = 100
+        
+        // 최종 데이터 갱신
+        if (currentDiary.value.id) {
+            const finalData = await diaryAPI.getDiary(currentDiary.value.id)
+            localDiary.value = finalData
         }
-    }, { immediate: true, deep: true })
+        emit('saved')
+    }
+
+    // === Handlers ===
+    const handleSave = async () => {
+        saving.value = true
+        try {
+            const payload = {
+                date: props.date,
+                mood: formData.value.mood,
+                question1: formData.value.question1, 
+                question2: formData.value.question2,
+                question3: formData.value.question3, 
+                question4: formData.value.question4
+            }
+
+            let result = null
+            if (props.diary) result = await diaryAPI.updateDiary(props.diary.id, payload)
+            else result = await diaryAPI.createDiary(payload)
+
+            // 즉시 화면 갱신 (로딩 상태)
+            localDiary.value = result
+            isViewMode.value = true
+            showForm.value = false
+
+            // Polling 시작
+            if (result.task_id) startRealPolling(result.task_id)
+            else startFakePolling() // Task ID 없으면 Fallback
+
+            emit('saved')
+        } catch (e) {
+            alert('저장 실패: ' + e.message)
+        } finally {
+            saving.value = false
+        }
+    }
+
+    const startWriting = () => { showForm.value = true }
+    const cancelWriting = () => { showForm.value = false; emit('close') }
+    const handleEdit = () => {
+        isViewMode.value = false
+        showForm.value = true
+        // 데이터 채우기
+        const d = currentDiary.value
+        formData.value = {
+            mood: moodLevelToName[d.mood_level] || 'neutral',
+            question1: d.event||'', question2: d.emotion_desc||'',
+            question3: d.emotion_meaning||'', question4: d.self_talk||''
+        }
+    }
+    const handleDelete = async () => {
+        if(!confirm('삭제하시겠습니까?')) return
+        try {
+            await diaryAPI.deleteDiary(currentDiary.value.id)
+            emit('saved'); emit('close')
+        } catch(e) { alert('삭제 실패') }
+    }
+
+    // === Watchers ===
+    // 1. Props 변경 시 초기화
+    watch(() => props.diary, (newVal) => {
+        isViewMode.value = !!newVal
+        localDiary.value = null 
+        clearTimers()
+        isProcessing.value = false
+        
+        if (newVal) {
+             // 폼 데이터 초기화
+             formData.value = {
+                mood: moodLevelToName[newVal.mood_level] || 'neutral',
+                question1: newVal.event||'', question2: newVal.emotion_desc||'',
+                question3: newVal.emotion_meaning||'', question4: newVal.self_talk||''
+            }
+            // 2. 이미 열었을 때 '분석 중'이면 Fallback Polling 시작
+            if (newVal.ai_prediction && newVal.ai_prediction.includes('분석 중')) {
+                startFakePolling()
+            }
+        }
+    }, { immediate: true })
+
+    onUnmounted(() => clearTimers())
 
     return {
-      isViewMode,
-      showForm,
-      saving,
-      formData,
-      formattedDate,
-      isValid,
-      displayDiary,
-      progressData,
-      getMoodEmoji,
-      getMoodName,
-      showProgressBar,
-      formatDateTime,
-      handleSave,
-      handleEdit,
-      handleDelete,
-      startWriting,
-      cancelWriting
+        isViewMode, showForm, saving, formData,
+        currentDiary, formattedDate, formattedDateTime, isValid,
+        getMoodEmoji, getMoodName,
+        handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
+        // AI State
+        isProcessing, progressPercent, loadingMessage, eta
     }
   }
 }
 </script>
 
 <style scoped>
-.diary-panel {
-  height: 100%;
-  overflow-y: auto;
-  padding: var(--spacing-xl);
-  background-color: var(--bg-card);
-}
+/* 기존 스타일 유지 + AI Progress Bar 스타일 추가 */
+.diary-panel { height: 100%; overflow-y: auto; padding: 24px; background: #fff; }
+.modal-header { border-bottom: 2px solid #eee; padding-bottom: 16px; margin-bottom: 24px; }
+.modal-title { font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+.diary-timestamp { font-size: 13px; color: #888; }
 
-.modal-header {
-  margin-bottom: var(--spacing-xl);
-  padding-bottom: var(--spacing-lg);
-  border-bottom: 2px solid var(--color-border);
-}
+.diary-empty, .diary-form { display: flex; flex-direction: column; gap: 20px; }
+.empty-message { text-align: center; padding: 40px 0; }
+.btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; font-size: 14px; transition: 0.2s; }
+.btn-primary { background: #FFD93D; color: #333; } /* Yellow Theme */
+.btn-primary:hover { background: #FFC107; }
+.btn-primary:disabled { background: #eee; cursor: not-allowed; }
+.btn-secondary { background: #717171; color: white; display: inline-block; margin-right: 8px;}
+.btn-danger { background: #ff4757; color: white; display: inline-block; margin-right: 8px;}
+.modal-actions { margin-top: 24px; border-top: 1px solid #eee; padding-top: 16px; display: flex; justify-content: flex-end; }
 
-.modal-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-xs);
-}
+/* View Mode */
+.view-emoji { background: #FFF9C4; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 24px; }
+.emoji-container { display: flex; align-items: center; gap: 16px; }
+.emoji-large { width: 80px; height: 80px; }
+.emoji-info { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.emoji-label { font-size: 18px; font-weight: bold; }
+.ai-prediction-badge { font-size: 12px; background: rgba(0,0,0,0.1); padding: 4px 8px; border-radius: 4px; }
 
-.diary-timestamp {
-  font-size: 13px;
-  color: var(--color-text-light);
-}
+.ai-comment-box { background: rgba(255,255,255,0.8); padding: 16px; border-radius: 8px; width: 100%; display: flex; gap: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.ai-comment-text { font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
 
-.diary-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
+/* [NEW] AI Loading Section Style */
+.ai-loading-section { width: 100%; background: rgba(255,255,255,0.6); padding: 16px; border-radius: 8px; margin-top: 12px; }
+.loading-header { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
+.loading-msg { color: #333; }
+.loading-timer { color: #FF9800; }
+.progress-track { width: 100%; height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+.progress-fill { height: 100%; background: #FFD93D; transition: width 0.5s ease; }
 
-.diary-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 400px;
-  padding: var(--spacing-xl);
-}
-
-.empty-message {
-  text-align: center;
-}
-
-.empty-message .btn {
-  padding: var(--spacing-md) var(--spacing-xl);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.modal-actions {
-  display: flex;
-  gap: var(--spacing-md);
-  justify-content: space-between;
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-lg);
-  border-top: 1px solid var(--color-border);
-}
-
-.modal-actions .btn {
-  flex: 1;
-}
-
-/* 상세보기 모드 스타일 */
-.diary-view {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xl);
-}
-
-.view-emoji {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  background-color: rgba(255, 217, 61, 0.1);
-  border-radius: var(--radius-lg);
-}
-
-.emoji-container {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-}
-
-.emoji-info {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.emoji-large {
-  width: 72px;
-  height: 72px;
-  object-fit: contain;
-}
-
-.emoji-label {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--color-text);
-}
-
-.ai-prediction-badge {
-  font-size: 12px;
-  color: var(--color-text-light);
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  font-weight: 500;
-}
-
-.ai-comment-box {
-  margin-top: var(--spacing-md);
-  padding: 12px;
-  background-color: rgba(255, 255, 255, 0.6);
-  border-radius: var(--radius-md);
-  display: flex;
-  gap: var(--spacing-sm);
-  align-items: flex-start;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.ai-icon {
-  font-size: 20px;
-}
-
-.ai-comment-text {
-  font-size: 14px;
-  color: var(--color-text);
-  line-height: 1.5;
-  text-align: left;
-  flex: 1;
-  font-weight: 500;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-
-.ai-progress-container {
-  margin-top: var(--spacing-md);
-  width: 100%;
-  max-width: 400px;
-  background-color: rgba(255, 255, 255, 0.6);
-  padding: 16px;
-  border-radius: var(--radius-md);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.progress-eta {
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-.progress-bar-bg {
-  width: 100%;
-  height: 8px;
-  background-color: #e0e0e0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background-color: var(--color-primary); /* Yellow/Orange theme */
-  border-radius: 4px;
-  transition: width 0.5s ease-in-out;
-}
-
-.view-answers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-lg);
-}
-
-.answer-item {
-  padding: var(--spacing-md);
-  background-color: var(--bg-primary);
-  border-radius: var(--radius-md);
-}
-
-.answer-question {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: var(--spacing-sm);
-}
-
-.answer-text {
-  font-size: 14px;
-  color: var(--color-text-light);
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-@media (max-width: 640px) {
-  .diary-modal {
-    padding: var(--spacing-lg);
-  }
-  
-  .modal-actions {
-    flex-direction: column;
-  }
-}
+.view-answers { display: flex; flex-direction: column; gap: 20px; }
+.answer-item { background: #f8f9fa; padding: 16px; border-radius: 8px; }
+.answer-question { font-size: 14px; color: #333; margin-bottom: 8px; font-weight: bold; }
+.answer-text { font-size: 14px; color: #666; line-height: 1.6; white-space: pre-wrap; }
 </style>
