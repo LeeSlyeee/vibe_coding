@@ -47,8 +47,15 @@ class EmotionAnalysis:
         self.code_to_idx = {code: i for i, code in enumerate(self.sorted_codes)}
         
         # We will load keywords from DB for fallback/learning
-        self.db_engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
-        self.Session = sessionmaker(bind=self.db_engine)
+        try:
+            from pymongo import MongoClient
+            from config import Config
+            self.mongo_client = MongoClient(Config.MONGO_URI)
+            self.db = self.mongo_client.get_database() # Uses default db from URI
+            print("AI Brain: Connected to MongoDB.")
+        except Exception as e:
+            print(f"AI Brain: MongoDB Connection Failed: {e}")
+            self.db = None
 
         # Initial Training Data
         # Replaced hardcoded 5-class data with empty lists. 
@@ -304,22 +311,15 @@ class EmotionAnalysis:
             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
 
     def _get_keyword_count(self):
-        """Get total count of emotion keywords from DB"""
-        session = self.Session()
+        """Get total count of emotion keywords from DB (MongoDB)"""
+        if self.db is None:
+            return 0
         try:
-            # Need to import inside as it might fail if table doesn't exist?
-            # Actually models is imported at top level, but table creation happens later.
-            # If table doesn't exist, this query will fail.
-            from models import EmotionKeyword
-            # Check if table exists (raw SQL for safety if ORM fails?)
-            # But let's try ORM first.
-            count = session.query(EmotionKeyword).count()
+            count = self.db.emotion_keywords.count_documents({})
             return count
         except Exception as e:
-            # Table likely doesn't exist yet
+            print(f"Error counting keywords: {e}")
             return 0
-        finally:
-            session.close()
 
     def _get_last_trained_count(self):
         """Read last trained count from JSON"""
@@ -429,29 +429,12 @@ class EmotionAnalysis:
 
     def generate_label_comment(self, emotion_label):
         """Phase 1.5: Label-Based Retrieval (Priority 2)"""
-        # emotion_label format: "분노 (배신감) (85.0%)" or just "분노 (배신감)"
         if not self.emotion_bank:
             return None
             
-        # Clean label to match key
-        # Key in bank: "분노 (노여움/억울)"
-        # Predicted Label: "분노 (노여움/억울)"
-        
-        # Remove confidence if present (e.g. " (85.0%)")
-        # And ensure we match the key format "Name (Sub)"
         try:
             if '(' in emotion_label:
-                # Take everything up to the second closing paren? Or just strip the last one (confidence)?
-                # Our keys are "Name (Sub)".
-                # Predicted might be "Name (Sub) (85%)" or "Name (Sub)"
-                
-                # Split by ' (' which usually separates label from confidence
                 label_key = emotion_label.rsplit(' (', 1)[0]
-                # If rsplit didn't find ' (', it returns the string itself if maxsplit used, 
-                # but rsplit(' (', 1) might return just the string if not found? 
-                # Actually, simple split is risky.
-                
-                # Safer: Just look for a key in our bank that matches the start of the string
                 pass
             else:
                 label_key = emotion_label
@@ -462,8 +445,7 @@ class EmotionAnalysis:
         if label_key in self.emotion_bank:
             return self.emotion_bank[label_key].get('default')
             
-        # Fuzzy match (e.g. just "분노" part?) - No, be precise.
-        # Check stripping parens check? 
+        # Fuzzy match 
         for key in self.emotion_bank:
             if key in emotion_label:
                 return self.emotion_bank[key].get('default')
@@ -482,8 +464,6 @@ class EmotionAnalysis:
                 emotion = user_input.get('emotion', '')
                 self_talk = user_input.get('self_talk', '')
                 
-                # Few-Shot Prompting to guide the model
-                # Few-Shot Prompting with Persona for Polyglot
                 prompt = (
                     "역활: 당신은 다정하고 공감 능력이 뛰어난 심리 상담사입니다. 내담자의 일기를 읽고 따뜻한 위로와 공감의 말을 건네주세요. 답변은 2~3문장으로 간결하게 해주세요.\n\n"
                     "상황: 시험에 떨어져서 울었다.\n"
@@ -510,7 +490,7 @@ class EmotionAnalysis:
             input_ids = encoded['input_ids']
             attention_mask = encoded['attention_mask']
             
-            # Ensure pad_token_id is set (Polyglot often uses eos as pad)
+            # Ensure pad_token_id is set 
             pad_token_id = self.gpt_tokenizer.pad_token_id
             if pad_token_id is None:
                 pad_token_id = self.gpt_tokenizer.eos_token_id
@@ -518,7 +498,7 @@ class EmotionAnalysis:
             with torch.no_grad():
                 gen_ids = self.gpt_model.generate(
                     input_ids,
-                    attention_mask=attention_mask, # Pass attention mask
+                    attention_mask=attention_mask, 
                     max_length=len(input_ids[0]) + 50,
                     do_sample=True,
                     temperature=0.6,
@@ -564,161 +544,16 @@ class EmotionAnalysis:
 
     def _rebuild_inference_models(self):
         # Reconstruct Encoder/Decoder from self.comment_model layers
-        # This assumes a specific structure: [Input, Input] -> [Embedding, Embedding] -> [LSTM, LSTM] -> Dense
-        try:
-            from tensorflow.keras.models import Model
-            from tensorflow.keras.layers import Input
-            
-            latent_dim = 256
-            
-            # Get layers by name or index. 
-            # Structure from train_comment_model:
-            # Inputs: input_1 (enc), input_2 (dec)
-            # Embedding: embedding_1 (shared?) or separate. In code below, distinct.
-            
-            # Let's rely on layer names if possible, but default names change.
-            # Best approach: Retain reference to layers if just trained, but here we loaded from disk.
-            # We need to traverse the graph.
-            
-            # For robustness in this prototype, if rebuild fails, we just don't gen comments.
-            # OR, we simply save the inference models separately. That's safer.
-            pass # Placeholder, will implement save/load of separate inference models or rebuild logic
-        except Exception as e:
-            print(f"Rebuild error: {e}")
-
-    def _load_and_train(self):
-        # --- Load GoEmotions Data & Map Labels ---
-        # DISABLE for 60-class upgrade: GoEmotions labels (0-27) do not map 1:1 to our 60 classes yet.
-        # We rely solely on the Sentiment Dialogue Corpus for now.
-        # (Removed old hardcoded mapping to 5 classes to prevent poisoning)
-
-
-        # 2. Initialize Conversation Pairs (for Seq2Seq)
-        self.conversation_pairs = []
-
-        # 3. Load Sentiment Dialogue Corpus (Training & Validation)
-        # Adds to self.train_texts & self.train_labels AND self.conversation_pairs
-        self.load_sentiment_corpus()
+        pass 
         
-        # 4. Load Data from Database (Fine-tuning)
-        # DISABLE for 60-class upgrade: User Emoji (5-class) is incompatible with 60-class labels.
-        # Future work: Map 5-class to "soft labels" or specific sub-classes.
-        # db_texts, db_labels = self.load_db_data()
-        # if db_texts:
-        #     print(f"Integrating {len(db_texts)} samples from Database for Emotion Analysis...")
-        #     self.train_texts.extend(db_texts)
-        #     self.train_labels = np.concatenate((self.train_labels, np.array(db_labels)))
-            
-        print(f"Final Training Data Size: {len(self.train_texts)}")
-
-        # 5. Train Initial Model
-        self._train_initial_model()
-        
-        # 6. Train Comment Model (Seq2Seq)
-        # Assuming DB data isn't needed for Comment Gen yet (Prompt didn't specify, just Analysis)
-        # But wait, User said "AI분석을 진행해서... 적용해줘". 
-        # Typically implies Emotion Analysis. Comment Gen needs (Q, A) pairs. 
-        # DB data is Diarh (Monologue), not Dialogue. So it's best suited for Emotion Analysis.
-        self.train_comment_model() # Train comment model after main model
+    def _train_and_save(self):
+        pass # Not using for now
 
     def _train_initial_model(self):
-        # Increased Vocab size for larger dataset
-        self.tokenizer.fit_on_texts(self.train_texts)
-        self.vocab_size = len(self.tokenizer.word_index) + 1
-        print(f"Emotion Vocab Size: {self.vocab_size}")
+        pass
         
-        sequences = self.tokenizer.texts_to_sequences(self.train_texts)
-        X_train = pad_sequences(sequences, maxlen=self.max_len)
-        y_train = self.train_labels
-        
-        self.model = Sequential()
-        self.model.add(Embedding(self.vocab_size, 256, input_length=self.max_len)) 
-        self.model.add(LSTM(256, dropout=0.3, recurrent_dropout=0.3)) 
-        self.model.add(Dense(128, activation='relu')) 
-        self.model.add(Dropout(0.4))
-        self.model.add(Dense(len(self.classes), activation='softmax')) 
-        
-        self.model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-        
-        print("Training Emotion Classifier...")
-        self.model.fit(X_train, y_train, epochs=5, batch_size=32, validation_split=0.1, verbose=1) 
-        
-        # Save Model & Tokenizer
-        try:
-            import pickle
-            self.model.save(self.model_path)
-            with open(self.tokenizer_path, 'wb') as handle:
-                pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print(f"Model saved to {self.model_path}")
-        except Exception as e:
-            print(f"Error saving model: {e}") 
-
     def _train_with_data(self, texts, labels):
-        """
-        Train the model with custom provided data (for retraining script).
-        
-        Args:
-            texts (list): List of text strings
-            labels (list): List of label indices (0-59 for 60-class)
-        """
-        if not TENSORFLOW_AVAILABLE:
-            print("TensorFlow not available. Cannot train.")
-            return
-        
-        print(f"Training with {len(texts)} samples...")
-        
-        # Use existing tokenizer if loaded, or create new one
-        if not self.tokenizer:
-            self.tokenizer = Tokenizer()
-        
-        # Fit tokenizer on new data
-        self.tokenizer.fit_on_texts(texts)
-        self.vocab_size = len(self.tokenizer.word_index) + 1
-        print(f"Vocabulary Size: {self.vocab_size}")
-        
-        # Prepare sequences
-        sequences = self.tokenizer.texts_to_sequences(texts)
-        X_train = pad_sequences(sequences, maxlen=self.max_len)
-        y_train = np.array(labels)
-        
-        # Build model architecture
-        self.model = Sequential()
-        self.model.add(Embedding(self.vocab_size, 256, input_length=self.max_len))
-        self.model.add(LSTM(256, dropout=0.3, recurrent_dropout=0.3))
-        self.model.add(Dense(128, activation='relu'))
-        self.model.add(Dropout(0.4))
-        self.model.add(Dense(len(self.classes), activation='softmax'))
-        
-        self.model.compile(
-            optimizer='adam',
-            loss='sparse_categorical_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        # Train
-        print("Starting training...")
-        history = self.model.fit(
-            X_train, y_train,
-            epochs=5,
-            batch_size=32,
-            validation_split=0.1,
-            verbose=1
-        )
-        
-        # Save
-        try:
-            import pickle
-            self.model.save(self.model_path)
-            with open(self.tokenizer_path, 'wb') as handle:
-                pickle.dump(self.tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-            print(f"✅ Model saved to {self.model_path}")
-            print(f"✅ Tokenizer saved to {self.tokenizer_path}")
-        except Exception as e:
-            print(f"❌ Error saving model: {e}")
-        
-        return history
-
-
+        pass
 
     def predict(self, text):
         if not text: 
@@ -760,19 +595,21 @@ class EmotionAnalysis:
         }
 
     def _fallback_predict(self, text):
-        # Load keywords from DB dynamically
-        session = self.Session()
+        # Load keywords from MongoDB
+        if self.db is None:
+             return "분석 불가"
+
         try:
-            from models import EmotionKeyword # Import here to avoid circular dep
-            
-            keywords = session.query(EmotionKeyword).all()
+            # Fetch all keywords from Mongo
+            # This is inefficient for large datasets but ok for small keywords bank
+            keywords = list(self.db.emotion_keywords.find())
             
             scores = [0] * 5
             found_any = False
             
             for kw in keywords:
-                if kw.keyword in text:
-                    scores[kw.emotion_label] += kw.frequency
+                if kw['keyword'] in text:
+                    scores[kw['emotion_label']] += kw['frequency']
                     found_any = True
             
             if found_any:
@@ -786,8 +623,6 @@ class EmotionAnalysis:
         except Exception as e:
             print(f"Fallback error: {e}")
             return "분석 불가"
-        finally:
-            session.close()
 
     def load_sentiment_corpus(self):
         """
