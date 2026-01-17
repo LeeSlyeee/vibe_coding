@@ -5,6 +5,10 @@
         <h1 class="auth-title">MOOD DIARY</h1>
         
         <form @submit.prevent="handleLogin" class="auth-form">
+          <div class="test-account-info">
+             <p>Test Account: <strong>test</strong> / <strong>12qw</strong></p>
+          </div>
+
           <div class="form-group">
             <input
               v-model="userId"
@@ -139,6 +143,17 @@ export default {
   padding: var(--spacing-sm);
   background-color: rgba(255, 107, 107, 0.1);
   border-radius: var(--radius-sm);
+}
+
+.test-account-info {
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
 .btn-large {
