@@ -24,7 +24,7 @@ mongo = PyMongo(app)
 
 # CORS Setup
 # CORS Setup
-allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173", "http://217.142.253.35"]
 client_url = os.environ.get('CLIENT_URL')
 if client_url:
     allowed_origins.append(client_url)
