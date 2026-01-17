@@ -17,10 +17,11 @@
           'other-month': !date.isCurrentMonth,
           'today': date.isToday,
           'has-diary': date.hasDiary,
-          'selected': selectedDate === date.dateString
+          'selected': selectedDate === date.dateString,
+          'future-date': date.isFuture
         }"
         @click="handleDateClick(date)"
-        :disabled="!date.isCurrentMonth"
+        :disabled="!date.isCurrentMonth || date.isFuture"
         type="button"
       >
         <span class="date-number">{{ date.day }}</span>
@@ -72,6 +73,9 @@ export default {
     }
 
     const dates = computed(() => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+
       const result = []
       const firstDay = new Date(props.year, props.month - 1, 1)
       const lastDay = new Date(props.year, props.month, 0)
@@ -90,12 +94,12 @@ export default {
           isToday: false,
           hasDiary: false,
           emoji: null,
-          dateString: null
+          dateString: null,
+          isFuture: false // Previous month dates visible in current view are always past relative to current view, but checked via disabled anyway
         })
       }
       
       // 현재 달 날짜
-      const today = new Date()
       for (let day = 1; day <= lastDate; day++) {
         const dateString = `${props.year}-${String(props.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
         const diary = props.diaries.find(d => d.date === dateString)
@@ -104,6 +108,9 @@ export default {
           today.getMonth() + 1 === props.month &&
           today.getDate() === day
         
+        const currentDataDate = new Date(props.year, props.month - 1, day)
+        const isFuture = currentDataDate > today
+
         result.push({
           key: `current-${day}`,
           day,
@@ -112,7 +119,8 @@ export default {
           hasDiary: !!diary,
           emoji: diary ? emojiMap[diary.mood] : null,
           aiPrediction: diary?.ai_prediction || null,
-          dateString
+          dateString,
+          isFuture
         })
       }
       

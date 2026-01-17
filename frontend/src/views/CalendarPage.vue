@@ -220,6 +220,13 @@ export default {
     }
 
     const handleDateClick = async (date) => {
+      const today = new Date()
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+      
+      if (date.dateString > todayStr) {
+        return
+      }
+
       selectedDate.value = date.dateString
       
       // 해당 날짜의 일기가 있는지 확인 (created_at과 date 둘 다 체크)
