@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-from flask_cors import CORS
+# from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_pymongo import PyMongo
 from datetime import datetime
@@ -25,13 +25,13 @@ mongo = PyMongo(app)
 # CORS Setup
 # CORS Setup
 # CORS Setup - Allow All (Debug Mode)
-CORS(app, resources={
-    r"/*": {
-        "origins": "*",
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-    }
-})
+# CORS(app, resources={
+#     r"/*": {
+#         "origins": "*",
+#         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+#         "allow_headers": ["Content-Type", "Authorization"],
+#     }
+# })
 
 jwt = JWTManager(app)
 
