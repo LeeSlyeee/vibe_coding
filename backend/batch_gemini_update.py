@@ -46,6 +46,11 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
+        # [Resumable Logic] Skip if already done
+        if d.get('ai_comment') and d.get('ai_prediction'):
+             print("⏭️  Skipping (Already Processed).")
+             continue
+        
         # Strict Rate Limit Enforcement (Gemini Free Tier: 15 RPM)
         # We aim for ~10 RPM to be safe -> 1 request every 6 seconds.
         SAFE_INTERVAL = 0.1 # No rate limits for local AI! 
