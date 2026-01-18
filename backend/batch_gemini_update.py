@@ -89,11 +89,10 @@ def batch_process_user(username="test"):
 if __name__ == "__main__":
     target_user = sys.argv[1] if len(sys.argv) > 1 else "test"
     
-    # Optional: Allow passing API Key as 2nd argument
-    if len(sys.argv) > 2:
-        new_key = sys.argv[2]
-        print(f"🔑 Using New API Key provided from command line: {new_key[:5]}...*****")
-        Config.GEMINI_API_KEY = AIzaSyAyHJM4BsRT46f2T-NQV5cktZF9f3_QfNw
-        os.environ['GEMINI_API_KEY'] = AIzaSyAyHJM4BsRT46f2T-NQV5cktZF9f3_QfNw
+    # Hardcoded Key Override (Temporary)
+    manual_key = "AIzaSyAyHJM4BsRT46f2T-NQV5cktZF9f3_QfNw"
+    print(f"🔑 Using Hardcoded API Key: {manual_key[:5]}...*****")
+    Config.GEMINI_API_KEY = manual_key
+    os.environ['GEMINI_API_KEY'] = manual_key
         
     batch_process_user(target_user)
