@@ -111,6 +111,27 @@ export default {
         const currentDataDate = new Date(props.year, props.month - 1, day)
         const isFuture = currentDataDate > today
 
+        // [Parsing AI Prediction]
+        // "AI가 예측한 당신의 감정은 '행복해 (95%)'입니다." -> "행복해 (95%)"
+        let shortPrediction = null
+        if (diary?.ai_prediction) {
+          try {
+             // Match content inside single quotes, allowing for parentheses and numbers
+             const match = diary.ai_prediction.match(/'([^']+)'/)
+             if (match && match[1]) {
+               // match[1] will rely include "행복해 (95%)"
+               shortPrediction = `AI 예측: ${match[1]}`
+             } else {
+               // Fallback
+               shortPrediction = diary.ai_prediction.length > 15
+                 ? diary.ai_prediction.slice(0, 12) + '...' 
+                 : diary.ai_prediction
+             }
+          } catch (e) {
+            shortPrediction = 'AI 분석값 오류'
+          }
+        }
+
         result.push({
           key: `current-${day}`,
           day,
@@ -118,7 +139,7 @@ export default {
           isToday,
           hasDiary: !!diary,
           emoji: diary ? emojiMap[diary.mood] : null,
-          aiPrediction: diary?.ai_prediction || null,
+          aiPrediction: shortPrediction,
           dateString,
           isFuture
         })

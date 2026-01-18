@@ -59,7 +59,7 @@ def batch_process_user(username="test"):
             start_time = time.time()
             try:
                 # Use the new ultra-fast method
-                prediction, comment = ai.analyze_diary_with_gemini(content)
+                prediction, comment = ai.analyze_diary_with_local_llm(content)
                 
                 if prediction and comment:
                     # Success!
@@ -68,7 +68,7 @@ def batch_process_user(username="test"):
                         {'$set': {
                             'ai_prediction': prediction,
                             'ai_comment': comment,
-                            'task_id': 'batch_update_v4' 
+                            'task_id': 'batch_update_v5' 
                         }}
                     )
                     print(f"✅ Diary {i+1} Done!")

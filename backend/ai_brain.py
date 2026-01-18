@@ -1034,21 +1034,16 @@ class EmotionAnalysis:
 
     # Seq2Seq Generation helpers removed
 
-    def analyze_diary_with_gemini(self, text):
-        """
-        [Ultra Fast Mode] Uses Gemini for both Classification and Comment Generation.
-        Uses Direct HTTP (REST) to prevent SDK hanging issues on OCI.
-        """
+
+
+    def analyze_diary_with_local_llm(self, text):
+        # [Local AI Mode] Uses Local Ollama (Gemma 2) for Analysis.
+        # Free, Unlimited, Private.
         import requests
         import json
         
-        if not self.gemini_model:
-            return None, None
-            
-        print(f"🚀 [HTTP Analysis] Requesting Gemini for All-in-One analysis...", end=" ", flush=True)
-
-        # OCI Local Ollama URL
-        print(f"🦙 [Local AI] Requesting Ollama (Gemma 2) for analysis...", end=" ", flush=True)
+        # Local Ollama URL
+        print(f"🦙 [Local AI] Requesting Ollama (Gemma 2:2b)...", end=" ", flush=True)
         try:
             url = "http://localhost:11434/api/generate"
             
@@ -1058,12 +1053,13 @@ class EmotionAnalysis:
                 f"반드시 다음 JSON 형식으로만 답변해. 다른 말은 절대 하지 마.\n"
                 f"{{\n"
                 f"  \"emotion\": \"happy\" | \"sad\" | \"angry\" | \"neutral\" | \"panic\",\n"
+                f"  \"confidence\": 0~100 (정수),\n"
                 f"  \"comment\": \"한국어 공감 코멘트\"\n"
                 f"}}"
             )
             
             payload = {
-                "model": "gemma2",
+                "model": "gemma2:2b",
                 "prompt": prompt_text,
                 "stream": False,
                 "format": "json"  # Gemma 2 supports JSON mode
@@ -1080,44 +1076,48 @@ class EmotionAnalysis:
             # Parse Response
             result = response.json()
             response_text = result.get('response', '{}')
+            print(f"🔍 Raw Ollama Output: {response_text[:300]}...") # Print first 300 chars to debug
             
             try:
                 data = json.loads(response_text)
                 
                 emotion_str = data.get('emotion', 'neutral').lower()
                 comment = data.get('comment', '오늘 하루도 고생 많으셨어요.')
+                confidence = data.get('confidence', 80) # Default to 80% if missing
                 
-                # Map emotion string to code
-                code_map = {
-                    "happy": 1, "joy": 1, 
-                    "sad": 2, "depressed": 2, "grief": 2,
-                    "neutral": 3, "calm": 3, "soso": 3,
-                    "angry": 4, "annoyed": 4, "rage": 4,
-                    "panic": 5, "anxious": 5, "fear": 5, "surprise": 5
+                # Map emotion string to Korean label
+                # 0:happy, 1:calm, 2:neutral, 3:depressed, 4:angry
+                # Adjusting to match DB/Frontend expectations usually:
+                emotion_map = {
+                    "happy": "행복해", "joy": "행복해", 
+                    "sad": "우울해", "depressed": "우울해", "grief": "우울해", 
+                    "neutral": "평온해", "calm": "평온해", "soso": "그저그래",
+                    "angry": "화가나", "annoyed": "화가나", "rage": "화가나",
+                    "panic": "우울해", "anxious": "우울해", "fear": "우울해", "surprise": "행복해"
                 }
-                emotion_code = code_map.get(emotion_str, 3)
+                
+                korean_emotion = emotion_map.get(emotion_str, "평온해")
+                formatted_prediction = f"AI가 예측한 당신의 감정은 '{korean_emotion} ({confidence}%)'입니다."
                 
                 print("Done!")
-                return str(emotion_code), comment
+                return formatted_prediction, comment
                 
-
-                
-            except (KeyError, IndexError, json.JSONDecodeError) as e:
+            except (json.JSONDecodeError) as e:
+                # Fallback for when JSON parsing fails (sometimes models gossip)
                 print(f"⚠️ Parse Failed: {e}")
                 return None, None
                 
         except Exception as e:
-            print(f"❌ HTTP/Network Error: {e}")
+            print(f"❌ Local AI Error: {e}")
+            # Ensure None is returned to trigger safe fallback
             return None, None
 
     def generate_comment(self, prediction_text, user_text=None):
-        """
-        Generate a supportive comment.
-        Priority: 1. Keyword Bank (Safety Net) 2. AI Generation (Seq2Seq) 3. Fallback
-        """
+        # Generate a supportive comment.
+        # Priority: 1. Keyword Bank (Safety Net) 2. AI Generation (Seq2Seq) 3. Fallback
         # If we have user_text and gemini, try fast path
         if user_text and self.gemini_model:
-             _, comment = self.analyze_diary_with_gemini(user_text)
+             _, comment = self.analyze_diary_with_local_llm(user_text)
              if comment: return comment
 
         # 1. Phase 1: Keyword Safety Net (Highest Priority)
@@ -1160,11 +1160,7 @@ class EmotionAnalysis:
 
 
     def update_keywords(self, text, mood_level):
-        """
-        Learn new keywords from the text based on the user's provided mood_level.
-        mood_level: 1-5 (User input)
-        Mapping: 5->0(Happy), 4->1(Calm), 3->2(Neutral), 2->3(Depressed), 1->4(Angry)
-        """
+        # Learn new keywords from the text based on the user's provided mood_level.
         if not text: return
 
         # Map mood_level to label

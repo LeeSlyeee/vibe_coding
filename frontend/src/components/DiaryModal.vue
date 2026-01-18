@@ -22,20 +22,21 @@
       <!-- 2. 초기 화면 (작성 전) -->
       <div v-if="!isViewMode && !showForm" class="diary-empty">
         <div class="empty-message">
-          <button @click="startWriting" class="btn btn-primary btn-large shadow-hover" type="button">
-            오늘의 감정 기록하기
-          </button>
-          
           <!-- 통합 인사이트 말풍선 (제미나이) -->
           <div v-if="mindsetInsight" class="insight-bubble insight-bubble-purple fade-in">
              <span class="insight-icon">🧘‍♀️</span>
              <span style="color: #4A148C;">{{ mindsetInsight }}</span>
           </div>
           <div v-else-if="isLoadingInsight" class="mindset-loading" style="margin-top: 12px;">
-                <span class="pulse-mini"></span> 마음의 흐름을 읽고 있어요...
+                <span class="pulse-mini"></span> 마음의 흐름을 읽고 있어요... 분석이 완료되면 일기를 작성할 수 있어요
           </div>
           
           <p v-if="!mindsetInsight && !isLoadingInsight" class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
+
+          <!-- 버튼을 인사이트 아래로 이동 및 조건부 표시 -->
+          <button v-if="mindsetInsight" @click="startWriting" class="btn btn-primary btn-large shadow-hover fade-in" type="button">
+            오늘의 감정 기록하기
+          </button>
         </div>
       </div>
 
