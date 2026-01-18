@@ -46,43 +46,50 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        # Infinite Retry Loop (Until Success)
-        retry_count = 0
+        # Strict Rate Limit Enforcement (Gemini Free Tier: 15 RPM)
+        # We aim for ~10 RPM to be safe -> 1 request every 6 seconds.
+        SAFE_INTERVAL = 6 
         
         while True:
+            start_time = time.time()
             try:
                 # Use the new ultra-fast method
                 prediction, comment = ai.analyze_diary_with_gemini(content)
                 
                 if prediction and comment:
+                    # Success!
                     db.diaries.update_one(
                         {'_id': diary_id},
                         {'$set': {
                             'ai_prediction': prediction,
                             'ai_comment': comment,
-                            'task_id': 'batch_update_v3' 
+                            'task_id': 'batch_update_v4' 
                         }}
                     )
-                    print(f"✅ Done! (Retries: {retry_count})")
+                    print(f"✅ Diary {i+1} Done!")
                     success_count += 1
-                    # Super Safe Sleep (Gemini Free is tricky)
-                    time.sleep(15) 
+                    
+                    # Smart Sleep: Ensure we wait at least SAFE_INTERVAL seconds
+                    elapsed = time.time() - start_time
+                    if elapsed < SAFE_INTERVAL:
+                        time.sleep(SAFE_INTERVAL - elapsed)
                     break 
+                    
                 else:
-                    print(f"⚠️ AI returned None (Attempt {retry_count+1})...", end=" ")
-                    retry_count += 1
-                    time.sleep(5)
+                    print(f"⚠️ AI returned None (Retrying)...", end=" ")
+                    time.sleep(2)
+                    # Retry continues...
 
             except Exception as e:
+                # Even with safe pacing, if we hit a limit, cool down significantly
                 error_str = str(e)
                 if "429" in error_str or "Quota exceeded" in error_str:
-                    wait_time = 65 + (retry_count * 5) # Progressive wait
-                    print(f"\n⏳ Rate Limit Hit! Sleeping for {wait_time}s... (Attempt {retry_count+1})")
-                    time.sleep(wait_time)
-                    retry_count += 1
+                    print(f"\n⏳ Quota Pulse Hit. Cooling down for 30s...")
+                    time.sleep(30)
                 else:
-                    print(f"❌ Fatal Error: {e}")
-                    break # Fatal error (not rate limit), skip
+                    print(f"❌ Error: {e}")
+                    time.sleep(5)
+                    # Retry continues...
             
     print(f"\n🎉 Batch Update Complete! ({success_count}/{total} updated)")
 
