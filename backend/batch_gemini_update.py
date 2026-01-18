@@ -46,11 +46,10 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        # Retry Loop for 429 Errors
-        max_retries = 3
+        # Infinite Retry Loop (Until Success)
         retry_count = 0
         
-        while retry_count < max_retries:
+        while True:
             try:
                 # Use the new ultra-fast method
                 prediction, comment = ai.analyze_diary_with_gemini(content)
@@ -61,28 +60,29 @@ def batch_process_user(username="test"):
                         {'$set': {
                             'ai_prediction': prediction,
                             'ai_comment': comment,
-                            'task_id': 'batch_update_v2' # Reset task
+                            'task_id': 'batch_update_v3' 
                         }}
                     )
-                    print("✅ Done!")
+                    print(f"✅ Done! (Retries: {retry_count})")
                     success_count += 1
-                    # Success Sleep (avoid hitting limit again)
-                    time.sleep(10) 
-                    break # Success, move to next diary
+                    # Super Safe Sleep (Gemini Free is tricky)
+                    time.sleep(15) 
+                    break 
                 else:
                     print(f"⚠️ AI returned None (Attempt {retry_count+1})...", end=" ")
                     retry_count += 1
-                    time.sleep(2)
+                    time.sleep(5)
 
             except Exception as e:
                 error_str = str(e)
                 if "429" in error_str or "Quota exceeded" in error_str:
-                    print(f"\n⏳ Rate Limit Hit! Sleeping for 35s... (Attempt {retry_count+1})")
-                    time.sleep(35)
+                    wait_time = 65 + (retry_count * 5) # Progressive wait
+                    print(f"\n⏳ Rate Limit Hit! Sleeping for {wait_time}s... (Attempt {retry_count+1})")
+                    time.sleep(wait_time)
                     retry_count += 1
                 else:
-                    print(f"❌ Error: {e}")
-                    break # Fatal error, skip
+                    print(f"❌ Fatal Error: {e}")
+                    break # Fatal error (not rate limit), skip
             
     print(f"\n🎉 Batch Update Complete! ({success_count}/{total} updated)")
 
