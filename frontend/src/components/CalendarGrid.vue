@@ -120,15 +120,16 @@ export default {
              const match = diary.ai_prediction.match(/'([^']+)'/)
              if (match && match[1]) {
                // match[1] will rely include "행복해 (95%)"
-               shortPrediction = `AI 예측: ${match[1]}`
+               // Remove "AI 예측:" prefix to save space
+               shortPrediction = match[1]
              } else {
                // Fallback
-               shortPrediction = diary.ai_prediction.length > 15
-                 ? diary.ai_prediction.slice(0, 12) + '...' 
+               shortPrediction = diary.ai_prediction.length > 20
+                 ? diary.ai_prediction.slice(0, 18) + '...' 
                  : diary.ai_prediction
              }
           } catch (e) {
-            shortPrediction = 'AI 분석값 오류'
+            shortPrediction = '???'
           }
         }
 
@@ -269,25 +270,22 @@ export default {
 .date-ai-prediction {
   position: relative;
   z-index: 1; /* Above emoji */
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px; /* Slightly smaller */
+  font-weight: 700;
   color: var(--color-text); /* Darker for readability */
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.2;
   width: 100%;
-  padding: 0 4px;
-  /* margin-top: auto; Remove push to bottom */
-  /* margin-bottom: 4px; */
+  padding: 0 2px;
   margin: 0; 
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%; /* Take full height to center properly if needed, or let flex parent handle it */
-  white-space: normal;
-  word-break: keep-all; /* Prefer breaking at spaces */
-  overflow: visible;
-  /* text-overflow: ellipsis; Remove ellipsis */
-  text-shadow: 0 1px 2px rgba(255,255,255,0.8); /* readable against bg */
+  height: 100%; 
+  white-space: normal; /* Allow wrapping */
+  word-break: break-word; /* Break long words if needed */
+  overflow: hidden; /* No scrollbars */
+  text-shadow: 0 1px 2px rgba(255,255,255,0.9); /* readable against bg */
 }
 
 .date-number {
