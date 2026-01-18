@@ -8,6 +8,12 @@ from sqlalchemy.orm import sessionmaker
 from config import Config
 import json
 TRAINING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'training_state.json')
+try:
+    from emotion_codes import EMOTION_CODE_MAP
+except ImportError:
+    print("Warning: Could not import EMOTION_CODE_MAP from emotion_codes")
+    EMOTION_CODE_MAP = {}
+
 # Optimization for Resource-Constrained Environments (OCI Free Tier)
 # If GEMINI_API_KEY is present, we disable heavy local models to save 2.6GB+ RAM.
 FORCE_LOCAL_AI_DISABLE = (os.environ.get('GEMINI_API_KEY') is not None)
@@ -17,7 +23,11 @@ try:
     if FORCE_LOCAL_AI_DISABLE:
         raise ImportError("Local AI Disabled to save memory (Gemini mode active)")
     from tensorflow.keras.preprocessing.text import Tokenizer
-    # ... (rest of imports)
+    from tensorflow.keras.preprocessing.sequence import pad_sequences
+    from tensorflow.keras.models import Sequential, Model
+    from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout, Input
+    from tensorflow.keras.utils import to_categorical
+    import pandas as pd
     TENSORFLOW_AVAILABLE = True
     print("AI Brain: TensorFlow Available.")
 except ImportError as e:
