@@ -143,6 +143,13 @@ export default {
                         percent: null
                     }
                 }
+             } else {
+                // [FIX] Fallback if no quotes found (Old data or different format)
+                // Just use the text as is, maybe truncate if too long
+                predictionData = {
+                    label: diary.ai_prediction.length > 20 ? diary.ai_prediction.slice(0,18) + '..' : diary.ai_prediction,
+                    percent: null
+                }
              }
           } catch (e) {
             predictionData = { label: '?', percent: null }
