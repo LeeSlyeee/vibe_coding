@@ -215,11 +215,35 @@ class EmotionAnalysis:
                 available_names = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
                 print(f" Found Models: {available_names}")
                 
-                # Priority: Flash -> Flash-Latest -> Pro
-                target_names = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
-                chosen = next((name for name in target_names if name in available_names), None)
+                # Priority: Stable 1.5 Flash (First) -> Variants -> Pro -> Experimental
+                target_names = [
+                    'models/gemini-1.5-flash', 
+                    'models/gemini-1.5-flash-latest', 
+                    'models/gemini-1.5-flash-001',
+                    'models/gemini-1.5-flash-002',
+                    'models/gemini-1.5-pro',
+                    'models/gemini-pro',
+                    'models/gemini-2.5-flash' # Last resort (Low Quota)
+                ]
                 
+                # Smart Match: Find the first target that partially matches any available model
+                chosen = None
+                for target in target_names:
+                     if target in available_names:
+                         chosen = target
+                         break
+                
+                # If exact match fails, try partial match (e.g. 'gemini-1.5-flash' matches 'models/gemini-1.5-flash-001')
+                if not chosen:
+                    for target in target_names:
+                        for available in available_names:
+                            if target.replace("models/", "") in available:
+                                chosen = available
+                                break
+                        if chosen: break
+
                 if not chosen and available_names:
+                    # Avoid 2.5/2.0 beta models if possible unless they are the ONLY option
                     chosen = available_names[0]
                 
                 if chosen:
