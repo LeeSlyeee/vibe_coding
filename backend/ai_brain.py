@@ -1,5 +1,6 @@
 import numpy as np
 import os
+import google.generativeai as genai
 import random
 import random
 from sqlalchemy import create_engine
@@ -19,24 +20,32 @@ except ImportError:
     print("Warning: Could not import EMOTION_CODE_MAP from emotion_codes")
     EMOTION_CODE_MAP = {}
 
-# Try to import TensorFlow/Keras, but provide fallback if not installed
+# TensorFlow/Keras Import (Optional)
 try:
     from tensorflow.keras.preprocessing.text import Tokenizer
     from tensorflow.keras.preprocessing.sequence import pad_sequences
     from tensorflow.keras.models import Sequential, Model
     from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout, Input
     from tensorflow.keras.utils import to_categorical
-    from tensorflow.keras.utils import to_categorical
     import pandas as pd
     TENSORFLOW_AVAILABLE = True
-    
-    # KoGPT-2 Imports
-    from transformers import GPT2LMHeadModel, PreTrainedTokenizerFast, AutoTokenizer, AutoModelForCausalLM
-    import torch
+    print("AI Brain: TensorFlow Available.")
 except ImportError as e:
     TENSORFLOW_AVAILABLE = False
-    print(f"Warning: AI Library not found. Error: {e}")
-    print("Using simple keyword-based sentiment analysis.")
+    print(f"AI Brain: TensorFlow not found ({e}). Prediction model will be limited.")
+
+# Transformers/PyTorch Import (Critical for Insight)
+try:
+    from transformers import GPT2LMHeadModel, PreTrainedTokenizerFast, AutoTokenizer, AutoModelForCausalLM
+    import torch
+    TRANSFORMERS_AVAILABLE = True
+    print("AI Brain: Transformers/PyTorch Available.")
+except ImportError as e:
+    TRANSFORMERS_AVAILABLE = False
+    print(f"AI Brain: Transformers not found ({e}). Insight generation disabled.")
+
+if not TENSORFLOW_AVAILABLE and not TRANSFORMERS_AVAILABLE:
+    print("AI Brain: No AI libraries found. Using pure keyword fallback.")
 
 class EmotionAnalysis:
     def __init__(self):
@@ -186,16 +195,41 @@ class EmotionAnalysis:
         # Initialize attributes
         self.gpt_model = None
         self.gpt_tokenizer = None
-    
-        if TENSORFLOW_AVAILABLE:
-            print("Initializing AI Emotion Analysis Model (5-Class LSTM)...")
-            self.tokenizer = Tokenizer()
-            
-            # Check for saved model
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            self.model_path = os.path.join(base_dir, 'emotion_model.h5')
-            self.tokenizer_path = os.path.join(base_dir, 'tokenizer.pickle')
-            
+        self.gemini_model = None
+        self.device = torch.device("cpu") # Default
+
+        # 1. Gemini AI Loading (Priority)
+        if hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
+            try:
+                print("🚀 Initializing Gemini AI for Insight...")
+                genai.configure(api_key=Config.GEMINI_API_KEY)
+                
+                # Dynamically find the best available model to avoid 404
+                print("🔍 Scanning available Gemini models...")
+                models = genai.list_models()
+                available_names = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+                print(f"� Found Models: {available_names}")
+                
+                # Priority: Flash -> Flash-Latest -> Pro
+                target_names = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
+                chosen = next((name for name in target_names if name in available_names), None)
+                
+                if not chosen and available_names:
+                    chosen = available_names[0]
+                
+                if chosen:
+                    self.gemini_model = genai.GenerativeModel(chosen)
+                    print(f"✅ Gemini AI Initialized successfully with model: {chosen}")
+                else:
+                    print("❌ No compatible Gemini models found.")
+                    
+            except Exception as e:
+                print(f"❌ Gemini Initialization Failed: {e}")
+
+        # 2. Local Generative AI Loading (Fallback)
+        # Skip this if Gemini is already working to save 2.6GB+ RAM
+        if TRANSFORMERS_AVAILABLE and not self.gemini_model:
+            print("Initializing Generative AI (Polyglot-Ko) for Insight (Fallback)...")
             try:
                 # Optimized for OCI (CUDA/CPU) and Local (MPS)
                 if torch.cuda.is_available():
@@ -208,7 +242,7 @@ class EmotionAnalysis:
                     print("🚀 Using MPS for AI acceleration (Local Mac).")
                 else:
                     device = torch.device("cpu")
-                    torch_dtype = torch.float32 # Typical for CPU-only instances in OCI
+                    torch_dtype = torch.float32 
                     print("⚠️ Using CPU for AI (Cloud/Standard). Performance may be lower.")
                 
                 model_name = "EleutherAI/polyglot-ko-1.3b"
@@ -221,13 +255,27 @@ class EmotionAnalysis:
                     low_cpu_mem_usage=True
                 ).to(device)
                 self.device = device 
-                print("Polyglot-Ko-1.3B Loaded successfully.")
+                print("✅ Polyglot-Ko-1.3B Loaded successfully.")
             except Exception as e:
-                print(f"Polyglot Load Failed: {e}")
+                print(f"❌ Polyglot Load Failed: {e}")
                 self.gpt_model = None
                 self.gpt_tokenizer = None
-                self.device = torch.device("cpu")
+        elif self.gemini_model:
+            print("ℹ️ Gemini AI is active. Skipping Local Polyglot load to save RAM.")
+        else:
+            print("⚠️ Transformers library not available. Skipping GenAI load.")
                
+        # === Tensorflow / LSTM Model Logic ===
+        if TENSORFLOW_AVAILABLE:
+            self.tokenizer = Tokenizer()
+            # Check for saved model
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            self.model_path = os.path.join(base_dir, 'emotion_model.h5')
+            self.tokenizer_path = os.path.join(base_dir, 'tokenizer.pickle')
+            # ... (LSTM loading logic continues implicitly or is handled by load_model later if needed)
+               
+        # === Tensorflow / LSTM Model Logic ===
+        if TENSORFLOW_AVAILABLE:
             # Check Training Condition
             current_count = self._get_keyword_count()
             last_count = self._get_last_trained_count()
@@ -236,19 +284,11 @@ class EmotionAnalysis:
             print(f"📊 Training Check: Current Keywords={current_count}, Last Trained={last_count}, Diff={diff}")
             
             should_train = (diff >= 100)
-            
-            # Force train if models are missing?
-            # User said "Otherwise just run server". But if models missing, we can't run AI.
-            # However, fallback logic exists.
-            # We will follow user strictly: Only train if diff >= 100.
-            # But we must try to load if we don't train.
-            
             model_exists = os.path.exists(self.model_path) and os.path.exists(self.tokenizer_path)
 
             if should_train:
                 try:
                     # In this version of the code, training is handled by a separate script or method.
-                    # Fix the method name if it exists, otherwise just log.
                     if hasattr(self, '_load_and_train_models'):
                         self._load_and_train_models()
                     else:
@@ -266,21 +306,38 @@ class EmotionAnalysis:
                 print("📦 Models found. Loading existing models...")
                 self._load_existing_models()
                 print("✅ Emotion Model loaded.")
-                
             else:
                 print("⚠️ No models found and new data < 100. Skipping training.")
                 print("   The server will run in Basic Mode (Keyword Fallback).")
             
             print("AI Model initialization finished.")
-            
-            # Load Comment Bank (Safety Net)
-            self.load_comment_bank()
-            self.load_emotion_bank()
 
-        else:
-            print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
+        else: # TENSORFLOW NOT AVAILABLE
+             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
+
+        # Load Comment Bank (Safety Net) - Always load this
+        self.load_comment_bank()
+        self.load_emotion_bank()
+
+    def _sanitize_context(self, text):
+        """
+        Privacy Guard: Removes potential sensitive information before sending to external API.
+        - Truncates long text
+        - Focuses on sentiment-carrying words
+        """
+        if not text: return ""
+        # Simple privacy protection: Remove common patterns (emails, phone numbers)
+        import re
+        text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', text)
+        text = re.sub(r'\d{2,3}-\d{3,4}-\d{4}', '[PHONE]', text)
+        
+        # To further protect privacy, we could use the local emotion results 
+        # instead of raw text, but for 'insight' we need some context.
+        # We limit the length to prevent sending too much detail.
+        return text[:100].strip() + "..." if len(text) > 100 else text
 
     def _get_keyword_count(self):
+
         """Get total count of emotion keywords from DB (MongoDB)"""
         if self.db is None:
             return 0
@@ -504,6 +561,84 @@ class EmotionAnalysis:
 
 
     
+    def generate_pre_write_insight(self, recent_diaries, weather=None, weather_stats=None):
+        """
+        Generates a warm insight before user starts writing.
+        Priority: Gemini 1.5 Flash (API)
+        Fallback: Polyglot-Ko (Local) or Default String
+        """
+        print(f"🔍 [Insight] Request received. Recent diaries count: {len(recent_diaries)}, Weather: {weather}, Stats: {weather_stats}")
+        
+        if not recent_diaries:
+            return "오늘의 첫 기록을 시작해보세요! 솔직한 마음을 담으면 됩니다."
+
+        # 1. Gemini AI (Fast & Smart)
+        if self.gemini_model:
+            try:
+                print(f"🚀 [Insight] Attempting {self.gemini_model.model_name} with Privacy Shield...")
+                diary_context = ""
+                for d in recent_diaries:
+                    sanitized_event = self._sanitize_context(d.get('event',''))
+                    diary_context += f"- [{d.get('date','')}] 기분:{d.get('mood','')} / 상황:{sanitized_event}\n"
+
+                weather_info = f"오늘의 날씨: {weather}" if weather else "오늘의 날씨 정보 없음"
+                stats_info = f" (과거 이 날씨에 당신은 주로 {weather_stats} 감정을 느끼셨네요)" if weather_stats else ""
+
+                prompt = (
+                    "당신은 사용자의 지난 일기 기록과 오늘의 날씨, 그리고 '과거 날씨별 감정 패턴'을 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사입니다.\n\n"
+                    f"### {weather_info}{stats_info}\n"
+                    "### 사용자의 최근 1주일 흐름\n"
+                    f"{diary_context}\n"
+                    "### 지시사항\n"
+                    "1. 반드시 '한 문장'으로 작성하세요.\n"
+                    "2. 문장의 시작은 과거 패턴이나 오늘 날씨에 대한 공감으로 시작하세요.\n"
+                    "   (예: '비가 올 때면 평소보다 조금 더 우울해지곤 하셨죠. 오늘은 지난주의 활기찬 기운을 빌려 조금 더 웃어보는 건 어떨까요?')\n"
+                    "3. 최근 1주일간의 감정 흐름이 좋은지 나쁜지를 반드시 반영하여 개인화된 조언을 하세요.\n"
+                    "4. '오늘 하루 응원합니다' 같은 뻔한 말은 금지입니다.\n"
+                    "5. 20자~50자 내외로 부드러운 존댓말(해요체)을 사용하세요.\n\n"
+                    "상담사 조언(패턴과 최근 흐름이 통합된 한 문장):"
+                )
+
+                response = self.gemini_model.generate_content(prompt)
+                
+                # Handling blocked responses or empty candidates
+                try:
+                    if response and response.text:
+                        final_response = response.text.strip()
+                        # Basic validation
+                        if len(final_response) >= 5:
+                            print(f"✅ [Insight] Gemini Success: {final_response}")
+                            return final_response
+                        else:
+                            print(f"⚠️ [Insight] Gemini response too short (<5 chars): '{final_response}'")
+                except ValueError:
+                    # This happens if response.text is not available (e.g., blocked by safety)
+                    print(f"🚫 [Insight] Gemini response blocked by safety filters or no candidates.")
+                    if hasattr(response, 'prompt_feedback'):
+                        print(f"   Feedback: {response.prompt_feedback}")
+                    
+            except Exception as e:
+                print(f"❌ [Insight] Gemini Inference Failed: {str(e)}")
+
+        # 2. Local Model Fallback (Polyglot)
+        if self.gpt_model and self.gpt_tokenizer:
+            try:
+                print("🏃 [Insight] Falling back to Local Polyglot-Ko...")
+                # Simplified fallback logic for robustness
+                input_text = f"상담 기록:\n{recent_diaries[-1].get('event','')}\n조언:"
+                encoded = self.gpt_tokenizer(input_text, return_tensors='pt').to(self.device)
+                with torch.no_grad():
+                    ids = self.gpt_model.generate(encoded.input_ids, max_length=50)
+                decoded = self.gpt_tokenizer.decode(ids[0], skip_special_tokens=True)
+                print(f"✅ [Insight] Local Fallback success.")
+                return decoded.split("조언:")[-1].strip()
+            except Exception as e:
+                print(f"❌ [Insight] Local Fallback Failed: {str(e)}")
+
+        # 3. Final Fallback (Return None to let Frontend handle 30s timeout)
+        print("💡 [Insight] All AI models failed/blocked. Returning None to trigger frontend default.")
+        return None
+
     def _rebuild_inference_models(self):
         # Seq2Seq Removed
         pass 
@@ -513,6 +648,9 @@ class EmotionAnalysis:
         pass
 
     def predict(self, text):
+        import time
+        start_time = time.time()
+        
         if not text: 
             return {"emotion": "분석 불가", "comment": "내용이 없습니다."}
 
@@ -521,6 +659,7 @@ class EmotionAnalysis:
         # 1. Emotion Classification (LSTM or Keyword)
         if TENSORFLOW_AVAILABLE and self.model:
             try:
+                tf_start = time.time()
                 sequences = self.tokenizer.texts_to_sequences([text])
                 padded = pad_sequences(sequences, maxlen=self.max_len)
                 prediction = self.model.predict(padded, verbose=0)[0]
@@ -528,26 +667,38 @@ class EmotionAnalysis:
                 confidence = prediction[predicted_class_idx]
                 predicted_label = self.classes[predicted_class_idx]
                 emotion_result = f"{predicted_label} ({(confidence * 100):.1f}%)"
+                print(f"⏱️ [Timer] TensorFlow Prediction took: {time.time() - tf_start:.3f}s")
             except Exception as e:
                 print(f"Prediction error: {e}")
                 emotion_result = self._fallback_predict(text)
         else:
             emotion_result = self._fallback_predict(text)
             
-        # 2. Comment Generation (Polyglot)
+        # 2. Comment Generation (Priority: Gemini -> Polyglot -> Keyword)
         comment_result = ""
-        try:
-            # Try Polyglot first
-            print(f"🤖 Generating Polyglot comment for: {text[:30]}...")
-            comment_result = self.generate_polyglot_comment(text, emotion_result)
-            print(f"✅ Comment generated: {comment_result[:30]}...")
-        except Exception as e:
-            print(f"Polyglot generation failed: {e}")
         
-        # Fallback if Polyglot failed or returned nothing
+        # try Gemini First
+        if self.gemini_model:
+            try:
+                gemini_start = time.time()
+                print(f"🚀 [Comment] Generating letter using Gemini...")
+                comment_result = self.generate_gemini_comment(text, emotion_result)
+                print(f"⏱️ [Timer] Gemini Comment took: {time.time() - gemini_start:.3f}s")
+            except Exception as e:
+                print(f"❌ [Comment] Gemini failed: {e}")
+
+        # Fallback to Polyglot if Gemini failed
+        if not comment_result and self.gpt_model:
+            try:
+                comment_result = self.generate_polyglot_comment(text, emotion_result)
+            except Exception as e:
+                print(f"❌ [Comment] Polyglot failed: {e}")
+        
+        # Final Fallback
         if not comment_result:
-            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 수고 많으셨어요."
+            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 정말 고생 많으셨어요."
             
+        print(f"✨ [Timer] Total AI Analysis took: {time.time() - start_time:.3f}s")
         return {
             "emotion": emotion_result,
             "comment": comment_result

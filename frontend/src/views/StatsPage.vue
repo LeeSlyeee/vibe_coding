@@ -47,7 +47,7 @@
                 <div v-else-if="currentTab === 'monthly'" key="monthly" class="chart-section">
                     <div class="section-info">
                         <h3>📅 월별 상세 기록</h3>
-                        <p>각 달마다 나의 기록 습관을 확인해보세요.</p>
+                        <p>각 날짜별로 기록된 나의 기분 변화를 확인해보세요.</p>
                     </div>
                     
                     <div class="charts-grid">
@@ -270,7 +270,7 @@ export default {
         rawStats.value.daily.forEach(item => {
             const month = item._id.substring(0, 7)
             if (!grouped[month]) grouped[month] = {}
-            grouped[month][item._id] = item.count
+            grouped[month][item._id] = item.count // Now stores mood level
         })
 
         const sortedMonths = Object.keys(grouped).sort().reverse()
@@ -281,11 +281,14 @@ export default {
             
             const labels = []
             const data = []
+            const bgColors = []
             
             for (let i = 1; i <= daysInMonth; i++) {
                 labels.push(i)
                 const dateKey = `${monthStr}-${String(i).padStart(2, '0')}`
-                data.push(grouped[monthStr][dateKey] || 0)
+                const moodVal = grouped[monthStr][dateKey] || 0
+                data.push(moodVal)
+                bgColors.push(moodVal ? (moodMap[moodVal] ? moodMap[moodVal].color : '#1d1d1f') : 'rgba(0,0,0,0.03)')
             }
 
             return {
@@ -293,14 +296,45 @@ export default {
                 data: {
                     labels,
                     datasets: [{
-                        label: '작성',
+                        label: '기분',
                         data,
-                        backgroundColor: '#1d1d1f',
+                        backgroundColor: bgColors,
                         borderRadius: 4,
-                        barPercentage: 0.6
+                        barPercentage: 0.7
                     }]
                 },
-                options: commonOptions
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        ...commonOptions.scales,
+                        y: {
+                            min: 0,
+                            max: 5,
+                            grid: { display: false },
+                            ticks: {
+                                stepSize: 1,
+                                callback: (v) => v === 0 ? '' : {1:'😠', 2:'😢', 3:'😐', 4:'😌', 5:'😊'}[v],
+                                font: { size: 14 }
+                            }
+                        },
+                        x: {
+                            ...commonOptions.scales.x,
+                            ticks: { font: { size: 9 }, autoSkip: false }
+                        }
+                    },
+                    plugins: {
+                        ...commonOptions.plugins,
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const val = ctx.raw
+                                    const labelMap = { 1: '화남', 2: '슬픔', 3: '평범', 4: '편안', 5: '행복' }
+                                    return val > 0 ? ` 기분: ${labelMap[val]} (${val})` : ' 기록 없음'
+                                }
+                            }
+                        }
+                    }
+                }
             }
         })
     })

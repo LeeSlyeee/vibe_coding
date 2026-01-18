@@ -161,6 +161,16 @@ export const diaryAPI = {
     
     const response = await api.get('/weather-insight', { params })
     return response.data
+  },
+
+  // 작성 전 마음가짐 인사이트
+  getMindsetInsight: async (date = null, weather = null) => {
+    const params = {}
+    if (date) params.date = date
+    if (weather) params.weather = weather
+    
+    const response = await api.get('/insight', { params })
+    return response.data
   }
 }
 

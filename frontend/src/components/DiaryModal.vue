@@ -26,18 +26,27 @@
             오늘의 감정 기록하기
           </button>
           
-          <!-- 날씨/감정 인사이트 말풍선 -->
-          <div v-if="weatherInsight" class="insight-bubble fade-in">
-             <span class="insight-icon">🌥️</span>
-             {{ weatherInsight }}
+          <!-- 통합 인사이트 말풍선 (제미나이) -->
+          <div v-if="mindsetInsight" class="insight-bubble insight-bubble-purple fade-in">
+             <span class="insight-icon">🧘‍♀️</span>
+             <span style="color: #4A148C;">{{ mindsetInsight }}</span>
           </div>
-          <p v-else class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
+          <div v-else-if="isLoadingInsight" class="mindset-loading" style="margin-top: 12px;">
+                <span class="pulse-mini"></span> 마음의 흐름을 읽고 있어요...
+          </div>
+          
+          <p v-if="!mindsetInsight && !isLoadingInsight" class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
         </div>
       </div>
 
       <!-- 3. 작성 폼 -->
       <div v-else-if="!isViewMode && showForm" class="diary-form">
+        
+
+
         <EmojiSelector v-model="formData.mood" />
+
+
 
         <QuestionAccordion
           question="오늘 무슨일이 있었나요?"
@@ -252,18 +261,15 @@ export default {
                 weatherInfo.value = { temp, desc: map[code] || '흐림' };
                 console.log("✅ Weather Updated:", weatherInfo.value);
 
-                // 날씨 인사이트 가져오기 (작성 모드일 때만)
-                if (!props.diary && weatherInfo.value.desc) {
-                    try {
-                        const insightData = await diaryAPI.getWeatherInsight(weatherInfo.value.desc, date);
-                        weatherInsight.value = insightData.message;
-                    } catch (err) {
-                        console.error("Insight Fail:", err);
-                    }
+                // 날씨 정보가 업데이트된 후 스마트 인사이트 호출
+                if (!props.diary) {
+                    fetchMindsetInsight();
                 }
             }
         } catch (e) {
             console.error("Weather Fail:", e);
+            // 날씨 실패해도 인사이트는 보여줘야 함
+            if (!props.diary) fetchMindsetInsight();
         }
     }
 
@@ -272,9 +278,17 @@ export default {
         console.log("📡 checkWeather Start...", date);
         // 1. 일단 서울 날씨로 즉시 시도 (Fallback 먼저)
         if (!weatherInfo.value) {
-             console.log("🏙️ Using Default Seoul Weather first...");
+             console.log("🏙️ Using Default Seoul Weather as placeholder...");
              getWeatherFromAPI(DEFAULT_LAT, DEFAULT_LON, date);
         }
+
+        // 3초 후에도 날씨가 안 오면 그냥 진행 (강제 타임아웃)
+        setTimeout(() => {
+            if (!weatherInfo.value) {
+                console.warn("⏱️ Weather strongly delayed. Proceeding with insight anyway.");
+                if (!props.diary) fetchMindsetInsight();
+            }
+        }, 5000);
 
         // 2. 실제 위치 찾기 시도 (비동기)
         if (navigator.geolocation) {
@@ -297,6 +311,7 @@ export default {
             );
         } else {
              console.warn("❌ Geo Not Supported in Browser");
+             if (!props.diary) fetchMindsetInsight();
         }
     }
 
@@ -371,7 +386,39 @@ export default {
         } catch (e) { alert('저장 실패: ' + e.message) } finally { saving.value = false }
     }
 
-    const startWriting = () => { showForm.value = true }
+    // === Mindset Insight ===
+    const mindsetInsight = ref('')
+    const isLoadingInsight = ref(false)
+
+    const fetchMindsetInsight = async () => {
+        if (mindsetInsight.value || isLoadingInsight.value) return 
+        
+        isLoadingInsight.value = true
+        const weatherDesc = weatherInfo.value ? weatherInfo.value.desc : null
+        
+        try {
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
+            const res = await Promise.race([
+                diaryAPI.getMindsetInsight(props.date, weatherDesc),
+                timeout
+            ])
+            
+            if (res.message && res.message.trim().length > 0) {
+                 mindsetInsight.value = res.message
+            } else {
+                 mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
+            }
+        } catch (e) {
+            console.error("Insight Error/Timeout:", e)
+            mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
+        } finally {
+            isLoadingInsight.value = false
+        }
+    }
+
+    const startWriting = () => { 
+        showForm.value = true
+    }
     const cancelWriting = () => { showForm.value = false; emit('close') }
     const handleEdit = () => {
         isViewMode.value = false; showForm.value = true;
@@ -394,10 +441,14 @@ export default {
     // === Lifecycle & Watch ===
     watch([() => props.diary, () => props.date], ([newDiary, newDate]) => {
         isViewMode.value = !!newDiary
+        showForm.value = false
         localDiary.value = null
         clearTimers()
         isProcessing.value = false
         weatherInfo.value = null // Reset
+        
+        // Reset Insight
+        mindsetInsight.value = ''
 
         if (newDiary) {
             // 수정/보기 모드
@@ -452,7 +503,8 @@ export default {
         currentDiary, formattedDate, formattedDateTime, isValid, getMoodEmoji, getMoodName,
         handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
         isProcessing, progressPercent, loadingMessage, eta,
-        getWeatherIcon, getMoodColorClass
+        getWeatherIcon, getMoodColorClass,
+        mindsetInsight, isLoadingInsight
     }
   }
 }
@@ -502,14 +554,39 @@ export default {
   position: relative;
 }
 .insight-bubble::before {
+  /* Border Triangle */
   content: '';
   position: absolute;
-  top: -6px;
+  top: -8px; 
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid rgba(0,0,0,0.04);
+}
+.insight-bubble::after {
+  /* Background Mask Triangle */
+  content: '';
+  position: absolute;
+  top: -6px; 
   left: 50%;
   transform: translateX(-50%);
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-bottom: 6px solid white;
+}
+
+/* ... existing code ... */
+
+.insight-bubble-purple {
+    background: #F3E5F5;
+    border-color: rgba(74, 20, 140, 0.1);
+}
+.insight-bubble-purple::before {
+    border-bottom-color: rgba(74, 20, 140, 0.1);
+}
+.insight-bubble-purple::after {
+    border-bottom-color: #F3E5F5;
 }
 .insight-icon { font-size: 20px; }
 .fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; transform: translateY(10px); }
@@ -575,4 +652,26 @@ export default {
 .answer-item-premium:hover { transform: translateY(-4px); }
 .answer-question { font-size: 14px; color: #999; margin-bottom: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 .answer-text { font-size: 17px; color: #1d1d1f; line-height: 1.7; white-space: pre-wrap; font-weight: 500; }
+
+.mindset-bubble {
+    background: #F3E5F5; /* Gentle Purple */
+    padding: 16px 20px;
+    border-radius: 16px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(0,0,0,0.03);
+    animation: slideDown 0.4s ease-out;
+}
+.mindset-content { display: flex; gap: 12px; align-items: center; }
+.mindset-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.mindset-text { font-size: 15px; color: #4A148C; font-weight: 600; line-height: 1.5; word-break: keep-all; }
+
+.mindset-loading {
+    text-align: center; color: #999; font-size: 13px; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.pulse-mini { width: 6px; height: 6px; background: #999; border-radius: 50%; animation: pulse-anim 1s infinite; }
+
+@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+
 </style>
