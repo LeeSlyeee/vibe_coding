@@ -1,10 +1,8 @@
 Flask
 Flask-Cors
 Flask-JWT-Extended
-Flask-Migrate
-Flask-SQLAlchemy
-PyMySQL
-cryptography
+flask-pymongo
+pymongo
 python-dotenv
 numpy
 pandas
@@ -13,3 +11,5 @@ torch
 transformers
 celery
 redis
+google-generativeai
+sentencepiece

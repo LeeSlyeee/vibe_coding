@@ -8,44 +8,33 @@ from sqlalchemy.orm import sessionmaker
 from config import Config
 import json
 TRAINING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'training_state.json')
-try:
-    from models import EmotionKeyword
-except ImportError:
-    pass
-
-try:
-    from emotion_codes import EMOTION_CODE_MAP
-except ImportError:
-    # If this fails, we are in trouble for __init__, so let's define a fallback or print error
-    print("Warning: Could not import EMOTION_CODE_MAP from emotion_codes")
-    EMOTION_CODE_MAP = {}
+# Optimization for Resource-Constrained Environments (OCI Free Tier)
+# If GEMINI_API_KEY is present, we disable heavy local models to save 2.6GB+ RAM.
+FORCE_LOCAL_AI_DISABLE = (os.environ.get('GEMINI_API_KEY') is not None)
 
 # TensorFlow/Keras Import (Optional)
 try:
+    if FORCE_LOCAL_AI_DISABLE:
+        raise ImportError("Local AI Disabled to save memory (Gemini mode active)")
     from tensorflow.keras.preprocessing.text import Tokenizer
-    from tensorflow.keras.preprocessing.sequence import pad_sequences
-    from tensorflow.keras.models import Sequential, Model
-    from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout, Input
-    from tensorflow.keras.utils import to_categorical
-    import pandas as pd
+    # ... (rest of imports)
     TENSORFLOW_AVAILABLE = True
     print("AI Brain: TensorFlow Available.")
 except ImportError as e:
     TENSORFLOW_AVAILABLE = False
-    print(f"AI Brain: TensorFlow not found ({e}). Prediction model will be limited.")
+    print(f"AI Brain: Local Emotion Model support skipped ({e}).")
 
 # Transformers/PyTorch Import (Critical for Insight)
 try:
+    if FORCE_LOCAL_AI_DISABLE:
+         raise ImportError("Local AI Disabled to save memory (Gemini mode active)")
     from transformers import GPT2LMHeadModel, PreTrainedTokenizerFast, AutoTokenizer, AutoModelForCausalLM
     import torch
     TRANSFORMERS_AVAILABLE = True
     print("AI Brain: Transformers/PyTorch Available.")
 except ImportError as e:
     TRANSFORMERS_AVAILABLE = False
-    print(f"AI Brain: Transformers not found ({e}). Insight generation disabled.")
-
-if not TENSORFLOW_AVAILABLE and not TRANSFORMERS_AVAILABLE:
-    print("AI Brain: No AI libraries found. Using pure keyword fallback.")
+    print(f"AI Brain: Local GenAI support skipped ({e}).")
 
 class EmotionAnalysis:
     def __init__(self):
@@ -983,11 +972,59 @@ class EmotionAnalysis:
 
     # Seq2Seq Generation helpers removed
 
+    def analyze_diary_with_gemini(self, text):
+        """
+        [Ultra Fast Mode] Uses Gemini for both Classification and Comment Generation.
+        Saves OCI CPU and significantly improves speed.
+        """
+        if not self.gemini_model:
+            return None, None
+
+        import re
+        sanitized_text = self._sanitize_context(text)
+        
+        prompt = (
+            "당신은 전문 심리 상담사입니다. 사용자의 일기를 분석하여 다음 두 가지를 수행하세요.\n\n"
+            "일기 내용:\n"
+            f"\"{sanitized_text}\"\n\n"
+            "지시사항:\n"
+            "1. 사용자의 감정을 한 단어로 분류하세요. (예: 행복, 우울, 편안, 분노, 평범 등)\n"
+            "2. 감정에 어울리는 세밀한 설명과 확률을 '상태 (상세) (00.0%)' 형식으로 작성하세요.\n"
+            "   (예: '행복 (설렘) (92.5%)', '우울 (무기력) (88.1%)')\n"
+            "3. 사용자의 기분에 공감하고 따뜻한 위로를 건네는 짧은 편지를 작성하세요. (2~3문장)\n"
+            "4. 반드시 아래 JSON 형식으로만 답변하세요:\n"
+            "{\n"
+            "  \"prediction\": \"분류결과\",\n"
+            "  \"comment\": \"따뜻한 위로의 말\"\n"
+            "}"
+        )
+
+        try:
+            print("🚀 [Fast Analysis] Requesting Gemini for All-in-One analysis...")
+            response = self.gemini_model.generate_content(prompt)
+            content = response.text
+            
+            # Extract JSON using regex (more robust)
+            import json
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                data = json.loads(match.group())
+                return data.get('prediction'), data.get('comment')
+        except Exception as e:
+            print(f"❌ Gemini Fast Analysis Failed: {e}")
+            
+        return None, None
+
     def generate_comment(self, prediction_text, user_text=None):
         """
         Generate a supportive comment.
         Priority: 1. Keyword Bank (Safety Net) 2. AI Generation (Seq2Seq) 3. Fallback
         """
+        # If we have user_text and gemini, try fast path
+        if user_text and self.gemini_model:
+             _, comment = self.analyze_diary_with_gemini(user_text)
+             if comment: return comment
+
         # 1. Phase 1: Keyword Safety Net (Highest Priority)
         if user_text:
             keyword_comment = self.generate_keyword_comment(user_text)

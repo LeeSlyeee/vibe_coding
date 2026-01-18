@@ -47,16 +47,26 @@ def process_diary_ai(self, diary_id_str):
         # Note: In Mongo, keys are accessed like dict
         combined_text = f"사건: {diary.get('event', '')}\n감정: {diary.get('emotion_desc', '')}\n생각: {diary.get('emotion_meaning', '')}"
         
-        # 3. Perform AI Analysis (Heavy Task)
-        self.update_state(state='PROGRESS', meta={'process_percent': 30, 'message': '감정을 깊이 분석하고 있습니다...', 'eta_seconds': 12})
+        # 3. Perform AI Analysis (Optimized for Speed)
+        self.update_state(state='PROGRESS', meta={'process_percent': 30, 'message': 'AI가 감정을 탐색하고 있습니다...', 'eta_seconds': 5})
         
         global ai_analyzer
         if ai_analyzer is None:
-             # Just in case worker restarted or lazy loading isn't working
              ai_analyzer = EmotionAnalysis()
 
-        result = ai_analyzer.predict(combined_text)
+        # Try Fast Gemini Path first to save OCI CPU
+        prediction, comment = None, None
+        if ai_analyzer.gemini_model:
+            print("🚀 [Worker] Using Fast Gemini Analysis...")
+            prediction, comment = ai_analyzer.analyze_diary_with_gemini(combined_text)
         
+        # Fallback to Local Model if Gemini fails or is not available
+        if not prediction:
+            print("📦 [Worker] Fallback to Local Model Analysis...")
+            result = ai_analyzer.predict(combined_text)
+            prediction = result.get('emotion', '분석 실패')
+            comment = result.get('comment', '분석에 실패했습니다.')
+
         # 3.5. Finished Analysis, Saving result (Progress: 90%)
         self.update_state(state='PROGRESS', meta={'process_percent': 90, 'message': '분석 완료! 결과 저장 중...', 'eta_seconds': 1})
         
@@ -64,8 +74,8 @@ def process_diary_ai(self, diary_id_str):
         db.diaries.update_one(
             {'_id': diary_id},
             {'$set': {
-                'ai_prediction': result.get('emotion', '분석 실패'),
-                'ai_comment': result.get('comment', '분석에 실패했습니다.')
+                'ai_prediction': prediction,
+                'ai_comment': comment
             }}
         )
         
