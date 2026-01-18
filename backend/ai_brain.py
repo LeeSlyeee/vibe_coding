@@ -217,13 +217,14 @@ class EmotionAnalysis:
                 
                 # Priority: Stable 1.5 Flash (First) -> Variants -> Pro -> Experimental
                 target_names = [
+                    'models/gemini-flash-latest', # This exists in your list! (likely 1.5)
                     'models/gemini-1.5-flash', 
                     'models/gemini-1.5-flash-latest', 
                     'models/gemini-1.5-flash-001',
                     'models/gemini-1.5-flash-002',
                     'models/gemini-1.5-pro',
                     'models/gemini-pro',
-                    'models/gemini-2.5-flash' # Last resort (Low Quota)
+                    'models/gemini-2.5-flash' # Last resort
                 ]
                 
                 # Smart Match: Find the first target that partially matches any available model
