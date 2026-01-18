@@ -1047,53 +1047,42 @@ class EmotionAnalysis:
             
         print(f"🚀 [HTTP Analysis] Requesting Gemini for All-in-One analysis...", end=" ", flush=True)
 
+        # OCI Local Ollama URL
+        print(f"🦙 [Local AI] Requesting Ollama (Gemma 2) for analysis...", end=" ", flush=True)
         try:
-            # Construct REST API URL manually
-            api_key = Config.GEMINI_API_KEY
-            # Use 'gemini-pro-latest' as 1.5 versions are missing and 2.0 has strict quotas
-            model_name = "gemini-pro-latest" 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-            
-            headers = {'Content-Type': 'application/json'}
+            url = "http://localhost:11434/api/generate"
             
             prompt_text = (
-                f"다음 일기를 읽고 사용자의 감정을 분석하고, 짧은 공감 코멘트를 해줘.\n\n"
+                f"다음 일기를 읽고 사용자의 감정을 분석하고, 따뜻한 위로의 코멘트를 50자 이내로 작성해줘.\n"
                 f"일기:\n{text}\n\n"
-                f"출력 형식(반드시 JSON 준수):\n"
+                f"반드시 다음 JSON 형식으로만 답변해. 다른 말은 절대 하지 마.\n"
                 f"{{\n"
                 f"  \"emotion\": \"happy\" | \"sad\" | \"angry\" | \"neutral\" | \"panic\",\n"
-                f"  \"comment\": \"따뜻하고 공감하는 한국어 한 마디 (반말 금지)\"\n"
-                f"}}\n"
-                f"주의: 감정은 위 5개 중 하나만 선택. json 코드블록 없이 순수 JSON만 출력."
+                f"  \"comment\": \"한국어 공감 코멘트\"\n"
+                f"}}"
             )
             
             payload = {
-                "contents": [{
-                    "parts": [{"text": prompt_text}]
-                }],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 200
-                }
+                "model": "gemma2",
+                "prompt": prompt_text,
+                "stream": False,
+                "format": "json"  # Gemma 2 supports JSON mode
             }
             
-            # Send Request with STRICT 10s Timeout
-            print("Requesting...", end=" ")
-            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            # Send Request to Local Ollama
+            # OCI CPU inference might be slow, giving 120s timeout
+            response = requests.post(url, json=payload, timeout=120)
             
             if response.status_code != 200:
-                print(f"❌ API Error {response.status_code}: {response.text}")
+                print(f"❌ Ollama Error {response.status_code}: {response.text}")
                 return None, None
                 
             # Parse Response
             result = response.json()
+            response_text = result.get('response', '{}')
+            
             try:
-                # Extract text from complex JSON structure
-                content_text = result['candidates'][0]['content']['parts'][0]['text']
-                
-                # Clean up Markdown JSON if present
-                clean_json = content_text.strip().replace("```json", "").replace("```", "")
-                data = json.loads(clean_json)
+                data = json.loads(response_text)
                 
                 emotion_str = data.get('emotion', 'neutral').lower()
                 comment = data.get('comment', '오늘 하루도 고생 많으셨어요.')
@@ -1101,15 +1090,17 @@ class EmotionAnalysis:
                 # Map emotion string to code
                 code_map = {
                     "happy": 1, "joy": 1, 
-                    "sad": 2, "depressed": 2,
+                    "sad": 2, "depressed": 2, "grief": 2,
                     "neutral": 3, "calm": 3, "soso": 3,
-                    "angry": 4, "annoyed": 4,
-                    "panic": 5, "anxious": 5, "fear": 5
+                    "angry": 4, "annoyed": 4, "rage": 4,
+                    "panic": 5, "anxious": 5, "fear": 5, "surprise": 5
                 }
                 emotion_code = code_map.get(emotion_str, 3)
                 
                 print("Done!")
                 return str(emotion_code), comment
+                
+
                 
             except (KeyError, IndexError, json.JSONDecodeError) as e:
                 print(f"⚠️ Parse Failed: {e}")
