@@ -46,10 +46,10 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        # [Resumable Logic] Skip ONLY if processed by THIS batch script (v4)
-        if d.get('task_id') == 'batch_update_v4':
-             print("⏭️  Skipping (Already Processed by Gemma2).")
-             continue
+        # [Resumable Logic] DISABLED for full re-run
+        # if d.get('task_id') == 'batch_update_v5':
+        #      print("⏭️  Skipping (Already Processed by Gemma2).")
+        #      continue
         
         # Strict Rate Limit Enforcement (Gemini Free Tier: 15 RPM)
         # We aim for ~10 RPM to be safe -> 1 request every 6 seconds.
