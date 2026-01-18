@@ -46,9 +46,9 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        # [Resumable Logic] Skip if already done
-        if d.get('ai_comment') and d.get('ai_prediction'):
-             print("⏭️  Skipping (Already Processed).")
+        # [Resumable Logic] Skip ONLY if processed by THIS batch script (v4)
+        if d.get('task_id') == 'batch_update_v4':
+             print("⏭️  Skipping (Already Processed by Gemma2).")
              continue
         
         # Strict Rate Limit Enforcement (Gemini Free Tier: 15 RPM)
