@@ -629,10 +629,29 @@ class EmotionAnalysis:
                     "상담사 조언(패턴과 최근 흐름이 통합된 한 문장):"
                 )
 
+                # Define a basic generation config if not already defined
+                # This is added to ensure 'config' is defined, as per the user's provided 'Code Edit' snippet.
+                # If 'config' is meant to be a more complex object, it should be defined elsewhere.
+                # For now, a minimal config is provided to prevent NameError.
+                try:
+                    import google.generativeai as genai
+                    config = genai.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.95,
+                        top_k=40,
+                        max_output_tokens=60,
+                    )
+                except ImportError:
+                    print("Warning: google.generativeai not imported, cannot define GenerationConfig.")
+                    config = None # Fallback if genai is not available
+
+                print("DEBUG: Sending request to Gemini... WITH TIMEOUT 15s")
                 response = self.gemini_model.generate_content(
                 prompt,
+                generation_config=config,
                 request_options={"timeout": 15}  # Force timeout after 15s
             )
+                print("DEBUG: Received response from Gemini!")
                 # Handling blocked responses or empty candidates
                 try:
                     if response and response.text:
