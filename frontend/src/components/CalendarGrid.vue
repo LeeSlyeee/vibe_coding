@@ -26,7 +26,12 @@
       >
         <span class="date-number">{{ date.day }}</span>
         <img v-if="date.emoji" :src="date.emoji" class="date-emoji" alt="mood" />
-        <span v-if="date.aiPrediction" class="date-ai-prediction">{{ date.aiPrediction }}</span>
+        
+        <!-- AI Prediction Text (2 Lines) -->
+        <div v-if="date.aiPrediction" class="date-ai-prediction-box">
+             <div class="pred-label">{{ date.aiPrediction.label }}</div>
+             <div v-if="date.aiPrediction.percent" class="pred-percent">{{ date.aiPrediction.percent }}</div>
+        </div>
       </button>
     </div>
   </div>
@@ -113,23 +118,34 @@ export default {
 
         // [Parsing AI Prediction]
         // "AI가 예측한 당신의 감정은 '행복해 (95%)'입니다." -> "행복해 (95%)"
-        let shortPrediction = null
+        // Then split into: { label: "행복해", percent: "(95%)" }
+        let predictionData = null
         if (diary?.ai_prediction) {
           try {
-             // Match content inside single quotes, allowing for parentheses and numbers
+             // Match content inside single quotes
              const match = diary.ai_prediction.match(/'([^']+)'/)
              if (match && match[1]) {
-               // match[1] will rely include "행복해 (95%)"
-               // Remove "AI 예측:" prefix to save space
-               shortPrediction = match[1]
-             } else {
-               // Fallback
-               shortPrediction = diary.ai_prediction.length > 20
-                 ? diary.ai_prediction.slice(0, 18) + '...' 
-                 : diary.ai_prediction
+                const fullText = match[1] // e.g. "슬픔 (한탄) (49.5%)"
+                
+                // Try to split the last parenthesis part (Percentage)
+                // Regex: Look for last occurrence of ( ... )
+                const percentMatch = fullText.match(/(.*)(\s\(\d+(\.\d+)?%\))$/)
+                
+                if (percentMatch) {
+                    predictionData = {
+                        label: percentMatch[1].trim(), // "슬픔 (한탄)"
+                        percent: percentMatch[2].trim() // "(49.5%)"
+                    }
+                } else {
+                    // Fallback for non-percentage format (just text)
+                    predictionData = {
+                        label: fullText,
+                        percent: null
+                    }
+                }
              }
           } catch (e) {
-            shortPrediction = '???'
+            predictionData = { label: '?', percent: null }
           }
         }
 
@@ -140,7 +156,7 @@ export default {
           isToday,
           hasDiary: !!diary,
           emoji: diary ? emojiMap[diary.mood] : null,
-          aiPrediction: shortPrediction,
+          aiPrediction: predictionData, // Pass Object instead of String
           dateString,
           isFuture
         })
@@ -267,25 +283,35 @@ export default {
   pointer-events: none;
 }
 
-.date-ai-prediction {
+.date-ai-prediction-box {
   position: relative;
   z-index: 1; /* Above emoji */
-  font-size: 10px; /* Slightly smaller */
-  font-weight: 700;
-  color: var(--color-text); /* Darker for readability */
-  text-align: center;
-  line-height: 1.2;
   width: 100%;
-  padding: 0 2px;
-  margin: 0; 
+  height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%; 
-  white-space: normal; /* Allow wrapping */
-  word-break: break-word; /* Break long words if needed */
-  overflow: hidden; /* No scrollbars */
-  text-shadow: 0 1px 2px rgba(255,255,255,0.9); /* readable against bg */
+  pointer-events: none; /* Let clicks pass to button */
+}
+
+.pred-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+  text-align: center;
+  word-break: break-word; /* Allow text wrapping */
+  /* white-space: pre-wrap; */
+  text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+}
+
+.pred-percent {
+  font-size: 9px;
+  font-weight: 600;
+  color: #555; /* Slightly lighter */
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(255,255,255,0.9);
 }
 
 .date-number {
