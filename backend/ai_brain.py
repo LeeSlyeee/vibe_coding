@@ -1070,8 +1070,8 @@ class EmotionAnalysis:
             }
             
             # Send Request to Local Ollama
-            # OCI CPU inference might be slow, giving 120s timeout
-            response = requests.post(url, json=payload, timeout=120)
+            # OCI CPU inference might be slow, giving 300s timeout for cold start
+            response = requests.post(url, json=payload, timeout=300)
             
             if response.status_code != 200:
                 print(f"❌ Ollama Error {response.status_code}: {response.text}")
