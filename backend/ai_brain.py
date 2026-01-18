@@ -195,7 +195,13 @@ class EmotionAnalysis:
         self.gpt_model = None
         self.gpt_tokenizer = None
         self.gemini_model = None
-        self.device = torch.device("cpu") # Default
+        
+        # Safe device init (Avoid 'torch' not defined error)
+        try:
+            import torch
+            self.device = torch.device("cpu")
+        except ImportError:
+            self.device = "cpu" # Fallback string if torch is missing
 
         # 1. Gemini AI Loading (Priority)
         if hasattr(Config, 'GEMINI_API_KEY') and Config.GEMINI_API_KEY:
@@ -207,7 +213,7 @@ class EmotionAnalysis:
                 print("🔍 Scanning available Gemini models...")
                 models = genai.list_models()
                 available_names = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
-                print(f"� Found Models: {available_names}")
+                print(f" Found Models: {available_names}")
                 
                 # Priority: Flash -> Flash-Latest -> Pro
                 target_names = ['models/gemini-1.5-flash', 'models/gemini-1.5-flash-latest', 'models/gemini-pro']
@@ -226,8 +232,8 @@ class EmotionAnalysis:
                 print(f"❌ Gemini Initialization Failed: {e}")
 
         # 2. Local Generative AI Loading (Fallback)
-        # Skip this if Gemini is already working to save 2.6GB+ RAM
-        if TRANSFORMERS_AVAILABLE and not self.gemini_model:
+        # Verify torch/transformers is actually available first
+        if not FORCE_LOCAL_AI_DISABLE and TRANSFORMERS_AVAILABLE and not self.gemini_model:
             print("Initializing Generative AI (Polyglot-Ko) for Insight (Fallback)...")
             try:
                 # Optimized for OCI (CUDA/CPU) and Local (MPS)
