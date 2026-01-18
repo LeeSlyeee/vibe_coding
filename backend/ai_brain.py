@@ -1050,8 +1050,8 @@ class EmotionAnalysis:
         try:
             # Construct REST API URL manually
             api_key = Config.GEMINI_API_KEY
-            # Use 'gemini-1.5-flash-8b' for potential region availability
-            model_name = "gemini-1.5-flash-8b" 
+            # Use 'gemini-pro-latest' as 1.5 versions are missing and 2.0 has strict quotas
+            model_name = "gemini-pro-latest" 
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             
             headers = {'Content-Type': 'application/json'}
