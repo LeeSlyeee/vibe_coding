@@ -76,9 +76,9 @@ def batch_process_user(username="test"):
                     break 
                     
                 else:
-                    print(f"⚠️ AI returned None (Retrying)...", end=" ")
-                    time.sleep(2)
-                    # Retry continues...
+                    print(f"⚠️ AI returned None (Quota Limit/Error). Cooling down for 60s...", end=" ")
+                    time.sleep(60) 
+                    # Retry continues after 1 minute...
 
             except Exception as e:
                 # Even with safe pacing, if we hit a limit, cool down significantly

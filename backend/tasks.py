@@ -44,44 +44,53 @@ def process_diary_ai(self, diary_id_str):
             return "Diary Not Found"
             
         # 2. Prepare text for analysis (Progress: 20%)
-        # Note: In Mongo, keys are accessed like dict
-        combined_text = f"사건: {diary.get('event', '')}\n감정: {diary.get('emotion_desc', '')}\n생각: {diary.get('emotion_meaning', '')}"
+            return f"Error: Diary {diary_id} not found"
+            
+        # 2. Prepare text for analysis
+        content = f"사건: {diary.get('event', '')}\n감정: {diary.get('emotion_desc', '')}\n생각: {diary.get('emotion_meaning', '')}"
         
-        # 3. Perform AI Analysis (Optimized for Speed)
-        self.update_state(state='PROGRESS', meta={'process_percent': 30, 'message': 'AI가 감정을 탐색하고 있습니다...', 'eta_seconds': 5})
+        # 3. Analyze (Gemini Priority)
+        # self.update_state(state='PROGRESS', meta={'process_percent': 30, 'message': 'AI가 감정을 탐색하고 있습니다...', 'eta_seconds': 5})
         
-        global ai_analyzer
-        if ai_analyzer is None:
-             ai_analyzer = EmotionAnalysis()
-
-        # Try Fast Gemini Path first to save OCI CPU
+        # Re-initialize AI per task to ensure clean state or use global singleton if preferred
+        # Here we use a lightweight init
+        ai = EmotionAnalysis() 
+        
         prediction, comment = None, None
-        if ai_analyzer.gemini_model:
+        if ai.gemini_model:
             print("🚀 [Worker] Using Fast Gemini Analysis...")
-            prediction, comment = ai_analyzer.analyze_diary_with_gemini(combined_text)
-        
+            prediction, comment = ai.analyze_diary_with_gemini(content)
+            
+            # If Gemini fails/limits return None, we RAISE exception to trigger Retry!
+            if not prediction:
+                raise Exception("Gemini returned None (Rate Limit or Error)")
+                
         # Fallback to Local Model if Gemini fails or is not available
-        if not prediction:
+        if not prediction: # This condition will be true if Gemini failed or was not available
             print("📦 [Worker] Fallback to Local Model Analysis...")
-            result = ai_analyzer.predict(combined_text)
-            prediction = result.get('emotion', '분석 실패')
+            result = ai.predict(content) # Assuming predict returns a dict with 'emotion' and 'comment'
+            prediction = result.get('emotion')
             comment = result.get('comment', '분석에 실패했습니다.')
 
-        # 3.5. Finished Analysis, Saving result (Progress: 90%)
-        self.update_state(state='PROGRESS', meta={'process_percent': 90, 'message': '분석 완료! 결과 저장 중...', 'eta_seconds': 1})
+        # 3.5. Finished Analysis, Saving result
+        # self.update_state(state='PROGRESS', meta={'process_percent': 90, 'message': '분석 완료! 결과 저장 중...', 'eta_seconds': 1})
         
         # 4. Update DB
-        db.diaries.update_one(
-            {'_id': diary_id},
-            {'$set': {
-                'ai_prediction': prediction,
-                'ai_comment': comment
-            }}
-        )
-        
-        print(f"✅ [Worker] Analysis Complete for Diary {diary_id_str}")
-        return {'process_percent': 100, 'message': '완료', 'result': 'Success'}
-        
+        if prediction:
+            mongo.db.diaries.update_one(
+                {'_id': ObjectId(diary_id)},
+                {'$set': {
+                    'ai_prediction': prediction,
+                    'ai_comment': comment,
+                    'task_id': None # Clear task ID
+                }}
+            )
+            print(f"✅ [Worker] Analysis Complete for Diary {diary_id}")
+            return {'process_percent': 100, 'message': '완료', 'result': 'Success'}
+        else:
+            raise Exception("AI Analysis Failed (Both Gemini & Local)")
+
     except Exception as e:
-        print(f"💥 [Worker] Error processing diary {diary_id_str}: {e}")
-        return f"Error: {str(e)}"
+        print(f"💥 [Worker] Error processing diary {diary_id}: {e}")
+        # Retrying is handled by decorator
+        raise self.retry(exc=e)
