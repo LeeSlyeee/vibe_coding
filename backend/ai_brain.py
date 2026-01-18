@@ -1037,45 +1037,87 @@ class EmotionAnalysis:
     def analyze_diary_with_gemini(self, text):
         """
         [Ultra Fast Mode] Uses Gemini for both Classification and Comment Generation.
-        Saves OCI CPU and significantly improves speed.
+        Uses Direct HTTP (REST) to prevent SDK hanging issues on OCI.
         """
+        import requests
+        import json
+        
         if not self.gemini_model:
             return None, None
-
-        import re
-        sanitized_text = self._sanitize_context(text)
-        
-        prompt = (
-            "당신은 전문 심리 상담사입니다. 사용자의 일기를 분석하여 다음 두 가지를 수행하세요.\n\n"
-            "일기 내용:\n"
-            f"\"{sanitized_text}\"\n\n"
-            "지시사항:\n"
-            "1. 사용자의 감정을 한 단어로 분류하세요. (예: 행복, 우울, 편안, 분노, 평범 등)\n"
-            "2. 감정에 어울리는 세밀한 설명과 확률을 '상태 (상세) (00.0%)' 형식으로 작성하세요.\n"
-            "   (예: '행복 (설렘) (92.5%)', '우울 (무기력) (88.1%)')\n"
-            "3. 사용자의 기분에 공감하고 따뜻한 위로를 건네는 짧은 편지를 작성하세요. (2~3문장)\n"
-            "4. 반드시 아래 JSON 형식으로만 답변하세요:\n"
-            "{\n"
-            "  \"prediction\": \"분류결과\",\n"
-            "  \"comment\": \"따뜻한 위로의 말\"\n"
-            "}"
-        )
+            
+        print(f"🚀 [HTTP Analysis] Requesting Gemini for All-in-One analysis...", end=" ", flush=True)
 
         try:
-            print("🚀 [Fast Analysis] Requesting Gemini for All-in-One analysis...")
-            response = self.gemini_model.generate_content(prompt)
-            content = response.text
+            # Construct REST API URL manually
+            api_key = Config.GEMINI_API_KEY
+            # Use 'gemini-1.5-flash-latest' to match available models
+            model_name = "gemini-1.5-flash-latest" 
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             
-            # Extract JSON using regex (more robust)
-            import json
-            match = re.search(r'\{.*\}', content, re.DOTALL)
-            if match:
-                data = json.loads(match.group())
-                return data.get('prediction'), data.get('comment')
+            headers = {'Content-Type': 'application/json'}
+            
+            prompt_text = (
+                f"다음 일기를 읽고 사용자의 감정을 분석하고, 짧은 공감 코멘트를 해줘.\n\n"
+                f"일기:\n{text}\n\n"
+                f"출력 형식(반드시 JSON 준수):\n"
+                f"{{\n"
+                f"  \"emotion\": \"happy\" | \"sad\" | \"angry\" | \"neutral\" | \"panic\",\n"
+                f"  \"comment\": \"따뜻하고 공감하는 한국어 한 마디 (반말 금지)\"\n"
+                f"}}\n"
+                f"주의: 감정은 위 5개 중 하나만 선택. json 코드블록 없이 순수 JSON만 출력."
+            )
+            
+            payload = {
+                "contents": [{
+                    "parts": [{"text": prompt_text}]
+                }],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 200
+                }
+            }
+            
+            # Send Request with STRICT 10s Timeout
+            print("Requesting...", end=" ")
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code != 200:
+                print(f"❌ API Error {response.status_code}: {response.text}")
+                return None, None
+                
+            # Parse Response
+            result = response.json()
+            try:
+                # Extract text from complex JSON structure
+                content_text = result['candidates'][0]['content']['parts'][0]['text']
+                
+                # Clean up Markdown JSON if present
+                clean_json = content_text.strip().replace("```json", "").replace("```", "")
+                data = json.loads(clean_json)
+                
+                emotion_str = data.get('emotion', 'neutral').lower()
+                comment = data.get('comment', '오늘 하루도 고생 많으셨어요.')
+                
+                # Map emotion string to code
+                code_map = {
+                    "happy": 1, "joy": 1, 
+                    "sad": 2, "depressed": 2,
+                    "neutral": 3, "calm": 3, "soso": 3,
+                    "angry": 4, "annoyed": 4,
+                    "panic": 5, "anxious": 5, "fear": 5
+                }
+                emotion_code = code_map.get(emotion_str, 3)
+                
+                print("Done!")
+                return str(emotion_code), comment
+                
+            except (KeyError, IndexError, json.JSONDecodeError) as e:
+                print(f"⚠️ Parse Failed: {e}")
+                return None, None
+                
         except Exception as e:
-            print(f"❌ Gemini Fast Analysis Failed: {e}")
-            
-        return None, None
+            print(f"❌ HTTP/Network Error: {e}")
+            return None, None
 
     def generate_comment(self, prediction_text, user_text=None):
         """

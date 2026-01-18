@@ -13,3 +13,4 @@ celery
 redis
 google-generativeai
 sentencepiece
+requests
