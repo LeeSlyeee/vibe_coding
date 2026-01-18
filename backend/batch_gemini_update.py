@@ -96,17 +96,11 @@ def batch_process_user(username="test"):
 if __name__ == "__main__":
     target_user = sys.argv[1] if len(sys.argv) > 1 else "test"
     
-    # Priority 1: Command Line Argument (Override)
-    if len(sys.argv) > 2:
-        new_key = sys.argv[2]
-        print(f"🔑 Using New API Key provided from command line: {new_key[:5]}...*****")
-        Config.GEMINI_API_KEY = new_key
-        os.environ['GEMINI_API_KEY'] = new_key
-    # Priority 2: Config from .env (Default)
-    elif Config.GEMINI_API_KEY:
+    # Priority: Config from .env (Best Practice)
+    if Config.GEMINI_API_KEY:
         print(f"🔑 Using API Key from .env: {Config.GEMINI_API_KEY[:5]}...*****")
     else:
-        print("❌ No API Key found in .env or arguments!")
+        print("❌ No API Key found in .env!")
         sys.exit(1)
         
     batch_process_user(target_user)
