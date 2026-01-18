@@ -46,31 +46,43 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        try:
-            # Use the new ultra-fast method
-            prediction, comment = ai.analyze_diary_with_gemini(content)
-            
-            if prediction and comment:
-                db.diaries.update_one(
-                    {'_id': diary_id},
-                    {'$set': {
-                        'ai_prediction': prediction,
-                        'ai_comment': comment,
-                        'task_id': 'batch_update' # Mark as updated
-                    }}
-                )
-                print("✅ Done!")
-                success_count += 1
-            else:
-                print("⚠️ Skipped (AI returned None)")
+        # Retry Loop for 429 Errors
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # Use the new ultra-fast method
+                prediction, comment = ai.analyze_diary_with_gemini(content)
                 
-            # Rate Limit Protection (Safety Sleep)
-            # Gemini Free Tier allows 15 RPM (1 request every 4 seconds)
-            # We sleep 4.5s to be safe.
-            time.sleep(4.5)
-            
-        except Exception as e:
-            print(f"❌ Error: {e}")
+                if prediction and comment:
+                    db.diaries.update_one(
+                        {'_id': diary_id},
+                        {'$set': {
+                            'ai_prediction': prediction,
+                            'ai_comment': comment,
+                            'task_id': 'batch_update_v2' # Reset task
+                        }}
+                    )
+                    print("✅ Done!")
+                    success_count += 1
+                    # Success Sleep (avoid hitting limit again)
+                    time.sleep(10) 
+                    break # Success, move to next diary
+                else:
+                    print(f"⚠️ AI returned None (Attempt {retry_count+1})...", end=" ")
+                    retry_count += 1
+                    time.sleep(2)
+
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "Quota exceeded" in error_str:
+                    print(f"\n⏳ Rate Limit Hit! Sleeping for 35s... (Attempt {retry_count+1})")
+                    time.sleep(35)
+                    retry_count += 1
+                else:
+                    print(f"❌ Error: {e}")
+                    break # Fatal error, skip
             
     print(f"\n🎉 Batch Update Complete! ({success_count}/{total} updated)")
 
