@@ -629,8 +629,10 @@ class EmotionAnalysis:
                     "상담사 조언(패턴과 최근 흐름이 통합된 한 문장):"
                 )
 
-                response = self.gemini_model.generate_content(prompt)
-                
+                response = self.gemini_model.generate_content(
+                prompt,
+                request_options={"timeout": 15}  # Force timeout after 15s
+            )
                 # Handling blocked responses or empty candidates
                 try:
                     if response and response.text:
