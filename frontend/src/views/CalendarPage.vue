@@ -462,7 +462,6 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
   padding: 8px 0;
 }
 
