@@ -419,13 +419,8 @@ def get_statistics():
     user_id = get_jwt_identity()
     diaries = list(mongo.db.diaries.find({'user_id': user_id}).sort('created_at', 1))
     
-    # Decrypt 'ai_prediction' for processing
-    for d in diaries:
-        if 'ai_prediction' in d:
-            d['ai_prediction'] = crypto_manager.decrypt(d['ai_prediction'])
-            
-    # Copy paste the rest of the statistics logic logic...
-    # (Reusing existing logic with decrypted 'diaries' list)
+    from datetime import timedelta
+    KST = timedelta(hours=9)
     
     stats = {
         'monthly': {},
@@ -436,27 +431,39 @@ def get_statistics():
         'timeline': []
     }
     
-    from datetime import timedelta
-    KST = timedelta(hours=9)
-    
     for d in diaries:
-        ai_mood = map_ai_to_mood(d.get('ai_prediction'))
-        user_mood = d.get('mood_level')
+        # Full Decryption
+        decrypted = decrypt_doc(d)
+        
+        # Extract Data from Decrypted Doc
+        ai_pred_raw = decrypted.get('ai_prediction')
+        user_mood = decrypted.get('mood_level')
+        weather = decrypted.get('weather')
+        created_at = decrypted.get('created_at') # Should be datetime object from decrypt_doc logic
+
+        # Determine Mood
+        ai_mood = map_ai_to_mood(ai_pred_raw)
         mood = ai_mood if ai_mood else (user_mood if user_mood is not None else 3)
-        try: mood = int(mood)
-        except: mood = 3
+        
+        try: 
+            mood = int(mood)
+        except: 
+            mood = 3
         if not (1 <= mood <= 5): mood = 3
             
-        utc_date = d.get('created_at')
-        if not utc_date: continue
-        local_date = utc_date + KST
+        if not created_at: continue
+        
+        # Handle timezone if naive or UTC
+        # Assuming decrypt_doc returns datetime. If it's UTC, add KST.
+        # If decrypt_doc handles timezone, adjust accordingly. 
+        # Usually pymongo returns UTC datetime.
+        local_date = created_at + KST
         date_str = local_date.strftime('%Y-%m-%d')
         month_str = local_date.strftime('%Y-%m')
         
         stats['monthly'][month_str] = stats['monthly'].get(month_str, 0) + 1
         stats['moods'][mood] = stats['moods'].get(mood, 0) + 1
         
-        weather = d.get('weather')
         if weather:
             if weather not in stats['weather']: stats['weather'][weather] = {'1': 0, '2': 0, '3': 0, '4': 0, '5': 0, 'total': 0}
             stats['weather'][weather][str(mood)] += 1
@@ -468,7 +475,7 @@ def get_statistics():
         stats['timeline'].append({
             'date': date_str,
             'mood_level': mood,
-            'ai_label': d.get('ai_prediction', ''), # Decrypted
+            'ai_label': ai_pred_raw if ai_pred_raw else '',
             'user_mood': user_mood
         })
 
