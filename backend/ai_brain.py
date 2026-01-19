@@ -1020,69 +1020,74 @@ class EmotionAnalysis:
         try:
             url = "http://localhost:11434/api/generate"
             
+            # Simple Structured Text Prompt (Faster & Safer than JSON mode for 2B models)
             prompt_text = (
-                f"다음 일기를 읽고 사용자의 감정을 분석하고, 따뜻한 위로의 코멘트를 50자 이내로 작성해줘.\n"
+                f"다음 일기를 읽고 분석 결과를 아래 형식으로 작성해줘.\n"
                 f"일기:\n{text}\n\n"
-                f"반드시 다음 JSON 형식으로만 답변해. 다른 말은 절대 하지 마.\n"
-                f"{{\n"
-                f"  \"emotion\": \"happy\" | \"sad\" | \"angry\" | \"neutral\" | \"panic\",\n"
-                f"  \"confidence\": 0~100 (정수),\n"
-                f"  \"comment\": \"한국어 공감 코멘트\"\n"
-                f"}}"
+                f"형식:\n"
+                f"Emotion: (happy, sad, angry, neutral, panic 중 하나)\n"
+                f"Confidence: (0~100 숫자만)\n"
+                f"Comment: (50자 이내의 따뜻한 한국어 위로)\n"
+                f"반드시 위 형식만 지켜서 답변해."
             )
             
             payload = {
                 "model": "gemma2:2b",
                 "prompt": prompt_text,
                 "stream": False,
-                "format": "json"  # Gemma 2 supports JSON mode
+                # "format": "json"  <-- REMOVED: Cause of hanging
+                "options": {
+                    "temperature": 0.3, # Low temp for stability
+                    "num_predict": 150
+                }
             }
             
-            # Send Request to Local Ollama
-            # OCI CPU inference might be slow, giving 300s timeout for cold start
-            response = requests.post(url, json=payload, timeout=300)
+            # Timeout 60s
+            response = requests.post(url, json=payload, timeout=60)
             
             if response.status_code != 200:
                 print(f"❌ Ollama Error {response.status_code}: {response.text}")
                 return None, None
                 
-            # Parse Response
             result = response.json()
-            response_text = result.get('response', '{}')
-            print(f"🔍 Raw Ollama Output: {response_text[:300]}...") # Print first 300 chars to debug
+            response_text = result.get('response', '').strip()
+            print(f"🔍 Raw Output: {response_text}")
             
-            try:
-                data = json.loads(response_text)
-                
-                emotion_str = data.get('emotion', 'neutral').lower()
-                comment = data.get('comment', '오늘 하루도 고생 많으셨어요.')
-                confidence = data.get('confidence', 80) # Default to 80% if missing
-                
-                # Map emotion string to Korean label
-                # 0:happy, 1:calm, 2:neutral, 3:depressed, 4:angry
-                # Adjusting to match DB/Frontend expectations usually:
-                emotion_map = {
-                    "happy": "행복해", "joy": "행복해", 
-                    "sad": "우울해", "depressed": "우울해", "grief": "우울해", 
-                    "neutral": "평온해", "calm": "평온해", "soso": "그저그래",
-                    "angry": "화가나", "annoyed": "화가나", "rage": "화가나",
-                    "panic": "우울해", "anxious": "우울해", "fear": "우울해", "surprise": "행복해"
-                }
-                
-                korean_emotion = emotion_map.get(emotion_str, "평온해")
-                formatted_prediction = f"AI가 예측한 당신의 감정은 '{korean_emotion} ({confidence}%)'입니다."
-                
-                print("Done!")
-                return formatted_prediction, comment
-                
-            except (json.JSONDecodeError) as e:
-                # Fallback for when JSON parsing fails (sometimes models gossip)
-                print(f"⚠️ Parse Failed: {e}")
-                return None, None
+            # Regex Parsing
+            import re
+            
+            # 1. Emotion
+            emotion_match = re.search(r"Emotion:\s*([a-zA-Z]+)", response_text, re.IGNORECASE)
+            emotion_str = emotion_match.group(1).lower() if emotion_match else "neutral"
+            
+            # 2. Confidence
+            conf_match = re.search(r"Confidence:\s*(\d+)", response_text)
+            confidence = int(conf_match.group(1)) if conf_match else 80
+            
+            # 3. Comment
+            comment_match = re.search(r"Comment:\s*(.*)", response_text, re.DOTALL)
+            comment = comment_match.group(1).strip() if comment_match else "오늘 하루도 수고 많으셨어요."
+            
+            # Remove any trailing quotes if model added them
+            if comment.startswith('"') and comment.endswith('"'):
+                comment = comment[1:-1]
+
+            # Map to Korean
+            emotion_map = {
+                "happy": "행복해", "joy": "행복해", 
+                "sad": "우울해", "depressed": "우울해", 
+                "neutral": "평온해", "calm": "평온해", "soso": "그저그래",
+                "angry": "화가나", "annoyed": "화가나", 
+                "panic": "우울해", "anxious": "우울해"
+            }
+            
+            korean_emotion = emotion_map.get(emotion_str, "평온해")
+            formatted_prediction = f"'{korean_emotion} ({confidence}%)'"
+            
+            return formatted_prediction, comment
                 
         except Exception as e:
             print(f"❌ Local AI Error: {e}")
-            # Ensure None is returned to trigger safe fallback
             return None, None
 
     def generate_comment(self, prediction_text, user_text=None):
