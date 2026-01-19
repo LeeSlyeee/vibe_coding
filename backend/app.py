@@ -519,8 +519,55 @@ def weather_insight_original():
         mood_msg_map = {1: "예민", 2: "우울", 3: "평범", 4: "평온", 5: "행복"}
         mood_desc = mood_msg_map.get(top_mood, "다양한")
         return jsonify({'message': f"'{target_keyword}' 날씨에는 주로 {mood_desc}한 기분을 느끼셨어요."}), 200
-    except:
-        return jsonify({'message': ""}), 200
+    return jsonify({'message': ""}), 200
+
+@app.route('/api/report/comprehensive', methods=['GET'])
+@jwt_required()
+def get_comprehensive_report():
+    user_id = get_jwt_identity()
+
+    # 1. Fetch Diaries (Limit 50 to avoid token overflow context window of 2B model)
+    cursor = mongo.db.diaries.find({'user_id': user_id}).sort('created_at', -1).limit(50)
+    diaries = list(cursor)
+
+    if len(diaries) < 3:
+        return jsonify({"report": "분석을 위해서는 최소 3일 이상의 일기 기록이 필요해요. 조금 더 기록을 쌓아주세요! 📝"}), 200
+
+    # 2. Summarize Data for AI
+    summary_lines = []
+    mood_counts = {}
+
+    for d in diaries:
+        # Decrypt first
+        decrypted = decrypt_doc(d)
+        
+        created_at = decrypted.get('created_at')
+        date = created_at.strftime('%Y-%m-%d') if created_at else "날짜없음"
+        
+        mood = decrypted.get('mood_level', 3)
+        event = decrypted.get('event', '')[:50].replace('\n', ' ') # Shorten & clean
+        emotion = decrypted.get('emotion_desc', '')[:30]
+        thought = decrypted.get('emotion_meaning', '')[:30]
+        
+        summary_lines.append(f"- {date} (기분:{mood}/5): {event} | 감정: {emotion} | 생각: {thought}")
+        mood_counts[mood] = mood_counts.get(mood, 0) + 1
+
+    summary_text = "\n".join(summary_lines)
+    stats_text = f"최근 {len(diaries)}일간 기분 분포: {mood_counts}"
+    
+    final_input = f"{stats_text}\n\n[최근 일기 요약]\n{summary_text}"
+
+    print(f"🧠 Requesting Comprehensive Report for user {user_id}...")
+    
+    # 3. Call AI (Lightweight Init)
+    from ai_brain import EmotionAnalysis
+    try:
+        ai = EmotionAnalysis()
+        report = ai.generate_comprehensive_report(final_input)
+        return jsonify({"report": report}), 200
+    except Exception as e:
+        print(f"Report Error: {e}")
+        return jsonify({"report": "죄송해요, 리포트를 생성하는 중 오류가 발생했어요."}), 500
 
 if __name__ == '__main__':
     # No SQL create_all() needed

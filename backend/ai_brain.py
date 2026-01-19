@@ -1137,6 +1137,61 @@ class EmotionAnalysis:
             return "당신의 마음을 이해해요."
 
 
+    def generate_comprehensive_report(self, diary_summary):
+        """
+        Generates a detailed 10-paragraph psychological report using Local Gemma 2.
+        """
+        import requests
+        print("🧠 [Brain] Generating Comprehensive Report...")
+        
+        try:
+            url = "http://localhost:11434/api/generate"
+            
+            prompt_text = (
+                "당신은 20년 경력의 베테랑 심리 상담사입니다. 아래 내담자(사용자)의 일기 기록과 통계를 자세히 읽고 분석해주세요.\n\n"
+                f"### [사용자 데이터]\n{diary_summary}\n\n"
+                "### [작성 지침]\n"
+                "사용자에게 보내는 '심층 심리 분석 리포트'를 작성해야 합니다.\n"
+                "반드시 **서론-본론(진단)-결론(처방)**의 흐름을 갖춘 **총 10문단 이상의 긴 글**이어야 합니다.\n"
+                "전문적인 심리학 용어를 사용하되, 따뜻하고 이해하기 쉬운 언어로 풀어주세요.\n\n"
+                "### [리포트 구조]\n"
+                "1부. **마음의 지도 (현상 진단)** (5문단)\n"
+                "   - 내담자가 주로 사용하는 감정 언어와 내면의 상태 분석\n"
+                "   - 반복되는 스트레스 패턴이나 감정의 트리거 파악\n"
+                "   - 숨겨진 긍정적인 자원이나 강점 발굴\n\n"
+                "2부. **나아가야 할 길 (미래 처방)** (5문단)\n"
+                "   - 현재 상태에서 실천할 수 있는 구체적인 심리 기법 3가지 (ACT, CBT 등 활용)\n"
+                "   - 감정의 파도를 다스리는 생활 습관 제안\n"
+                "   - 상담사로서 전하는 진심 어린 격려와 희망의 메시지\n\n"
+                "지금 바로 리포트 작성을 시작하세요."
+            )
+            
+            payload = {
+                "model": "gemma2:2b",
+                "prompt": prompt_text,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 4096, # Maximum length
+                    "repeat_penalty": 1.1,
+                    "top_k": 40,
+                    "top_p": 0.9
+                }
+            }
+            
+            # Timeout 180s (3 mins)
+            response = requests.post(url, json=payload, timeout=180)
+            
+            if response.status_code == 200:
+                result = response.json().get('response', '')
+                return result
+            else:
+                return "죄송합니다. AI가 리포트를 작성하는 도중 연결이 끊겼습니다."
+                
+        except Exception as e:
+            print(f"❌ Report Generation Error: {e}")
+            return "리포트 생성 시스템에 오류가 발생했습니다."
+
     def update_keywords(self, text, mood_level):
         # Learn new keywords from the text based on the user's provided mood_level.
         if not text: return

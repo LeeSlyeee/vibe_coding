@@ -171,6 +171,13 @@ export const diaryAPI = {
     
     const response = await api.get('/insight', { params })
     return response.data
+  },
+
+  // 심층 리포트 생성
+  getComprehensiveReport: async () => {
+    // Timeout 3 minutes
+    const response = await api.get('/report/comprehensive', { timeout: 180000 })
+    return response.data
   }
 }
 

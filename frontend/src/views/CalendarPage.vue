@@ -34,12 +34,18 @@
                 <span class="stat-info">이번 달 <strong>{{ diaries.length }}개</strong>의 기록이 있습니다</span>
              </div>
              <div class="stat-divider-v2"></div>
-             <div class="stat-group">
-                <span class="stat-icon">{{ dominantMood.emoji }}</span>
-                <span class="stat-info">주로 <strong>{{ dominantMood.name }}</strong> 감정을 느끼셨네요</span>
-             </div>
-          </div>
+              <div class="stat-group">
+                 <span class="stat-icon">{{ dominantMood.emoji }}</span>
+                 <span class="stat-info">주로 <strong>{{ dominantMood.name }}</strong> 감정을 느끼셨네요</span>
+              </div>
+              
+              <!-- New Report Button -->
+              <button @click="handleGenerateReport" class="report-btn-v2" :disabled="isGeneratingReport">
+                 ✨ 심층 진단
+              </button>
+           </div>
         </transition>
+
         <!-- 검색 결과 리스트 (검색 중일 때) -->
         <div v-if="isSearching" class="search-results-overlay">
            <div class="search-header">
@@ -80,6 +86,29 @@
         </div>
       </div>
     </div>
+    
+    <!-- AI Report Modal -->
+    <transition name="fade">
+      <div v-if="showReportModal" class="report-modal-overlay">
+         <div class="report-card">
+            <button class="close-report-btn" @click="closeReport">✕</button>
+            <div class="report-header">
+               <h2>🔮 AI 심층 심리 분석 리포트</h2>
+               <p v-if="!isGeneratingReport" class="report-date">{{ new Date().toLocaleDateString() }} 기준</p>
+            </div>
+            
+            <div v-if="isGeneratingReport" class="report-loading">
+               <div class="spinner"></div>
+               <p>지난 일기들을 꼼꼼히 읽고 있어요...</p>
+               <p class="sub-text">잠시만 기다려주세요 (최대 3분)</p>
+            </div>
+            
+            <div v-else class="report-content-body">
+               <div class="report-text" v-html="formattedReportContent"></div>
+            </div>
+         </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -104,6 +133,11 @@ export default {
     const searchQuery = ref('')
     const searchResults = ref([])
     const isSearching = ref(false)
+    
+    // Report State
+    const showReportModal = ref(false)
+    const isGeneratingReport = ref(false)
+    const reportContent = ref('')
 
     const formattedMonth = computed(() => {
       return `${currentYear.value}년 ${currentMonth.value}월`
@@ -158,6 +192,15 @@ export default {
           'angry': { name: '화남', emoji: '😠' }
         }
         return moodMap[maxMood] || { name: '평범', emoji: '😐' }
+    })
+    
+    const formattedReportContent = computed(() => {
+       // Simple markdown-ish to HTML
+       if (!reportContent.value) return ''
+       return reportContent.value
+         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+         .replace(/\n\n/g, '<br><br>') // Paragraphs
+         .replace(/\n/g, '<br>') // Line breaks
     })
 
     const previousMonth = () => {
@@ -339,6 +382,27 @@ export default {
         }
       }
     }
+    
+    // New Report Functions
+    const handleGenerateReport = async () => {
+       showReportModal.value = true
+       isGeneratingReport.value = true
+       reportContent.value = ''
+       
+       try {
+          const res = await diaryAPI.getComprehensiveReport()
+          reportContent.value = res.report || "리포트 생성에 실패했어요."
+       } catch (e) {
+          reportContent.value = "죄송합니다. 리포트를 생성하는 중 오류가 발생했습니다.\n" + (e.message || "")
+       } finally {
+          isGeneratingReport.value = false
+       }
+    }
+    
+    const closeReport = () => {
+       if (isGeneratingReport.value) return // Generating... prevent close
+       showReportModal.value = false
+    }
 
     onMounted(() => {
       loadDiaries()
@@ -360,9 +424,17 @@ export default {
       searchResults,
       isSearching,
       dominantMood,
-     handleSearch,
+      handleSearch,
       closeSearch,
-      viewDiary
+      viewDiary,
+      
+      // Report Exports
+      showReportModal,
+      isGeneratingReport,
+      reportContent,
+      formattedReportContent,
+      handleGenerateReport,
+      closeReport
     }
   }
 }
@@ -377,7 +449,7 @@ html, body {
 </style>
 
 <style scoped>
-
+/* Previous Styles Maintainted... */
 .calendar-page {
   height: calc(100vh - 56px); /* Fixed height instead of min-height */
   padding: var(--spacing-lg); /* Reduce padding slightly */
@@ -389,11 +461,10 @@ html, body {
 .calendar-layout {
   display: grid;
   grid-template-columns: 5.5fr 4.5fr;
-  /* Ensure children respect the ratio and don't collapse */
   min-width: 0; 
-  gap: var(--spacing-lg); /* Reduce gap slightly */
+  gap: var(--spacing-lg);
   width: 100%;
-  height: 100%; /* Fill parent */
+  height: 100%;
   max-width: 1400px;
   margin: 0 auto;
 }
@@ -401,22 +472,21 @@ html, body {
 .calendar-section, .diary-section {
     min-width: 0;
     width: 100%;
-    /* height: 100%; Remove fixed height forcing 100% stretch */
     height: auto; 
-    max-height: 100%; /* Allow it to fill but not forced if content is small */
+    max-height: 100%;
     display: flex;
     flex-direction: column;
-    overflow: hidden; /* Container itself shouldn't scroll, but its content will */
+    overflow: hidden;
 }
 
 .diary-section {
-    overflow-y: auto; /* Enable vertical scroll for diary content */
+    overflow-y: auto;
 }
 
 .calendar-section {
   background-color: var(--bg-card);
   border-radius: var(--radius-xl);
-  padding: var(--spacing-lg); /* Reduce padding inside card */
+  padding: var(--spacing-lg);
   box-shadow: var(--shadow-lg);
 }
 
@@ -436,7 +506,6 @@ html, body {
   text-align: center;
 }
 
-/* V2 Header & Stats Styles */
 .calendar-header-v2 {
   display: flex;
   justify-content: space-between;
@@ -623,115 +692,163 @@ html, body {
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
-.nav-btn {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--color-border);
-  background-color: var(--bg-card);
-  border-radius: var(--radius-md);
-  font-size: 24px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text);
+
+/* Report Modal Styles */
+.report-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.nav-btn:hover {
-  background-color: var(--color-hover);
-  border-color: var(--color-primary);
-  transform: scale(1.05);
+.report-card {
+    background: white;
+    width: 600px;
+    max-width: 90%;
+    height: 80vh;
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    padding: 40px;
+    position: relative;
+    animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.close-report-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #999;
+}
+
+.report-header {
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 20px;
+}
+
+.report-header h2 {
+    font-size: 24px;
+    color: #333;
+    margin-bottom: 8px;
+}
+
+.report-date {
+    color: #888;
+    font-size: 14px;
+}
+
+.report-content-body {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
+    line-height: 1.8;
+    color: #444;
+    font-size: 16px;
+}
+
+.report-btn-v2 {
+    margin-left: auto;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+}
+
+.report-btn-v2:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+}
+
+.report-btn-v2:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.report-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #666;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #764ba2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+.sub-text {
+    font-size: 13px;
+    color: #999;
+    margin-top: 8px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 @media (max-width: 1024px) {
   .calendar-layout {
-    grid-template-columns: 1fr; /* Keep 1 column for tablet but handle stack */
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 768px) {
-  .calendar-page {
-    padding: var(--spacing-sm);
-  }
-  
-  .calendar-section {
-    padding: var(--spacing-md);
-    height: 100%;
-    border-radius: var(--radius-lg);
-  }
-  
-  .calendar-layout {
-    display: block; /* No grid on mobile */
-  }
-
-  /* Make Diary Section a Full Screen Modal on Mobile */
+  .calendar-page { padding: var(--spacing-sm); }
+  .calendar-section { padding: var(--spacing-md); height: 100%; border-radius: var(--radius-lg); }
+  .calendar-layout { display: block; }
   .diary-section {
-    display: none; /* Hidden by default */
-    position: fixed;
-    top: 56px; /* Below header */
-    left: 0;
-    width: 100%;
-    height: calc(100% - 56px);
-    z-index: 1000;
-    margin: 0;
-    border-radius: 0;
+    display: none;
+    position: fixed; top: 56px; left: 0; width: 100%; height: calc(100% - 56px);
+    z-index: 1000; margin: 0; border-radius: 0;
     animation: slideUp 0.3s ease-out;
   }
+  .diary-section.mobile-active { display: flex; }
+  .current-month { font-size: 18px; }
   
-  .diary-section.mobile-active {
-    display: flex; /* Show when active */
-  }
-  
-  .current-month {
-    font-size: 18px;
-  }
+  .report-card { width: 100%; height: 100%; border-radius: 0; padding: 20px; }
+  .stats-premium-banner { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .report-btn-v2 { width: 100%; margin: 0; }
 }
 
-/* Mobile Landscape Mode Adjustment */
 @media (max-width: 915px) and (orientation: landscape) {
-  .calendar-page {
-    height: 100vh; /* Full viewport height */
-    padding: var(--spacing-xs);
-    overflow: hidden;
-  }
-
-  .calendar-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr; /* Side by side 50:50 */
-    gap: var(--spacing-sm);
-    height: 100%;
-  }
-
-  /* Reset Calendar Section */
-  .calendar-section {
-    height: 100%;
-    overflow-y: auto; /* Scrollable if needed */
-    padding: var(--spacing-sm);
-  }
-
-  /* Reset Diary Section from Mobile Modal to Side Panel */
-  .diary-section {
-    display: flex !important; /* Force display */
-    position: static; /* Not fixed anymore */
-    width: 100%;
-    height: 100%;
-    border-radius: var(--radius-lg);
-    background-color: var(--bg-card);
-    z-index: 1; /* Reset z-index */
-    animation: none; /* No slide up */
-  }
-  
-  /* Adjust internal spacing for landscape */
-  .nav-btn {
-    width: 32px;
-    height: 32px;
-    font-size: 18px;
-  }
-  
-  .current-month {
-    font-size: 16px;
-  }
+  .calendar-page { height: 100vh; padding: var(--spacing-xs); overflow: hidden; }
+  .calendar-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); height: 100%; }
+  .calendar-section { height: 100%; overflow-y: auto; padding: var(--spacing-sm); }
+  .diary-section { display: flex !important; position: static; width: 100%; height: 100%; border-radius: var(--radius-lg); z-index: 1; animation: none; }
+  .nav-btn { width: 32px; height: 32px; font-size: 18px; }
+  .current-month { font-size: 16px; }
 }
 
 @keyframes slideUp {
@@ -739,3 +856,5 @@ html, body {
   to { transform: translateY(0); opacity: 1; }
 }
 </style>
+
+
