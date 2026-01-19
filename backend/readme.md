@@ -115,3 +115,33 @@ python app.py
   - **필수**: 서버에 `Ollama` 설치 및 `ollama pull gemma2:2b` 필요.
   - **실행**: `./venv/bin/python batch_gemini_update.py` (배치 모드)
   - **운영**: API 키 불필요, 오직 서버의 로컬 컴퓨팅 파워만 사용.
+
+## 최근 작업 상황 및 업데이트 내역 (2026-01-19 기준)
+
+### 1. AI 심층 리포트 생성 최적화 (504 Gateway Timeout 해결)
+
+- **문제 해결**: AI 리포트 생성 시 발생하는 긴 대기 시간으로 인한 `504 Gateway Timeout` 오류 해결.
+- **비동기 처리 도입**:
+  - **Backend**: 리포트 생성 요청을 백그라운드 스레드에서 처리하고 즉시 응답 반환.
+  - **Frontend**: 생성 요청 후 `completed` 상태가 될 때까지 주기적으로(3초) 상태를 폴링(Polling)하는 방식으로 변경.
+  - **UI 개선**: 리포트 생성 중 "로딩 화면"을 표시하고, 생성 완료 시 결과 리포트를 렌더링하도록 `StatsPage.vue` 업데이트.
+
+### 2. OCI 서버 배포 및 환경 설정
+
+- **배포 완료**: Oracle Cloud Infrastructure (OCI) 인스턴스에 성공적으로 배포.
+- **Nginx 설정**:
+  - Reverse Proxy 설정을 통해 포트 80 접속을 백엔드/프론트엔드로 라우팅.
+  - `Access-Control-Allow-Origin` 등 CORS 헤더를 Nginx 레벨에서 처리하여 API 통신 문제 해결.
+- **Python 환경**: 가상 환경 설정 및 패키지 의존성 문제(TensorFlow, Dotenv 등) 해결.
+
+### 3. AI 모델 및 데이터 고도화
+
+- **이미지 분류**: `MobileNetV2` 기반의 미세 조정(Fine-tuning) 모델을 적용하여 분류 정확도 향상.
+- **감정 분석**:
+  - `GoEmotions-Korean` 데이터셋을 활용하여 28가지 세부 감정을 5대 핵심 감정으로 매핑.
+  - `Gemini API` 및 로컬 LLM (`Gemma 2`, `Polyglot-Ko`)을 상황에 따라 유동적으로 사용하는 하이브리드 로직 구현 (`ai_brain.py`).
+
+### 4. 프론트엔드 및 데이터 개선
+
+- **Emoji 개선**: 기존 텍스트 이모지를 고화질 PNG 이미지로 전면 교체하여 시각적 품질 향상 (`EmojiSelector`, `CalendarGrid`).
+- **데이터셋 구축**: 테스트 및 학습을 위한 대량의 다이어리 데이터(10,000건+) 생성 및 DB 적재 완료.
