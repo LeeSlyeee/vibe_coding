@@ -118,7 +118,7 @@
                         <div v-else-if="isGeneratingReport" class="report-loading">
                             <div class="spinner-large"></div>
                             <p class="loading-text">AI가 내면의 목소리를 듣고 있어요...</p>
-                            <p class="loading-sub">잠시만 기다려주세요 (최대 3분)</p>
+                            <p class="loading-sub">잠시만 기다려주세요 (최대 10분)</p>
                         </div>
 
                         <!-- 3. 결과 (리포트) -->
