@@ -5,6 +5,7 @@ from ai_brain import EmotionAnalysis
 from config import Config
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from crypto_utils import crypto_manager 
 
 # Initialize AI Brain ONLY in the worker process
 ai_analyzer = None
@@ -44,8 +45,12 @@ def process_diary_ai(self, diary_id_str):
             print(f"❌ [Worker] Diary {diary_id_str} not found!")
             return "Diary Not Found"
             
-        # 2. Prepare text for analysis
-        content = f"사건: {diary.get('event', '')}\n감정: {diary.get('emotion_desc', '')}\n생각: {diary.get('emotion_meaning', '')}"
+        # 2. Prepare text for analysis (Decrypt first)
+        event = crypto_manager.decrypt(diary.get('event', ''))
+        emotion_desc = crypto_manager.decrypt(diary.get('emotion_desc', ''))
+        emotion_meaning = crypto_manager.decrypt(diary.get('emotion_meaning', ''))
+        
+        content = f"사건: {event}\n감정: {emotion_desc}\n생각: {emotion_meaning}"
         
         # 3. Analyze (Gemma 2 Local Priority)
         print(f"🦙 [Worker] Diary {diary_id}: Requesting Gemma 2 Analysis...")
@@ -59,12 +64,15 @@ def process_diary_ai(self, diary_id_str):
             print(f"❌ [Worker] AI Analysis Failed for {diary_id}")
             raise Exception("Gemma 2 Analysis Failed")
 
-        # 4. Update DB
+        # 4. Update DB (Encrypt results)
+        enc_prediction = crypto_manager.encrypt(prediction)
+        enc_comment = crypto_manager.encrypt(comment)
+        
         db.diaries.update_one(
             {'_id': diary_id},
             {'$set': {
-                'ai_prediction': prediction,
-                'ai_comment': comment,
+                'ai_prediction': enc_prediction,
+                'ai_comment': enc_comment,
                 'task_id': None 
             }}
         )
