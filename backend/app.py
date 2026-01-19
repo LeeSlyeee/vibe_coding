@@ -519,7 +519,8 @@ def weather_insight_original():
         mood_msg_map = {1: "예민", 2: "우울", 3: "평범", 4: "평온", 5: "행복"}
         mood_desc = mood_msg_map.get(top_mood, "다양한")
         return jsonify({'message': f"'{target_keyword}' 날씨에는 주로 {mood_desc}한 기분을 느끼셨어요."}), 200
-    return jsonify({'message': ""}), 200
+    except:
+        return jsonify({'message': ""}), 200
 
 @app.route('/api/report/comprehensive', methods=['GET'])
 @jwt_required()

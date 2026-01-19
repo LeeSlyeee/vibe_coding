@@ -28,7 +28,7 @@
         <!-- 일기 요약 통계 -->
         <!-- 일기 요약 통계 (고급스럽고 미니멀한 버젼) -->
         <transition name="fade">
-          <div v-if="diaries.length > 0 && !isSearching" class="stats-premium-banner">
+          <div v-if="diaries.length > 0 && !isSearching" class="stats-premium-banner cursor-pointer" @click="$router.push('/stats')">
              <div class="stat-group">
                 <span class="stat-icon">📅</span>
                 <span class="stat-info">이번 달 <strong>{{ diaries.length }}개</strong>의 기록이 있습니다</span>
@@ -39,10 +39,8 @@
                  <span class="stat-info">주로 <strong>{{ dominantMood.name }}</strong> 감정을 느끼셨네요</span>
               </div>
               
-              <!-- New Report Button -->
-              <button @click="handleGenerateReport" class="report-btn-v2" :disabled="isGeneratingReport">
-                 ✨ 심층 진단
-              </button>
+              <!-- Arrow Icon for navigation hint -->
+              <div class="stat-arrow">›</div>
            </div>
         </transition>
 
@@ -86,29 +84,6 @@
         </div>
       </div>
     </div>
-    
-    <!-- AI Report Modal -->
-    <transition name="fade">
-      <div v-if="showReportModal" class="report-modal-overlay">
-         <div class="report-card">
-            <button class="close-report-btn" @click="closeReport">✕</button>
-            <div class="report-header">
-               <h2>🔮 AI 심층 심리 분석 리포트</h2>
-               <p v-if="!isGeneratingReport" class="report-date">{{ new Date().toLocaleDateString() }} 기준</p>
-            </div>
-            
-            <div v-if="isGeneratingReport" class="report-loading">
-               <div class="spinner"></div>
-               <p>지난 일기들을 꼼꼼히 읽고 있어요...</p>
-               <p class="sub-text">잠시만 기다려주세요 (최대 3분)</p>
-            </div>
-            
-            <div v-else class="report-content-body">
-               <div class="report-text" v-html="formattedReportContent"></div>
-            </div>
-         </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -134,11 +109,6 @@ export default {
     const searchResults = ref([])
     const isSearching = ref(false)
     
-    // Report State
-    const showReportModal = ref(false)
-    const isGeneratingReport = ref(false)
-    const reportContent = ref('')
-
     const formattedMonth = computed(() => {
       return `${currentYear.value}년 ${currentMonth.value}월`
     })
@@ -194,14 +164,7 @@ export default {
         return moodMap[maxMood] || { name: '평범', emoji: '😐' }
     })
     
-    const formattedReportContent = computed(() => {
-       // Simple markdown-ish to HTML
-       if (!reportContent.value) return ''
-       return reportContent.value
-         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-         .replace(/\n\n/g, '<br><br>') // Paragraphs
-         .replace(/\n/g, '<br>') // Line breaks
-    })
+
 
     const previousMonth = () => {
       if (currentMonth.value === 1) {
@@ -384,25 +347,7 @@ export default {
     }
     
     // New Report Functions
-    const handleGenerateReport = async () => {
-       showReportModal.value = true
-       isGeneratingReport.value = true
-       reportContent.value = ''
-       
-       try {
-          const res = await diaryAPI.getComprehensiveReport()
-          reportContent.value = res.report || "리포트 생성에 실패했어요."
-       } catch (e) {
-          reportContent.value = "죄송합니다. 리포트를 생성하는 중 오류가 발생했습니다.\n" + (e.message || "")
-       } finally {
-          isGeneratingReport.value = false
-       }
-    }
-    
-    const closeReport = () => {
-       if (isGeneratingReport.value) return // Generating... prevent close
-       showReportModal.value = false
-    }
+
 
     onMounted(() => {
       loadDiaries()
@@ -426,15 +371,9 @@ export default {
       dominantMood,
       handleSearch,
       closeSearch,
-      viewDiary,
-      
-      // Report Exports
-      showReportModal,
-      isGeneratingReport,
-      reportContent,
-      formattedReportContent,
-      handleGenerateReport,
-      closeReport
+      handleSearch,
+      closeSearch,
+      viewDiary
     }
   }
 }
@@ -450,6 +389,19 @@ html, body {
 
 <style scoped>
 /* Previous Styles Maintainted... */
+.cursor-pointer {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.cursor-pointer:hover {
+    transform: scale(1.02);
+}
+.stat-arrow {
+    margin-left: auto;
+    font-size: 24px;
+    color: #ccc;
+    font-weight: 300;
+}
 .calendar-page {
   height: calc(100vh - 56px); /* Fixed height instead of min-height */
   padding: var(--spacing-lg); /* Reduce padding slightly */
@@ -693,130 +645,7 @@ html, body {
   opacity: 0;
 }
 
-/* Report Modal Styles */
-.report-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(5px);
-    z-index: 2000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
 
-.report-card {
-    background: white;
-    width: 600px;
-    max-width: 90%;
-    height: 80vh;
-    border-radius: 20px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-    display: flex;
-    flex-direction: column;
-    padding: 40px;
-    position: relative;
-    animation: scaleIn 0.3s ease-out;
-}
-
-@keyframes scaleIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-.close-report-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    font-size: 24px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #999;
-}
-
-.report-header {
-    text-align: center;
-    margin-bottom: 20px;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 20px;
-}
-
-.report-header h2 {
-    font-size: 24px;
-    color: #333;
-    margin-bottom: 8px;
-}
-
-.report-date {
-    color: #888;
-    font-size: 14px;
-}
-
-.report-content-body {
-    flex: 1;
-    overflow-y: auto;
-    padding-right: 10px;
-    line-height: 1.8;
-    color: #444;
-    font-size: 16px;
-}
-
-.report-btn-v2 {
-    margin-left: auto;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 20px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
-}
-
-.report-btn-v2:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
-}
-
-.report-btn-v2:disabled {
-    opacity: 0.7;
-    cursor: wait;
-}
-
-.report-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #666;
-}
-
-.spinner {
-    width: 40px;
-    height: 40px;
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #764ba2;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 20px;
-}
-
-.sub-text {
-    font-size: 13px;
-    color: #999;
-    margin-top: 8px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
 
 @media (max-width: 1024px) {
   .calendar-layout {

@@ -94,6 +94,44 @@
                         <Bar :data="weatherChartData" :options="weatherBarOptions" />
                     </div>
                 </div>
+
+                <!-- 4. AI 심층 리포트 (New) -->
+                <div v-else-if="currentTab === 'report'" key="report" class="chart-section report-section">
+                    <div class="section-info">
+                        <h3>🔮 AI 심층 심리 분석</h3>
+                        <p>전문 AI 상담사가 나의 기록을 바탕으로 마음의 지도를 그려드립니다.</p>
+                    </div>
+
+                    <div class="report-container">
+                        <!-- 1. 생성 전 (버튼) -->
+                        <div v-if="!isGeneratingReport && !formattedReportContent" class="report-initial">
+                             <div class="report-icon-large">🧘</div>
+                             <p>최근 50개의 일기 기록을 종합적으로 분석하여<br>현재 심리 상태 진단과 맞춤형 조언을 제공합니다.</p>
+                             <button @click="handleGenerateReport" class="generate-btn">
+                                심층 리포트 생성하기
+                             </button>
+                             <p class="notice">* 생성에는 약 1~3분이 소요됩니다.</p>
+                        </div>
+
+                        <!-- 2. 생성 중 (로딩) -->
+                        <div v-else-if="isGeneratingReport" class="report-loading">
+                            <div class="spinner-large"></div>
+                            <p class="loading-text">AI가 내면의 목소리를 듣고 있어요...</p>
+                            <p class="loading-sub">잠시만 기다려주세요 (최대 3분)</p>
+                        </div>
+
+                        <!-- 3. 결과 (리포트) -->
+                        <div v-else class="report-result">
+                            <div class="report-meta">
+                                <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
+                                <button @click="handleGenerateReport" class="regenerate-btn">다시 분석하기</button>
+                            </div>
+                            <div class="report-content-box">
+                                <div class="report-text" v-html="formattedReportContent"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </transition>
         </div>
       </div>
@@ -128,12 +166,17 @@ export default {
     const loading = ref(true)
     const currentTab = ref('flow') // Default to 'flow'
     const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [], timeline: [] })
+    
+    // Report State
+    const isGeneratingReport = ref(false)
+    const reportContent = ref('')
 
     const tabs = [
         { id: 'flow', label: '감정 흐름', icon: '📈' },
         { id: 'monthly', label: '월별 기록', icon: '📅' },
         { id: 'mood', label: '감정 분포', icon: '🎨' },
-        { id: 'weather', label: '날씨 통계', icon: '☁️' }
+        { id: 'weather', label: '날씨 통계', icon: '☁️' },
+        { id: 'report', label: 'AI 심층 진단', icon: '🔮' }
     ]
 
     // === Chart Options ===
@@ -429,6 +472,28 @@ export default {
             datasets: datasets
         }
     })
+    
+    // === Report Logic ===
+    const formattedReportContent = computed(() => {
+       if (!reportContent.value) return ''
+       return reportContent.value
+         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+         .replace(/\n\n/g, '<br><br>')
+         .replace(/\n/g, '<br>')
+    })
+
+    const handleGenerateReport = async () => {
+       isGeneratingReport.value = true
+       reportContent.value = ''
+       try {
+          const res = await diaryAPI.getComprehensiveReport()
+          reportContent.value = res.report || "생성 실패"
+       } catch (e) {
+          reportContent.value = "오류가 발생했습니다: " + (e.message || "알 수 없는 오류")
+       } finally {
+          isGeneratingReport.value = false
+       }
+    }
 
     onMounted(async () => {
         try {
@@ -447,7 +512,13 @@ export default {
         tabs,
         monthlyCharts, flowChartData, flowChartOptions,
         moodChartData, doughnutOptions, moodLegendData,
-        weatherChartData, weatherBarOptions
+        weatherChartData, weatherBarOptions,
+        
+        // Report Exports
+        isGeneratingReport,
+        reportContent,
+        formattedReportContent,
+        handleGenerateReport
     }
   }
 }
@@ -676,5 +747,140 @@ export default {
   .close-btn { align-self: flex-end; }
   .mood-layout .mood-content { flex-direction: column; }
   .stats-content { padding: 24px; }
+}
+
+/* === Report Section Styles === */
+.report-section {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.report-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #fbfbfd;
+    border-radius: 20px;
+    padding: 30px;
+    border: 1px solid #f2f2f7;
+    min-height: 400px;
+}
+
+/* Initial State */
+.report-initial {
+    text-align: center;
+    max-width: 400px;
+}
+.report-icon-large {
+    font-size: 60px;
+    margin-bottom: 20px;
+}
+.report-initial p {
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+.generate-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 14px 32px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+}
+.generate-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+}
+.notice {
+    margin-top: 16px !important;
+    font-size: 13px !important;
+    color: #999 !important;
+}
+
+/* Loading State */
+.report-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.spinner-large {
+    width: 50px;
+    height: 50px;
+    border: 5px solid #e0e0e0;
+    border-top: 5px solid #764ba2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 24px;
+}
+.loading-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 8px;
+}
+.loading-sub {
+    color: #888;
+    font-size: 14px;
+}
+
+/* Result State */
+.report-result {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+.report-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eee;
+}
+.report-date {
+    font-size: 14px;
+    color: #888;
+    background: #eee;
+    padding: 4px 12px;
+    border-radius: 12px;
+}
+.regenerate-btn {
+    background: none;
+    border: 1px solid #ddd;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #666;
+    transition: all 0.2s;
+}
+.regenerate-btn:hover {
+    background: #f5f5f5;
+    color: #333;
+}
+.report-content-box {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 10px;
+    font-size: 16px;
+    line-height: 1.8;
+    color: #333;
+    white-space: pre-wrap; /* Preserve formatting */
+}
+.report-content-box::-webkit-scrollbar {
+  width: 6px;
+}
+.report-content-box::-webkit-scrollbar-thumb {
+  background-color: #ddd;
+  border-radius: 3px;
 }
 </style>
