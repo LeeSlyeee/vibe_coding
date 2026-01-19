@@ -354,14 +354,26 @@ def update_diary(id):
 @jwt_required()
 def delete_diary(id):
     current_user_id = get_jwt_identity()
+    print(f"🗑️ [DELETE] Request for ID: {id}, User: {current_user_id}")
     
-    if not ObjectId.is_valid(id): return jsonify({"message": "Invalid ID"}), 400
+    if not ObjectId.is_valid(id): 
+        print("❌ Invalid ID format")
+        return jsonify({"message": "Invalid ID"}), 400
     
     diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
-    if not diary: return jsonify({"message": "Not found"}), 404
-    if diary.get('user_id') != current_user_id: return jsonify({"message": "Unauthorized"}), 403
+    if not diary: 
+        print("❌ Diary not found in DB")
+        return jsonify({"message": "Not found"}), 404
+        
+    print(f"📄 Found Diary User: {diary.get('user_id')}")
     
-    mongo.db.diaries.delete_one({'_id': ObjectId(id)})
+    if diary.get('user_id') != current_user_id: 
+        print("❌ Unauthorized: User mismatch")
+        return jsonify({"message": "Unauthorized"}), 403
+    
+    result = mongo.db.diaries.delete_one({'_id': ObjectId(id)})
+    print(f"✅ Delete Result: {result.deleted_count}")
+    
     return jsonify({"message": "Deleted successfully"}), 200
 
 @app.route('/api/diaries/search', methods=['GET'])
