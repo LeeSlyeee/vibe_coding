@@ -173,10 +173,15 @@ export const diaryAPI = {
     return response.data
   },
 
-  // 심층 리포트 생성
-  getComprehensiveReport: async () => {
-    // Timeout 10 minutes
-    const response = await api.get('/report/comprehensive', { timeout: 600000 })
+  // 심층 리포트 생성 (비동기 시작)
+  startReportGeneration: async () => {
+    const response = await api.post('/report/start')
+    return response.data
+  },
+
+  // 심층 리포트 상태 확인 (Polling)
+  getReportStatus: async () => {
+    const response = await api.get('/report/status')
     return response.data
   }
 }

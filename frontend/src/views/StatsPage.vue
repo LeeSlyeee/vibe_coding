@@ -140,7 +140,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, reactive } from 'vue'
+import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { diaryAPI } from '../services/api'
 import {
   Chart as ChartJS,
@@ -482,28 +482,81 @@ export default {
          .replace(/\n/g, '<br>')
     })
 
+    let pollingInterval = null
+
+    const checkStatus = async () => {
+        try {
+            const res = await diaryAPI.getReportStatus()
+            if (res.status === 'processing') {
+                isGeneratingReport.value = true
+                // Start polling if not started
+                if (!pollingInterval) {
+                     pollingInterval = setInterval(checkStatus, 3000)
+                }
+            } else if (res.status === 'completed') {
+                isGeneratingReport.value = false
+                reportContent.value = res.report
+                if (pollingInterval) {
+                    clearInterval(pollingInterval)
+                    pollingInterval = null
+                }
+            } else if (res.status === 'failed') {
+                isGeneratingReport.value = false
+                reportContent.value = "리포트 생성에 실패했습니다. (AI 오류)"
+                if (pollingInterval) {
+                    clearInterval(pollingInterval)
+                    pollingInterval = null
+                }
+            } else {
+                // status: none or unexpected
+                isGeneratingReport.value = false
+                if (pollingInterval) {
+                    clearInterval(pollingInterval)
+                    pollingInterval = null
+                }
+            }
+        } catch (e) {
+            console.error("Polling error:", e)
+        }
+    }
+
     const handleGenerateReport = async () => {
        isGeneratingReport.value = true
        reportContent.value = ''
+       
        try {
-          const res = await diaryAPI.getComprehensiveReport()
-          reportContent.value = res.report || "생성 실패"
+          // 1. Start Generation
+          await diaryAPI.startReportGeneration()
+          
+          // 2. Start Polling
+          if (pollingInterval) clearInterval(pollingInterval)
+          pollingInterval = setInterval(checkStatus, 3000) // Poll every 3s
+          
        } catch (e) {
-          reportContent.value = "오류가 발생했습니다: " + (e.message || "알 수 없는 오류")
-       } finally {
           isGeneratingReport.value = false
+          reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
        }
     }
 
     onMounted(async () => {
         try {
+            // Load Charts
             const res = await diaryAPI.getStatistics()
             rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
+            
+            // Resume Report Polling if needed
+            checkStatus() 
+            
         } catch (e) {
             console.error(e)
         } finally {
             loading.value = false
         }
+    })
+
+    // Cleanup on unmount
+    onUnmounted(() => {
+        if (pollingInterval) clearInterval(pollingInterval)
     })
 
     return {

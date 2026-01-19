@@ -547,31 +547,57 @@ def weather_insight_original():
     except:
         return jsonify({'message': ""}), 200
 
-@app.route('/api/report/comprehensive', methods=['GET'])
+# Async Report Generation
+import threading
+
+def background_generate_task(app_instance, user_id, final_input):
+    """Background thread to generate report without blocking"""
+    with app_instance.app_context():
+        try:
+            print(f"🧵 [Thread] Starting background report generation for {user_id}")
+            from ai_brain import EmotionAnalysis
+            ai = EmotionAnalysis()
+            report = ai.generate_comprehensive_report(final_input)
+            
+            # Save success
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {
+                    'report_status': 'completed',
+                    'latest_report': report,
+                    'report_updated_at': datetime.utcnow()
+                }}
+            )
+            print(f"✅ [Thread] Report generation complete for {user_id}")
+            
+        except Exception as e:
+            print(f"❌ [Thread] Report generation failed: {e}")
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {'report_status': 'failed'}}
+            )
+
+@app.route('/api/report/start', methods=['POST'])
 @jwt_required()
-def get_comprehensive_report():
+def start_report_generation():
     user_id = get_jwt_identity()
 
-    # 1. Fetch Diaries (Limit 50 to avoid token overflow context window of 2B model)
+    # 1. Check Diaries
     cursor = mongo.db.diaries.find({'user_id': user_id}).sort('created_at', -1).limit(50)
     diaries = list(cursor)
 
     if len(diaries) < 3:
-        return jsonify({"report": "분석을 위해서는 최소 3일 이상의 일기 기록이 필요해요. 조금 더 기록을 쌓아주세요! 📝"}), 200
+        return jsonify({"status": "error", "message": "분석을 위해서는 최소 3일 이상의 기록이 필요해요."}), 400
 
-    # 2. Summarize Data for AI
+    # 2. Summarize Data
     summary_lines = []
     mood_counts = {}
 
     for d in diaries:
-        # Decrypt first
         decrypted = decrypt_doc(d)
-        
-        created_at = decrypted.get('created_at')
-        date = created_at.strftime('%Y-%m-%d') if created_at else "날짜없음"
-        
+        date = decrypted.get('created_at').strftime('%Y-%m-%d') if decrypted.get('created_at') else "날짜없음"
         mood = decrypted.get('mood_level', 3)
-        event = decrypted.get('event', '')[:50].replace('\n', ' ') # Shorten & clean
+        event = decrypted.get('event', '')[:50].replace('\n', ' ')
         emotion = decrypted.get('emotion_desc', '')[:30]
         thought = decrypted.get('emotion_meaning', '')[:30]
         
@@ -580,20 +606,35 @@ def get_comprehensive_report():
 
     summary_text = "\n".join(summary_lines)
     stats_text = f"최근 {len(diaries)}일간 기분 분포: {mood_counts}"
-    
     final_input = f"{stats_text}\n\n[최근 일기 요약]\n{summary_text}"
 
-    print(f"🧠 Requesting Comprehensive Report for user {user_id}...")
+    # 3. Set Status & Start Thread
+    mongo.db.users.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {'report_status': 'processing'}}
+    )
+
+    thread = threading.Thread(target=background_generate_task, args=(app, user_id, final_input))
+    thread.start()
+
+    return jsonify({"status": "processing", "message": "리포트 분석을 시작했습니다."}), 202
+
+@app.route('/api/report/status', methods=['GET'])
+@jwt_required()
+def check_report_status():
+    user_id = get_jwt_identity()
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
     
-    # 3. Call AI (Lightweight Init)
-    from ai_brain import EmotionAnalysis
-    try:
-        ai = EmotionAnalysis()
-        report = ai.generate_comprehensive_report(final_input)
-        return jsonify({"report": report}), 200
-    except Exception as e:
-        print(f"Report Error: {e}")
-        return jsonify({"report": "죄송해요, 리포트를 생성하는 중 오류가 발생했어요."}), 500
+    if not user:
+        return jsonify({"status": "none"}), 200
+        
+    status = user.get('report_status', 'none')
+    report = ''
+    
+    if status == 'completed':
+        report = user.get('latest_report', '')
+        
+    return jsonify({"status": status, "report": report}), 200
 
 if __name__ == '__main__':
     # No SQL create_all() needed
