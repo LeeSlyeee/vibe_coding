@@ -213,6 +213,24 @@ def decrypt_doc(doc):
             doc[field] = crypto_manager.decrypt(doc[field])
     return doc
 
+def map_ai_to_mood(ai_text):
+    """
+    Parses '평범 (85%)' or '평범' style strings and maps them to 1-5 level.
+    """
+    if not ai_text: return None
+    # 5: 행복, 기쁨
+    if "행복" in ai_text or "기쁨" in ai_text: return 5
+    # 4: 편안, 평온
+    if "평온" in ai_text or "편안" in ai_text: return 4
+    # 3: 평범, 중립, 보통
+    if "평범" in ai_text or "중립" in ai_text or "보통" in ai_text: return 3
+    # 2: 우울, 슬픔, 비통
+    if "우울" in ai_text or "슬픔" in ai_text: return 2
+    # 1: 화남, 분노
+    if "화남" in ai_text or "분노" in ai_text: return 1
+    
+    return None # Fallback to user_mood logic in caller
+
 # Helper to Encrypt Data (for saving)
 def encrypt_data(data):
     encrypted = {}
