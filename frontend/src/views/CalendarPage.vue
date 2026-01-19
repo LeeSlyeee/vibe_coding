@@ -111,8 +111,33 @@ export default {
 
     const dominantMood = computed(() => {
         if (diaries.value.length === 0) return { name: '-', emoji: '😶' }
+        
+        // Korean Label -> Internal Key Mapping
+        const labelToKey = {
+            '행복해': 'happy', '기쁨': 'happy',
+            '평온해': 'calm', '편안해': 'calm',
+            '그저그래': 'neutral', '평범': 'neutral',
+            '우울해': 'sad', '슬픔': 'sad',
+            '화가나': 'angry', '분노': 'angry'
+        }
+
         const counts = diaries.value.reduce((acc, d) => {
-            acc[d.mood] = (acc[d.mood] || 0) + 1
+            let key = d.mood // Default fallback
+            
+            // Try to use AI Prediction
+            if (d.ai_prediction) {
+                // Extract 'label' from "AI... 'label (95%)'..." or just "label"
+                const match = d.ai_prediction.match(/'([^']+)'/)
+                if (match && match[1]) {
+                     // "평온해 (90%)" -> "평온해"
+                     let label = match[1].split('(')[0].trim()
+                     if (labelToKey[label]) {
+                         key = labelToKey[label]
+                     }
+                }
+            }
+            
+            acc[key] = (acc[key] || 0) + 1
             return acc
         }, {})
         
