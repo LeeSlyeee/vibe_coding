@@ -100,6 +100,7 @@
                     <div class="section-info">
                         <h3>🔮 AI 심층 심리 분석</h3>
                         <p>전문 AI 상담사가 나의 기록을 바탕으로 마음의 지도를 그려드립니다.</p>
+                        <p>분석하고 완료까지 약 10분정도 소요됩니다.</p>
                     </div>
 
                     <div class="report-container">
@@ -110,7 +111,7 @@
                              <button @click="handleGenerateReport" class="generate-btn">
                                 심층 리포트 생성하기
                              </button>
-                             <p class="notice">* 생성에는 약 1~3분이 소요됩니다.</p>
+                             <p class="notice">* 생성에는 약 10분이 소요됩니다.</p>
                         </div>
 
                         <!-- 2. 생성 중 (로딩) -->
