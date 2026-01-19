@@ -550,7 +550,6 @@ html, body {
   background: white;
   padding: 24px 32px;
   border-radius: 24px;
-  margin-bottom: 32px;
   box-shadow: 0 8px 30px rgba(0,0,0,0.03);
   border: 1px solid rgba(0,0,0,0.02);
 }
