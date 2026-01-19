@@ -1,7 +1,7 @@
 <template>
   <div id="app">
-    <!-- 네비게이션 바 -->
-    <header class="navbar" v-if="showNavbar">
+    <!-- 데스크탑용 상단 네비게이션 -->
+    <header class="navbar desktop-nav" v-if="showNavbar">
       <div class="navbar-content">
         <h1 class="logo" @click="goHome">MOOD DIARY</h1>
         <div class="nav-actions">
@@ -28,10 +28,50 @@
       </div>
     </header>
 
+    <!-- 모바일용 상단 헤더 (앱 타이틀만) -->
+    <header class="navbar mobile-header" v-if="showNavbar">
+        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+    </header>
+
     <!-- 라우터 뷰 -->
     <main class="main-content">
       <RouterView />
     </main>
+
+    <!-- 모바일용 하단 네비게이션 -->
+    <nav class="bottom-nav" v-if="showNavbar && isAuthenticated">
+      <button 
+        class="nav-item" 
+        :class="{ active: $route.path === '/calendar' || $route.path === '/' }"
+        @click="$router.push('/calendar')"
+      >
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">일기</span>
+      </button>
+      
+      <button 
+        class="nav-item" 
+        :class="{ active: $route.path === '/stats' }"
+        @click="$router.push('/stats')"
+      >
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">분석</span>
+      </button>
+
+      <button 
+        class="nav-item" 
+        :class="{ active: $route.path === '/guide' }"
+        @click="$router.push('/guide')"
+      >
+        <span class="nav-icon">📘</span>
+        <span class="nav-label">가이드</span>
+      </button>
+
+      <button class="nav-item" @click="handleLogout">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label">MY</span>
+      </button>
+    </nav>
   </div>
 </template>
 
@@ -69,9 +109,11 @@ export default {
     );
 
     const handleLogout = () => {
-      localStorage.removeItem("token");
-      localStorage.removeItem("authToken");
-      router.push("/login");
+      if (confirm("로그아웃 하시겠습니까?")) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("authToken");
+        router.push("/login");
+      }
     };
 
     const goHome = () => {
@@ -98,8 +140,10 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background-color: var(--bg-primary);
 }
 
+/* === Desktop Navigation === */
 .navbar {
   background-color: var(--color-primary);
   color: white;
@@ -124,53 +168,107 @@ export default {
 }
 
 .logo {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.5px;
   margin: 0;
   cursor: pointer;
 }
 
-.stats-btn {
+.stats-btn, .logout-btn {
   background-color: transparent;
   color: white;
   border: none;
   padding: 6px 12px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-right: 8px;
+  gap: 6px;
+  margin-right: 4px;
 }
 
-.stats-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-.logout-btn {
-  background-color: transparent;
-  color: white;
-  border: none;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.logout-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+.stats-btn:hover, .logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .main-content {
   flex: 1;
   overflow: hidden;
   position: relative;
+  width: 100%;
+}
+
+/* === Mobile & Responsive Styles === */
+.mobile-header {
+    display: none;
+    justify-content: center;
+    padding: 12px;
+}
+
+.bottom-nav {
+    display: none; /* Hidden on Desktop */
+    background: white;
+    border-top: 1px solid #eee;
+    padding: 8px 0;
+    justify-content: space-around;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
+    z-index: 100;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 4px 12px;
+    color: #999;
+    font-size: 10px;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.nav-item.active {
+    color: var(--color-primary);
+}
+
+.nav-icon {
+    font-size: 20px;
+}
+
+@media (max-width: 768px) {
+    /* Hide Desktop Nav */
+    .desktop-nav {
+        display: none;
+    }
+
+    /* Show Mobile Header & Bottom Nav */
+    .mobile-header {
+        display: flex;
+    }
+
+    .bottom-nav {
+        display: flex;
+    }
+
+    .navbar {
+        background: white; /* Mobile header white background */
+        color: #1d1d1f;
+        box-shadow: 0 1px 0 rgba(0,0,0,0.05); /* Subtle separator */
+    }
+    
+    .logo {
+        font-size: 18px;
+        color: #1d1d1f;
+    }
+
+    /* Adjust main content for bottom nav */
+    .main-content {
+        /* No extra padding needed as bottom nav is flex item, not fixed overlay */
+    }
 }
 </style>

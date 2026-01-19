@@ -887,10 +887,70 @@ export default {
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 
 @media (max-width: 768px) {
-  .stats-header { flex-direction: column; gap: 16px; }
-  .close-btn { align-self: flex-end; }
+  .stats-page {
+      padding: 16px; 
+      padding-bottom: 90px; /* Space for bottom nav */
+      height: 100%;
+      overflow-y: auto; /* Scroll page, not just content */
+  }
+  
+  .stats-container { height: auto; display: block; }
+  
+  .stats-header { 
+      flex-direction: column; 
+      gap: 12px; 
+      align-items: flex-start;
+  }
+  
+  .close-btn { 
+      position: absolute;
+      top: 16px;
+      right: 16px;
+  }
+  
+  /* Horizontal Scrollable Tabs */
+  .stats-nav {
+      overflow-x: auto;
+      white-space: nowrap;
+      padding: 10px 4px; /* More clickable area */
+      margin-bottom: 16px;
+      -webkit-overflow-scrolling: touch;
+  }
+  
+  .stats-nav::-webkit-scrollbar { display: none; }
+  
+  .nav-item {
+      flex: 0 0 auto; /* Don't shrink */
+      padding: 10px 16px;
+  }
+
   .mood-layout .mood-content { flex-direction: column; }
-  .stats-content { padding: 24px; }
+  
+  .stats-content { 
+      padding: 20px; 
+      height: auto; 
+      border-radius: 20px;
+      box-shadow: none; /* Simplier look on mobile */
+      border: 1px solid #f0f0f0;
+  }
+  
+  .content-body { padding: 0; overflow: visible; }
+  
+  .report-meta {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+  }
+  
+  .report-actions {
+      width: 100%;
+      flex-direction: column;
+  }
+  
+  .meta-btn, .regenerate-btn {
+      width: 100%;
+      justify-content: center;
+  }
 }
 
 /* === Report Section Styles === */

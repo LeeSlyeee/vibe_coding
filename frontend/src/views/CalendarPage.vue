@@ -652,30 +652,67 @@ html, body {
 }
 
 @media (max-width: 768px) {
-  .calendar-page { padding: var(--spacing-sm); }
-  .calendar-section { padding: var(--spacing-md); height: 100%; border-radius: var(--radius-lg); }
-  .calendar-layout { display: block; }
+  .calendar-page { 
+      padding: 0; /* Remove padding for full-width feel on mobile */
+      height: 100%;
+  }
+  
+  .calendar-section { 
+      padding: 16px; 
+      height: 100%; 
+      border-radius: 0; /* Flat layout on mobile */
+      overflow-y: auto;
+  }
+  
+  .calendar-layout { display: block; height: 100%; }
+  
+  /* Stack Header Elements */
+  .calendar-header-v2 {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 16px;
+  }
+  
+  .month-navigation-v2 {
+      justify-content: space-between;
+      width: 100%;
+      padding: 0 10px;
+  }
+  
+  .search-box-v2 {
+      flex: 1;
+      width: 100%;
+  }
+  
+  /* Mobile Fullscreen Diary Panel (Bottom Sheet style) */
   .diary-section {
     display: none;
-    position: fixed; top: 56px; left: 0; width: 100%; height: calc(100% - 56px);
-    z-index: 1000; margin: 0; border-radius: 0;
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%;
+    z-index: 2000; /* Higher than navbar */
+    margin: 0; 
+    border-radius: 0;
+    padding-bottom: 80px; /* Space for bottom nav or safe area */
     animation: slideUp 0.3s ease-out;
   }
-  .diary-section.mobile-active { display: flex; }
-  .current-month { font-size: 18px; }
   
-  .report-card { width: 100%; height: 100%; border-radius: 0; padding: 20px; }
-  .stats-premium-banner { flex-direction: column; align-items: flex-start; gap: 16px; }
-  .report-btn-v2 { width: 100%; margin: 0; }
-}
-
-@media (max-width: 915px) and (orientation: landscape) {
-  .calendar-page { height: 100vh; padding: var(--spacing-xs); overflow: hidden; }
-  .calendar-layout { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); height: 100%; }
-  .calendar-section { height: 100%; overflow-y: auto; padding: var(--spacing-sm); }
-  .diary-section { display: flex !important; position: static; width: 100%; height: 100%; border-radius: var(--radius-lg); z-index: 1; animation: none; }
-  .nav-btn { width: 32px; height: 32px; font-size: 18px; }
-  .current-month { font-size: 16px; }
+  .diary-section.mobile-active { display: flex; }
+  
+  .current-month-v2 { font-size: 24px; }
+  
+  .stats-premium-banner { 
+      flex-direction: column; 
+      align-items: flex-start; 
+      gap: 12px;
+      padding: 20px;
+  }
+  
+  .stat-divider-v2 { display: none; } /* Hide divider on mobile */
+  
+  .stat-arrow { display: none; }
 }
 
 @keyframes slideUp {
