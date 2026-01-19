@@ -1179,8 +1179,8 @@ class EmotionAnalysis:
                 }
             }
             
-            # Timeout 180s (3 mins)
-            response = requests.post(url, json=payload, timeout=180)
+            # Timeout 600s (10 mins) - Increased for OCI environment
+            response = requests.post(url, json=payload, timeout=600)
             
             if response.status_code == 200:
                 result = response.json().get('response', '')
