@@ -550,6 +550,7 @@ def weather_insight_original():
 # Async Report Generation
 import threading
 
+
 def background_generate_task(app_instance, user_id, final_input):
     """Background thread to generate report without blocking"""
     with app_instance.app_context():
@@ -557,14 +558,24 @@ def background_generate_task(app_instance, user_id, final_input):
             print(f"🧵 [Thread] Starting background report generation for {user_id}")
             from ai_brain import EmotionAnalysis
             ai = EmotionAnalysis()
-            report = ai.generate_comprehensive_report(final_input)
+            report_content = ai.generate_comprehensive_report(final_input)
             
-            # Save success
+            # 1. Archive Report (New Collection)
+            new_report = {
+                'user_id': user_id,
+                'content': report_content,
+                'created_at': datetime.utcnow(),
+                'type': 'comprehensive'
+            }
+            mongo.db.reports.insert_one(new_report)
+            print(f"✅ [Thread] Report archived to DB.")
+            
+            # 2. Update User Status
             mongo.db.users.update_one(
                 {'_id': ObjectId(user_id)},
                 {'$set': {
                     'report_status': 'completed',
-                    'latest_report': report,
+                    'latest_report': report_content,
                     'report_updated_at': datetime.utcnow()
                 }}
             )
@@ -576,6 +587,41 @@ def background_generate_task(app_instance, user_id, final_input):
                 {'_id': ObjectId(user_id)},
                 {'$set': {'report_status': 'failed'}}
             )
+
+@app.route('/api/report/longterm', methods=['POST'])
+@jwt_required()
+def generate_long_term_report():
+    user_id = get_jwt_identity()
+    
+    # 1. Fetch Past Reports (Limit 5 most recent)
+    cursor = mongo.db.reports.find({'user_id': user_id, 'type': 'comprehensive'}).sort('created_at', -1).limit(5)
+    reports = list(cursor)
+    
+    if len(reports) < 2:
+        return jsonify({"message": "장기 분석을 하려면 최소 2개 이상의 심층 리포트가 필요해요."}), 400
+        
+    # Prepare Data for AI
+    # Pass oldest to newest for chronological analysis
+    reports.reverse() 
+    
+    history_data = []
+    for r in reports:
+        history_data.append({
+            'date': r['created_at'].strftime('%Y-%m-%d'),
+            'content': r['content']
+        })
+        
+    # 2. Generate Insight
+    try:
+        from ai_brain import EmotionAnalysis
+        ai = EmotionAnalysis()
+        insight = ai.generate_long_term_insight(history_data)
+        
+        return jsonify({"message": "분석 완료", "insight": insight}), 200
+        
+    except Exception as e:
+        print(f"Longterm Error: {e}")
+        return jsonify({"message": "분석 중 오류가 발생했습니다."}), 500
 
 @app.route('/api/report/start', methods=['POST'])
 @jwt_required()

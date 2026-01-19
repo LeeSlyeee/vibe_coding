@@ -1195,6 +1195,63 @@ class EmotionAnalysis:
             print(f"❌ Report Generation Error: {e}")
             return "리포트 생성 시스템에 오류가 발생했습니다."
 
+    def generate_long_term_insight(self, report_history):
+        """
+        [Meta-Analysis] Analyzes multiple past reports to find long-term patterns.
+        """
+        import requests
+        print(f"🧠 [Brain] Generating Long-Term Insight from {len(report_history)} reports...")
+        
+        if not report_history:
+            return "분석할 과거 리포트 데이터가 충분하지 않습니다."
+            
+        try:
+            url = "http://localhost:11434/api/generate"
+            
+            # Construct context from history
+            history_context = ""
+            for i, r in enumerate(report_history):
+                date = r.get('date', 'Unknown Date')
+                content = r.get('content', '')[:500] # Truncate to save context window
+                history_context += f"### [리포트 {i+1} - {date}]\n{content}...\n\n"
+                
+            prompt_text = (
+                "## SYSTEM: You represent a wise psychologist specializing in long-term therapy. Answer in KOREAN ONLY.\n"
+                "당신은 내담자의 '과거 심리 분석 리포트들'을 종합하여 장기적인 변화와 흐름을 분석하는 '메타 분석가'입니다.\n"
+                "아래 제공된 과거 리포트 기록들을 읽고, 내담자의 심리 상태가 시간의 흐름에 따라 어떻게 변화했는지 분석해주세요.\n\n"
+                f"{history_context}\n"
+                "### [작성 지침]\n"
+                "1. **언어**: 반드시 **한국어**로 작성하세요.\n"
+                "2. **구조**:\n"
+                "   - **변화의 흐름**: 감정이나 태도가 어떻게 변해왔는지 (긍정적/부정적 변화)\n"
+                "   - **반복되는 패턴**: 시간이 지나도 여전히 해결되지 않고 반복되는 문제점\n"
+                "   - **장기 제언**: 앞으로의 1개월을 위한 핵심 조언\n"
+                "3. **분량**: 3~4문단 내외로 깊이 있게 작성하세요.\n\n"
+                "메타 분석 결과:"
+            )
+            
+            payload = {
+                "model": "gemma2:2b",
+                "prompt": prompt_text,
+                "stream": False,
+                "options": {
+                    "temperature": 0.6,
+                    "num_predict": 2048
+                }
+            }
+            
+            response = requests.post(url, json=payload, timeout=300)
+            
+            if response.status_code == 200:
+                return response.json().get('response', '')
+            else:
+                return "메타 분석 생성에 실패했습니다."
+                
+        except Exception as e:
+            print(f"❌ Long-Term Insight Error: {e}")
+            return "분석 중 오류가 발생했습니다."
+
+
     def update_keywords(self, text, mood_level):
         # Learn new keywords from the text based on the user's provided mood_level.
         if not text: return

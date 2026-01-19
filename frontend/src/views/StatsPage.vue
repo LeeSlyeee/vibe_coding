@@ -125,8 +125,22 @@
                         <div v-else class="report-result">
                             <div class="report-meta">
                                 <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
-                                <button @click="handleGenerateReport" class="regenerate-btn">다시 분석하기</button>
+                                <div class="report-actions">
+                                    <button @click="handleGenerateLongTermReport" class="meta-btn" :disabled="isGeneratingLongTerm">
+                                        <span v-if="isGeneratingLongTerm">분석 중...</span>
+                                        <span v-else>🧠 과거 기록 통합 분석 (Meta-Analysis)</span>
+                                    </button>
+                                    <button @click="handleGenerateReport" class="regenerate-btn">다시 분석하기</button>
+                                </div>
                             </div>
+                            
+                            <!-- 메타 분석 결과 (Long Term) -->
+                            <div v-if="longTermReportContent" class="long-term-box">
+                                <h4>🧠 장기 심리 변화 분석 (Meta-Insight)</h4>
+                                <div class="report-text" v-html="formattedLongTermContent"></div>
+                            </div>
+                            
+                            <!-- 기본 리포트 -->
                             <div class="report-content-box">
                                 <div class="report-text" v-html="formattedReportContent"></div>
                             </div>
@@ -171,6 +185,10 @@ export default {
     // Report State
     const isGeneratingReport = ref(false)
     const reportContent = ref('')
+    
+    // Long-term Report State
+    const isGeneratingLongTerm = ref(false)
+    const longTermReportContent = ref('')
 
     const tabs = [
         { id: 'flow', label: '감정 흐름', icon: '📈' },
@@ -473,11 +491,19 @@ export default {
             datasets: datasets
         }
     })
-    
+
     // === Report Logic ===
     const formattedReportContent = computed(() => {
        if (!reportContent.value) return ''
        return reportContent.value
+         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
+         .replace(/\n\n/g, '<br><br>')
+         .replace(/\n/g, '<br>')
+    })
+    
+    const formattedLongTermContent = computed(() => {
+       if (!longTermReportContent.value) return ''
+       return longTermReportContent.value
          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
          .replace(/\n\n/g, '<br><br>')
          .replace(/\n/g, '<br>')
@@ -524,6 +550,7 @@ export default {
     const handleGenerateReport = async () => {
        isGeneratingReport.value = true
        reportContent.value = ''
+       longTermReportContent.value = '' // Clear previous meta analysis
        
        try {
           // 1. Start Generation
@@ -537,6 +564,22 @@ export default {
           isGeneratingReport.value = false
           reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
        }
+    }
+    
+    const handleGenerateLongTermReport = async () => {
+        if (isGeneratingLongTerm.value) return
+        
+        isGeneratingLongTerm.value = true
+        longTermReportContent.value = ''
+        
+        try {
+            const res = await diaryAPI.generateLongTermReport()
+            longTermReportContent.value = res.insight
+        } catch (e) {
+            alert(e.response?.data?.message || "분석 실패: " + e.message)
+        } finally {
+            isGeneratingLongTerm.value = false
+        }
     }
 
     onMounted(async () => {
@@ -572,13 +615,60 @@ export default {
         isGeneratingReport,
         reportContent,
         formattedReportContent,
-        handleGenerateReport
+        handleGenerateReport,
+        
+        // Long Term
+        isGeneratingLongTerm,
+        longTermReportContent,
+        formattedLongTermContent,
+        handleGenerateLongTermReport
     }
   }
 }
 </script>
 
 <style scoped>
+/* Previous Styles (omitted) */
+.long-term-box {
+    background: #f0fdf4; /* Light Green Tint */
+    border: 1px solid #bbf7d0;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+}
+.long-term-box h4 {
+    margin: 0 0 16px 0;
+    color: #166534;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.report-actions {
+    display: flex;
+    gap: 10px;
+}
+.meta-btn {
+    background: #10b981;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.meta-btn:hover:not(:disabled) {
+    background: #059669;
+    transform: scale(1.02);
+}
+.meta-btn:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+/* ... Rest of styles */
 .stats-page {
   height: 100%;
   overflow: hidden;

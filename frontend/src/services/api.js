@@ -183,6 +183,12 @@ export const diaryAPI = {
   getReportStatus: async () => {
     const response = await api.get('/report/status')
     return response.data
+  },
+
+  // 장기 메타 분석 생성
+  generateLongTermReport: async () => {
+    const response = await api.post('/report/longterm')
+    return response.data
   }
 }
 
