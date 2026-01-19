@@ -1172,7 +1172,7 @@ class EmotionAnalysis:
                 "stream": False,
                 "options": {
                     "temperature": 0.7,
-                    "num_predict": 4096, # Maximum length
+                    "num_predict": 2500, # Optimized length for speed
                     "repeat_penalty": 1.1,
                     "top_k": 40,
                     "top_p": 0.9
