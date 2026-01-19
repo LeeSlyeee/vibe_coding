@@ -350,6 +350,20 @@ def update_diary(id):
     updated_diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
     return jsonify(serialize_doc(decrypt_doc(updated_diary))), 200
 
+@app.route('/api/diaries/<id>', methods=['DELETE'])
+@jwt_required()
+def delete_diary(id):
+    current_user_id = get_jwt_identity()
+    
+    if not ObjectId.is_valid(id): return jsonify({"message": "Invalid ID"}), 400
+    
+    diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
+    if not diary: return jsonify({"message": "Not found"}), 404
+    if diary.get('user_id') != current_user_id: return jsonify({"message": "Unauthorized"}), 403
+    
+    mongo.db.diaries.delete_one({'_id': ObjectId(id)})
+    return jsonify({"message": "Deleted successfully"}), 200
+
 @app.route('/api/diaries/search', methods=['GET'])
 @jwt_required()
 def search_diaries():
