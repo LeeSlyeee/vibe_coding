@@ -398,7 +398,8 @@ export default {
         const weatherDesc = weatherInfo.value ? weatherInfo.value.desc : null
         
         try {
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 30000))
+            // Timeout increased to 60s
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000))
             const res = await Promise.race([
                 diaryAPI.getMindsetInsight(props.date, weatherDesc),
                 timeout

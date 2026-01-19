@@ -642,8 +642,8 @@ class EmotionAnalysis:
             print(f"🦙 [Insight] Requesting Ollama (Gemma 2:2b)...")
             url = "http://localhost:11434/api/generate"
             
-            # Timeout 20s (User is waiting on UI)
-            response = requests.post(url, json=payload, timeout=20)
+            # Timeout Increased to 60s (OCI CPU might be slow or busy)
+            response = requests.post(url, json=payload, timeout=60)
             
             if response.status_code != 200:
                 print(f"❌ Ollama Insight Error {response.status_code}: {response.text}")
