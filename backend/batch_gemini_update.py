@@ -6,11 +6,12 @@ from pymongo import MongoClient
 from config import Config
 from ai_brain import EmotionAnalysis
 
-# Force Gemini Mode
-os.environ['GEMINI_API_KEY'] = Config.GEMINI_API_KEY
+# Force Local Mode by ensuring GEMINI_API_KEY is NOT set in env for this process
+if 'GEMINI_API_KEY' in os.environ:
+    del os.environ['GEMINI_API_KEY']
 
 def batch_process_user(username="test"):
-    print(f"🚀 Starting Gemini Batch Update for user: {username}")
+    print(f"🚀 Starting Local AI (Gemma 2) Batch Update for user: {username}")
     
     # 1. Connect DB
     client = MongoClient(Config.MONGO_URI)
@@ -29,10 +30,9 @@ def batch_process_user(username="test"):
     
     # 4. Initialize AI
     try:
+        # Initialize AI without Gemini Key context
         ai = EmotionAnalysis()
-        if not ai.gemini_model:
-            print("❌ Gemini AI failed to load. Check API Key.")
-            return
+        print("✅ AI Brain Initialized (Local Mode).")
     except Exception as e:
         print(f"❌ AI Init Error: {e}")
         return
@@ -46,66 +46,54 @@ def batch_process_user(username="test"):
         
         print(f"[{i+1}/{total}] Analyzing Diary {diary_id}...", end=" ", flush=True)
         
-        # [Resumable Logic] DISABLED for full re-run
-        # if d.get('task_id') == 'batch_update_v5':
-        #      print("⏭️  Skipping (Already Processed by Gemma2).")
-        #      continue
+        # [Resumable Logic] 
+        # Skip if already processed by 'batch_update_v5' (or new tag)
+        if d.get('task_id') == 'batch_update_v5':
+             print("⏭️  Skipping (Already Processed).")
+             continue
         
-        # Strict Rate Limit Enforcement (Gemini Free Tier: 15 RPM)
-        # We aim for ~10 RPM to be safe -> 1 request every 6 seconds.
-        SAFE_INTERVAL = 0.1 # No rate limits for local AI! 
+        # No Strict Rate Limit for Local AI, but good to be gentle on CPU
+        SAFE_INTERVAL = 0.5 
         
-        while True:
-            start_time = time.time()
-            try:
-                # Use the new ultra-fast method
-                prediction, comment = ai.analyze_diary_with_local_llm(content)
+        start_time = time.time()
+        try:
+            # key point: uses 'analyze_diary_with_local_llm'
+            prediction, comment = ai.analyze_diary_with_local_llm(content)
+            
+            if prediction and comment:
+                # Success!
+                db.diaries.update_one(
+                    {'_id': diary_id},
+                    {'$set': {
+                        'ai_prediction': prediction,
+                        'ai_comment': comment,
+                        'task_id': 'batch_update_v5' 
+                    }}
+                )
+                print(f"✅ Done! ({time.time() - start_time:.1f}s)")
+                success_count += 1
+                time.sleep(SAFE_INTERVAL)
                 
-                if prediction and comment:
-                    # Success!
-                    db.diaries.update_one(
-                        {'_id': diary_id},
-                        {'$set': {
-                            'ai_prediction': prediction,
-                            'ai_comment': comment,
-                            'task_id': 'batch_update_v5' 
-                        }}
-                    )
-                    print(f"✅ Diary {i+1} Done!")
-                    success_count += 1
-                    
-                    # Smart Sleep: Ensure we wait at least SAFE_INTERVAL seconds
-                    elapsed = time.time() - start_time
-                    if elapsed < SAFE_INTERVAL:
-                        time.sleep(SAFE_INTERVAL - elapsed)
-                    break 
-                    
-                else:
-                    print(f"⚠️ AI returned None (Quota Limit/Error). Cooling down for 60s...", end=" ")
-                    time.sleep(60) 
-                    # Retry continues after 1 minute...
+            else:
+                print(f"⚠️ AI returned None. (Local AI Error or Timeout)")
+                time.sleep(1) 
 
-            except Exception as e:
-                # Even with safe pacing, if we hit a limit, cool down significantly
-                error_str = str(e)
-                if "429" in error_str or "Quota exceeded" in error_str:
-                    print(f"\n⏳ Quota Pulse Hit. Cooling down for 30s...")
-                    time.sleep(30)
-                else:
-                    print(f"❌ Error: {e}")
-                    time.sleep(5)
-                    # Retry continues...
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            time.sleep(1)
             
     print(f"\n🎉 Batch Update Complete! ({success_count}/{total} updated)")
 
 if __name__ == "__main__":
     target_user = sys.argv[1] if len(sys.argv) > 1 else "test"
     
-    # Priority: Config from .env (Best Practice)
-    if Config.GEMINI_API_KEY:
-        print(f"🔑 Using API Key from .env: {Config.GEMINI_API_KEY[:5]}...*****")
-    else:
-        print("❌ No API Key found in .env!")
+    # Check Ollama availability before start
+    import requests
+    try:
+        requests.get("http://localhost:11434")
+        print("✅ Ollama Server is running.")
+    except:
+        print("❌ Ollama server is NOT running. Please run 'ollama serve' first.")
         sys.exit(1)
-        
+
     batch_process_user(target_user)
