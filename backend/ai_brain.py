@@ -593,102 +593,76 @@ class EmotionAnalysis:
     
     def generate_pre_write_insight(self, recent_diaries, weather=None, weather_stats=None):
         """
-        Generates a warm insight before user starts writing.
-        Priority: Gemini 1.5 Flash (API)
-        Fallback: Polyglot-Ko (Local) or Default String
+        Generates a warm insight using Local Gemma 2 (Ollama).
         """
-        print(f"🔍 [Insight] Request received. Recent diaries count: {len(recent_diaries)}, Weather: {weather}, Stats: {weather_stats}")
+        import requests
+        import json
+
+        print(f"🔍 [Insight] Request received. Recent diaries count: {len(recent_diaries)}, Weather: {weather}")
         
         if not recent_diaries:
             return "오늘의 첫 기록을 시작해보세요! 솔직한 마음을 담으면 됩니다."
 
-        # 1. Gemini AI (Fast & Smart)
-        if self.gemini_model:
-            try:
-                print(f"🚀 [Insight] Attempting {self.gemini_model.model_name} with Privacy Shield...")
-                diary_context = ""
-                for d in recent_diaries:
-                    sanitized_event = self._sanitize_context(d.get('event',''))
-                    diary_context += f"- [{d.get('date','')}] 기분:{d.get('mood','')} / 상황:{sanitized_event}\n"
+        try:
+            # Construct Prompt
+            diary_context = ""
+            for d in recent_diaries:
+                sanitized_event = self._sanitize_context(d.get('event',''))
+                diary_context += f"- [{d.get('date','')}] 기분:{d.get('mood','')} / 내용:{sanitized_event}\n"
 
-                weather_info = f"오늘의 날씨: {weather}" if weather else "오늘의 날씨 정보 없음"
-                stats_info = f" (과거 이 날씨에 당신은 주로 {weather_stats} 감정을 느끼셨네요)" if weather_stats else ""
+            weather_info = f"오늘의 날씨: {weather}" if weather else "오늘의 날씨 정보 없음"
+            stats_info = f" (과거 이 날씨에 당신은 주로 {weather_stats} 감정을 느끼셨네요)" if weather_stats else ""
 
-                prompt = (
-                    "당신은 사용자의 지난 일기 기록과 오늘의 날씨, 그리고 '과거 날씨별 감정 패턴'을 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사입니다.\n\n"
-                    f"### {weather_info}{stats_info}\n"
-                    "### 사용자의 최근 1주일 흐름\n"
-                    f"{diary_context}\n"
-                    "### 지시사항\n"
-                    "1. 반드시 '한 문장'으로 작성하세요.\n"
-                    "2. 문장의 시작은 과거 패턴이나 오늘 날씨에 대한 공감으로 시작하세요.\n"
-                    "   (예: '비가 올 때면 평소보다 조금 더 우울해지곤 하셨죠. 오늘은 지난주의 활기찬 기운을 빌려 조금 더 웃어보는 건 어떨까요?')\n"
-                    "3. 최근 1주일간의 감정 흐름이 좋은지 나쁜지를 반드시 반영하여 개인화된 조언을 하세요.\n"
-                    "4. '오늘 하루 응원합니다' 같은 뻔한 말은 금지입니다.\n"
-                    "5. 20자~50자 내외로 부드러운 존댓말(해요체)을 사용하세요.\n\n"
-                    "상담사 조언(패턴과 최근 흐름이 통합된 한 문장):"
-                )
-
-                # Define a basic generation config if not already defined
-                # This is added to ensure 'config' is defined, as per the user's provided 'Code Edit' snippet.
-                # If 'config' is meant to be a more complex object, it should be defined elsewhere.
-                # For now, a minimal config is provided to prevent NameError.
-                try:
-                    import google.generativeai as genai
-                    config = genai.GenerationConfig(
-                        temperature=0.7,
-                        top_p=0.95,
-                        top_k=40,
-                        max_output_tokens=60,
-                    )
-                except ImportError:
-                    print("Warning: google.generativeai not imported, cannot define GenerationConfig.")
-                    config = None # Fallback if genai is not available
-
-                print("DEBUG: Sending request to Gemini... WITH TIMEOUT 15s")
-                response = self.gemini_model.generate_content(
-                prompt,
-                generation_config=config,
-                request_options={"timeout": 15}  # Force timeout after 15s
+            prompt_text = (
+                "당신은 사용자의 지난 일기 기록과 오늘의 날씨, 그리고 '과거 날씨별 감정 패턴'을 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사입니다.\n\n"
+                f"### {weather_info}{stats_info}\n"
+                "### 사용자의 최근 1주일 흐름\n"
+                f"{diary_context}\n"
+                "### 지시사항\n"
+                "1. 반드시 '한 문장'으로 작성하세요.\n"
+                "2. 문장의 시작은 과거 패턴이나 오늘 날씨에 대한 공감으로 시작하세요.\n"
+                "   (예: '비가 올 때면 평소보다 조금 더 우울해지곤 하셨죠. 오늘은 지난주의 활기찬 기운을 빌려 조금 더 웃어보는 건 어떨까요?')\n"
+                "3. 최근 1주일간의 감정 흐름이 좋은지 나쁜지를 반드시 반영하여 개인화된 조언을 하세요.\n"
+                "4. '오늘 하루 응원합니다' 같은 뻔한 말은 금지입니다.\n"
+                "5. 30자~60자 내외로 부드러운 존댓말(해요체)을 사용하세요.\n\n"
+                "상담사 조언(패턴과 최근 흐름이 통합된 한 문장):"
             )
-                print("DEBUG: Received response from Gemini!")
-                # Handling blocked responses or empty candidates
-                try:
-                    if response and response.text:
-                        final_response = response.text.strip()
-                        # Basic validation
-                        if len(final_response) >= 5:
-                            print(f"✅ [Insight] Gemini Success: {final_response}")
-                            return final_response
-                        else:
-                            print(f"⚠️ [Insight] Gemini response too short (<5 chars): '{final_response}'")
-                except ValueError:
-                    # This happens if response.text is not available (e.g., blocked by safety)
-                    print(f"🚫 [Insight] Gemini response blocked by safety filters or no candidates.")
-                    if hasattr(response, 'prompt_feedback'):
-                        print(f"   Feedback: {response.prompt_feedback}")
-                    
-            except Exception as e:
-                print(f"❌ [Insight] Gemini Inference Failed: {str(e)}")
 
-        # 2. Local Model Fallback (Polyglot)
-        if self.gpt_model and self.gpt_tokenizer:
-            try:
-                print("🏃 [Insight] Falling back to Local Polyglot-Ko...")
-                # Simplified fallback logic for robustness
-                input_text = f"상담 기록:\n{recent_diaries[-1].get('event','')}\n조언:"
-                encoded = self.gpt_tokenizer(input_text, return_tensors='pt').to(self.device)
-                with torch.no_grad():
-                    ids = self.gpt_model.generate(encoded.input_ids, max_length=50)
-                decoded = self.gpt_tokenizer.decode(ids[0], skip_special_tokens=True)
-                print(f"✅ [Insight] Local Fallback success.")
-                return decoded.split("조언:")[-1].strip()
-            except Exception as e:
-                print(f"❌ [Insight] Local Fallback Failed: {str(e)}")
+            # Ollama Payload
+            payload = {
+                "model": "gemma2:2b",
+                "prompt": prompt_text,
+                "stream": False,
+                # No 'format': 'json' here because we want free text
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 100 
+                }
+            }
+            
+            print(f"🦙 [Insight] Requesting Ollama (Gemma 2:2b)...")
+            url = "http://localhost:11434/api/generate"
+            
+            # Timeout 20s (User is waiting on UI)
+            response = requests.post(url, json=payload, timeout=20)
+            
+            if response.status_code != 200:
+                print(f"❌ Ollama Insight Error {response.status_code}: {response.text}")
+                return None
+                
+            result = response.json()
+            response_text = result.get('response', '').strip()
+            
+            # Cleanup quotes if model adds them
+            if response_text.startswith('"') and response_text.endswith('"'):
+                response_text = response_text[1:-1]
+                
+            print(f"✅ [Insight] Gemma Success: {response_text}")
+            return response_text
 
-        # 3. Final Fallback (Return None to let Frontend handle 30s timeout)
-        print("💡 [Insight] All AI models failed/blocked. Returning None to trigger frontend default.")
-        return None
+        except Exception as e:
+            print(f"❌ [Insight] Inference Failed: {str(e)}")
+            return None
 
     def _rebuild_inference_models(self):
         # Seq2Seq Removed
