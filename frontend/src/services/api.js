@@ -175,8 +175,8 @@ export const diaryAPI = {
 
   // 심층 리포트 생성
   getComprehensiveReport: async () => {
-    // Timeout 3 minutes
-    const response = await api.get('/report/comprehensive', { timeout: 180000 })
+    // Timeout 10 minutes
+    const response = await api.get('/report/comprehensive', { timeout: 600000 })
     return response.data
   }
 }
