@@ -377,14 +377,39 @@ export default {
 }
 
 /* Mobile Landscape & Short Screens Optimization */
+/* Mobile Landscape & Short Screens Optimization */
 @media (max-height: 600px) {
   .guide-page {
-    padding: 10px 15px;
+    /* 기존 100% 및 hidden 해제 -> 전체 스크롤 허용 */
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto; 
+    padding: 15px; /* 약간 여유를 줌 */
   }
+
+  .guide-container {
+    height: auto; /* 고정 높이 해제 */
+    display: block; /* Flex 해제 (필요시) */
+  }
+
   .guide-header {
-    margin-bottom: 10px;
+    margin-bottom: 20px;
     align-items: center;
   }
+  
+  .guide-content {
+    /* 내부 스크롤 제거 -> 페이지 전체가 늘어나도록 함 */
+    height: auto;
+    flex: none;
+    overflow: visible; 
+  }
+
+  .content-body {
+    /* 내부 스크롤 제거 */
+    overflow-y: visible;
+    padding: 30px 20px;
+  }
+
   .header-left h2 {
     font-size: 22px;
     margin-bottom: 4px;
@@ -392,20 +417,8 @@ export default {
   .subtitle {
     font-size: 13px;
   }
-  .close-btn {
-    padding: 6px 12px;
-    font-size: 13px;
-  }
-
-  /* Content Layout Adjustments */
-  .content-body {
-    padding: 20px;
-  }
-  .guide-section {
-    margin-bottom: 30px;
-  }
-
-  /* Grid Optimizations for Wide but Short screens */
+  
+  /* Grid Optimizations */
   .steps-grid {
     gap: 12px;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -413,27 +426,13 @@ export default {
   .step-card {
     padding: 16px;
   }
-  .step-num {
-    width: 24px;
-    height: 24px;
-    font-size: 12px;
-    top: -8px;
-    left: 16px;
-  }
-  .step-card h4 {
-    margin: 8px 0 4px 0;
-    font-size: 15px;
-  }
-  .step-card p {
-    font-size: 13px;
-  }
-
+  
   /* Feature Cards Compact */
   .feature-card {
     padding: 20px;
   }
   .ai-feature {
-    flex-direction: row; /* Keep side-by-side in landscape if width allows */
+    flex-direction: row; 
     gap: 20px;
     text-align: left;
   }
@@ -449,7 +448,7 @@ export default {
     text-align: left;
   }
   .two-col {
-    grid-template-columns: 1fr 1fr; /* Use width effectively */
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>
