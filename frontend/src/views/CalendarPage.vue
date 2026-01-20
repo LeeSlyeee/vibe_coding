@@ -724,8 +724,6 @@ html, body {
   from { transform: translateY(100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
-</style>
-
 
 /* Mobile Landscape Split View Optimization */
 @media (max-height: 600px) and (orientation: landscape) {
