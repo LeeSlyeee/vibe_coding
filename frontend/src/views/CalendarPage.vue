@@ -693,13 +693,15 @@ html, body {
     position: fixed; 
     top: 0; 
     left: 0; 
-    width: 100%; 
-    height: 100%;
-    z-index: 2000; /* Higher than navbar */
+    right: 0;
+    bottom: 60px; /* Leave space for bottom nav */
+    z-index: 50; /* Lower than bottom nav (100) */
     margin: 0; 
     border-radius: 0;
-    padding-bottom: 80px; /* Space for bottom nav or safe area */
+    padding-bottom: 20px; /* Inner padding */
     animation: slideUp 0.3s ease-out;
+    background-color: var(--bg-primary); /* Ensure background is opaque */
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
   
   .diary-section.mobile-active { display: flex; }

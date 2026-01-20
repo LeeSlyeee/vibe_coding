@@ -6,8 +6,11 @@
            <h2>📖 사용 설명서</h2>
            <p class="subtitle">MOOD DIARY를 100% 활용하는 방법을 알려드려요.</p>
          </div>
-         <button @click="$router.push('/calendar')" class="close-btn">
-            <span class="icon">✖</span> 닫기
+         <button @click="$router.push('/calendar')" class="close-btn" aria-label="닫기">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 6L6 18" stroke="#333" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M6 6L18 18" stroke="#333" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
          </button>
       </header>
 
@@ -51,10 +54,10 @@
                             단순히 '좋다', '나쁘다'가 아닌, <strong>60가지의 세분화된 감정</strong>(비통함, 홀가분함, 설렘, 억울함 등)으로 당신의 마음을 정확하게 읽어냅니다.
                         </p>
                         <br>
-                        <h4>전문 심리 상담사 같은 코멘트</h4>
+                        <h4>💬 전문 상담사급 AI 코멘트 (Gemma 2)</h4>
                         <p>
-                             국내 최고 수준의 한국어 AI 모델(Polyglot-Ko)이 당신의 일기 속 <strong>문맥과 숨겨진 의미</strong>를 파악하여, 
-                             마치 상담사가 옆에서 이야기하듯 따뜻하고 깊이 있는 위로를 건넵니다.
+                             구글의 최신 고성능 모델 <strong>Gemma 2 (2b)</strong>가 탑재되어 있습니다. 
+                             당신의 일기 속 <strong>문맥과 숨겨진 의미</strong>를 깊이 있게 파악하여, 전문 상담사처럼 따뜻한 위로를 건넵니다.
                         </p>
                         <p class="tip-text">
                              💡 일기 내용을 수정하면 AI가 다시 깊게 고민하여 새로운 답변을 준비해요!
@@ -64,19 +67,62 @@
                 </div>
             </section>
 
-            <!-- 3. 통계 및 검색 -->
-            <section class="guide-section two-col">
-                <div class="feature-card">
-                    <h3>📊 감정 통계</h3>
-                    <p>
-                        <strong>[분석]</strong> 페이지에서 AI가 분석한 <strong>감정 흐름</strong>, 나의 <strong>월별 기록 습관</strong>, 그리고 <strong>날씨와 기분의 상관관계</strong>를 직관적인 차트로 확인해보세요.
-                    </p>
+            <!-- 3. 프라이버시 & 심층 분석 -->
+            <section class="guide-section">
+                <h3>📊 프라이버시 & 심층 분석</h3>
+                
+                <div class="feature-card" style="margin-bottom: 20px; border-left: 4px solid #34C759;">
+                    <div class="ai-feature">
+                        <div class="text-content">
+                            <h4>🔒 철통 보안 AI 상담사</h4>
+                            <p>
+                                당신의 소중한 일기는 외부 클라우드로 전송되지 않습니다.<br>
+                                오직 <strong>안전한 로컬/개인 서버 AI</strong>가 당신만의 비밀 공간에서 일기를 분석하고 위로를 건넵니다.
+                                <br><span class="tip-text" style="font-size: 13px; color: #888;">(안심하고 속마음을 모두 털어놓으세요)</span>
+                            </p>
+                        </div>
+                        <div class="icon-visual">🛡️</div>
+                    </div>
                 </div>
-                <div class="feature-card">
-                    <h3>🔍 일기 검색</h3>
-                    <p>
-                        지난 일기가 기억나지 않나요? 상단 검색창을 통해 <strong>사건, 감정, 생각, 위로</strong> 등 기록한 모든 내용에서 키워드를 찾아보세요.
-                    </p>
+
+                <div class="feature-card" style="margin-bottom: 20px;">
+                    <div class="ai-feature">
+                        <div class="text-content">
+                            <h4>🧠 심층 심리 리포트</h4>
+                            <p>
+                                일기가 <strong>3개 이상</strong> 모이면, AI가 당신의 최근 심리 상태를 종합적으로 진단하는 <strong>나만의 심리 보고서</strong>를 발행해 드려요.
+                                <br><span class="tip-text" style="font-size: 13px; color: #888;">(나의 숨겨진 욕구, 현재 스트레스 원인, 맞춤 솔루션 제공)</span>
+                            </p>
+                        </div>
+                        <div class="icon-visual">📑</div>
+                    </div>
+                </div>
+
+                <div class="feature-card" style="margin-bottom: 20px;">
+                    <div class="ai-feature">
+                        <div class="text-content">
+                            <h4>🔬 과거 기록 통합 분석</h4>
+                            <p>
+                                리포트가 쌓이면, **과거와 현재를 비교 분석**하여 당신의 감정이 시간의 흐름에 따라 어떻게 치유되고 성장했는지 **장기적인 통찰**을 제공합니다.
+                            </p>
+                        </div>
+                        <div class="icon-visual">🔭</div>
+                    </div>
+                </div>
+
+                <div class="two-col">
+                    <div class="feature-card">
+                        <h4>🧩 감정 패턴 통계</h4>
+                        <p style="font-size: 14px; color: #555; margin-top: 8px;">
+                            <strong>날씨와 기분의 상관관계</strong>, 월별 감정 흐름을 차트로 한눈에 확인하세요.
+                        </p>
+                    </div>
+                    <div class="feature-card">
+                        <h4>🔍 키워드 검색</h4>
+                        <p style="font-size: 14px; color: #555; margin-top: 8px;">
+                            "그때 내가 왜 힘들었더라?"<br><strong>감정, 사건, 생각</strong> 키워드로 과거의 나를 찾아보세요.
+                        </p>
+                    </div>
                 </div>
             </section>
         </div>
@@ -132,24 +178,25 @@ export default {
 }
 
 .close-btn {
-  background: white;
-  border: 1px solid #d2d2d7;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1d1d1f;
-  cursor: pointer;
-  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  background: #e5e5ea; /* Apple-style light gray */
+  border: none;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 .close-btn:hover {
-  background: #f5f5f7;
-  transform: scale(1.02);
+  background: #d1d1d6;
+  transform: scale(1.05);
 }
-.close-btn .icon { font-size: 12px; }
+.close-btn:active {
+  transform: scale(0.95);
+}
 
 /* Content Structure matches StatsPage style */
 .guide-content {
