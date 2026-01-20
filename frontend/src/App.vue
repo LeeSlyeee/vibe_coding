@@ -275,4 +275,26 @@ export default {
         /* No extra padding needed as bottom nav is flex item, not fixed overlay */
     }
 }
+/* Mobile Landscape Optimization - Force Global Scroll */
+@media (max-height: 800px) and (orientation: landscape) {
+  #app {
+    /* 화면 높이 고정 해제 -> 전체 스크롤 허용 */
+    height: auto !important;
+    min-height: 100vh;
+    overflow-y: auto !important;
+  }
+  
+  .main-content {
+    /* 내부 스크롤 해제 -> 컨텐츠 크기만큼 늘어남 */
+    overflow: visible !important;
+    height: auto !important;
+    flex: none !important; 
+  }
+  
+  /* 바텀 네비게이션이 컨텐츠 끝에 붙도록 (화면 가리지 않음) */
+  .bottom-nav {
+    position: relative;
+    z-index: 10;
+  }
+}
 </style>
