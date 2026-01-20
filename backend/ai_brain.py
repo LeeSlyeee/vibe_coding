@@ -1160,7 +1160,7 @@ class EmotionAnalysis:
 
 
 
-    def analyze_diary_with_local_llm(self, text):
+    def analyze_diary_with_local_llm(self, text, history_context=None):
         # [Local AI Mode] Uses Local Ollama (Gemma 2) for Analysis.
         # Free, Unlimited, Private.
         import requests
@@ -1171,14 +1171,24 @@ class EmotionAnalysis:
         try:
             url = "http://localhost:11434/api/generate"
             
+            # Context Injection
+            context_section = ""
+            if history_context:
+                context_section = (
+                    f"### [참고: 내담자의 과거 기록]\n"
+                    f"{history_context}\n"
+                    f"(지침: 위 과거 기록의 흐름을 참고하여, 맥락이 이어지는 깊이 있는 공감 멘트를 작성해줘.)\n\n"
+                )
+
             # Simple Structured Text Prompt (Faster & Safer than JSON mode for 2B models)
             prompt_text = (
                 f"다음 일기를 읽고 분석 결과를 아래 형식으로 작성해줘.\n"
-                f"일기:\n{text}\n\n"
+                f"{context_section}"
+                f"### [오늘의 일기]:\n{text}\n\n"
                 f"형식:\n"
                 f"Emotion: (happy, sad, angry, neutral, panic 중 하나)\n"
                 f"Confidence: (0~100 숫자만)\n"
-                f"Comment: (50자 이내의 따뜻한 한국어 위로)\n"
+                f"Comment: (과거 맥락을 고려한 50자 이내의 따뜻한 한국어 위로)\n"
                 f"반드시 위 형식만 지켜서 답변해."
             )
             

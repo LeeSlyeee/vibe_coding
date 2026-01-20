@@ -5,6 +5,7 @@ from ai_brain import EmotionAnalysis
 from config import Config
 from pymongo import MongoClient
 from bson.objectid import ObjectId
+from datetime import datetime, timedelta
 from crypto_utils import crypto_manager 
 
 # Initialize AI Brain ONLY in the worker process
@@ -52,13 +53,40 @@ def process_diary_ai(self, diary_id_str):
         
         content = f"사건: {event}\n감정: {emotion_desc}\n생각: {emotion_meaning}"
         
+        # 2.5 Fetch 7-Day History Context
+        history_context = ""
+        try:
+            current_date = diary.get('created_at', datetime.utcnow())
+            start_date = current_date - timedelta(days=7)
+            
+            # Fetch previous diaries (exclude current)
+            history_cursor = db.diaries.find({
+                'user_id': diary.get('user_id'),
+                'created_at': {'$gte': start_date, '$lt': current_date}
+            }).sort('created_at', 1)
+            
+            history_lines = []
+            for doc in history_cursor:
+                # Simple summary: Date + Mood + Event
+                d_date = doc.get('created_at').strftime('%Y-%m-%d')
+                d_mood = doc.get('mood_level', 3)
+                d_event = crypto_manager.decrypt(doc.get('event', ''))[:30] # Truncate event
+                history_lines.append(f"- {d_date} (기분:{d_mood}): {d_event}")
+            
+            if history_lines:
+                history_context = "[지난 7일간의 기록]\n" + "\n".join(history_lines)
+                print(f"📜 [Worker] Found {len(history_lines)} past entries for context.")
+                
+        except Exception as e:
+            print(f"⚠️ [Worker] Failed to fetch history context: {e}")
+
         # 3. Analyze (Gemma 2 Local Priority)
-        print(f"🦙 [Worker] Diary {diary_id}: Requesting Gemma 2 Analysis...")
+        print(f"🦙 [Worker] Diary {diary_id}: Requesting Gemma 2 Analysis (with Context)...")
         
         # Use local instance to ensure freshness or global if preferred. 
         ai = EmotionAnalysis() 
         
-        prediction, comment = ai.analyze_diary_with_local_llm(content)
+        prediction, comment = ai.analyze_diary_with_local_llm(content, history_context=history_context)
         
         if not prediction:
             print(f"❌ [Worker] AI Analysis Failed for {diary_id}")
