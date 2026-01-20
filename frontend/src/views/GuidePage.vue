@@ -455,6 +455,12 @@ export default {
   .two-col {
     grid-template-columns: 1fr 1fr !important;
   }
+  
+  /* Global scroll unlock specific to this view */
+  html, body {
+      overflow-y: auto !important;
+      height: auto !important;
+  }
 }
 
 /* Force side-by-side for AI feature on small landscape phones if they hit the max-width: 768px rule */
