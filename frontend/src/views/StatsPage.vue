@@ -570,7 +570,14 @@ export default {
           pollingInterval = setInterval(checkStatus, 3000)
        } catch (e) {
           isGeneratingReport.value = false
-          reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
+          if (e.response && e.response.status === 400) {
+              // 400 Bad Request: Not enough diaries
+              const msg = e.response.data.message || "분석을 위해서는 최소 3일 이상의 기록이 필요해요."
+              alert(msg)
+              reportContent.value = "" // Clear loading text
+          } else {
+              reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
+          }
        }
     }
     
