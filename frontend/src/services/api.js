@@ -185,9 +185,15 @@ export const diaryAPI = {
     return response.data
   },
 
-  // 장기 메타 분석 생성
-  generateLongTermReport: async () => {
-    const response = await api.post('/report/longterm')
+  // 장기 메타 분석 생성 (비동기 시작)
+  startLongTermReportGeneration: async () => {
+    const response = await api.post('/report/longterm/start')
+    return response.data
+  },
+
+  // 장기 메타 분석 상태 확인 (Polling)
+  getLongTermReportStatus: async () => {
+    const response = await api.get('/report/longterm/status')
     return response.data
   }
 }

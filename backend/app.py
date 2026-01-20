@@ -588,9 +588,36 @@ def background_generate_task(app_instance, user_id, final_input):
                 {'$set': {'report_status': 'failed'}}
             )
 
-@app.route('/api/report/longterm', methods=['POST'])
+def background_long_term_task(app_instance, user_id, history_data):
+    """Background thread to generate long-term insight without blocking"""
+    with app_instance.app_context():
+        try:
+            print(f"🧵 [Thread] Starting long-term analysis for {user_id}")
+            from ai_brain import EmotionAnalysis
+            ai = EmotionAnalysis()
+            insight = ai.generate_long_term_insight(history_data)
+            
+            # Update User Status & Result
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {
+                    'longterm_status': 'completed',
+                    'longterm_result': insight,
+                    'longterm_updated_at': datetime.utcnow()
+                }}
+            )
+            print(f"✅ [Thread] Long-term analysis complete for {user_id}")
+            
+        except Exception as e:
+            print(f"❌ [Thread] Long-term analysis failed: {e}")
+            mongo.db.users.update_one(
+                {'_id': ObjectId(user_id)},
+                {'$set': {'longterm_status': 'failed'}}
+            )
+
+@app.route('/api/report/longterm/start', methods=['POST'])
 @jwt_required()
-def generate_long_term_report():
+def start_long_term_report():
     user_id = get_jwt_identity()
     
     # 1. Fetch Past Reports (Limit 5 most recent)
@@ -600,10 +627,8 @@ def generate_long_term_report():
     if len(reports) < 2:
         return jsonify({"message": "장기 분석을 하려면 최소 2개 이상의 심층 리포트가 필요해요."}), 400
         
-    # Prepare Data for AI
-    # Pass oldest to newest for chronological analysis
+    # Prepare Data
     reports.reverse() 
-    
     history_data = []
     for r in reports:
         history_data.append({
@@ -611,17 +636,33 @@ def generate_long_term_report():
             'content': r['content']
         })
         
-    # 2. Generate Insight
-    try:
-        from ai_brain import EmotionAnalysis
-        ai = EmotionAnalysis()
-        insight = ai.generate_long_term_insight(history_data)
+    # 2. Set Status & Start Thread
+    mongo.db.users.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {'longterm_status': 'processing'}}
+    )
+
+    thread = threading.Thread(target=background_long_term_task, args=(app, user_id, history_data))
+    thread.start()
         
-        return jsonify({"message": "분석 완료", "insight": insight}), 200
+    return jsonify({"status": "processing", "message": "과거 기록 통합 분석을 시작했습니다."}), 202
+
+@app.route('/api/report/longterm/status', methods=['GET'])
+@jwt_required()
+def check_long_term_report_status():
+    user_id = get_jwt_identity()
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    
+    if not user:
+        return jsonify({"status": "none"}), 200
         
-    except Exception as e:
-        print(f"Longterm Error: {e}")
-        return jsonify({"message": "분석 중 오류가 발생했습니다."}), 500
+    status = user.get('longterm_status', 'none')
+    insight = ''
+    
+    if status == 'completed':
+        insight = user.get('longterm_result', '')
+        
+    return jsonify({"status": status, "insight": insight}), 200
 
 @app.route('/api/report/start', methods=['POST'])
 @jwt_required()

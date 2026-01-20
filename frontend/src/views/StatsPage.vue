@@ -510,40 +510,52 @@ export default {
     })
 
     let pollingInterval = null
+    let longTermPollingInterval = null
 
     const checkStatus = async () => {
         try {
             const res = await diaryAPI.getReportStatus()
             if (res.status === 'processing') {
                 isGeneratingReport.value = true
-                // Start polling if not started
-                if (!pollingInterval) {
-                     pollingInterval = setInterval(checkStatus, 3000)
-                }
+                if (!pollingInterval) pollingInterval = setInterval(checkStatus, 3000)
             } else if (res.status === 'completed') {
                 isGeneratingReport.value = false
                 reportContent.value = res.report
-                if (pollingInterval) {
-                    clearInterval(pollingInterval)
-                    pollingInterval = null
-                }
+                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
             } else if (res.status === 'failed') {
                 isGeneratingReport.value = false
                 reportContent.value = "리포트 생성에 실패했습니다. (AI 오류)"
-                if (pollingInterval) {
-                    clearInterval(pollingInterval)
-                    pollingInterval = null
-                }
+                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
             } else {
-                // status: none or unexpected
                 isGeneratingReport.value = false
-                if (pollingInterval) {
-                    clearInterval(pollingInterval)
-                    pollingInterval = null
-                }
+                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
             }
         } catch (e) {
             console.error("Polling error:", e)
+        }
+    }
+
+    const checkLongTermStatus = async () => {
+        try {
+            const res = await diaryAPI.getLongTermReportStatus()
+            if (res.status === 'processing') {
+                isGeneratingLongTerm.value = true
+                if (!longTermPollingInterval) longTermPollingInterval = setInterval(checkLongTermStatus, 3000)
+            } else if (res.status === 'completed') {
+                isGeneratingLongTerm.value = false
+                longTermReportContent.value = res.insight
+                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
+            } else if (res.status === 'failed') {
+                isGeneratingLongTerm.value = false
+                longTermReportContent.value = "분석에 실패했습니다."
+                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
+            } else {
+                // none or unexpected
+                isGeneratingLongTerm.value = false
+                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
+            }
+        } catch (e) {
+            console.error("LongTerm Polling error:", e)
         }
     }
 
@@ -553,13 +565,9 @@ export default {
        longTermReportContent.value = '' // Clear previous meta analysis
        
        try {
-          // 1. Start Generation
           await diaryAPI.startReportGeneration()
-          
-          // 2. Start Polling
           if (pollingInterval) clearInterval(pollingInterval)
-          pollingInterval = setInterval(checkStatus, 3000) // Poll every 3s
-          
+          pollingInterval = setInterval(checkStatus, 3000)
        } catch (e) {
           isGeneratingReport.value = false
           reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
@@ -573,12 +581,14 @@ export default {
         longTermReportContent.value = ''
         
         try {
-            const res = await diaryAPI.generateLongTermReport()
-            longTermReportContent.value = res.insight
+            await diaryAPI.startLongTermReportGeneration()
+            
+            if (longTermPollingInterval) clearInterval(longTermPollingInterval)
+            longTermPollingInterval = setInterval(checkLongTermStatus, 3000)
+            
         } catch (e) {
-            alert(e.response?.data?.message || "분석 실패: " + e.message)
-        } finally {
             isGeneratingLongTerm.value = false
+            alert(e.response?.data?.message || "분석 요청 실패: " + e.message)
         }
     }
 
@@ -588,8 +598,9 @@ export default {
             const res = await diaryAPI.getStatistics()
             rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
             
-            // Resume Report Polling if needed
+            // Resume Polling if needed
             checkStatus() 
+            checkLongTermStatus()
             
         } catch (e) {
             console.error(e)
@@ -601,6 +612,7 @@ export default {
     // Cleanup on unmount
     onUnmounted(() => {
         if (pollingInterval) clearInterval(pollingInterval)
+        if (longTermPollingInterval) clearInterval(longTermPollingInterval)
     })
 
     return {
