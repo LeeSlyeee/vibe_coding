@@ -792,3 +792,4 @@ def transcribe_voice():
 if __name__ == '__main__':
     # No SQL create_all() needed
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5001)
+ 
