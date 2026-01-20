@@ -4,13 +4,11 @@ Flask-JWT-Extended
 flask-pymongo
 pymongo
 python-dotenv
-numpy
+numpy<2.0
 pandas
 tensorflow
-torch
-transformers
 celery
 redis
 google-generativeai
-sentencepiece
 requests
+faster-whisper

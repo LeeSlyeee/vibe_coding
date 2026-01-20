@@ -28,13 +28,21 @@ def get_db():
 @celery_app.task(bind=True)
 def process_diary_ai(self, diary_id_str):
     """
-    Background task to perform AI analysis on a diary entry.
-    Updated to use Local Gemma 2 (Ollama).
+    Celery Wrapper for AI Analysis
     """
-    print(f"🤖 [Worker] Processing Diary ID: {diary_id_str}")
+    def update_progress(state, meta):
+        self.update_state(state=state, meta=meta)
+        
+    return analyze_diary_logic(diary_id_str, update_progress_callback=update_progress)
+
+def analyze_diary_logic(diary_id_str, update_progress_callback=None):
+    """
+    Core AI Analysis Logic (Framework Agnostic)
+    """
+    print(f"🤖 [Analysis] Processing Diary ID: {diary_id_str}")
     
-    # 1. Fetch the diary from DB
-    self.update_state(state='PROGRESS', meta={'process_percent': 10, 'message': '일기장을 펼치는 중...', 'eta_seconds': 15})
+    if update_progress_callback:
+        update_progress_callback('PROGRESS', {'process_percent': 10, 'message': '일기장을 펼치는 중...', 'eta_seconds': 15})
     
     db = get_db()
     
@@ -43,7 +51,7 @@ def process_diary_ai(self, diary_id_str):
         diary = db.diaries.find_one({'_id': diary_id})
         
         if not diary:
-            print(f"❌ [Worker] Diary {diary_id_str} not found!")
+            print(f"❌ [Analysis] Diary {diary_id_str} not found!")
             return "Diary Not Found"
             
         # 2. Prepare text for analysis (Decrypt first)
@@ -75,13 +83,13 @@ def process_diary_ai(self, diary_id_str):
             
             if history_lines:
                 history_context = "[지난 7일간의 기록]\n" + "\n".join(history_lines)
-                print(f"📜 [Worker] Found {len(history_lines)} past entries for context.")
+                print(f"📜 [Analysis] Found {len(history_lines)} past entries for context.")
                 
         except Exception as e:
-            print(f"⚠️ [Worker] Failed to fetch history context: {e}")
+            print(f"⚠️ [Analysis] Failed to fetch history context: {e}")
 
         # 3. Analyze (Gemma 2 Local Priority)
-        print(f"🦙 [Worker] Diary {diary_id}: Requesting Gemma 2 Analysis (with Context)...")
+        print(f"🦙 [Analysis] Diary {diary_id}: Requesting Gemma 2 Analysis (with Context)...")
         
         # Use local instance to ensure freshness or global if preferred. 
         ai = EmotionAnalysis() 
@@ -89,8 +97,13 @@ def process_diary_ai(self, diary_id_str):
         prediction, comment = ai.analyze_diary_with_local_llm(content, history_context=history_context)
         
         if not prediction:
-            print(f"❌ [Worker] AI Analysis Failed for {diary_id}")
-            raise Exception("Gemma 2 Analysis Failed")
+            print(f"❌ [Analysis] AI Analysis Failed for {diary_id}")
+            # Instead of raising Exception immediately, maybe fallback?
+             # Fallback to Label/Keyword
+            print("⚠️ Switching to Fallback Analysis...")
+            res = ai.predict(content) # This includes fallbacks
+            prediction = res['emotion']
+            comment = res['comment']
 
         # 4. Update DB (Encrypt results)
         enc_prediction = crypto_manager.encrypt(prediction)
@@ -104,10 +117,10 @@ def process_diary_ai(self, diary_id_str):
                 'task_id': None 
             }}
         )
-        print(f"✅ [Worker] Analysis Complete for Diary {diary_id}")
+        print(f"✅ [Analysis] Complete for Diary {diary_id}")
         return {'process_percent': 100, 'message': '완료', 'result': 'Success'}
             
     except Exception as e:
-        print(f"💥 [Worker] Error processing diary {diary_id_str}: {e}")
-        # Retrying is handled by decorator
-        raise self.retry(exc=e)
+        print(f"💥 [Analysis] Error processing diary {diary_id_str}: {e}")
+        # Retrying handled by caller if needed
+        raise e

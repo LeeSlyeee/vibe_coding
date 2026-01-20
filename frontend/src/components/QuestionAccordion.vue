@@ -10,7 +10,20 @@
         {{ question }}
         <span v-if="required" class="required-mark">*</span>
       </span>
-      <span class="toggle-icon">{{ isOpen ? '▲' : '▼' }}</span>
+      
+      <div class="header-actions">
+           <!-- Voice Button (Stop propagation to prevent toggle) -->
+           <button 
+             type="button" 
+             class="btn-mic-mini" 
+             :class="{ 'recording': recording }"
+             @click.stop="$emit('record')"
+             title="말로 기록하기"
+           >
+             {{ recording ? '⏹️' : '🎙️' }}
+           </button>
+           <span class="toggle-icon">{{ isOpen ? '▲' : '▼' }}</span>
+      </div>
     </button>
     
     <transition name="slide">
@@ -56,9 +69,13 @@ export default {
     defaultOpen: {
       type: Boolean,
       default: false
+    },
+    recording: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'record'],
   setup(props, { emit }) {
     const isOpen = ref(props.defaultOpen)
     const inputValue = ref(props.modelValue)
@@ -154,5 +171,39 @@ export default {
   opacity: 0;
   padding-top: 0;
   padding-bottom: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.btn-mic-mini {
+    background: #f1f3f5;
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.2s ease;
+}
+.btn-mic-mini:hover {
+    background: #e9ecef;
+    transform: scale(1.1);
+}
+.btn-mic-mini.recording {
+    background: #ffec99;
+    border-color: #fcc419;
+    animation: pulse-orange 1.5s infinite;
+}
+@keyframes pulse-orange {
+    0% { box-shadow: 0 0 0 0 rgba(255, 192, 25, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 192, 25, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 192, 25, 0); }
 }
 </style>

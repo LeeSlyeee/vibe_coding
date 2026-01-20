@@ -45,6 +45,14 @@
         
 
 
+        <!-- Voice Loading Indicator (Global) -->
+        <div v-if="isTranscribing" class="voice-loading-overlay">
+            <div class="voice-loader-box">
+                <span class="pulse-mini"></span> 
+                <span>AI가 받아적고 있어요...</span>
+            </div>
+        </div>
+
         <EmojiSelector v-model="formData.mood" />
 
 
@@ -55,6 +63,8 @@
           :required="true"
           :default-open="true"
           placeholder="오늘 있었던 일을 적어주세요..."
+          :recording="activeField === 'question1'"
+          @record="toggleRecording('question1')"
         />
 
         <QuestionAccordion
@@ -62,18 +72,24 @@
           v-model="formData.question2"
           :required="true"
           placeholder="무슨 일이 있었는지 자세히 적어주세요..."
+          :recording="activeField === 'question2'"
+          @record="toggleRecording('question2')"
         />
 
         <QuestionAccordion
           question="마지막으로 더 깊게 자신의 감정을 써보세요."
           v-model="formData.question3"
           placeholder="어떤 감정을 느꼈는지 적어주세요..."
+          :recording="activeField === 'question3'"
+          @record="toggleRecording('question3')"
         />
 
         <QuestionAccordion
           question="나에게 따듯한 위로를 보내세요."
           v-model="formData.question4"
           placeholder="앞으로 어떻게 하면 좋을지 생각해보세요..."
+          :recording="activeField === 'question4'"
+          @record="toggleRecording('question4')"
         />
 
         <!-- 작성 모드 하단 버튼 (인라인으로 변경) -->
@@ -439,6 +455,79 @@ export default {
         try { await diaryAPI.deleteDiary(currentDiary.value.id); emit('saved'); emit('close'); } catch(e) {}
     }
 
+    // === Voice Recording Logic ===
+    const isRecording = ref(false)
+    const isTranscribing = ref(false)
+    const activeField = ref(null) // question1, question2, ...
+    let mediaRecorder = null
+    let audioChunks = []
+
+    const toggleRecording = (field) => {
+        if (activeField.value === field && isRecording.value) {
+            stopRecording()
+        } else if (isRecording.value) {
+            // Stop current, start new? Or just ignore? 
+            // Better to stop current first.
+            alert("이미 녹음 중입니다. 먼저 종료해주세요.")
+        } else {
+            startRecording(field)
+        }
+    }
+
+    const startRecording = async (field) => {
+        if (!navigator.mediaDevices) { alert("마이크를 찾을 수 없어요."); return; }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            mediaRecorder = new MediaRecorder(stream)
+            audioChunks = []
+            activeField.value = field
+            
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data)
+            }
+            
+            mediaRecorder.onstop = async () => {
+                const targetField = activeField.value // Capture current field
+                isRecording.value = false
+                activeField.value = null
+                
+                isTranscribing.value = true
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+                const fd = new FormData()
+                fd.append('file', audioBlob, 'diary.webm')
+                fd.append('auto_fill', 'false') // Explicitly disable auto-categorization
+                
+                try {
+                    const res = await diaryAPI.transcribeVoice(fd)
+                    if (res.text) {
+                        const currentText = formData.value[targetField] || ''
+                        // Append text with space if needed
+                        formData.value[targetField] = currentText ? currentText + " " + res.text : res.text
+                    }
+                } catch (e) {
+                    alert("음성 변환 실패: " + (e.message || "서버 오류"))
+                } finally {
+                    isTranscribing.value = false
+                    // Stop tracks
+                    stream.getTracks().forEach(track => track.stop())
+                }
+            }
+            
+            mediaRecorder.start()
+            isRecording.value = true
+        } catch (e) {
+            console.error(e)
+            alert("마이크 권한이 필요합니다.")
+        }
+    }
+
+    const stopRecording = () => {
+        if (mediaRecorder && isRecording.value) {
+            mediaRecorder.stop()
+            // State update happens in onstop
+        }
+    }
+
     // === Lifecycle & Watch ===
     // === Lifecycle & Watch ===
     watch([() => props.diary, () => props.date], ([newDiary, newDate]) => {
@@ -506,7 +595,10 @@ export default {
         handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
         isProcessing, progressPercent, loadingMessage, eta,
         getWeatherIcon, getMoodColorClass,
-        mindsetInsight, isLoadingInsight
+        isProcessing, progressPercent, loadingMessage, eta,
+        getWeatherIcon, getMoodColorClass,
+        mindsetInsight, isLoadingInsight,
+        isRecording, isTranscribing, toggleRecording, activeField
     }
   }
 }
@@ -674,6 +766,73 @@ export default {
 .pulse-mini { width: 6px; height: 6px; background: #999; border-radius: 50%; animation: pulse-anim 1s infinite; }
 
 @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Voice UI */
+.voice-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.btn-voice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border-radius: 30px;
+  border: 1px solid rgba(0,0,0,0.08); /* Subtle border */
+  background: white;
+  color: #333;
+  font-weight: 700;
+  font-size: 15px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  transition: all 0.3s ease;
+  width: 100%;
+  justify-content: center;
+  cursor: pointer;
+}
+.btn-voice:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  border-color: #1d1d1f;
+}
+.btn-voice.recording {
+  background: #ff3b30;
+  color: white;
+  border-color: #ff3b30;
+  animation: pulse-red 2s infinite;
+}
+.voice-loading {
+  font-size: 13px;
+  color: #666;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+@keyframes pulse-red {
+  0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+}
+
+.voice-loading-overlay {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(255,255,255, 0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 20;
+    backdrop-filter: blur(2px);
+    border-radius: 20px;
+}
+.voice-loader-box {
+    background: white;
+    padding: 16px 24px;
+    border-radius: 30px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    display: flex; align-items: center; gap: 10px;
+    font-size: 14px; color: #555; font-weight: 600;
+}
 
 
 </style>

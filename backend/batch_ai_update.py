@@ -6,7 +6,7 @@ from pymongo import MongoClient
 from config import Config
 from ai_brain import EmotionAnalysis
 
-# Force Local Mode by ensuring GEMINI_API_KEY is NOT set in env for this process
+# Force Local Mode logic if needed
 if 'GEMINI_API_KEY' in os.environ:
     del os.environ['GEMINI_API_KEY']
 
@@ -30,7 +30,7 @@ def batch_process_user(username="test"):
     
     # 4. Initialize AI
     try:
-        # Initialize AI without Gemini Key context
+        # Initialize AI (Local Mode)
         ai = EmotionAnalysis()
         print("✅ AI Brain Initialized (Local Mode).")
     except Exception as e:

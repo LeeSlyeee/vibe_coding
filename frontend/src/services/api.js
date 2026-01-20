@@ -195,6 +195,14 @@ export const diaryAPI = {
   getLongTermReportStatus: async () => {
     const response = await api.get('/report/longterm/status')
     return response.data
+  },
+
+  // 음성 받아쓰기 (Voice Diary)
+  transcribeVoice: async (formData) => {
+    const response = await api.post('/voice/transcribe', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
   }
 }
 

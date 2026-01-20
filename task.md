@@ -1,35 +1,44 @@
-# Task: 504 Timeout on "Past Record Integrated Analysis" (과거 기록 통합 분석)
+# Task: Per-Field Voice Recording UI
 
 ## Status: Completed
 
-## Issues Identified
+## User Objective
 
-- The 504 Gateway Timeout error was caused by a long-running synchronous `POST /api/report/longterm` request.
-- The backend was waiting for the AI generation (Gemini API) to complete before responding, which exceeded the Nginx/Server timeout (typically 60s).
+- The user found "Auto-Categorization" confusing or inaccurate.
+- Requested to record voice separately for each diary setion (Question 1, 2, 3, 4).
+
+## Solution
+
+- **Frontend Refactor**:
+  - Removed the single global "Voice Record" button.
+  - Added a "Microphone" button to **each** question field (inside the accordion header).
+  - When clicked, it records audio ONLY for that specific field.
+  - The transcription is appended directly to that field's text box.
+  - Auto-categorization (`auto_fill`) is disabled for this flow.
 
 ## Changes Implemented
 
-### Backend (`app.py`)
+### Frontend (`QuestionAccordion.vue`)
 
-- Refactored `generate_long_term_report` into an asynchronous workflow:
-  - **Created `start_long_term_report` (`/api/report/longterm/start`)**:
-    - Initiates the AI generation in a background thread.
-    - Immediately returns `202 Accepted` to the frontend.
-  - **Created `check_long_term_report_status` (`/api/report/longterm/status`)**:
-    - Allows the frontend to poll for the result.
-    - Returns `{ status: 'processing' | 'completed' | 'failed', insight: ... }`.
-  - **Added `background_long_term_task`**: The function that actually runs the heavy AI logic.
+- Added `recording` prop (Boolean) to show active state.
+- Added `@record` emit event.
+- Added a circular Microphone button in the header.
+- Added CSS for recording permission state (pulsing orange).
 
-### Frontend (`StatsPage.vue` & `api.js`)
+### Frontend (`DiaryModal.vue`)
 
-- Updated `diaryAPI` to use the new endpoints.
-- Modified `handleGenerateLongTermReport` in `StatsPage.vue`:
-  - Now calls `start` and then sets up a polling interval (`setInterval`).
-- Added `checkLongTermStatus` function to handle the polling logic.
-- Ensures polling continues even if the user refreshes the page (checks status on mount).
+- Removed global voice logic.
+- Implemented `activeField` state to track which question is being recorded.
+- passing `activeField === 'questionX'` to each Accordion.
+- Updated `startRecording`/`stopRecording` to handle target fields.
+- Updated API call to send `auto_fill='false'`.
 
 ## Verification
 
-- Click the "과거 기록 통합 분석" button.
-- It should now immediately show a "processing" state (e.g., "분석 중...") instead of hanging and showing a browser error.
-- After a minute or so, the result should appear automatically via polling.
+1. Open "Write Diary".
+2. You will see a 🎙️ icon next to "Question 1".
+3. Click it -> It turns Orange/Pulsing.
+4. Speak: "Today I went to the park."
+5. Click it again -> Stops.
+6. "Today I went to the park" appears in Question 1's text box.
+7. Repeat for Question 2 with different content.

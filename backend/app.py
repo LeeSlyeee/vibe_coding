@@ -6,11 +6,15 @@ from datetime import datetime, timedelta
 from bson.objectid import ObjectId
 import os
 from config import Config
-from tasks import process_diary_ai
+from tasks import process_diary_ai, analyze_diary_logic
 from ai_brain import EmotionAnalysis
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+from werkzeug.utils import secure_filename
+import tempfile
+from voice_brain import voice_brain_instance
 
 # Global AI for immediate insights (Lazy loaded)
 insight_ai = None
@@ -296,14 +300,20 @@ def create_diary():
         result = mongo.db.diaries.insert_one(encrypted_diary)
         new_diary_id = str(result.inserted_id)
         
-        # Trigger Task
-        task_id = None
+        # Trigger Task (Threading)
+        task_id = "local-thread"
         try:
-            task = process_diary_ai.delay(new_diary_id)
-            task_id = task.id
+            # Use threading to run analysis in background logic directly
+            
+            # Note: We need to pass the ID string
+            threading.Thread(
+                target=analyze_diary_logic, 
+                args=(new_diary_id,)
+            ).start()
+            
             mongo.db.diaries.update_one({'_id': result.inserted_id}, {'$set': {'task_id': task_id}})
         except Exception as e:
-            print(f"Failed to queue task: {e}")
+            print(f"Failed to start thread: {e}")
         
         # Return Decrypted Response (which is just raw_diary with ID)
         raw_diary['_id'] = result.inserted_id
@@ -356,13 +366,15 @@ def update_diary(id):
     
     mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
     
-    # Trigger AI
-    task_id = None
+    # Trigger AI (Threading)
     try:
-        task = process_diary_ai.delay(id)
-        task_id = task.id
-        mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': task_id}})
-    except: pass
+        threading.Thread(
+            target=analyze_diary_logic,
+            args=(id,)
+        ).start()
+        mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': 'local-thread'}})
+    except Exception as e: 
+        print(f"Failed to start thread: {e}")
     
     # Return decrypted
     updated_diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
@@ -550,14 +562,23 @@ def weather_insight_original():
 # Async Report Generation
 import threading
 
+# Global AI Brain Instance for reuse (Singleton)
+global_ai_brain = None
+
+def get_ai_brain():
+    global global_ai_brain
+    if global_ai_brain is None:
+        from ai_brain import EmotionAnalysis
+        print("🧠 [App] Initializing Global EmotionAnalysis Instance...")
+        global_ai_brain = EmotionAnalysis()
+    return global_ai_brain
 
 def background_generate_task(app_instance, user_id, final_input):
     """Background thread to generate report without blocking"""
     with app_instance.app_context():
         try:
             print(f"🧵 [Thread] Starting background report generation for {user_id}")
-            from ai_brain import EmotionAnalysis
-            ai = EmotionAnalysis()
+            ai = get_ai_brain()
             report_content = ai.generate_comprehensive_report(final_input)
             
             # 1. Archive Report (New Collection)
@@ -593,8 +614,7 @@ def background_long_term_task(app_instance, user_id, history_data):
     with app_instance.app_context():
         try:
             print(f"🧵 [Thread] Starting long-term analysis for {user_id}")
-            from ai_brain import EmotionAnalysis
-            ai = EmotionAnalysis()
+            ai = get_ai_brain()
             insight = ai.generate_long_term_insight(history_data)
             
             # Update User Status & Result
@@ -722,6 +742,50 @@ def check_report_status():
         report = user.get('latest_report', '')
         
     return jsonify({"status": status, "report": report}), 200
+
+@app.route('/api/voice/transcribe', methods=['POST'])
+@jwt_required()
+def transcribe_voice():
+    if 'file' not in request.files:
+        return jsonify({"message": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"message": "No selected file"}), 400
+        
+    if file:
+        try:
+            filename = secure_filename(file.filename)
+            # Create temp file
+            # Determine suffix based on filename or default to .webm
+            suffix = os.path.splitext(filename)[1]
+            if not suffix: suffix = ".webm"
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+                file.save(temp.name)
+                temp_path = temp.name
+                
+            print(f"🎙️ Transcribing file: {temp_path}")
+            text = voice_brain_instance.transcribe(temp_path)
+            
+            # Clean up
+            os.remove(temp_path)
+            
+            # Check for auto-structure request
+            auto_fill = request.form.get('auto_fill', 'false').lower() == 'true'
+            
+            response_data = {"text": text}
+            
+            if auto_fill and text and len(text) > 10:
+                print(f"🧠 Auto-Filling requested for: {text[:30]}...")
+                structured_data = voice_brain_instance.structure_diary_text(text)
+                if structured_data:
+                    response_data['structured'] = structured_data
+            
+            return jsonify(response_data), 200
+        except Exception as e:
+            print(f"❌ Transcribe Error: {e}")
+            return jsonify({"message": "Transcription failed"}), 500
 
 if __name__ == '__main__':
     # No SQL create_all() needed

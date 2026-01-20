@@ -12,8 +12,8 @@
 # 1. 시스템 업데이트
 sudo apt update && sudo apt upgrade -y
 
-# 2. 필수 패키지 설치 (Python, pip, venv, git, nginx, mariadb)
-sudo apt install -y python3-pip python3-venv git nginx mariadb-server libmysqlclient-dev pkg-config
+# 2. 필수 패키지 설치 (Python, pip, venv, git, nginx, mariadb, ffmpeg)
+sudo apt install -y python3-pip python3-venv git nginx mariadb-server libmysqlclient-dev pkg-config ffmpeg
 
 # 3. Timezone 한국으로 변경 (선택)
 sudo timedatectl set-timezone Asia/Seoul
