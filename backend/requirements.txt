@@ -9,6 +9,5 @@ pandas
 tensorflow
 celery
 redis
-google-generativeai
-requests
 faster-whisper
+
