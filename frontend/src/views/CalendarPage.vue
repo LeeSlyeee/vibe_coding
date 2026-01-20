@@ -729,37 +729,44 @@ html, body {
 @media (max-height: 600px) and (orientation: landscape) {
     .calendar-page {
         display: block !important;
-        padding: 10px 15px !important;
-        height: 100vh !important; /* 앱처럼 꽉 찬 화면 */
-        overflow: hidden !important; /* 전체 스크롤 방지 -> 내부 스크롤 사용 */
+        padding: 20px !important;
+        /* 고정 높이 해제 -> 전체 스크롤 허용 */
+        height: auto !important;
+        min-height: 100vh !important;
+        overflow-y: visible !important;
+        box-sizing: border-box !important;
     }
 
     .calendar-layout {
         display: grid !important;
-        grid-template-columns: 1.2fr 1fr !important; /* 캘린더를 조금 더 넓게 */
-        gap: 15px !important;
-        height: 100% !important;
+        grid-template-columns: 1.2fr 1fr !important; 
+        gap: 20px !important;
+        /* 높이 자동 조절 */
+        height: auto !important;
+        min-height: 0 !important;
     }
 
     /* 1. Left: Calendar Panel */
     .calendar-section {
         width: 100% !important;
-        height: 100% !important;
+        /* 컨텐츠 크기만큼 늘어남 */
+        height: auto !important; 
+        min-height: 400px !important; /* 최소 높이 보장 */
         border-radius: 16px !important;
-        padding: 10px !important;
-        overflow-y: auto !important;
+        padding: 15px !important;
+        overflow: visible !important; /* 내부 스크롤 제거 */
         box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
     }
 
     /* 2. Right: Diary Panel */
     .diary-section {
-        display: flex !important; /* 항상 표시 (빈 화면 포함) */
-        position: static !important; /* 모바일 오버레이 해제 */
-        top: auto !important;
-        left: auto !important;
-        bottom: auto !important;
+        display: flex !important;
+        flex-direction: column !important;
+        position: static !important;
         width: 100% !important;
-        height: 100% !important;
+        /* 컨텐츠 크기만큼 늘어남 */
+        height: auto !important;
+        min-height: 400px !important;
         margin: 0 !important;
         z-index: 1 !important;
         background-color: white !important;
@@ -767,6 +774,7 @@ html, body {
         animation: none !important;
         border-radius: 16px !important;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+        overflow: visible !important;
     }
     
     /* 모바일 오버레이 애니메이션 제거 */
@@ -779,7 +787,7 @@ html, body {
         flex-direction: row !important;
         justify-content: space-between !important;
         gap: 10px !important;
-        margin-bottom: 10px;
+        margin-bottom: 15px;
     }
     
     .month-navigation-v2 {
