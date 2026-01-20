@@ -726,14 +726,14 @@ html, body {
 }
 
 /* Mobile Landscape Split View Optimization */
-@media (max-height: 600px) and (orientation: landscape) {
+@media (max-height: 800px) and (orientation: landscape) {
     .calendar-page {
         display: block !important;
         padding: 20px !important;
         /* 고정 높이 해제 -> 전체 스크롤 허용 */
         height: auto !important;
         min-height: 100vh !important;
-        overflow-y: visible !important;
+        overflow-y: auto !important;
         box-sizing: border-box !important;
     }
 
@@ -744,6 +744,7 @@ html, body {
         /* 높이 자동 조절 */
         height: auto !important;
         min-height: 0 !important;
+        overflow: visible !important;
     }
 
     /* 1. Left: Calendar Panel */
@@ -756,6 +757,7 @@ html, body {
         padding: 15px !important;
         overflow: visible !important; /* 내부 스크롤 제거 */
         box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+        flex: none !important;
     }
 
     /* 2. Right: Diary Panel */
@@ -775,6 +777,7 @@ html, body {
         border-radius: 16px !important;
         box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
         overflow: visible !important;
+        flex: none !important;
     }
     
     /* 모바일 오버레이 애니메이션 제거 */
@@ -813,6 +816,12 @@ html, body {
     /* 통계 배너 숨김 (공간 확보) */
     .stats-premium-banner {
         display: none !important;
+    }
+    
+    /* Global scroll unlock specific to this view */
+    html, body {
+        overflow-y: auto !important;
+        height: auto !important;
     }
 }
 </style>
