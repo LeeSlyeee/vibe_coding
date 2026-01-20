@@ -17,6 +17,9 @@
     "lint": "eslint . --fix --cache"
   },
   "dependencies": {
+    "@capacitor/cli": "^6.2.1",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/ios": "^6.2.1",
     "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "pinia": "^3.0.4",

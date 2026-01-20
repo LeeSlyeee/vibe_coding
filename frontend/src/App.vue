@@ -206,17 +206,21 @@ export default {
     display: none;
     justify-content: center;
     padding: 12px;
+    padding-top: max(12px, env(safe-area-inset-top)); /* Handle Notch */
+    background-color: white; 
+    z-index: 1000;
 }
 
 .bottom-nav {
-    display: none; /* Hidden on Desktop */
+    display: none;
     background: white;
     border-top: 1px solid #eee;
     padding: 8px 0;
     justify-content: space-around;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
     z-index: 100;
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: max(8px, env(safe-area-inset-bottom)); /* Handle Home Indicator */
+    flex-shrink: 0; /* Prevent shrinking */
 }
 
 .nav-item {

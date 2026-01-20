@@ -653,15 +653,18 @@ html, body {
 
 @media (max-width: 768px) {
   .calendar-page { 
-      padding: 0; /* Remove padding for full-width feel on mobile */
-      height: 100%;
+      padding: 0; 
+      height: 100%; /* Fill available space */
+      display: flex; /* Ensure flex layout */
+      flex-direction: column;
   }
   
   .calendar-section { 
-      padding: 16px; 
+      padding: 8px; /* Reduce padding to prevent overflow */
       height: 100%; 
-      border-radius: 0; /* Flat layout on mobile */
+      border-radius: 0; 
       overflow-y: auto;
+      flex: 1; /* Take up remaining space */
   }
   
   .calendar-layout { display: block; height: 100%; }
