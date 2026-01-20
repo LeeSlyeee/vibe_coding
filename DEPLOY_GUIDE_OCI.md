@@ -232,3 +232,25 @@ sudo systemctl status mood_backend
 
 1. **오라클 방화벽(Security List)**: 클라우드 콘솔 웹페이지에서 `Ingress Rules`에 **80번 포트(HTTP)**가 열려 있는지 꼭 확인하세요.
 2. **우분투 방화벽**: `sudo iptables -F` (임시)로 방화벽을 꺼보고 되면, `netfilter-persistent`로 포트를 열어야 합니다.
+
+---
+
+## 7. 업데이트 방법 (유지보수)
+
+코드를 수정하고 다시 배포해야 할 때 사용하세요.
+
+```bash
+# 1. 프로젝트 폴더로 이동
+cd ~/project
+
+# 2. 최신 코드 가져오기
+git pull
+
+# 3. 프론트엔드 다시 빌드 (화면 수정 시 필수)
+cd ~/project/frontend
+npm install
+npm run build
+
+# 4. 백엔드 재시작 (API 수정 시 필수)
+sudo systemctl restart mood_backend
+```
