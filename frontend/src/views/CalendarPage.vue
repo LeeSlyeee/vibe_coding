@@ -727,3 +727,86 @@ html, body {
 </style>
 
 
+/* Mobile Landscape Split View Optimization */
+@media (max-height: 600px) and (orientation: landscape) {
+    .calendar-page {
+        display: block !important;
+        padding: 10px 15px !important;
+        height: 100vh !important; /* 앱처럼 꽉 찬 화면 */
+        overflow: hidden !important; /* 전체 스크롤 방지 -> 내부 스크롤 사용 */
+    }
+
+    .calendar-layout {
+        display: grid !important;
+        grid-template-columns: 1.2fr 1fr !important; /* 캘린더를 조금 더 넓게 */
+        gap: 15px !important;
+        height: 100% !important;
+    }
+
+    /* 1. Left: Calendar Panel */
+    .calendar-section {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 16px !important;
+        padding: 10px !important;
+        overflow-y: auto !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    }
+
+    /* 2. Right: Diary Panel */
+    .diary-section {
+        display: flex !important; /* 항상 표시 (빈 화면 포함) */
+        position: static !important; /* 모바일 오버레이 해제 */
+        top: auto !important;
+        left: auto !important;
+        bottom: auto !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        z-index: 1 !important;
+        background-color: white !important;
+        padding-bottom: 0 !important;
+        animation: none !important;
+        border-radius: 16px !important;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05) !important;
+    }
+    
+    /* 모바일 오버레이 애니메이션 제거 */
+    .diary-section.mobile-active {
+        animation: none !important;
+    }
+    
+    /* 헤더 최적화 */
+    .calendar-header-v2 {
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        gap: 10px !important;
+        margin-bottom: 10px;
+    }
+    
+    .month-navigation-v2 {
+        padding: 0 !important;
+        width: auto !important;
+    }
+    
+    .current-month-v2 {
+        font-size: 20px !important;
+    }
+    
+    .nav-btn-v2 {
+        width: 30px !important;
+        height: 30px !important;
+        font-size: 16px !important;
+    }
+    
+    /* 검색창 숨김 (공간 확보) or 축소 */
+    .search-box-v2 {
+        display: none !important;
+    }
+
+    /* 통계 배너 숨김 (공간 확보) */
+    .stats-premium-banner {
+        display: none !important;
+    }
+}
+</style>
