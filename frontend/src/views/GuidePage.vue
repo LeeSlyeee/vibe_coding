@@ -377,67 +377,83 @@ export default {
 }
 
 /* Mobile Landscape & Short Screens Optimization */
-/* Mobile Landscape & Short Screens Optimization */
-@media (max-height: 600px) {
+/* Mobile Landscape Optimization */
+@media (max-height: 800px) and (orientation: landscape) {
   .guide-page {
-    /* 기존 100% 및 hidden 해제 -> 전체 스크롤 허용 */
-    height: auto;
-    min-height: 100%;
-    overflow-y: auto; 
-    padding: 15px; /* 약간 여유를 줌 */
+    /* 전체 페이지 스크롤 강제 적용 */
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important; 
+    padding: 15px 40px; /* 좌우 여백을 넉넉하게 줌 */
   }
 
   .guide-container {
-    height: auto; /* 고정 높이 해제 */
-    display: block; /* Flex 해제 (필요시) */
+    height: auto !important; /* 고정 높이 해제 */
+    display: block !important;
+    max-width: 100% !important;
   }
 
   .guide-header {
-    margin-bottom: 20px;
+    margin-bottom: 15px;
     align-items: center;
   }
   
   .guide-content {
-    /* 내부 스크롤 제거 -> 페이지 전체가 늘어나도록 함 */
-    height: auto;
-    flex: none;
-    overflow: visible; 
+    /* 컨텐츠 박스 높이 제한 해제 */
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
+    box-shadow: none; /* 가로 모드에선 그림자 제거해서 깔끔하게 */
+    background: transparent; /* 배경 투명하게 하여 일체감 */
   }
 
   .content-body {
-    /* 내부 스크롤 제거 */
-    overflow-y: visible;
-    padding: 30px 20px;
+    padding: 10px 0; /* 내부 패딩 축소 */
+    overflow: visible !important;
   }
 
   .header-left h2 {
-    font-size: 22px;
+    font-size: 24px;
     margin-bottom: 4px;
   }
   .subtitle {
-    font-size: 13px;
+    font-size: 14px;
   }
   
+  /* Sections */
+  .guide-section {
+    margin-bottom: 40px;
+    background: white;
+    padding: 24px;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* 섹션별 카드화 */
+  }
+
   /* Grid Optimizations */
   .steps-grid {
-    gap: 12px;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    grid-template-columns: repeat(2, 1fr); /* 2열 강제 */
   }
   .step-card {
-    padding: 16px;
+    padding: 20px;
   }
   
-  /* Feature Cards Compact */
+  /* Feature Cards */
   .feature-card {
     padding: 20px;
   }
   .ai-feature {
-    flex-direction: row; 
+    flex-direction: row !important; 
     gap: 20px;
-    text-align: left;
+    text-align: left !important;
+    align-items: center;
   }
   .icon-visual {
-    font-size: 32px;
+    font-size: 36px;
+  }
+  
+  .two-col {
+    grid-template-columns: 1fr 1fr !important;
   }
 }
 
