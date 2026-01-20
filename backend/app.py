@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request
-# from flask_cors import CORS
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_pymongo import PyMongo
 from datetime import datetime, timedelta
@@ -15,6 +15,8 @@ app.config.from_object(Config)
 from werkzeug.utils import secure_filename
 import tempfile
 from voice_brain import voice_brain_instance
+
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Global AI for immediate insights (Lazy loaded)
 insight_ai = None
