@@ -167,12 +167,13 @@ import {
   LinearScale,
   ArcElement,
   PointElement,
-  LineElement
+  LineElement,
+  Filler
 } from 'chart.js'
 import { Bar, Doughnut, Line } from 'vue-chartjs'
 
 // Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
 
 export default {
   name: 'StatsPage',
