@@ -30,7 +30,7 @@
 
     <!-- 모바일용 상단 헤더 (앱 타이틀만) -->
     <header class="navbar mobile-header" v-if="showNavbar">
-        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+      <h1 class="logo" @click="goHome">MOOD DIARY</h1>
     </header>
 
     <!-- 라우터 뷰 -->
@@ -40,17 +40,17 @@
 
     <!-- 모바일용 하단 네비게이션 -->
     <nav class="bottom-nav" v-if="showNavbar && isAuthenticated">
-      <button 
-        class="nav-item" 
+      <button
+        class="nav-item"
         :class="{ active: $route.path === '/calendar' || $route.path === '/' }"
         @click="$router.push('/calendar')"
       >
         <span class="nav-icon">📅</span>
         <span class="nav-label">일기</span>
       </button>
-      
-      <button 
-        class="nav-item" 
+
+      <button
+        class="nav-item"
         :class="{ active: $route.path === '/stats' }"
         @click="$router.push('/stats')"
       >
@@ -58,8 +58,8 @@
         <span class="nav-label">분석</span>
       </button>
 
-      <button 
-        class="nav-item" 
+      <button
+        class="nav-item"
         :class="{ active: $route.path === '/guide' }"
         @click="$router.push('/guide')"
       >
@@ -105,7 +105,7 @@ export default {
       () => {
         checkAuth();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const handleLogout = () => {
@@ -175,7 +175,8 @@ export default {
   cursor: pointer;
 }
 
-.stats-btn, .logout-btn {
+.stats-btn,
+.logout-btn {
   background-color: transparent;
   color: white;
   border: none;
@@ -190,7 +191,8 @@ export default {
   margin-right: 4px;
 }
 
-.stats-btn:hover, .logout-btn:hover {
+.stats-btn:hover,
+.logout-btn:hover {
   background-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -203,84 +205,85 @@ export default {
 
 /* === Mobile & Responsive Styles === */
 .mobile-header {
-    display: none;
-    justify-content: center;
-    padding: 12px;
-    padding-top: max(12px, env(safe-area-inset-top)); /* Handle Notch */
-    background-color: white; 
-    z-index: 1000;
+  display: none;
+  justify-content: center;
+  padding: 12px;
+  padding-top: max(12px, env(safe-area-inset-top)); /* Handle Notch */
+  background-color: white;
+  z-index: 1000;
 }
 
 .bottom-nav {
-    display: none;
-    background: white;
-    border-top: 1px solid #eee;
-    padding: 8px 0;
-    justify-content: space-around;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.03);
-    z-index: 100;
-    padding-bottom: max(8px, env(safe-area-inset-bottom)); /* Handle Home Indicator */
-    flex-shrink: 0; /* Prevent shrinking */
+  display: none;
+  background: white;
+  border-top: 1px solid #eee;
+  padding: 8px 0;
+  justify-content: space-around;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.03);
+  z-index: 100;
+  padding-bottom: max(8px, env(safe-area-inset-bottom)); /* Handle Home Indicator */
+  flex-shrink: 0; /* Prevent shrinking */
 }
 
 .nav-item {
-    background: none;
-    border: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 4px 12px;
-    color: #999;
-    font-size: 10px;
-    gap: 4px;
-    cursor: pointer;
+  background: none;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 12px;
+  color: #999;
+  font-size: 10px;
+  gap: 4px;
+  cursor: pointer;
 }
 
 .nav-item.active {
-    color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 .nav-icon {
-    font-size: 20px;
+  font-size: 20px;
 }
 
 @media (max-width: 768px) {
-    /* Hide Desktop Nav */
-    .desktop-nav {
-        display: none;
-    }
+  /* Hide Desktop Nav */
+  .desktop-nav {
+    display: none;
+  }
 
-    /* Show Mobile Header & Bottom Nav */
-    .mobile-header {
-        display: flex;
-    }
+  /* Show Mobile Header & Bottom Nav */
+  .mobile-header {
+    display: flex;
+  }
 
-    .bottom-nav {
-        display: flex;
-    }
+  .bottom-nav {
+    display: flex;
+  }
 
-    .navbar {
-        background: white; /* Mobile header white background */
-        color: #1d1d1f;
-        box-shadow: 0 1px 0 rgba(0,0,0,0.05); /* Subtle separator */
-    }
-    
-    .logo {
-        font-size: 18px;
-        color: #1d1d1f;
-    }
+  .navbar {
+    background: white; /* Mobile header white background */
+    color: #1d1d1f;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.05); /* Subtle separator */
+  }
 
-    /* Adjust main content for bottom nav */
-    .main-content {
-        /* No extra padding needed as bottom nav is flex item, not fixed overlay */
-    }
+  .logo {
+    font-size: 18px;
+    color: #1d1d1f;
+  }
+
+  /* Adjust main content for bottom nav */
+  .main-content {
+    /* No extra padding needed as bottom nav is flex item, not fixed overlay */
+  }
 }
 </style>
 
 <!-- 전역 스타일: 가로 모드 스크롤 강제 허용 -->
 <style>
 @media (max-height: 800px) and (orientation: landscape) {
-  html, body {
+  html,
+  body {
     overflow-y: auto !important;
     height: auto !important;
     min-height: 100vh !important;
@@ -293,17 +296,17 @@ export default {
 /* Mobile Landscape Optimization - App Layout */
 @media (max-height: 800px) and (orientation: landscape) {
   #app {
-    height: auto !important; 
+    height: auto !important;
     min-height: 100vh;
     overflow: visible !important;
   }
-  
+
   .main-content {
     overflow: visible !important;
     height: auto !important;
-    flex: none !important; 
+    flex: none !important;
   }
-  
+
   .bottom-nav {
     position: relative;
     z-index: 10;
