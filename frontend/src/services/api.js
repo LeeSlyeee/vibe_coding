@@ -3,8 +3,7 @@ import axios from 'axios'
 // API 베이스 URL 설정
 // Nginx Reverse Proxy를 사용하기 위해 상대 경로로 변경 (웹)
 // 앱에서는 .env 파일의 VITE_API_URL을 사용
-// const API_BASE_URL = import.meta.env.VITE_API_URL || '/api'
-const API_BASE_URL = '/api'
+const API_BASE_URL = 'https://217.142.253.35.nip.io/api'
 
 // axios 인스턴스 생성
 const api = axios.create({
