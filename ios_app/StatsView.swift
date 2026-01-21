@@ -300,26 +300,49 @@ struct FlowChartView: View {
 
 struct MonthlyChartView: View {
     let data: [StatsDailyItem]
+    
+    var monthlyGroups: [(String, [StatsDailyItem])] {
+        let grouped = Dictionary(grouping: data) { String($0._id.prefix(7)) }
+        return grouped.sorted { $0.key > $1.key }
+    }
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Image(systemName: "calendar").foregroundColor(.accent)
-                Text("이달의 기록").font(.title3).fontWeight(.bold).foregroundColor(.primaryText)
-            }
-            if #available(iOS 16.0, *) {
-                Chart {
-                    ForEach(data, id: \._id) { item in
-                        BarMark(x: .value("Date", String(item._id.suffix(5))), y: .value("Mood", item.count))
-                            .foregroundStyle(moodColor(item.count))
-                            .cornerRadius(4)
+        VStack(spacing: 24) {
+            ForEach(monthlyGroups, id: \.0) { month, items in
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Image(systemName: "calendar").foregroundColor(.accent)
+                        Text(formatMonthHeader(month)).font(.title3).fontWeight(.bold).foregroundColor(.primaryText)
+                    }
+                    if #available(iOS 16.0, *) {
+                        Chart {
+                            ForEach(items.sorted(by: { $0._id < $1._id }), id: \._id) { item in
+                                BarMark(
+                                    x: .value("Day", String(item._id.suffix(2))), // Show day "01", "02"
+                                    y: .value("Mood", item.count)
+                                )
+                                .foregroundStyle(moodColor(item.count))
+                                .cornerRadius(4)
+                            }
+                        }
+                        .chartYScale(domain: 0...6)
+                        .chartYAxis { AxisMarks(values: [1,3,5]) }
+                        .frame(height: 200)
+                    } else {
+                        Text("iOS 16 이상 버전이 필요합니다.")
                     }
                 }
-                .chartScrollableAxes(.horizontal)
-                .frame(height: 280)
+                .modifier(CardModifier())
             }
         }
-        .modifier(CardModifier())
     }
+    
+    func formatMonthHeader(_ yyyymm: String) -> String {
+        let parts = yyyymm.split(separator: "-")
+        if parts.count == 2 { return "\(parts[0])년 \(parts[1])월" }
+        return yyyymm
+    }
+    
     func moodColor(_ l: Int) -> Color { [Color.gray, .mood1, .mood2, .mood3, .mood4, .mood5][min(l, 5)] }
 }
 
