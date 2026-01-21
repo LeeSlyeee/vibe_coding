@@ -281,7 +281,7 @@ struct AppDiaryWriteView: View {
         task.resume()
         
         // Timeout safety
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
             if isLoadingInsight {
                 isLoadingInsight = false
                 if insightMessage.isEmpty {
