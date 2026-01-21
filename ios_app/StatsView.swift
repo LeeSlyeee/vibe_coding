@@ -191,9 +191,12 @@ struct StatsView: View {
         }.resume()
     }
     func fetchExistingReports() {
+        print("🔍 Checking existing reports...")
+        
         // Short-term report check
         apiCall(path: "/api/analysis/report/status", method: "GET") { data in
             guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
+            print("🔍 Short report status: \(res.status)")
             if res.status == "completed", let report = res.report {
                 DispatchQueue.main.async { self.reportContent = report }
             }
@@ -202,6 +205,7 @@ struct StatsView: View {
         // Long-term report check
         apiCall(path: "/api/analysis/report/longterm/status", method: "GET") { data in
             guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
+            print("🔍 Long report status: \(res.status)")
             if res.status == "completed", let insight = res.insight {
                 DispatchQueue.main.async { self.longTermContent = insight }
             }
