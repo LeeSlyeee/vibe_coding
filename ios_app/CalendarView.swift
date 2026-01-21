@@ -55,19 +55,35 @@ struct CalendarView: View {
                                 let diary = diaries[dateStr]
                                 
                                 Button(action: { handleDateTap(date, diary: diary) }) {
-                                    VStack {
+                                    VStack(spacing: 2) {
                                         Text("\(Calendar.current.component(.day, from: date))")
-                                            .font(.caption)
+                                            .font(.caption2)
                                             .foregroundColor(Calendar.current.isDateInToday(date) ? .blue : .primary)
                                             .fontWeight(diary != nil ? .bold : .regular)
                                         
                                         if let d = diary {
-                                            Text(moodEmoji(d.mood_level)).font(.system(size: 20))
+                                            let (label, percent) = parseAI(d.ai_prediction)
+                                            if !label.isEmpty {
+                                                VStack(spacing: 0) {
+                                                    Text(label)
+                                                        .font(.system(size: 8, weight: .bold))
+                                                        .foregroundColor(.primary)
+                                                        .lineLimit(1)
+                                                        .minimumScaleFactor(0.8)
+                                                    if !percent.isEmpty {
+                                                        Text(percent)
+                                                            .font(.system(size: 7))
+                                                            .foregroundColor(.secondary)
+                                                    }
+                                                }
+                                            }
                                         } else {
                                             Text("").font(.system(size: 20))
+                                            Spacer().frame(height: 10)
                                         }
                                     }
-                                    .frame(height: 60)
+                                    .padding(.vertical, 4)
+                                    .frame(height: 70)
                                     .frame(maxWidth: .infinity)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10)
@@ -101,6 +117,28 @@ struct CalendarView: View {
     }
     
     // MARK: - Logic
+    func parseAI(_ text: String?) -> (String, String) {
+        guard var raw = text, !raw.isEmpty else { return ("", "") }
+        
+        // 1. Extract from single quotes if present (e.g., 'Happy (80%)')
+        if let start = raw.firstIndex(of: "'"), let end = raw.lastIndex(of: "'"), start != end {
+            raw = String(raw[raw.index(after: start)..<end])
+        }
+        
+        // 2. Extract Label and Percent
+        // Check for format "Label (N%)"
+        if raw.hasSuffix(")"), let openParen = raw.lastIndex(of: "(") {
+            let label = String(raw[..<openParen]).trimmingCharacters(in: .whitespaces)
+            let percent = String(raw[openParen...])
+            if percent.contains("%") {
+                 return (label, percent)
+            }
+        }
+        
+        // Fallback: Return raw string as label if parsing fails
+        return (raw, "")
+    }
+
     func handleDateTap(_ date: Date, diary: Diary?) {
         if let diary = diary {
             // 이미 일기가 있으면 상세 보기
