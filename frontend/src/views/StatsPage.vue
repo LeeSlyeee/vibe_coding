@@ -39,8 +39,10 @@
                          <h3>📈 감정 흐름</h3>
                          <p>나의 기분이 시간의 흐름에 따라 어떻게 변해왔는지 확인해보세요.</p>
                      </div>
-                     <div class="chart-wrapper main-chart">
-                         <Line :data="flowChartData" :options="flowChartOptions" />
+                     <div class="chart-wrapper main-chart" style="overflow-x: auto; padding-bottom: 10px;">
+                         <div :style="{ width: flowChartWidth, minWidth: '100%', height: '350px' }">
+                             <Line :data="flowChartData" :options="flowChartOptions" />
+                         </div>
                      </div>
                 </div>
 
@@ -322,6 +324,11 @@ export default {
                 fill: true
             }]
         }
+    })
+
+    const flowChartWidth = computed(() => {
+        const count = rawStats.value.timeline ? rawStats.value.timeline.length : 0
+        return count > 7 ? `${count * 60}px` : '100%'
     })
 
 
@@ -627,7 +634,7 @@ export default {
         loading,
         currentTab,
         tabs,
-        monthlyCharts, flowChartData, flowChartOptions,
+        monthlyCharts, flowChartData, flowChartOptions, flowChartWidth,
         moodChartData, doughnutOptions, moodLegendData,
         weatherChartData, weatherBarOptions,
         
