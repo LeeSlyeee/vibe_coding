@@ -748,12 +748,17 @@ def check_report_status():
 @app.route('/api/voice/transcribe', methods=['POST'])
 @jwt_required()
 def transcribe_voice():
+    print(f"🎤 [DEBUG] Headers: {request.headers}")
+    print(f"🎤 [DEBUG] Files: {request.files}")
     if 'file' not in request.files:
-        return jsonify({"message": "No file part"}), 400
+        print("❌ [DEBUG] No 'file' key in request.files")
+        return jsonify({"message": "No file part (DEBUG: file key missing)"}), 400
     
     file = request.files['file']
+    print(f"🎤 [DEBUG] Filename: {file.filename}")
     if file.filename == '':
-        return jsonify({"message": "No selected file"}), 400
+        print("❌ [DEBUG] Empty filename")
+        return jsonify({"message": "No selected file (DEBUG: filename empty)"}), 400
         
     if file:
         try:
@@ -787,7 +792,9 @@ def transcribe_voice():
             return jsonify(response_data), 200
         except Exception as e:
             print(f"❌ Transcribe Error: {e}")
-            return jsonify({"message": "Transcription failed"}), 500
+            import traceback
+            traceback.print_exc()
+            return jsonify({"message": f"Transcription failed: {str(e)}"}), 500
 
 if __name__ == '__main__':
     # No SQL create_all() needed
