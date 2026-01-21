@@ -1,6 +1,12 @@
 
 import SwiftUI
 
+// MARK: - Safe Data Wrapper
+struct WriteTargetDate: Identifiable {
+    let id = UUID()
+    let date: Date
+}
+
 // MARK: - Helper Struct
 struct CalendarDay: Identifiable {
     let id = UUID()
@@ -16,9 +22,8 @@ struct MoodCalendarView: View {
     @State private var selectedDiary: Diary?
     @State private var showDetail = false
     
-    // Write Modal State
-    @State private var selectedDateForWrite: Date?
-    @State private var showWriteSheet = false
+    // Write Modal State (Identifiable Item for Safe Presentation)
+    @State private var writeTarget: WriteTargetDate?
     
     // ✅ Base URL
     let baseURL = "https://217.142.253.35.nip.io"
@@ -70,9 +75,12 @@ struct MoodCalendarView: View {
                                         
                                         if let d = diary {
                                             VStack(spacing: 0) {
-                                                // 2. 사용자 선택 이모지
-                                                Text(moodEmoji(d.mood_level))
-                                                    .font(.system(size: 22)) // 이모지 크기 조정
+                                                // 2. 사용자 선택 이모지 (이미지)
+                                                let asset = getMoodAsset(level: d.mood_level)
+                                                Image(uiImage: UIImage(named: asset.image) ?? UIImage())
+                                                    .resizable()
+                                                    .scaledToFit()
+                                                    .frame(width: 28, height: 28)
                                                     .padding(.bottom, 2)
                                                 
                                                 // 3 & 4. AI 예측 (감정 + 퍼센트)
@@ -102,7 +110,7 @@ struct MoodCalendarView: View {
                                     .frame(maxWidth: .infinity)
                                     .background(
                                         RoundedRectangle(cornerRadius: 8)
-                                            .fill(diary != nil ? moodColor(diary!.mood_level).opacity(0.15) : Color.clear)
+                                            .fill(diary != nil ? getMoodAsset(level: diary!.mood_level).color.opacity(0.15) : Color.clear)
                                     )
                                 }
                             } else {
@@ -123,10 +131,16 @@ struct MoodCalendarView: View {
             .navigationBarHidden(true)
             .onAppear(perform: fetchDiaries)
             .onChange(of: currentDate) { _ in fetchDiaries() }
-            .sheet(isPresented: $showWriteSheet) {
-                if let d = selectedDateForWrite {
-                    AppDiaryWriteView(isPresented: $showWriteSheet, date: d, onSave: fetchDiaries)
-                }
+            .sheet(item: $writeTarget) { target in
+                 // 바인딩 전달을 위한 래퍼
+                 AppDiaryWriteView(
+                    isPresented: Binding(
+                        get: { writeTarget != nil },
+                        set: { if !$0 { writeTarget = nil } }
+                    ),
+                    date: target.date,
+                    onSave: fetchDiaries
+                 )
             }
         }
     }
@@ -160,9 +174,8 @@ struct MoodCalendarView: View {
             self.selectedDiary = diary
             self.showDetail = true
         } else {
-            // 일기가 없으면 작성 모달
-            self.selectedDateForWrite = date
-            self.showWriteSheet = true
+            // 일기가 없으면 작성 모달 (데이터를 먼저 담고 시트 오픈)
+            self.writeTarget = WriteTargetDate(date: date)
         }
     }
     
