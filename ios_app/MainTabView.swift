@@ -6,18 +6,39 @@ struct MainTabView: View {
     
     var body: some View {
         TabView {
-            Text("캘린더 (구현 예정)")
+            CalendarView()
                 .tabItem {
                     Label("캘린더", systemImage: "calendar")
                 }
             
-            Text("통계 (구현 예정)")
+            StatsView()
                 .tabItem {
                     Label("통계", systemImage: "chart.bar.fill")
                 }
             
-            Button("로그아웃") {
-                authManager.logout()
+            GuideView()
+                .tabItem {
+                    Label("가이드", systemImage: "book.fill")
+                }
+            
+            VStack {
+                Spacer()
+                Button(action: {
+                    authManager.logout()
+                }) {
+                    HStack {
+                        Text("로그아웃")
+                            .fontWeight(.bold)
+                        Image(systemName: "arrow.right.circle.fill")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(width: 200)
+                    .background(Color.red)
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+                }
+                Spacer()
             }
             .tabItem {
                 Label("설정", systemImage: "gearshape.fill")
