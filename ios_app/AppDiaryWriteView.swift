@@ -166,7 +166,11 @@ struct AppDiaryWriteView: View {
                     .padding()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onAppear(perform: {
-                        fetchWeather()
+                        // 뷰가 먼저 렌더링되도록 약간의 지연 후 실행
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            fetchWeather()
+                        }
+                        
                         // 타임아웃 5분(300초)으로 연장
                         DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
                             if isLoadingInsight {
