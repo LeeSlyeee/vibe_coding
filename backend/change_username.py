@@ -34,20 +34,8 @@ def change_username(old_name, new_name):
         existing_new = users_col.find_one({'username': new_name})
         if existing_new:
             print(f"⚠️ Warning: The username '{new_name}' is ALREADY taken by another account (ID: {existing_new['_id']}).")
-            choice = input(f"Do you want to DELETE the existing '{new_name}' account and replace it with '{old_name}'? (delete_and_replace/cancel): ")
-            
-            if choice == 'delete_and_replace':
-                # Delete the existing colliding user
-                # Note: We should technically delete their data too using the logic from delete_user_data, 
-                # but let's keep it simple or minimal here.
-                # To be safe, let's just delete the user doc so the name is free.
-                # Data cleanup is separate responsibility usually, but let's warn.
-                print(f"🗑️ Deleting existing user document for '{new_name}'...")
-                users_col.delete_one({'_id': existing_new['_id']})
-                print("   (Note: Their diaries/reports might still exist as orphaned data)")
-            else:
-                print("❌ Operation cancelled.")
-                return
+            print(f"🗑️ FORCE MODING: Automatically deleting existing user document for '{new_name}' to proceed...")
+            users_col.delete_one({'_id': existing_new['_id']})
 
         # 3. Update Username
         result = users_col.update_one(
