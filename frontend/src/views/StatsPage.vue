@@ -701,115 +701,32 @@ export default {
 }
 /* ... Rest of styles */
 .stats-page {
-  height: 100%;
-  overflow: hidden;
+  min-height: 100%;
   background: #f5f5f7;
   padding: 20px;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  overflow-y: auto; /* Allow full page scroll */
 }
 
 .stats-container {
   max-width: 900px;
-  height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
-
-.stats-header {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-.header-left h2 {
-  font-size: 28px;
-  font-weight: 800;
-  color: #1d1d1f;
-  margin: 0 0 8px 0;
-}
-.subtitle {
-  font-size: 15px;
-  color: #86868b;
-  margin: 0;
-}
-
-.close-btn {
-  background: white;
-  border: 1px solid #d2d2d7;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1d1d1f;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.close-btn:hover {
-  background: #f5f5f7;
-  transform: scale(1.02);
-}
-.close-btn .icon { font-size: 12px; }
-
-/* Navigation Tabs */
-.stats-nav {
-  flex-shrink: 0;
-  display: flex;
-  background: white;
-  padding: 6px;
-  border-radius: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.03);
-  gap: 8px;
-}
-.nav-item {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 12px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #86868b;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-.nav-item:hover {
-  background: rgba(0,0,0,0.02);
-  color: #1d1d1f;
-}
-.nav-item.active {
-  background: #1d1d1f;
-  color: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-}
-.nav-icon { font-size: 18px; }
-
+/* ... */
 /* Content Area */
 .stats-content {
-  flex: 1;
-  min-height: 0;
   background: white;
   border-radius: 24px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.04);
   position: relative;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Clips scrollbar at corners */
 }
 
 .content-body {
-  flex: 1;
-  overflow-y: auto;
   padding: 30px;
 }
 
