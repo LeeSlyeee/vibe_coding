@@ -2,17 +2,19 @@
 import SwiftUI
 
 @main
-struct MoodDiaryApp: App {
+struct MindDiaryApp: App {
     @StateObject private var authManager = AuthManager()
     
     var body: some Scene {
         WindowGroup {
             if authManager.isAuthenticated {
-                MainTabView()
+                AppMainTabView()
                     .environmentObject(authManager)
+                    .preferredColorScheme(.light) // Force Light Mode
             } else {
-                LoginView()
+                AppLoginView()
                     .environmentObject(authManager)
+                    .preferredColorScheme(.light) // Force Light Mode
             }
         }
     }

@@ -1,7 +1,13 @@
 
 import SwiftUI
 
-struct CalendarView: View {
+// MARK: - Helper Struct
+struct CalendarDay: Identifiable {
+    let id = UUID()
+    let date: Date?
+}
+
+struct MoodCalendarView: View {
     @State private var currentDate = Date()
     @State private var diaries: [String: Diary] = [:] // "YYYY-MM-DD" : Diary Object
     @State private var isLoading = false
@@ -49,44 +55,53 @@ struct CalendarView: View {
                     Spacer(); ProgressView(); Spacer()
                 } else {
                     LazyVGrid(columns: columns, spacing: 15) {
-                        ForEach(calendarDays(), id: \.self) { date in
-                            if let date = date {
+                        ForEach(calendarDays()) { dayItem in
+                            if let date = dayItem.date {
                                 let dateStr = dateString(date)
                                 let diary = diaries[dateStr]
                                 
                                 Button(action: { handleDateTap(date, diary: diary) }) {
-                                    VStack(spacing: 2) {
+                                    VStack(spacing: 1) { // 간격 최소화
+                                        // 1. 날짜
                                         Text("\(Calendar.current.component(.day, from: date))")
-                                            .font(.caption2)
+                                            .font(.system(size: 10, weight: diary != nil ? .bold : .regular)) // 날짜 크기 축소
                                             .foregroundColor(Calendar.current.isDateInToday(date) ? .blue : .primary)
-                                            .fontWeight(diary != nil ? .bold : .regular)
+                                            .padding(.top, 4)
                                         
                                         if let d = diary {
-                                            let (label, percent) = parseAI(d.ai_prediction)
-                                            if !label.isEmpty {
-                                                VStack(spacing: 0) {
+                                            VStack(spacing: 0) {
+                                                // 2. 사용자 선택 이모지
+                                                Text(moodEmoji(d.mood_level))
+                                                    .font(.system(size: 22)) // 이모지 크기 조정
+                                                    .padding(.bottom, 2)
+                                                
+                                                // 3 & 4. AI 예측 (감정 + 퍼센트)
+                                                let (label, percent) = parseAI(d.ai_prediction)
+                                                if !label.isEmpty {
                                                     Text(label)
-                                                        .font(.system(size: 8, weight: .bold))
+                                                        .font(.system(size: 8, weight: .bold)) // 텍스트 크기 축소
                                                         .foregroundColor(.primary)
                                                         .lineLimit(1)
-                                                        .minimumScaleFactor(0.8)
+                                                        .minimumScaleFactor(0.7)
+                                                    
                                                     if !percent.isEmpty {
                                                         Text(percent)
                                                             .font(.system(size: 7))
                                                             .foregroundColor(.secondary)
+                                                            .lineLimit(1)
+                                                            .minimumScaleFactor(0.7)
                                                     }
                                                 }
                                             }
                                         } else {
-                                            Text("").font(.system(size: 20))
-                                            Spacer().frame(height: 10)
+                                            Spacer()
                                         }
+                                        Spacer(minLength: 2)
                                     }
-                                    .padding(.vertical, 4)
-                                    .frame(height: 70)
+                                    .frame(height: 75) // 셀 높이 약간 증가
                                     .frame(maxWidth: .infinity)
                                     .background(
-                                        RoundedRectangle(cornerRadius: 10)
+                                        RoundedRectangle(cornerRadius: 8)
                                             .fill(diary != nil ? moodColor(diary!.mood_level).opacity(0.15) : Color.clear)
                                     )
                                 }
@@ -101,7 +116,7 @@ struct CalendarView: View {
                 
                 // Hidden Navigation Link for Detail
                 NavigationLink(
-                    destination: selectedDiary != nil ? DiaryDetailView(diary: selectedDiary!, onDelete: { fetchDiaries() }) : nil,
+                    destination: selectedDiary != nil ? AppDiaryDetailView(diary: selectedDiary!, onDelete: { fetchDiaries() }) : nil,
                     isActive: $showDetail
                 ) { EmptyView() }
             }
@@ -110,7 +125,7 @@ struct CalendarView: View {
             .onChange(of: currentDate) { _ in fetchDiaries() }
             .sheet(isPresented: $showWriteSheet) {
                 if let d = selectedDateForWrite {
-                    DiaryWriteView(isPresented: $showWriteSheet, date: d, onSave: fetchDiaries)
+                    AppDiaryWriteView(isPresented: $showWriteSheet, date: d, onSave: fetchDiaries)
                 }
             }
         }
@@ -186,14 +201,26 @@ struct CalendarView: View {
     func changeMonth(by value: Int) {
         if let newDate = Calendar.current.date(byAdding: .month, value: value, to: currentDate) { currentDate = newDate }
     }
-    func calendarDays() -> [Date?] {
+    func calendarDays() -> [CalendarDay] {
         let cal = Calendar.current
         let components = cal.dateComponents([.year, .month], from: currentDate)
         let firstDay = cal.date(from: components)!
         let range = cal.range(of: .day, in: .month, for: firstDay)!
         let firstWeekday = cal.component(.weekday, from: firstDay) - 1
-        var days: [Date?] = Array(repeating: nil, count: firstWeekday)
-        for day in 1...range.count { days.append(cal.date(byAdding: .day, value: day-1, to: firstDay)) }
+        
+        var days: [CalendarDay] = []
+        
+        // 빈 칸 (이전 달)
+        for _ in 0..<firstWeekday {
+            days.append(CalendarDay(date: nil))
+        }
+        
+        // 이번 달 날짜들
+        for day in 1...range.count {
+            if let date = cal.date(byAdding: .day, value: day-1, to: firstDay) {
+                days.append(CalendarDay(date: date))
+            }
+        }
         return days
     }
     func monthYearString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "YYYY년 M월"; return f.string(from: d) }

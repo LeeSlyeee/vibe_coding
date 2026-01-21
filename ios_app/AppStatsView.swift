@@ -73,7 +73,7 @@ extension Color {
 }
 
 // MARK: - Main View
-struct StatsView: View {
+struct AppStatsView: View {
     @State private var currentTab = "flow"
     @State private var stats: StatisticsResponse?
     @State private var isLoading = true

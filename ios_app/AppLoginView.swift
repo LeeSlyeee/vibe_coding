@@ -1,7 +1,7 @@
 
 import SwiftUI
 
-struct LoginView: View {
+struct AppLoginView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var username = ""
     @State private var password = ""
@@ -11,9 +11,11 @@ struct LoginView: View {
     // ✅ 사용자분의 OCI 서버 도메인 (경로 문제 해결!)
     let baseURL = "https://217.142.253.35.nip.io"
     
+    init() {}
+    
     var body: some View {
         ZStack {
-            Color(UIColor.systemGroupedBackground).ignoresSafeArea()
+            Color.white.ignoresSafeArea()
             
             VStack(spacing: 24) {
                 Spacer()

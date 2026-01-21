@@ -1,7 +1,7 @@
 
 import SwiftUI
 
-struct DiaryDetailView: View {
+struct AppDiaryDetailView: View {
     let diary: Diary
     var onDelete: () -> Void
     @Environment(\.presentationMode) var presentationMode

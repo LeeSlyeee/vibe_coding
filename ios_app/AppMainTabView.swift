@@ -1,7 +1,56 @@
 
 import SwiftUI
 
-struct GuideView: View {
+struct AppMainTabView: View {
+    @EnvironmentObject var authManager: AuthManager
+    
+    var body: some View {
+        TabView {
+            MoodCalendarView()
+                .tabItem {
+                    Label("캘린더", systemImage: "calendar")
+                }
+            
+            AppStatsView()
+                .tabItem {
+                    Label("통계", systemImage: "chart.bar.fill")
+                }
+            
+            AppGuideView()
+                .tabItem {
+                    Label("가이드", systemImage: "book.fill")
+                }
+            
+            VStack {
+                Spacer()
+                Button(action: {
+                    authManager.logout()
+                }) {
+                    HStack {
+                        Text("로그아웃")
+                            .fontWeight(.bold)
+                        Image(systemName: "arrow.right.circle.fill")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .frame(width: 200)
+                    .background(Color.red)
+                    .cornerRadius(10)
+                    .shadow(radius: 5)
+                }
+                Spacer()
+            }
+            .tabItem {
+                Label("설정", systemImage: "gearshape.fill")
+            }
+        }
+        .accentColor(.black)
+    }
+}
+
+// MARK: - App Guide View (Included here to avoid file referencing issues)
+
+struct AppGuideView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
@@ -24,35 +73,35 @@ struct GuideView: View {
                         
                         // Section 1: 일기 작성하기
                         VStack(alignment: .leading, spacing: 20) {
-                            SectionHeader(title: "📝 일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
+                            GuideSectionHeader(title: "📝 일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
                             
                             VStack(spacing: 16) {
-                                StepCard(num: "1", title: "사실 (Event)", desc: "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
-                                StepCard(num: "2", title: "감정 (Emotion)", desc: "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
-                                StepCard(num: "3", title: "의미 (Meaning)", desc: "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
-                                StepCard(num: "4", title: "위로 (Self-Talk)", desc: "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
+                                GuideStepCard(num: "1", title: "사실 (Event)", desc: "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
+                                GuideStepCard(num: "2", title: "감정 (Emotion)", desc: "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
+                                GuideStepCard(num: "3", title: "의미 (Meaning)", desc: "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
+                                GuideStepCard(num: "4", title: "위로 (Self-Talk)", desc: "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
                             }
                         }
                         
                         // Section 2: AI 분석
                         VStack(alignment: .leading, spacing: 20) {
-                            SectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "전문 상담사급 AI가 당신의 마음을 읽어드립니다.")
+                            GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "전문 상담사급 AI가 당신의 마음을 읽어드립니다.")
                             
-                            FeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
-                            FeatureCard(icon: "💬", title: "전문 상담사급 AI 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
+                            GuideFeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
+                            GuideFeatureCard(icon: "💬", title: "전문 상담사급 AI 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
                         }
                         
                         // Section 3: 프라이버시 & 심층 분석
                         VStack(alignment: .leading, spacing: 20) {
-                            SectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
+                            GuideSectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
                             
-                            FeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 상담사", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
-                            FeatureCard(icon: "📑", title: "🧠 심층 심리 리포트", desc: "일기가 3개 이상 모이면, **나만의 심리 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)")
-                            FeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
+                            GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 상담사", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
+                            GuideFeatureCard(icon: "📑", title: "🧠 심층 심리 리포트", desc: "일기가 3개 이상 모이면, **나만의 심리 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)")
+                            GuideFeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
                             
                             HStack(spacing: 14) {
-                                SmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
-                                SmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
+                                GuideSmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
+                                GuideSmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
                             }
                         }
                         
@@ -68,7 +117,7 @@ struct GuideView: View {
 
 // MARK: - Components
 
-struct SectionHeader: View {
+struct GuideSectionHeader: View {
     let title: String
     let desc: String
     
@@ -85,7 +134,7 @@ struct SectionHeader: View {
     }
 }
 
-struct StepCard: View {
+struct GuideStepCard: View {
     let num: String
     let title: String
     let desc: String
@@ -124,7 +173,7 @@ struct StepCard: View {
     }
 }
 
-struct FeatureCard: View {
+struct GuideFeatureCard: View {
     let icon: String
     let title: String
     let desc: String
@@ -162,7 +211,7 @@ struct FeatureCard: View {
     }
 }
 
-struct SmallFeatureCard: View {
+struct GuideSmallFeatureCard: View {
     let title: String
     let desc: String
     
@@ -188,6 +237,3 @@ struct SmallFeatureCard: View {
         )
     }
 }
-
-// Reuse Color Extension if in separate file, but safe to include for standalone preview
-// Color extension removed to avoid redeclaration error
