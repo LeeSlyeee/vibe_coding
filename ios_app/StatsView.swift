@@ -210,7 +210,13 @@ struct StatsView: View {
                 DispatchQueue.main.async { self.debugMessage += "\n단기: 데이터 없음" }
                 return
             }
-            if let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) {
+            // Raw String Logging
+            if let str = String(data: data, encoding: .utf8) {
+                print("🔍 Short Raw: \(str)")
+            }
+            
+            do {
+                let res = try JSONDecoder().decode(ReportStatusResponse.self, from: data)
                 print("🔍 Short report status: \(res.status)")
                 DispatchQueue.main.async {
                     self.debugMessage += "\n단기: \(res.status)"
@@ -219,7 +225,8 @@ struct StatsView: View {
                         self.debugMessage += " (로드 완료)"
                     }
                 }
-            } else {
+            } catch {
+                print("🔍 JSON Error: \(error)")
                 DispatchQueue.main.async { self.debugMessage += "\n단기: 파싱 실패" }
             }
         }
