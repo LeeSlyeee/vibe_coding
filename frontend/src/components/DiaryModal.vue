@@ -478,37 +478,70 @@ export default {
         if (!navigator.mediaDevices) { alert("마이크를 찾을 수 없어요."); return; }
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            mediaRecorder = new MediaRecorder(stream)
+            
+            // [iOS Fix] 지원하는 MIME Type 확인
+            let options = {};
+            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) {
+                options = { mimeType: 'audio/webm' };
+            } else if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
+                options = { mimeType: 'audio/mp4' };
+            }
+            
+            mediaRecorder = new MediaRecorder(stream, options)
             audioChunks = []
             activeField.value = field
             
             mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data)
+                if (event.data && event.data.size > 0) {
+                    audioChunks.push(event.data)
+                }
             }
             
             mediaRecorder.onstop = async () => {
-                const targetField = activeField.value // Capture current field
+                const targetField = activeField.value 
                 isRecording.value = false
                 activeField.value = null
                 
+                // [Validation] 녹음 데이터 확인
+                if (audioChunks.length === 0) {
+                    alert("녹음된 음성이 없어요. (권한 또는 코덱 문제)");
+                    stream.getTracks().forEach(track => track.stop()); // Stream cleanup check
+                    return;
+                }
+
                 isTranscribing.value = true
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
+                
+                // Determine Blob Type and Extension
+                const mimeType = mediaRecorder.mimeType || 'audio/webm'; // Default fallback
+                const audioBlob = new Blob(audioChunks, { type: mimeType })
+                
+                console.log(`🎤 Recording finished. Size: ${audioBlob.size}, Type: ${mimeType}`);
+
+                if (audioBlob.size === 0) {
+                   alert("녹음 파일 크기가 0입니다. 다시 시도해주세요.");
+                   isTranscribing.value = false;
+                   return;
+                }
+                
+                // iOS prefers m4a/mp4
+                const ext = (mimeType.includes('mp4') || mimeType.includes('aac')) ? 'm4a' : 'webm';
+
                 const fd = new FormData()
-                fd.append('file', audioBlob, 'diary.webm')
-                fd.append('auto_fill', 'false') // Explicitly disable auto-categorization
+                fd.append('file', audioBlob, `diary.${ext}`)
+                fd.append('auto_fill', 'false') 
                 
                 try {
                     const res = await diaryAPI.transcribeVoice(fd)
                     if (res.text) {
                         const currentText = formData.value[targetField] || ''
-                        // Append text with space if needed
                         formData.value[targetField] = currentText ? currentText + " " + res.text : res.text
                     }
                 } catch (e) {
-                    alert("음성 변환 실패: " + (e.message || "서버 오류"))
+                    console.error("Transcribe Error:", e);
+                    const msg = e.response?.data?.message || e.message || "서버 오류";
+                    alert("음성 변환 실패: " + msg);
                 } finally {
                     isTranscribing.value = false
-                    // Stop tracks
                     stream.getTracks().forEach(track => track.stop())
                 }
             }
@@ -517,7 +550,7 @@ export default {
             isRecording.value = true
         } catch (e) {
             console.error(e)
-            alert("마이크 권한이 필요합니다.")
+            alert("마이크 권한이 필요하거나 지원하지 않는 브라우저입니다.")
         }
     }
 

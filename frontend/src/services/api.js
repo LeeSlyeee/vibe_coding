@@ -199,8 +199,18 @@ export const diaryAPI = {
 
   // 음성 받아쓰기 (Voice Diary)
   transcribeVoice: async (formData) => {
-    const response = await api.post('/voice/transcribe', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+    // [Fix] 기본 api 인스턴스는 'Content-Type: application/json'이 강제되므로
+    // Multipart 전송을 위해 순수 axios를 사용하여 전송합니다.
+    const token = localStorage.getItem('authToken')
+    const headers = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+    
+    // axios가 FormData를 감지하면 자동으로 Content-Type: multipart/form-data; boundary=... 를 설정합니다.
+    const response = await axios.post(`${API_BASE_URL}/voice/transcribe`, formData, {
+      headers,
+      withCredentials: true
     })
     return response.data
   }
