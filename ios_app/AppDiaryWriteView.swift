@@ -29,9 +29,11 @@ struct AppDiaryWriteView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.white.edgesIgnoringSafeArea(.all) // 백지 문제 방지용 배경
+                // 기본 배경
+                Color.white.edgesIgnoringSafeArea(.all)
                 
                 if showForm {
+                    // 일기 작성 폼
                     Form {
                         Section(header: Text("오늘의 기분")) {
                             Picker("기분", selection: $mood) {
@@ -44,7 +46,6 @@ struct AppDiaryWriteView: View {
                             .pickerStyle(SegmentedPickerStyle())
                             .padding(.vertical)
                         }
-                        
                         Section(header: Text("질문 1: 오늘 무슨일이 있었나요?")) {
                             TextEditor(text: $q1).frame(height: 100)
                         }
@@ -58,132 +59,80 @@ struct AppDiaryWriteView: View {
                             TextEditor(text: $q4).frame(height: 80)
                         }
                     }
-                    .navigationTitle(dateString(date))
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("취소") { isPresented = false }
-                        }
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button(action: saveDiary) {
-                                if isSaving { ProgressView() } else { Text("저장") }
-                            }
-                            .disabled(q1.isEmpty || q2.isEmpty || isSaving)
-                        }
-                    }
+                    .transition(.opacity) // 부드러운 전환
                 } else {
-                    // Insight View
-                    VStack(spacing: 30) {
-                        Spacer()
-                        
+                    // 가이드 및 로딩 화면 (전체 화면 덮기)
+                    VStack {
+                        // 상단 날짜 및 닫기 버튼 영역 (커스텀 헤더)
                         HStack {
-                            Text(dateString(date))
-                                .font(.headline)
-                                .foregroundColor(.gray)
-                            // 날씨 표시 추가
-                            Text("\(weatherDesc) \(String(format: "%.1f", temp))°C")
-                                .font(.subheadline)
-                                .foregroundColor(.blue)
+                            Button(action: { isPresented = false }) {
+                                Text("닫기").foregroundColor(.gray)
+                            }
+                            Spacer()
+                            Text(dateString(date)).font(.headline).foregroundColor(.gray)
+                            Spacer()
+                            Button(action: {}) { Text("    ") } // 균형 맞추기용 더미
                         }
+                        .padding()
                         
+                        // 날씨 정보
+                        HStack {
+                            Text("\(weatherDesc)")
+                            Text(String(format: "%.1f°C", temp))
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                        .padding(.bottom, 20)
+
                         if isLoadingInsight {
+                            // 로딩 안내 화면
                             VStack(spacing: 40) {
                                 Spacer()
-                                
-                                // 감성적인 아이콘 및 애니메이션 효과
                                 ZStack {
-                                    Circle()
-                                        .fill(Color.purple.opacity(0.1))
-                                        .frame(width: 120, height: 120)
-                                    Image(systemName: "wand.and.stars")
-                                        .font(.system(size: 50))
-                                        .foregroundColor(.purple)
+                                    Circle().fill(Color.purple.opacity(0.1)).frame(width: 120, height: 120)
+                                    Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundColor(.purple)
                                 }
-                                
                                 VStack(spacing: 20) {
                                     Text("마음 가이드를 준비하고 있어요")
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.primary)
-                                    
+                                        .font(.title2).fontWeight(.bold).foregroundColor(.primary)
                                     Text("오늘의 날씨와 지난 감정 흐름을 연결하여\n당신만을 위한 특별한 조언을 만들고 있습니다.")
-                                        .font(.body)
-                                        .multilineTextAlignment(.center)
-                                        .foregroundColor(.gray)
-                                        .lineSpacing(6)
-                                    
-                                    Text("잠시만 기다려주세요...")
-                                        .font(.subheadline)
-                                        .foregroundColor(.purple)
-                                        .padding(.top, 10)
+                                        .font(.body).multilineTextAlignment(.center).foregroundColor(.gray).lineSpacing(6)
+                                    Text("잠시만 기다려주세요...").font(.subheadline).foregroundColor(.purple).padding(.top, 10)
                                 }
-                                
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                    .scaleEffect(1.5)
-                                
-                                Spacer()
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple)).scaleEffect(1.5)
                                 Spacer()
                             }
-                            .padding()
                         } else {
-                            VStack(spacing: 20) {
-                                Circle()
-                                    .fill(Color.purple.opacity(0.1))
-                                    .frame(width: 80, height: 80)
+                            // 인사이트 결과 화면
+                            VStack(spacing: 30) {
+                                Spacer()
+                                Circle().fill(Color.purple.opacity(0.1)).frame(width: 80, height: 80)
                                     .overlay(Text("🧘‍♀️").font(.largeTitle))
-                                
-                                Text("오늘의 마음 가이드")
-                                    .font(.title3)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.purple)
-                                
-                                Text(insightMessage)
-                                    .font(.body)
-                                    .multilineTextAlignment(.center)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.purple.opacity(0.05))
-                                    .cornerRadius(15)
-                                    .padding(.horizontal)
+                                Text("오늘의 마음 가이드").font(.title3).fontWeight(.bold).foregroundColor(.purple)
+                                Text(insightMessage.isEmpty ? "오늘 하루도 수고 많으셨어요." : insightMessage)
+                                    .font(.body).multilineTextAlignment(.center).padding()
+                                    .frame(maxWidth: .infinity).background(Color.purple.opacity(0.05)).cornerRadius(15).padding(.horizontal)
+                                Button(action: { withAnimation { showForm = true } }) {
+                                    Text("오늘의 감정 기록하기").fontWeight(.bold).foregroundColor(.white).padding()
+                                        .frame(maxWidth: .infinity).background(Color.black).cornerRadius(15)
+                                }.padding(.horizontal, 40)
+                                Spacer()
                             }
-                            
-                            Button(action: { 
-                                withAnimation { showForm = true } 
-                            }) {
-                                Text("오늘의 감정 기록하기")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(Color.black)
-                                    .cornerRadius(15)
-                            }
-                            .padding(.horizontal, 40)
-                        }
-                        
-                        Spacer()
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onAppear(perform: {
-                        // 뷰가 먼저 렌더링되도록 약간의 지연 후 실행
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                            fetchWeather()
-                        }
-                        
-                        // 타임아웃 5분(300초)으로 연장
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
-                            if isLoadingInsight {
-                                isLoadingInsight = false
-                                if insightMessage.isEmpty { insightMessage = "오늘 하루도 수고 많으셨어요." }
-                            }
-                        }
-                    })
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button("닫기") { isPresented = false }
                         }
                     }
+                    .background(Color.white) // 배경 확실하게 지정
+                    .transition(.opacity)
+                }
+            }
+            .navigationBarHidden(true) // 네비게이션 바 숨기고 커스텀 헤더 사용
+        }
+        .navigationViewStyle(StackNavigationViewStyle()) // 렌더링 오류 방지
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { fetchWeather() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
+                if isLoadingInsight {
+                    isLoadingInsight = false
+                    if insightMessage.isEmpty { insightMessage = "오늘 하루도 수고 많으셨어요." }
                 }
             }
         }
@@ -243,6 +192,7 @@ struct AppDiaryWriteView: View {
     func fetchInsight() {
         guard let token = UserDefaults.standard.string(forKey: "authToken") else { 
             isLoadingInsight = false
+            insightMessage = "로그인이 필요합니다."
             return 
         }
         
