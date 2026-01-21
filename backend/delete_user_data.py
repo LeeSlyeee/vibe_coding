@@ -30,6 +30,11 @@ def delete_user(username):
         reports_col = db.reports 
         
         # 1. Find User
+        print("\n🔍 Debug: Current Users in DB:")
+        for u in users_col.find():
+            print(f" - {u.get('username')} (ID: {u.get('_id')})")
+        print("------------------------------------------------")
+
         user = users_col.find_one({'username': username})
         if not user:
             print(f"❌ User '{username}' not found in database '{db.name}'.")
