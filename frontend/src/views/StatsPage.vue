@@ -124,6 +124,7 @@
                         </div>
 
                         <!-- 3. 결과 (리포트) -->
+                        <!-- 3. 결과 (리포트) -->
                         <div v-else class="report-result">
                             <div class="report-meta">
                                 <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
@@ -143,19 +144,13 @@
                                     <div class="report-text" v-html="formattedReportContent"></div>
                                 </div>
 
-                            <!-- 메타 분석 결과 (Long Term) -->
-                            <div v-if="longTermReportContent" class="long-term-box">
-                                <h4>🧠 장기 심리 변화 분석 (Meta-Insight)</h4>
-                                <div class="report-text" v-html="formattedLongTermContent"></div>
-                            </div>
-                            
-                            <!-- 기본 리포트 -->
-                            <div class="report-content-box">
-                                <div class="report-text" v-html="formattedReportContent"></div>
+                                <!-- 메타 분석 결과 (Long Term) -->
+                                <div v-if="longTermReportContent" class="long-term-box">
+                                    <h4>🧠 과거 기록 통합 분석 (Meta-Analysis)</h4>
+                                    <div class="report-text" v-html="formattedLongTermContent"></div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
             </transition>
         </div>
       </div>
