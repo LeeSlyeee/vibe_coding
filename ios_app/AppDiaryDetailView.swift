@@ -29,10 +29,19 @@ struct AppDiaryDetailView: View {
                 
                 // 감정 및 내용
                 HStack {
-                    Text("기분 레벨: \(diary.mood_level)")
+                    Text("오늘의 기분")
+                        .font(.headline)
                     Spacer()
-                    Text(moodEmoji(diary.mood_level))
-                        .font(.largeTitle)
+                    let mood = getMoodAsset(level: diary.mood_level)
+                    VStack {
+                        Image(mood.image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 50, height: 50)
+                        Text(mood.title)
+                            .font(.subheadline)
+                            .foregroundColor(mood.color)
+                    }
                 }
                 .padding(.vertical)
                 
@@ -130,7 +139,5 @@ struct AppDiaryDetailView: View {
         return dateStr
     }
     
-    func moodEmoji(_ l: Int) -> String {
-        ["", "😠", "😢", "😐", "😌", "😊"][min(l, 5)]
-    }
+
 }
