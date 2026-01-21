@@ -37,8 +37,20 @@ def delete_user(username):
 
         user = users_col.find_one({'username': username})
         if not user:
-            print(f"❌ User '{username}' not found in database '{db.name}'.")
-            return
+            # Try case-insensitive search
+            user_ci = users_col.find_one({'username': {'$regex': f'^{username}$', '$options': 'i'}})
+            if user_ci:
+                print(f"❌ User '{username}' not found, BUT found '{user_ci['username']}'.")
+                confirm_ci = input(f"Did you mean to delete '{user_ci['username']}'? (yes/no): ")
+                if confirm_ci.lower() == 'yes':
+                    user = user_ci
+                    username = user['username'] # Update target username
+                else:
+                    print("❌ Operation cancelled.")
+                    return
+            else:
+                print(f"❌ User '{username}' not found in database '{db.name}'.")
+                return
 
         user_id_obj = user['_id']
         user_id_str = str(user_id_obj)
