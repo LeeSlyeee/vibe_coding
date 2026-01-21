@@ -164,7 +164,16 @@ struct StatsView: View {
                             }
                             .padding(.horizontal, 24)
                             .padding(.top, 10)
+                        }
                             .padding(.bottom, 100)
+                        }
+                        // DEBUG TEXT
+                        if currentTab == "report" {
+                            Text(debugMessage)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding()
+                                .background(Color.yellow.opacity(0.3))
                         }
                     }
                 }
@@ -190,15 +199,29 @@ struct StatsView: View {
             do { self.stats = try JSONDecoder().decode(StatisticsResponse.self, from: d) } catch { print("\(error)") }
         }.resume()
     }
+    @State private var debugMessage: String = "상태 확인 대기중..." // DEBUG
+
     func fetchExistingReports() {
+        self.debugMessage = "분석 결과 조회 시작..."
         print("🔍 Checking existing reports...")
         
         // Short-term report check
         apiCall(path: "/api/analysis/report/status", method: "GET") { data in
-            guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
-            print("🔍 Short report status: \(res.status)")
-            if res.status == "completed", let report = res.report {
-                DispatchQueue.main.async { self.reportContent = report }
+            guard let data = data else {
+                DispatchQueue.main.async { self.debugMessage += "\n단기: 데이터 없음" }
+                return
+            }
+            if let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) {
+                print("🔍 Short report status: \(res.status)")
+                DispatchQueue.main.async {
+                    self.debugMessage += "\n단기: \(res.status)"
+                    if res.status == "completed", let report = res.report {
+                        self.reportContent = report
+                        self.debugMessage += " (로드 완료)"
+                    }
+                }
+            } else {
+                DispatchQueue.main.async { self.debugMessage += "\n단기: 파싱 실패" }
             }
         }
         
