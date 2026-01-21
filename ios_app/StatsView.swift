@@ -164,7 +164,6 @@ struct StatsView: View {
                             }
                             .padding(.horizontal, 24)
                             .padding(.top, 10)
-                        }
                             .padding(.bottom, 100)
                         }
                         // DEBUG TEXT
