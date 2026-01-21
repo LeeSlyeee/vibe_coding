@@ -124,7 +124,6 @@
                         </div>
 
                         <!-- 3. 결과 (리포트) -->
-                        <!-- 3. 결과 (리포트) -->
                         <div v-else class="report-result">
                             <div class="report-meta">
                                 <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
@@ -144,11 +143,15 @@
                                     <div class="report-text" v-html="formattedReportContent"></div>
                                 </div>
 
-                                <!-- 메타 분석 결과 (Long Term) -->
-                                <div v-if="longTermReportContent" class="long-term-box">
-                                    <h4>🧠 과거 기록 통합 분석 (Meta-Analysis)</h4>
-                                    <div class="report-text" v-html="formattedLongTermContent"></div>
-                                </div>
+                            <!-- 메타 분석 결과 (Long Term) -->
+                            <div v-if="longTermReportContent" class="long-term-box">
+                                <h4>🧠 장기 심리 변화 분석 (Meta-Insight)</h4>
+                                <div class="report-text" v-html="formattedLongTermContent"></div>
+                            </div>
+                            
+                            <!-- 기본 리포트 -->
+                            <div class="report-content-box">
+                                <div class="report-text" v-html="formattedReportContent"></div>
                             </div>
                         </div>
                     </div>
@@ -701,32 +704,115 @@ export default {
 }
 /* ... Rest of styles */
 .stats-page {
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background: #f5f5f7;
   padding: 20px;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  overflow-y: auto; /* Allow full page scroll */
 }
 
 .stats-container {
   max-width: 900px;
+  height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
 }
-/* ... */
+
+.stats-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+.header-left h2 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1d1d1f;
+  margin: 0 0 8px 0;
+}
+.subtitle {
+  font-size: 15px;
+  color: #86868b;
+  margin: 0;
+}
+
+.close-btn {
+  background: white;
+  border: 1px solid #d2d2d7;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d1d1f;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.close-btn:hover {
+  background: #f5f5f7;
+  transform: scale(1.02);
+}
+.close-btn .icon { font-size: 12px; }
+
+/* Navigation Tabs */
+.stats-nav {
+  flex-shrink: 0;
+  display: flex;
+  background: white;
+  padding: 6px;
+  border-radius: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.03);
+  gap: 8px;
+}
+.nav-item {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #86868b;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.nav-item:hover {
+  background: rgba(0,0,0,0.02);
+  color: #1d1d1f;
+}
+.nav-item.active {
+  background: #1d1d1f;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.nav-icon { font-size: 18px; }
+
 /* Content Area */
 .stats-content {
+  flex: 1;
+  min-height: 0;
   background: white;
   border-radius: 24px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.04);
   position: relative;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Clips scrollbar at corners */
 }
 
 .content-body {
+  flex: 1;
+  overflow-y: auto;
   padding: 30px;
 }
 
@@ -1019,35 +1105,20 @@ export default {
     background: #f5f5f5;
     color: #333;
 }
-.report-scroll-container {
+.report-content-box {
     flex: 1;
     overflow-y: auto;
     padding: 0 10px;
-    padding-bottom: 20px;
-}
-.report-scroll-container::-webkit-scrollbar {
-    width: 6px;
-}
-.report-scroll-container::-webkit-scrollbar-thumb {
-    background-color: #ddd;
-    border-radius: 3px;
-}
-
-.report-content-box {
-    margin-bottom: 30px; /* Space between reports */
     font-size: 16px;
     line-height: 1.8;
     color: #333;
     white-space: pre-wrap; /* Preserve formatting */
 }
-.report-content-box.basic-report h4 {
-    margin: 0 0 16px 0;
-    color: #4b5563; /* Gray-600 */
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 2px solid #f3f4f6;
-    padding-bottom: 10px;
+.report-content-box::-webkit-scrollbar {
+  width: 6px;
+}
+.report-content-box::-webkit-scrollbar-thumb {
+  background-color: #ddd;
+  border-radius: 3px;
 }
 </style>
