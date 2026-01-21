@@ -124,7 +124,6 @@
                         </div>
 
                         <!-- 3. 결과 (리포트) -->
-                        <!-- 3. 결과 (리포트) -->
                         <div v-else class="report-result">
                             <div class="report-meta">
                                 <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
@@ -151,6 +150,8 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
+                </div>
             </transition>
         </div>
       </div>
