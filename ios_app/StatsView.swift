@@ -227,7 +227,11 @@ struct StatsView: View {
                 }
             } catch {
                 print("🔍 JSON Error: \(error)")
-                DispatchQueue.main.async { self.debugMessage += "\n단기: 파싱 실패" }
+                let rawStr = String(data: data, encoding: .utf8) ?? "decoding_fail"
+                DispatchQueue.main.async { 
+                    self.debugMessage += "\n❌에러: \(error.localizedDescription)"
+                    self.debugMessage += "\n📄데이터: \(rawStr.prefix(50))..." 
+                }
             }
         }
         
