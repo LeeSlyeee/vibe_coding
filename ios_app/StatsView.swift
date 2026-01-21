@@ -166,14 +166,6 @@ struct StatsView: View {
                             .padding(.top, 10)
                             .padding(.bottom, 100)
                         }
-                        // DEBUG TEXT
-                        if currentTab == "report" {
-                            Text(debugMessage)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                                .padding()
-                                .background(Color.yellow.opacity(0.3))
-                        }
                     }
                 }
             }
@@ -198,57 +190,36 @@ struct StatsView: View {
             do { self.stats = try JSONDecoder().decode(StatisticsResponse.self, from: d) } catch { print("\(error)") }
         }.resume()
     }
-    @State private var debugMessage: String = "상태 확인 대기중..." // DEBUG
-
     func fetchExistingReports() {
-        self.debugMessage = "분석 결과 조회 시작..."
-        print("🔍 Checking existing reports...")
-        
         // Short-term report check
-        apiCall(path: "/api/analysis/report/status", method: "GET") { data in
-            guard let data = data else {
-                DispatchQueue.main.async { self.debugMessage += "\n단기: 데이터 없음" }
-                return
-            }
-            // Raw String Logging
-            if let str = String(data: data, encoding: .utf8) {
-                print("🔍 Short Raw: \(str)")
-            }
-            
-            do {
-                let res = try JSONDecoder().decode(ReportStatusResponse.self, from: data)
-                print("🔍 Short report status: \(res.status)")
-                DispatchQueue.main.async {
-                    self.debugMessage += "\n단기: \(res.status)"
-                    if res.status == "completed", let report = res.report {
-                        self.reportContent = report
-                        self.debugMessage += " (로드 완료)"
-                    }
-                }
-            } catch {
-                print("🔍 JSON Error: \(error)")
-                let rawStr = String(data: data, encoding: .utf8) ?? "decoding_fail"
-                DispatchQueue.main.async { 
-                    self.debugMessage += "\n❌에러: \(error.localizedDescription)"
-                    self.debugMessage += "\n📄데이터: \(rawStr.prefix(50))..." 
-                }
+        apiCall(path: "/api/report/status", method: "GET") { data in
+            guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
+            if res.status == "completed", let report = res.report {
+                DispatchQueue.main.async { self.reportContent = report }
             }
         }
         
         // Long-term report check
-        apiCall(path: "/api/analysis/report/longterm/status", method: "GET") { data in
+        apiCall(path: "/api/report/longterm/status", method: "GET") { data in
             guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
-            print("🔍 Long report status: \(res.status)")
             if res.status == "completed", let insight = res.insight {
                 DispatchQueue.main.async { self.longTermContent = insight }
             }
         }
     }
 
-    func startReport() { isGeneratingReport = true; apiCall(path: "/api/analysis/report", method: "POST") { _ in pollStatus(isLongTerm: false) } }
-    func startLongTermReport() { isGeneratingLongTerm = true; apiCall(path: "/api/analysis/report/longterm", method: "POST") { _ in pollStatus(isLongTerm: true) } }
+    func startReport() { 
+        isGeneratingReport = true
+        apiCall(path: "/api/report/start", method: "POST") { _ in pollStatus(isLongTerm: false) } 
+    }
+    
+    func startLongTermReport() { 
+        isGeneratingLongTerm = true
+        apiCall(path: "/api/report/longterm/start", method: "POST") { _ in pollStatus(isLongTerm: true) } 
+    }
+    
     func pollStatus(isLongTerm: Bool) {
-        let endpoint = isLongTerm ? "/api/analysis/report/longterm/status" : "/api/analysis/report/status"
+        let endpoint = isLongTerm ? "/api/report/longterm/status" : "/api/report/status"
         Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { timer in
             apiCall(path: endpoint, method: "GET") { data in
                 guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
