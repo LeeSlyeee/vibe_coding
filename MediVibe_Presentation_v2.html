@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediVibe vs Mindy - 경쟁 우위 분석</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: #F5F1E8;
+            overflow-x: hidden;
+        }
+
+        .presentation {
+            width: 100vw;
+            height: 100vh;
+            scroll-snap-type: y mandatory;
+            overflow-y: scroll;
+            scroll-behavior: smooth;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100vh; /* min-height 보다는 고정 높이가 슬라이드에 적합 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            scroll-snap-align: start;
+            padding: 40px;
+            position: relative;
+            overflow: hidden; /* 다음 슬라이드로 내용이 침범하지 않도록 차단 */
+        }
+
+        .slide-content {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        /* 타이틀 슬라이드 */
+        .title-slide {
+            text-align: center;
+        }
+
+        .icon-heart {
+            width: 80px;
+            height: 80px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
+            font-size: 40px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        h1 {
+            font-size: 3rem;
+            font-weight: 900;
+            color: #2C3E50;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            color: #5D6D7E;
+            margin-bottom: 40px;
+            font-weight: 400;
+        }
+
+        .keywords {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+
+        .keyword {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            color: #34495E;
+        }
+
+        .keyword-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .keyword-icon.purple { background: #9B59B6; }
+        .keyword-icon.teal { background: #16A085; }
+        .keyword-icon.blue { background: #3498DB; }
+
+        .quote {
+            font-size: 1.1rem;
+            color: #7F8C8D;
+            font-style: italic;
+            margin: 30px 0;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: center;
+            gap: 60px;
+            margin-top: 50px;
+            font-size: 0.9rem;
+            color: #95A5A6;
+        }
+
+        /* 섹션 타이틀 */
+        h2 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: #2C3E50;
+            margin-bottom: 15px;
+        }
+
+        .section-subtitle {
+            font-size: 1rem;
+            color: #7F8C8D;
+            margin-bottom: 40px;
+        }
+
+        /* 카드 스타일 */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            border-bottom: 4px solid;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .card.red { border-bottom-color: #E74C3C; }
+        .card.teal { border-bottom-color: #16A085; }
+        .card.blue { border-bottom-color: #3498DB; }
+        .card.purple { border-bottom-color: #9B59B6; }
+        .card.orange { border-bottom-color: #E67E22; }
+        .card.green { border-bottom-color: #27AE60; }
+        .card.pink { border-bottom-color: #EC7063; }
+        .card.yellow { border-bottom-color: #F39C12; }
+
+        .card-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .card-icon.red { background: #FADBD8; }
+        .card-icon.teal { background: #D1F2EB; }
+        .card-icon.blue { background: #D6EAF8; }
+        .card-icon.purple { background: #E8DAEF; }
+        .card-icon.orange { background: #FDEBD0; }
+        .card-icon.green { background: #D5F4E6; }
+        .card-icon.pink { background: #F9EBEA; }
+        .card-icon.yellow { background: #FCF3CF; }
+
+        .card h3 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #2C3E50;
+            margin-bottom: 15px;
+        }
+
+        .card p, .card li {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: #5D6D7E;
+            margin-bottom: 10px;
+        }
+
+        .card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .card li {
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .card li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #16A085;
+            font-weight: bold;
+        }
+
+        .card-label {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .label-purple { background: #E8DAEF; color: #7D3C98; }
+        .label-teal { background: #D1F2EB; color: #117A65; }
+        .label-orange { background: #FDEBD0; color: #CA6F1E; }
+
+        /* 비교 테이블 */
+        .comparison-table {
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            width: 100%;
+        }
+
+        .comparison-header {
+            display: grid;
+            grid-template-columns: 150px 1fr 1fr 1fr;
+            background: #F8F9F9;
+            border-bottom: 2px solid #ECF0F1;
+            font-weight: 700;
+            color: #2C3E50;
+        }
+
+        .header-cell {
+            padding: 15px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .comparison-row {
+            display: grid;
+            grid-template-columns: 150px 1fr 1fr 1fr;
+            border-bottom: 1px solid #ECF0F1;
+            align-items: stretch;
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .cell {
+            padding: 12px 15px;
+            display: flex;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #5D6D7E;
+            line-height: 1.4;
+        }
+
+        .cell-label {
+            font-weight: 700;
+            color: #34495E;
+            background: #FBFCFC;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .cell-mindy {
+            justify-content: center;
+            text-align: center;
+            color: #7F8C8D;
+        }
+
+        .cell-medivibe {
+            justify-content: center;
+            text-align: center;
+            background: #FFF9F2;
+            color: #E67E22;
+            font-weight: 600;
+        }
+
+        .cell-advantage {
+            background: #F4FBF7;
+            color: #16A085;
+            font-weight: 700;
+            gap: 6px;
+        }
+
+        .check-icon {
+            color: #27AE60;
+            font-weight: bold;
+        }
+
+        /* 5가지 이유 카드 */
+        .reason-cards {
+            display: grid;
+            gap: 15px;
+        }
+
+        .reason-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        }
+
+        .reason-number {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 900;
+            flex-shrink: 0;
+        }
+
+        .reason-card:nth-child(1) .reason-number { background: #D6EAF8; color: #2874A6; }
+        .reason-card:nth-child(2) .reason-number { background: #D5F4E6; color: #117A65; }
+        .reason-card:nth-child(3) .reason-number { background: #FDEBD0; color: #CA6F1E; }
+        .reason-card:nth-child(4) .reason-number { background: #E8DAEF; color: #7D3C98; }
+        .reason-card:nth-child(5) .reason-number { background: #FADBD8; color: #C0392B; }
+
+        .reason-content h4 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #2C3E50;
+            margin-bottom: 8px;
+        }
+
+        .reason-content p {
+            font-size: 0.9rem;
+            color: #5D6D7E;
+            margin: 0;
+        }
+
+        /* CTA 섹션 */
+        .cta-section {
+            text-align: center;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            margin-top: 30px;
+        }
+
+        .cta-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .cta-title .highlight {
+            color: #16A085;
+        }
+
+        .cta-description {
+            font-size: 1.1rem;
+            color: #5D6D7E;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .contact-info {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.95rem;
+            color: #34495E;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: #16A085;
+            color: white;
+            padding: 15px 40px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(22,160,133,0.3);
+        }
+
+        .cta-button:hover {
+            background: #138D75;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(22,160,133,0.4);
+        }
+
+        /* 슬라이드 번호 */
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 40px;
+            color: #95A5A6;
+            font-size: 0.9rem;
+        }
+
+        /* 스크롤 인디케이터 */
+        .scroll-indicator {
+            position: fixed;
+            top: 50%;
+            right: 30px;
+            transform: translateY(-50%);
+            z-index: 1000;
+        }
+
+        .scroll-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #BDC3C7;
+            margin: 12px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .scroll-dot.active {
+            background: #16A085;
+            transform: scale(1.4);
+        }
+
+        /* PDF 인쇄 설정 */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 0;
+            }
+
+            html, body {
+                background: #F5F1E8 !important; /* 전체 배경색 강제 */
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                overflow: visible !important;
+            }
+
+            .presentation {
+                background: #F5F1E8 !important;
+                overflow: visible !important;
+                height: auto !important;
+                display: block !important;
+            }
+
+            .slide {
+                background: #F5F1E8 !important;
+                height: 100vh !important;
+                min-height: 100vh !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: hidden !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                border: none !important;
+            }
+
+            .slide-content {
+                transform: scale(0.95);
+                max-width: 90% !important;
+            }
+
+            /* 회색 박스 원인인 그림자 제거 및 테두리로 대체 */
+            .card, 
+            .icon-heart, 
+            .card-icon, 
+            .reason-card, 
+            .comparison-table, 
+            .cta-section {
+                box-shadow: none !important; 
+                border: 1px solid rgba(0,0,0,0.08) !important;
+                background-color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            /* 인쇄 시 제외할 요소 */
+            .scroll-indicator, 
+            .slide-number {
+                display: none !important;
+            }
+
+            /* 모든 요소의 배경색/이미지 출력 강제 */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="presentation">
+        <!-- Slide 1: 타이틀 -->
+        <div class="slide">
+            <div class="slide-content title-slide">
+                <div class="icon-heart">❤️</div>
+                <h1>MediVibe vs Mindy:<br>경쟁 우위 분석</h1>
+                <p class="subtitle">병원 안으로 들어온 안전한 AI, 디지털 멘탈케어의 새로운 표준</p>
+                
+                <div class="keywords">
+                    <div class="keyword">
+                        <div class="keyword-icon purple"></div>
+                        <span>의료 데이터 보안</span>
+                    </div>
+                    <div class="keyword">
+                        <div class="keyword-icon teal"></div>
+                        <span>On-Device AI</span>
+                    </div>
+                    <div class="keyword">
+                        <div class="keyword-icon blue"></div>
+                        <span>의료진 예후 관리</span>
+                    </div>
+                </div>
+
+                <p class="quote">"의료기관이 안심하고, 의료진 보람으로 길어 디지털 멘탈케어"</p>
+
+                <div class="meta-info">
+                    <div><strong>DATE</strong><br>2026. 01. 22</div>
+                    <div><strong>KEYWORDS</strong><br>B2G/B2B, DTx, Edge Computing</div>
+                    <div><strong>TARGET AUDIENCE</strong><br>병원·보건소·정신건강복지센터</div>
+                </div>
+            </div>
+            <div class="slide-number">1 / 13</div>
+        </div>
+
+        <!-- Slide 2: 문제 인식 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>문제 인식 (Problem Recognition)</h2>
+                <p class="section-subtitle">의료 현장의 현실적인 어려움과 기술 도입의 장벽</p>
+
+                <div class="card-grid">
+                    <div class="card red">
+                        <div class="card-icon red">🏥</div>
+                        <h3>1. 의료 현장의 병목 현상</h3>
+                        <ul>
+                            <li>의료진 부족과 사각지대<br>전문의 1인당 담당 환자 수 초과, 내원 간격 사이 모니터링 불가</li>
+                            <li>환자의 기록 저항감<br>자가(Homework)에 대한 낮은 순응도, 기억 왜곡 문제 심각</li>
+                        </ul>
+                        <p style="margin-top: 20px; padding: 15px; background: #FADBD8; border-radius: 10px; font-weight: 600; color: #C0392B;">
+                            💡 진료실 밖은 블랙박스 (Blackbox)
+                        </p>
+                    </div>
+
+                    <div class="card teal">
+                        <div class="card-icon teal">🔐</div>
+                        <h3>2. 데이터 보안 및 규제 장벽</h3>
+                        <ul>
+                            <li>클라우드 사용 제한<br>민감한 의료/심리 데이터를 외부 상용 클라우드(ChatGPT 등)에 업로드 불가</li>
+                            <li>높은 도입 비용<br>자체 서버(On-Premise) 구축 시 막대한 비용 소요, 중소 병원 및 보건소 AI 도입 어려움</li>
+                        </ul>
+                        <p style="margin-top: 20px; padding: 15px; background: #D1F2EB; border-radius: 10px; font-weight: 600; color: #117A65;">
+                            ⚖️ 개인정보보호법 및 의료법 규제
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">2 / 13</div>
+        </div>
+
+        <!-- Slide 3: MediVibe 소개 -->
+        <div class="slide">
+            <div class="slide-content">
+                <div style="text-align: center; margin-bottom: 40px;">
+                    <div class="icon-heart" style="display: inline-flex;">❤️</div>
+                    <h2 style="display: inline; margin-left: 15px;">MediVibe</h2>
+                    <p class="section-subtitle" style="margin-top: 10px;">원내 처방용 디지털 멘탈케어 솔루션</p>
+                </div>
+
+                <p style="text-align: center; font-size: 1.1rem; color: #5D6D7E; margin-bottom: 40px;">
+                    환자의 일상을 <strong>자동으로 기록</strong>하고, 의료진에게 <strong>임상 리포트</strong>를 제공하여<br>
+                    진료의 질을 높이고 예후 관리를 돕습니다.
+                </p>
+
+                <div class="card-grid">
+                    <div class="card orange">
+                        <span class="card-label label-orange">CLIENT APP</span>
+                        <div class="card-icon orange">📱</div>
+                        <h3>환자용 앱</h3>
+                        <ul>
+                            <li><strong>On-Device AI 상담</strong><br>인터넷 연결 없이 안전하게 작동, 24시간 감정 상담 및 증상 기록</li>
+                            <li><strong>Ease of Use (사용 편의성)</strong><br>"오늘 기분 어때요?" AI 선제 질문, 음성 기록(Voice-to-Text)으로 고령층 배려</li>
+                        </ul>
+                        <p style="margin-top: 15px; padding: 12px; background: #FDEBD0; border-radius: 10px; font-size: 0.85rem; color: #CA6F1E;">
+                            🔒 Gemma 2 기반 로컬 분석 엔진 탑재 완료
+                        </p>
+                    </div>
+
+                    <div class="card teal">
+                        <span class="card-label label-teal">PROVIDER WEB</span>
+                        <div class="card-icon teal">💻</div>
+                        <h3>의료진 대시보드</h3>
+                        <ul>
+                            <li><strong>PHR 연동 관리</strong><br>감정 추이, 수면, 스트레스 키워드가 진료 전 의료진 PC로 안전하게 동기화</li>
+                            <li><strong>Red Flag (위험군 알림)</strong><br>자살 사고, 극심한 우울 등 위험 징후 감지 시 의료진/사례 관리자에게 즉시 알림 발송</li>
+                        </ul>
+                        <p style="margin-top: 15px; padding: 12px; background: #D1F2EB; border-radius: 10px; font-size: 0.85rem; color: #117A65;">
+                            📊 진료 효율화 및 예후 관리
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">3 / 13</div>
+        </div>
+
+        <!-- Slide 4: 차별화 기술 -->
+        <div class="slide">
+            <div class="slide-content">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h2>차별화 기술: "병원 안으로 들어온 안전한 AI"</h2>
+                        <p class="section-subtitle">외부 유출 걱정 없는 On-Device AI 기술로 의료 데이터 주권을 지킵니다</p>
+                    </div>
+                    <div style="background: #16A085; color: white; padding: 10px 20px; border-radius: 30px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(22,160,133,0.2);">
+                        ⚡ 현재 구현 완료 (Gemma-2-2b Engine)
+                    </div>
+                </div>
+
+                <div class="card-grid">
+                    <div class="card purple">
+                        <div class="card-icon purple">🗄️</div>
+                        <h3>데이터 주권 (Sovereignty)</h3>
+                        <p>AI 추론은 환자 스마트폰 내부에서,<br>
+                        최종 데이터 저장은 병원 로컬 서버(또는 안전한 의료용 클라우드)에서만 이루어짐.<br>
+                        빅테크 기업 서버로 데이터가 절대 넘어가지 않음.</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #E8DAEF; border-radius: 10px; font-size: 0.85rem; color: #7D3C98;">
+                            🔐 의료법 기반 서버 보안 준수
+                        </p>
+                    </div>
+
+                    <div class="card blue">
+                        <div class="card-icon blue">🛡️</div>
+                        <h3>보안 및 규제 준수</h3>
+                        <p>개인정보보호법 및 의료법을 완벽히 준수,<br>
+                        클라우드 보안 문제 HIPAA 가이드라인 완벽 대응,<br>
+                        민감 정보의 외부 유출 없음.</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #D6EAF8; border-radius: 10px; font-size: 0.85rem; color: #2874A6;">
+                            ✅ Compliance Ready
+                        </p>
+                    </div>
+
+                    <div class="card green">
+                        <div class="card-icon green">⏱️</div>
+                        <h3>비용 최적화 (Edge AI)</h3>
+                        <p>AI 연산 비용을 환자의 디바이스(Edge)에 분산,<br>
+                        병원은 고가의 GPU 서버 없이도 수천 명의 환자를 AI로 케어 가능,<br>
+                        운영 비용 대폭 절감.</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #D5F4E6; border-radius: 10px; font-size: 0.85rem; color: #117A65;">
+                            ✅ Gemma 2 (2b) 로컬 추론 엔진 최적화 완료
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">4 / 13</div>
+        </div>
+
+        <!-- Slide 5: 경쟁사 Mindy -->
+        <div class="slide">
+            <div class="slide-content">
+                <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
+                    <div class="card-icon purple" style="margin: 0; width: 50px; height: 50px; font-size: 24px;">😊</div>
+                    <div>
+                        <h2 style="margin: 0; font-size: 2rem;">경쟁사 분석: Mindy (마인디)</h2>
+                        <p class="section-subtitle" style="margin: 5px 0 0 0;">국내 대표적인 B2C 웰니스 & 멘탈케어 플랫폼</p>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+                    <div class="card purple" style="padding: 20px;">
+                        <div class="card-icon purple" style="width: 45px; height: 45px; font-size: 22px; margin-bottom: 10px;">👥</div>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 10px;">타겟 및 포지션</h3>
+                        <p style="font-size: 0.9rem;">일반 소비자(B2C)를 대상으로 하는 자가 관리 목적의 웰니스 앱</p>
+                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span class="card-label label-purple" style="font-size: 0.7rem;">#웰니스앱</span>
+                            <span class="card-label label-purple" style="font-size: 0.7rem;">#일반대중</span>
+                            <span class="card-label label-purple" style="font-size: 0.7rem;">#B2C</span>
+                        </div>
+                    </div>
+
+                    <div class="card blue" style="padding: 20px;">
+                        <div class="card-icon blue" style="width: 45px; height: 45px; font-size: 22px; margin-bottom: 10px;">☁️</div>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 10px;">기술 및 데이터 저장</h3>
+                        <p style="font-size: 0.9rem;">외부 상용 클라우드 기반 AI 챗봇, 모든 사용자 데이터가 중앙 서버 저장</p>
+                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span class="card-label label-teal" style="font-size: 0.7rem;">#클라우드AI</span>
+                            <span class="card-label label-teal" style="font-size: 0.7rem;">#중앙서버</span>
+                        </div>
+                    </div>
+
+                    <div class="card yellow" style="padding: 20px;">
+                        <div class="card-icon yellow" style="width: 45px; height: 45px; font-size: 22px; margin-bottom: 10px;">💳</div>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 10px;">수익 모델</h3>
+                        <p style="font-size: 0.9rem;">개인 프리미엄 구독 (월 9,900원~), 광고 및 콘텐츠 판매 매출</p>
+                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span class="card-label label-orange" style="font-size: 0.7rem;">#프리미엄구독</span>
+                            <span class="card-label label-orange" style="font-size: 0.7rem;">#B2C모델</span>
+                        </div>
+                    </div>
+
+                    <div class="card pink" style="padding: 20px;">
+                        <div class="card-icon pink" style="width: 45px; height: 45px; font-size: 22px; margin-bottom: 10px;">👨‍⚕️</div>
+                        <h3 style="font-size: 1.2rem; margin-bottom: 10px;">의료 연계 한계</h3>
+                        <p style="font-size: 0.9rem;">의료진 대시보드 부재로 진료 활용이 매우 제한적, 위험 징후 알림 없음</p>
+                        <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                            <span class="card-label label-orange" style="font-size: 0.7rem;">#의료연계X</span>
+                            <span class="card-label label-orange" style="font-size: 0.7rem;">#단순기록용</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">5 / 13</div>
+        </div>
+
+        <!-- Slide 6: 비교표 -->
+        <div class="slide">
+            <div class="slide-content">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 10px;">
+                        <span style="font-size: 2rem;">⚖️</span>
+                        <h2 style="margin: 0; font-size: 2.2rem;">비교 분석: Mindy <span style="font-size: 0.8rem; background: #BDC3C7; color: white; padding: 2px 6px; border-radius: 50%; vertical-align: middle;">VS</span> MediVibe</h2>
+                    </div>
+                    <p class="section-subtitle">일반 웰니스 앱과 차별화된 의료 전문 솔루션으로서의 확실한 경쟁 우위</p>
+                </div>
+
+                <div class="comparison-table">
+                    <div class="comparison-header">
+                        <div class="header-cell">비교 항목</div>
+                        <div class="header-cell">☁️ Mindy (마인디)</div>
+                        <div class="header-cell">🧡 MediVibe (메디바이브)</div>
+                        <div class="header-cell">🏆 핵심 우위</div>
+                    </div>
+                    
+                    <div class="comparison-row">
+                        <div class="cell cell-label">타겟 시장</div>
+                        <div class="cell cell-mindy">B2C (일반 대중)</div>
+                        <div class="cell cell-medivibe">B2B / B2G (병원, 보건소)</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 의료기관 특화</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">데이터 보안</div>
+                        <div class="cell cell-mindy">클라우드 중앙 서버</div>
+                        <div class="cell cell-medivibe">On-Device AI + 병원 로컬</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 데이터 주권 보장</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">AI 처리</div>
+                        <div class="cell cell-mindy">서버 기반 (인터넷 필수)</div>
+                        <div class="cell cell-medivibe">디바이스 내 (오프라인 가능)</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 네트워크 독립성</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">의료진 연계</div>
+                        <div class="cell cell-mindy">없음 (단순 개인 기록)</div>
+                        <div class="cell cell-medivibe">의료진 대시보드 + 위험 알림</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 진료 효율 극대화</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">규제 대응</div>
+                        <div class="cell cell-mindy">웰니스 앱 (비의료기기)</div>
+                        <div class="cell cell-medivibe">DTx 인허가 추진 (의료기기)</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 건강보험 수가 진입</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">비용 구조</div>
+                        <div class="cell cell-mindy">개인 구독료 (이탈률 높음)</div>
+                        <div class="cell cell-medivibe">기관 라이선스 + 공공 조달</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 안정적 수익 확보</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">프라이버시</div>
+                        <div class="cell cell-mindy">약관 동의 기반 수집</div>
+                        <div class="cell cell-medivibe">의료진만 접근 (환자 동의 必)</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 환자 신뢰도 ↑</div>
+                    </div>
+
+                    <div class="comparison-row">
+                        <div class="cell cell-label">고령층 접근</div>
+                        <div class="cell cell-mindy">높은 스마트폰 숙련도 필요</div>
+                        <div class="cell cell-medivibe">음성 인식 + AI 선제 질문</div>
+                        <div class="cell cell-advantage"><span class="check-icon">✓</span> 디지털 약자 포용</div>
+                    </div>
+                </div>
+
+                <p style="margin-top: 20px; text-align: right; font-size: 0.8rem; color: #7F8C8D; font-style: italic;">
+                    * MediVibe는 의료법 및 개인정보보호법을 준수하여 설계되었습니다.
+                </p>
+            </div>
+            <div class="slide-number">6 / 13</div>
+        </div>
+
+        <!-- Slide 7: 5가지 이유 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>MediVibe가 Mindy를 압도하는 5가지 이유</h2>
+                <p class="section-subtitle">단순한 경쟁이 아닌, 의료 시장 디지털 전환을 위한 솔루션의 가치</p>
+
+                <div class="reason-cards">
+                    <div class="reason-card">
+                        <div class="reason-number">1</div>
+                        <div class="reason-content">
+                            <h4>의료 데이터 보안</h4>
+                            <p>On-Device AI 기술로 개인정보보호법을 완벽히 준수하여 의료기관이 안심하고 도입 가능</p>
+                        </div>
+                    </div>
+
+                    <div class="reason-card">
+                        <div class="reason-number">2</div>
+                        <div class="reason-content">
+                            <h4>의료진 워크플로우 통합</h4>
+                            <p>의사 대시보드 + 위험군 자동 알림으로 진료 효율을 극대화하고 환자 안전 확보</p>
+                        </div>
+                    </div>
+
+                    <div class="reason-card">
+                        <div class="reason-number">3</div>
+                        <div class="reason-content">
+                            <h4>안정적 수익 구조</h4>
+                            <p>B2C 구독 대신 B2B/B2G 장기 계약으로 낮은 이탈률과 안정적 매출 확보</p>
+                        </div>
+                    </div>
+
+                    <div class="reason-card">
+                        <div class="reason-number">4</div>
+                        <div class="reason-content">
+                            <h4>블루오션 시장 선점</h4>
+                            <p>의료기관용 On-Device AI 솔루션은 국내 최초, 경쟁자 전무로 선점 효과 극대화</p>
+                        </div>
+                    </div>
+
+                    <div class="reason-card">
+                        <div class="reason-number">5</div>
+                        <div class="reason-content">
+                            <h4>기술적 혁신성</h4>
+                            <p>Edge AI + 음성 우선 UX로 디지털 약자(고령층)까지 포용하는 포괄적 솔루션</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">7 / 13</div>
+        </div>
+
+        <!-- Slide 8: 비즈니스 모델 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>비즈니스 모델 (Business Model)</h2>
+                <p class="section-subtitle">안정적인 수익 창출을 위한 민간·공공 투트랙(Two-Track) 전략</p>
+
+                <div class="card-grid">
+                    <div class="card teal">
+                        <div class="card-icon teal">💻</div>
+                        <h3>SaaS 구독 모델</h3>
+                        <span class="card-label label-teal">민간 병원 및 심리상담센터</span>
+                        <ul style="margin-top: 15px;">
+                            <li><strong>타겟 대상</strong><br>로컬 정신건강의학과, 심리상담센터</li>
+                            <li><strong>수익 구조 (Recurring)</strong><br>의사 1인당 월 구독료 (Seat-based)<br>또는 환자 계정당 라이선스 비</li>
+                            <li><strong>기대 효과</strong><br>초기 도입 병원 확보로 레퍼런스 구축,<br>지속적인 구독 매출 창출</li>
+                        </ul>
+                    </div>
+
+                    <div class="card orange">
+                        <div class="card-icon orange">🏛️</div>
+                        <h3>공공 조달 모델</h3>
+                        <span class="card-label label-orange">보건소 & 정신건강복지센터</span>
+                        <ul style="margin-top: 15px;">
+                            <li><strong>타겟 대상</strong><br>전국 보건소, 정신건강복지센터,<br>치매안심센터, 지자체 복지과</li>
+                            <li><strong>수익 구조 (Contract)</strong><br>지자체 '고독사 예방' 또는 '청년 마음건강' 예산 활용,<br>사업 일괄 납품 및 유지보수 계약</li>
+                            <li><strong>기대 효과</strong><br>대규모 안정 매출 확보 예상,<br>사회적 가치 창출 및 정부 지원 수혜 가능</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">8 / 13</div>
+        </div>
+
+        <!-- Slide 9: 시장 진입 전략 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>시장 진입 전략 로드맵 (Go-to-Market)</h2>
+                <p class="section-subtitle">레퍼런스 확보에서 전국 확산까지, 단계별 체계적인 성장 전략</p>
+
+                <div class="card-grid">
+                    <div class="card teal">
+                        <span class="card-label label-teal">STEP 01</span>
+                        <div class="card-icon teal">🧪</div>
+                        <h3>레퍼런스 확보 (Pilot)</h3>
+                        <p><strong>지역 거점 병원 또는 대학병원<br>정신건강의학과와 MOU 체결</strong></p>
+                        <p style="margin-top: 15px;">임상 시범 적용(Pilot Test) 통해<br>정량적 효용 데이터 확보<br>(환자 순응도 300% ↑, 진료 시간 50% ↓)</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #D1F2EB; border-radius: 10px; font-size: 0.85rem; color: #117A65;">
+                            <strong>TARGET KPI</strong><br>순응도 300% 증가, 진료 시간 50% 단축
+                        </p>
+                    </div>
+
+                    <div class="card purple">
+                        <span class="card-label label-purple">STEP 02</span>
+                        <div class="card-icon purple">⚙️</div>
+                        <h3>수가 적용 및 인증</h3>
+                        <p><strong>디지털 치료제(DTx) 인허가 추진</strong></p>
+                        <p style="margin-top: 15px;">건강보험 수가 진입 시도,<br>단순 앱이 아닌 '처방 가능한 의료기기'로 포지셔닝</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #E8DAEF; border-radius: 10px; font-size: 0.85rem; color: #7D3C98;">
+                            <strong>KEY MILESTONE</strong><br>DTx 인허가 및 건강보험 수가 획득
+                        </p>
+                    </div>
+
+                    <div class="card orange">
+                        <span class="card-label label-orange">STEP 03</span>
+                        <div class="card-icon orange">🚀</div>
+                        <h3>전국 확산 (Scale-up)</h3>
+                        <p><strong>성공 사례 바탕으로 전국 보건소,<br>정신건강복지센터 공공 조달</strong></p>
+                        <p style="margin-top: 15px;">Mindy 등 B2C 서비스와 차별화된<br>의료 전문 솔루션으로 시장 독점,<br>전국 지자체 연계 확산</p>
+                        <p style="margin-top: 15px; padding: 12px; background: #FDEBD0; border-radius: 10px; font-size: 0.85rem; color: #CA6F1E;">
+                            <strong>TARGET GOAL</strong><br>전국 50개 이상 보건소 도입 목표
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">9 / 13</div>
+        </div>
+
+        <!-- Slide 10: 기대 효과 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>기대 효과 (Expected Outcome)</h2>
+                <p class="section-subtitle">의료진과 환자, 그리고 사회 전체에 전달하는 긍정적 변화</p>
+
+                <div class="card-grid">
+                    <div class="card blue">
+                        <div class="card-icon blue">👨‍⚕️</div>
+                        <h3>병원 / 보건소</h3>
+                        <span class="card-label label-teal">PROVIDER</span>
+                        <ul style="margin-top: 15px;">
+                            <li><strong>진료 효율화</strong><br>기억에 의존하는 진료 대신, 데이터 기반 정확하고 빠른 진료 가능</li>
+                            <li><strong>수가 창출</strong><br>디지털 치료제 처방료 또는 환자 관리료 등 새로운 수익 파이프라인 창출 가능성</li>
+                            <li><strong>위험 관리</strong><br>자살 고위험군 조기 발견으로 의료 사고 예방 및 법적 리스크 감소</li>
+                        </ul>
+                    </div>
+
+                    <div class="card pink">
+                        <div class="card-icon pink">💖</div>
+                        <h3>환자</h3>
+                        <span class="card-label label-purple">PATIENT</span>
+                        <ul style="margin-top: 15px;">
+                            <li><strong>치료 연속성</strong><br>병원 밖에서도 AI가 24시간 케어한다는 심리적 안정감 제공</li>
+                            <li><strong>프라이버시</strong><br>"내 기록은 의사만 본다"는 확실한 믿음으로 솔직한 감정 표출 유도</li>
+                            <li><strong>접근성 향상</strong><br>일반 앱 대비 의료진 처방으로 받는 '치료 도구'라는 신뢰감</li>
+                        </ul>
+                    </div>
+
+                    <div class="card green">
+                        <div class="card-icon green">🏡</div>
+                        <h3>사회적 가치</h3>
+                        <span class="card-label label-green">SOCIAL IMPACT</span>
+                        <ul style="margin-top: 15px;">
+                            <li><strong>의료 격차 해소</strong><br>정신과 전문의 부족 지역(지방, 섬)에서도 AI 기반 케어 제공</li>
+                            <li><strong>고독사 예방</strong><br>독거노인, 1인 가구 대상 정기 모니터링으로 사회적 고립 조기 발견</li>
+                            <li><strong>국가 의료비 절감</strong><br>정신질환 악화로 인한 응급실 방문, 장기 입원 감소</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">10 / 13</div>
+        </div>
+
+        <!-- Slide 11: 핵심 메시지 -->
+        <div class="slide">
+            <div class="slide-content">
+                <div style="text-align: center; margin-bottom: 50px;">
+                    <h2 style="font-size: 2.5rem; margin-bottom: 30px;">MediVibe는</h2>
+                    <h1 style="font-size: 3.5rem; line-height: 1.4;">
+                        의료기관이 <span style="color: #E74C3C;">안심</span>하고 도입할 수 있는<br>
+                        유일한 <span style="color: #F39C12;">멘탈케어 AI</span>입니다.
+                    </h1>
+                </div>
+
+                <div class="card-grid" style="grid-template-columns: repeat(5, 1fr); gap: 20px;">
+                    <div style="text-align: center;">
+                        <div class="card-icon blue" style="margin: 0 auto 15px;">🛡️</div>
+                        <h4 style="font-size: 1.1rem; font-weight: 700; color: #2C3E50; margin-bottom: 8px;">보안 준수</h4>
+                        <p style="font-size: 0.85rem; color: #7F8C8D;">On-Device AI</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div class="card-icon purple" style="margin: 0 auto 15px;">🤝</div>
+                        <h4 style="font-size: 1.1rem; font-weight: 700; color: #2C3E50; margin-bottom: 8px;">워크플로우 통합</h4>
+                        <p style="font-size: 0.85rem; color: #7F8C8D;">의료진 & 환자</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div class="card-icon orange" style="margin: 0 auto 15px;">💰</div>
+                        <h4 style="font-size: 1.1rem; font-weight: 700; color: #2C3E50; margin-bottom: 8px;">안정 수익</h4>
+                        <p style="font-size: 0.85rem; color: #7F8C8D;">B2B/B2G 모델</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div class="card-icon teal" style="margin: 0 auto 15px;">🎯</div>
+                        <h4 style="font-size: 1.1rem; font-weight: 700; color: #2C3E50; margin-bottom: 8px;">시장 선점</h4>
+                        <p style="font-size: 0.85rem; color: #7F8C8D;">블루오션 전략</p>
+                    </div>
+                    <div style="text-align: center;">
+                        <div class="card-icon green" style="margin: 0 auto 15px;">🌐</div>
+                        <h4 style="font-size: 1.1rem; font-weight: 700; color: #2C3E50; margin-bottom: 8px;">Edge 혁신</h4>
+                        <p style="font-size: 0.85rem; color: #7F8C8D;">기술 기반성</p>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">11 / 13</div>
+        </div>
+
+        <!-- Slide 12: 팀 역량 -->
+        <div class="slide">
+            <div class="slide-content">
+                <h2>팀 역량 (Team Capabilities)</h2>
+                <p class="section-subtitle">의료 전문성과 기술력을 겸비한 최적의 실행 팀</p>
+
+                <div class="card-grid">
+                    <div class="card teal">
+                        <div class="card-icon teal">💻</div>
+                        <h3>개발팀</h3>
+                        <span class="card-label label-teal">R&D / ENGINEERING</span>
+                        <ul style="margin-top: 15px;">
+                            <li>의료 데이터 표준(HL7/FHIR) 및 보안 통신 구현 완료</li>
+                            <li><strong>Gemma 2 (2b) 로컬 엔진</strong> 탑재 및 최적화 기술 보유 (On-Device 추론 성공)</li>
+                        </ul>
+                    </div>
+
+                    <div class="card blue">
+                        <div class="card-icon blue">👨‍⚕️</div>
+                        <h3>자문단</h3>
+                        <span class="card-label label-purple">MEDICAL / CLINICAL</span>
+                        <ul style="margin-top: 15px;">
+                            <li>현직 정신건강의학과 전문의 및<br>보건소 실무자로 구성된 자문단 그룹</li>
+                            <li>현장의 목소리(Pain Point)를<br>즉각 반영하는 애자일 로드맵 운영</li>
+                        </ul>
+                    </div>
+
+                    <div class="card purple">
+                        <div class="card-icon purple">💼</div>
+                        <h3>시장 전략</h3>
+                        <span class="card-label label-orange">STRATEGY / SALES</span>
+                        <ul style="margin-top: 15px;">
+                            <li>Mindy, 토닥토닥 등 B2C 웰니스<br>경쟁사 시장 분석 완료</li>
+                            <li>병원 및 공공기관 영업망<br>Go-to-Market 전략 수립 완료</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">12 / 13</div>
+        </div>
+
+        <!-- Slide 13: 결론 및 CTA -->
+        <div class="slide">
+            <div class="slide-content">
+                <div class="cta-section">
+                    <h2 class="cta-title">
+                        Mindy와 경쟁하지 않고,<br>
+                        의료 시장이라는 <span class="highlight">블루오션을 선점</span>합니다.
+                    </h2>
+                    
+                    <p class="cta-description">
+                        보안, 임상 통합, 수가 적용까지.<br>
+                        MediVibe는 의료기관을 위한 가장 안전하고 확실한 선택입니다.
+                    </p>
+
+                    <div class="contact-info">
+                        <div class="contact-item">
+                            <span>📧</span>
+                            <span>slyeee@naver.com</span>
+                        </div>
+                        <div class="contact-item">
+                            <span>📱</span>
+                            <span>010-7795-1023</span>
+                        </div>
+                    </div>
+
+                    <a href="https://217.142.253.35.nip.io/calendar" class="cta-button">
+                        💡 데모 체험하기
+                    </a>
+                </div>
+            </div>
+            <div class="slide-number">13 / 13</div>
+        </div>
+    </div>
+
+    <!-- 스크롤 인디케이터 -->
+    <div class="scroll-indicator">
+        <div class="scroll-dot active" onclick="scrollToSlide(0)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(1)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(2)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(3)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(4)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(5)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(6)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(7)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(8)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(9)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(10)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(11)"></div>
+        <div class="scroll-dot" onclick="scrollToSlide(12)"></div>
+    </div>
+
+    <script>
+        const presentation = document.querySelector('.presentation');
+        const dots = document.querySelectorAll('.scroll-dot');
+        const slides = document.querySelectorAll('.slide');
+
+        presentation.addEventListener('scroll', () => {
+            const scrollPosition = presentation.scrollTop;
+            const slideHeight = window.innerHeight;
+            const currentSlide = Math.round(scrollPosition / slideHeight);
+
+            dots.forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentSlide);
+            });
+        });
+
+        function scrollToSlide(index) {
+            presentation.scrollTo({
+                top: window.innerHeight * index,
+                behavior: 'smooth'
+            });
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const currentScroll = presentation.scrollTop;
+            const slideHeight = window.innerHeight;
+            const currentSlide = Math.round(currentScroll / slideHeight);
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                if (currentSlide < slides.length - 1) scrollToSlide(currentSlide + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (currentSlide > 0) scrollToSlide(currentSlide - 1);
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                scrollToSlide(0);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                scrollToSlide(slides.length - 1);
+            }
+        });
+    </script>
+</body>
+</html>
