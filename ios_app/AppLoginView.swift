@@ -23,7 +23,7 @@ struct AppLoginView: View {
                 VStack(spacing: 8) {
                     Text("🌙")
                         .font(.system(size: 80))
-                    Text("Mood Diary")
+                    Text("마음 온(Maum-On)")
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)

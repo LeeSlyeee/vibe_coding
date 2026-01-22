@@ -17,6 +17,7 @@ struct MoodCalendarView: View {
     @State private var currentDate = Date()
     @State private var diaries: [String: Diary] = [:] // "YYYY-MM-DD" : Diary Object
     @State private var isLoading = false
+    @State private var slideDirection: Edge = .trailing // Animation direction
     
     // Navigation State
     @State private var selectedDiary: Diary?
@@ -119,6 +120,12 @@ struct MoodCalendarView: View {
                         }
                     }
                     .padding()
+                    .id(currentDate) // Force view refresh for transition
+                    .transition(.asymmetric(
+                        insertion: .move(edge: slideDirection),
+                        removal: .move(edge: slideDirection == .trailing ? .leading : .trailing)
+                    ))
+                    .animation(.easeInOut(duration: 0.3), value: currentDate) // Apply animation
                 }
                 Spacer()
                 
@@ -142,6 +149,19 @@ struct MoodCalendarView: View {
                     onSave: fetchDiaries
                  )
             }
+            // ✅ 제스처 추가: 좌우 스와이프로 월 이동
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        if value.translation.width < -50 {
+                            // 왼쪽으로 스와이프 -> 다음 달
+                            changeMonth(by: 1)
+                        } else if value.translation.width > 50 {
+                            // 오른쪽으로 스와이프 -> 이전 달
+                            changeMonth(by: -1)
+                        }
+                    }
+            )
         }
     }
     
@@ -212,7 +232,12 @@ struct MoodCalendarView: View {
     
     // Helpers
     func changeMonth(by value: Int) {
-        if let newDate = Calendar.current.date(byAdding: .month, value: value, to: currentDate) { currentDate = newDate }
+        slideDirection = value > 0 ? .trailing : .leading
+        if let newDate = Calendar.current.date(byAdding: .month, value: value, to: currentDate) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                currentDate = newDate
+            }
+        }
     }
     func calendarDays() -> [CalendarDay] {
         let cal = Calendar.current

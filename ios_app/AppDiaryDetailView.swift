@@ -143,7 +143,7 @@ struct AppDiaryDetailView: View {
         
         if let date = iso.date(from: dateStr) {
             let f = DateFormatter()
-            f.dateFormat = "yy-MM-dd"
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
             return f.string(from: date)
         }
         
@@ -151,7 +151,7 @@ struct AppDiaryDetailView: View {
         iso.formatOptions = [.withInternetDateTime]
         if let date = iso.date(from: dateStr) {
             let f = DateFormatter()
-            f.dateFormat = "yy-MM-dd"
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
             return f.string(from: date)
         }
 
@@ -160,10 +160,35 @@ struct AppDiaryDetailView: View {
         parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         if let date = parser.date(from: dateStr) {
             let f = DateFormatter()
-            f.dateFormat = "yy-MM-dd"
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
+            return f.string(from: date)
+        }
+
+        // 4. Fallback: "yyyy-MM-dd HH:mm:ss" (no T separator)
+        parser.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        if let date = parser.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
             return f.string(from: date)
         }
         
+        // 5. Explicit Fallback for "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" (Microseconds)
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+        if let date = parser.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
+            return f.string(from: date)
+        }
+        
+        // 6. Explicit Fallback for "yyyy-MM-dd'T'HH:mm:ss.SSS" (Milliseconds)
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        if let date = parser.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
+            return f.string(from: date)
+        }
+        
+        // All strict parsing failed
         return dateStr
     }
     

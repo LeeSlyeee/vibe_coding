@@ -65,7 +65,7 @@ struct AppGuideView: View {
                             Text("📖 사용 설명서")
                                 .font(.system(size: 28, weight: .bold))
                                 .foregroundColor(Color(hex: "1D1D1F"))
-                            Text("MOOD DIARY를 100% 활용하는 방법을 알려드려요.")
+                            Text("마음 온(Maum-on)을 100% 활용하는 방법을 알려드려요.")
                                 .font(.system(size: 15))
                                 .foregroundColor(Color(hex: "86868B"))
                         }
@@ -103,6 +103,7 @@ struct AppGuideView: View {
                                 GuideSmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
                                 GuideSmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
                             }
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                         
                         Spacer(minLength: 50)
@@ -228,7 +229,7 @@ struct GuideSmallFeatureCard: View {
             Spacer()
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: 110)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(hex: "FBFBFD"))
         .cornerRadius(16)
         .overlay(
