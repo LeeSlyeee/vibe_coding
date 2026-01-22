@@ -21,10 +21,11 @@ struct AppDiaryWriteView: View {
     @State private var isLoadingInsight = true
     
     // Form State
-    @State private var q1: String = ""
-    @State private var q2: String = ""
-    @State private var q3: String = ""
-    @State private var q4: String = ""
+    @State private var q1: String = "" // Event
+    @State private var q2: String = "" // Emotion
+    @State private var q3: String = "" // Meaning
+    @State private var q4: String = "" // Self talk
+    @State private var qs: String = "" // Sleep
     @State private var isSaving = false
     
     // Weather State
@@ -50,8 +51,8 @@ struct AppDiaryWriteView: View {
                             Button(action: saveDiary) {
                                 if isSaving { ProgressView() } else { Text("저장").fontWeight(.bold) }
                             }
-                            .disabled(q1.isEmpty || q2.isEmpty || isSaving)
-                            .foregroundColor((q1.isEmpty || q2.isEmpty) ? .gray : .blue)
+                            .disabled(q1.isEmpty || q2.isEmpty || qs.isEmpty || isSaving)
+                            .foregroundColor((q1.isEmpty || q2.isEmpty || qs.isEmpty) ? .gray : .blue)
                         }
                         .padding()
                         .background(Color.white)
@@ -100,6 +101,12 @@ struct AppDiaryWriteView: View {
                                 .padding(.top)
                                 
                                 // 질문 카드들
+                                questionCard(
+                                    title: "잠은 잘 주무셨나요?",
+                                    binding: $qs,
+                                    fieldId: 0
+                                )
+                                
                                 questionCard(
                                     title: "오늘 무슨 일이 있었나요?",
                                     binding: $q1,
@@ -212,6 +219,7 @@ struct AppDiaryWriteView: View {
             let combined = (baseTextBeforeRecording.isEmpty ? "" : baseTextBeforeRecording + " ") + newText
             
             switch field {
+            case 0: qs = combined
             case 1: q1 = combined
             case 2: q2 = combined
             case 3: q3 = combined
@@ -378,6 +386,7 @@ struct AppDiaryWriteView: View {
             "created_at": isoDate,
             "mood_level": mood,
             "event": q1,
+            "sleep_desc": qs,
             "emotion_desc": q2,
             "emotion_meaning": q3,
             "self_talk": q4,

@@ -1,677 +1,896 @@
 <template>
   <div class="diary-panel" ref="panelRef">
-      <!-- 1. 헤더 영역 -->
-      <div class="modal-header">
-        <h3 class="modal-title">
-          {{ isViewMode ? '기록 내용' : `${formattedDate}` }}
-          <!-- 날씨 뱃지 -->
-          <div v-if="weatherInfo" class="weather-badge-premium">
-              <span class="weather-icon">{{ getWeatherIcon(weatherInfo.desc) }}</span>
-              <span class="weather-text">{{ weatherInfo.desc }} {{ weatherInfo.temp }}°C</span>
-          </div>
-          <!-- 로딩 인디케이터 (빨간색) -->
-          <span v-else class="weather-loading">
-              <span class="pulse"></span> 날씨 확인 중...
-          </span>
-        </h3>
-        <div v-if="isViewMode" class="diary-timestamp">
-          {{ formattedDateTime }}
+    <!-- 1. 헤더 영역 -->
+    <div class="modal-header">
+      <h3 class="modal-title">
+        {{ isViewMode ? "기록 내용" : `${formattedDate}` }}
+        <!-- 날씨 뱃지 -->
+        <div v-if="weatherInfo" class="weather-badge-premium">
+          <span class="weather-icon">{{ getWeatherIcon(weatherInfo.desc) }}</span>
+          <span class="weather-text">{{ weatherInfo.desc }} {{ weatherInfo.temp }}°C</span>
+        </div>
+        <!-- 로딩 인디케이터 (빨간색) -->
+        <span v-else class="weather-loading"> <span class="pulse"></span> 날씨 확인 중... </span>
+      </h3>
+      <div v-if="isViewMode" class="diary-timestamp">
+        {{ formattedDateTime }}
+      </div>
+    </div>
+
+    <!-- 2. 초기 화면 (작성 전) -->
+    <div v-if="!isViewMode && !showForm" class="diary-empty">
+      <div class="empty-message">
+        <!-- 통합 인사이트 말풍선 (제미나이) -->
+        <div v-if="mindsetInsight" class="insight-bubble insight-bubble-purple fade-in">
+          <span class="insight-icon">🧘‍♀️</span>
+          <span style="color: #4a148c">{{ mindsetInsight }}</span>
+        </div>
+        <div v-else-if="isLoadingInsight" class="mindset-loading" style="margin-top: 12px">
+          <span class="pulse-mini"></span> 마음의 흐름을 읽고 있어요... 분석이 완료되면 일기를
+          작성할 수 있어요
+        </div>
+
+        <p v-if="!mindsetInsight && !isLoadingInsight" class="empty-hint">
+          작은 기록이 모여 당신의 마음 지도를 만듭니다.
+        </p>
+
+        <!-- 버튼을 인사이트 아래로 이동 및 조건부 표시 -->
+        <button
+          v-if="mindsetInsight"
+          @click="startWriting"
+          class="btn btn-primary btn-large shadow-hover fade-in"
+          type="button"
+        >
+          오늘의 감정 기록하기
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 작성 폼 -->
+    <div v-else-if="!isViewMode && showForm" class="diary-form">
+      <!-- Voice Loading Indicator (Global) -->
+      <div v-if="isTranscribing" class="voice-loading-overlay">
+        <div class="voice-loader-box">
+          <span class="pulse-mini"></span>
+          <span>AI가 받아적고 있어요...</span>
         </div>
       </div>
 
-      <!-- 2. 초기 화면 (작성 전) -->
-      <div v-if="!isViewMode && !showForm" class="diary-empty">
-        <div class="empty-message">
-          <!-- 통합 인사이트 말풍선 (제미나이) -->
-          <div v-if="mindsetInsight" class="insight-bubble insight-bubble-purple fade-in">
-             <span class="insight-icon">🧘‍♀️</span>
-             <span style="color: #4A148C;">{{ mindsetInsight }}</span>
-          </div>
-          <div v-else-if="isLoadingInsight" class="mindset-loading" style="margin-top: 12px;">
-                <span class="pulse-mini"></span> 마음의 흐름을 읽고 있어요... 분석이 완료되면 일기를 작성할 수 있어요
-          </div>
-          
-          <p v-if="!mindsetInsight && !isLoadingInsight" class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
+      <EmojiSelector v-model="formData.mood" />
 
-          <!-- 버튼을 인사이트 아래로 이동 및 조건부 표시 -->
-          <button v-if="mindsetInsight" @click="startWriting" class="btn btn-primary btn-large shadow-hover fade-in" type="button">
-            오늘의 감정 기록하기
-          </button>
-        </div>
+      <QuestionAccordion
+        question="잠은 잘 주무셨나요?"
+        v-model="formData.question_sleep"
+        :required="true"
+        :placeholder="'수면 시간이나 수면의 질에 대해 적어주세요...'"
+        :recording="activeField === 'question_sleep'"
+        @record="toggleRecording('question_sleep')"
+      />
+
+      <QuestionAccordion
+        question="오늘 무슨일이 있었나요?"
+        v-model="formData.question1"
+        :required="true"
+        :default-open="true"
+        placeholder="오늘 있었던 일을 적어주세요..."
+        :recording="activeField === 'question1'"
+        @record="toggleRecording('question1')"
+      />
+
+      <QuestionAccordion
+        question="어떤 감정이 들었나요?"
+        v-model="formData.question2"
+        :required="true"
+        placeholder="무슨 일이 있었는지 자세히 적어주세요..."
+        :recording="activeField === 'question2'"
+        @record="toggleRecording('question2')"
+      />
+
+      <QuestionAccordion
+        question="마지막으로 더 깊게 자신의 감정을 써보세요."
+        v-model="formData.question3"
+        placeholder="어떤 감정을 느꼈는지 적어주세요..."
+        :recording="activeField === 'question3'"
+        @record="toggleRecording('question3')"
+      />
+
+      <QuestionAccordion
+        question="나에게 따듯한 위로를 보내세요."
+        v-model="formData.question4"
+        placeholder="앞으로 어떻게 하면 좋을지 생각해보세요..."
+        :recording="activeField === 'question4'"
+        @record="toggleRecording('question4')"
+      />
+
+      <!-- 작성 모드 하단 버튼 (인라인으로 변경) -->
+      <div class="modal-actions-inline">
+        <button @click="cancelWriting" class="btn btn-secondary" type="button">취소</button>
+        <button
+          @click="handleSave"
+          class="btn btn-primary"
+          type="button"
+          :disabled="!isValid || saving"
+        >
+          {{ saving ? "저장 중..." : "오늘 기록 완료" }}
+        </button>
       </div>
+    </div>
 
-      <!-- 3. 작성 폼 -->
-      <div v-else-if="!isViewMode && showForm" class="diary-form">
-        
+    <!-- 4. 상세보기 모드 (결과 화면) -->
+    <div v-else class="diary-view">
+      <div class="view-content-wrapper">
+        <!-- 감성적인 감정 카드 -->
+        <div class="view-emoji-premium" :class="getMoodColorClass(currentDiary.mood_level)">
+          <div class="emoji-container">
+            <img
+              :src="getMoodEmoji(currentDiary.mood_level)"
+              class="emoji-large anim-float"
+              alt="mood"
+            />
+            <!-- 감정 이름 위로 배치 -->
+            <span class="emoji-label primary-label">{{
+              getMoodName(currentDiary.mood_level)
+            }}</span>
 
+            <!-- AI 분석 결과 아래로 배치 -->
+            <span
+              v-if="
+                !isProcessing &&
+                currentDiary.ai_prediction &&
+                !currentDiary.ai_prediction.includes('분석 중')
+              "
+              class="ai-prediction-badge-premium"
+            >
+              {{ currentDiary.ai_prediction }}
+            </span>
+          </div>
 
-        <!-- Voice Loading Indicator (Global) -->
-        <div v-if="isTranscribing" class="voice-loading-overlay">
-            <div class="voice-loader-box">
-                <span class="pulse-mini"></span> 
-                <span>AI가 받아적고 있어요...</span>
+          <!-- AI 진행 상황 표시 (분석 중일 때) -->
+          <div v-if="isProcessing" class="ai-loading-section">
+            <div class="loading-header">
+              <span class="loading-msg">{{ loadingMessage }}</span>
+              <span class="loading-timer" v-if="eta > 0">{{ eta }}초 남음</span>
             </div>
+            <div class="progress-track">
+              <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+            </div>
+          </div>
+
+          <!-- AI 코멘트 표시 (분석 완료 시) -->
+          <div v-else-if="currentDiary.ai_comment" class="ai-letter-box">
+            <div class="letter-header">
+              <span class="ai-icon">💌</span>
+              <span class="ai-sender">AI 심리 상담사의 편지</span>
+            </div>
+            <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
+          </div>
         </div>
 
-        <EmojiSelector v-model="formData.mood" />
+        <!-- 질문 답변 리스트 -->
+        <div class="view-answers">
+          <div class="answer-item-premium">
+            <h4 class="answer-question">잠은 잘 주무셨나요?</h4>
+            <p class="answer-text">{{ currentDiary.sleep_condition || currentDiary.sleep_desc || '(기록 없음)' }}</p>
+          </div>
+          <div v-if="currentDiary.event" class="answer-item-premium">
+            <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
+            <p class="answer-text">{{ currentDiary.event }}</p>
+          </div>
+          <div v-if="currentDiary.emotion_desc" class="answer-item-premium">
+            <h4 class="answer-question">어떤 감정이 들었나요?</h4>
+            <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
+          </div>
+          <div v-if="currentDiary.emotion_meaning" class="answer-item-premium">
+            <h4 class="answer-question">자신의 감정을 깊게 탐색해보면...</h4>
+            <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
+          </div>
+          <div v-if="currentDiary.self_talk" class="answer-item-premium">
+            <h4 class="answer-question">나에게 보내는 따뜻한 위로</h4>
+            <p class="answer-text">{{ currentDiary.self_talk }}</p>
+          </div>
+        </div>
 
-
-
-        <QuestionAccordion
-          question="오늘 무슨일이 있었나요?"
-          v-model="formData.question1"
-          :required="true"
-          :default-open="true"
-          placeholder="오늘 있었던 일을 적어주세요..."
-          :recording="activeField === 'question1'"
-          @record="toggleRecording('question1')"
-        />
-
-        <QuestionAccordion
-          question="어떤 감정이 들었나요?"
-          v-model="formData.question2"
-          :required="true"
-          placeholder="무슨 일이 있었는지 자세히 적어주세요..."
-          :recording="activeField === 'question2'"
-          @record="toggleRecording('question2')"
-        />
-
-        <QuestionAccordion
-          question="마지막으로 더 깊게 자신의 감정을 써보세요."
-          v-model="formData.question3"
-          placeholder="어떤 감정을 느꼈는지 적어주세요..."
-          :recording="activeField === 'question3'"
-          @record="toggleRecording('question3')"
-        />
-
-        <QuestionAccordion
-          question="나에게 따듯한 위로를 보내세요."
-          v-model="formData.question4"
-          placeholder="앞으로 어떻게 하면 좋을지 생각해보세요..."
-          :recording="activeField === 'question4'"
-          @record="toggleRecording('question4')"
-        />
-
-        <!-- 작성 모드 하단 버튼 (인라인으로 변경) -->
+        <!-- 보기 모드 하단 버튼 (인라인으로 이동 및 시원한 스타일링) -->
         <div class="modal-actions-inline">
-          <button @click="cancelWriting" class="btn btn-secondary" type="button">
-            취소
-          </button>
-          <button @click="handleSave" class="btn btn-primary" type="button" :disabled="!isValid || saving">
-            {{ saving ? '저장 중...' : '오늘 기록 완료' }}
-          </button>
+          <button @click="handleDelete" class="btn btn-danger btn-ghost" type="button">삭제</button>
+          <button @click="handleEdit" class="btn btn-secondary" type="button">수정하기</button>
+          <button @click="$emit('close')" class="btn btn-primary" type="button">닫기</button>
         </div>
       </div>
-
-      <!-- 4. 상세보기 모드 (결과 화면) -->
-      <div v-else class="diary-view">
-        <div class="view-content-wrapper">
-          <!-- 감성적인 감정 카드 -->
-          <div class="view-emoji-premium" :class="getMoodColorClass(currentDiary.mood_level)">
-            <div class="emoji-container">
-              <img :src="getMoodEmoji(currentDiary.mood_level)" class="emoji-large anim-float" alt="mood" />
-              <!-- 감정 이름 위로 배치 -->
-              <span class="emoji-label primary-label">{{ getMoodName(currentDiary.mood_level) }}</span>
-              
-              <!-- AI 분석 결과 아래로 배치 -->
-              <span v-if="!isProcessing && currentDiary.ai_prediction && !currentDiary.ai_prediction.includes('분석 중')" class="ai-prediction-badge-premium">
-                {{ currentDiary.ai_prediction }}
-              </span>
-            </div>
-            
-            <!-- AI 진행 상황 표시 (분석 중일 때) -->
-            <div v-if="isProcessing" class="ai-loading-section">
-              <div class="loading-header">
-                 <span class="loading-msg">{{ loadingMessage }}</span>
-                 <span class="loading-timer" v-if="eta > 0">{{ eta }}초 남음</span>
-              </div>
-              <div class="progress-track">
-                 <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
-              </div>
-            </div>
-
-            <!-- AI 코멘트 표시 (분석 완료 시) -->
-            <div v-else-if="currentDiary.ai_comment" class="ai-letter-box">
-               <div class="letter-header">
-                  <span class="ai-icon">💌</span>
-                  <span class="ai-sender">AI 심리 상담사의 편지</span>
-               </div>
-               <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
-            </div>
-          </div>
-
-          <!-- 질문 답변 리스트 -->
-          <div class="view-answers">
-            <div v-if="currentDiary.event" class="answer-item-premium">
-              <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
-              <p class="answer-text">{{ currentDiary.event }}</p>
-            </div>
-            <div v-if="currentDiary.emotion_desc" class="answer-item-premium">
-              <h4 class="answer-question">어떤 감정이 들었나요?</h4>
-              <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
-            </div>
-            <div v-if="currentDiary.emotion_meaning" class="answer-item-premium">
-              <h4 class="answer-question">자신의 감정을 깊게 탐색해보면...</h4>
-              <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
-            </div>
-            <div v-if="currentDiary.self_talk" class="answer-item-premium">
-              <h4 class="answer-question">나에게 보내는 따뜻한 위로</h4>
-              <p class="answer-text">{{ currentDiary.self_talk }}</p>
-            </div>
-          </div>
-
-          <!-- 보기 모드 하단 버튼 (인라인으로 이동 및 시원한 스타일링) -->
-          <div class="modal-actions-inline">
-            <button @click="handleDelete" class="btn btn-danger btn-ghost" type="button">삭제</button>
-            <button @click="handleEdit" class="btn btn-secondary" type="button">수정하기</button>
-            <button @click="$emit('close')" class="btn btn-primary" type="button">닫기</button>
-          </div>
-        </div>
-      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, onUnmounted, onMounted, nextTick } from 'vue'
-import EmojiSelector from './EmojiSelector.vue'
-import QuestionAccordion from './QuestionAccordion.vue'
-import { diaryAPI } from '../services/api'
+import { ref, computed, watch, onUnmounted, onMounted, nextTick } from "vue";
+import EmojiSelector from "./EmojiSelector.vue";
+import QuestionAccordion from "./QuestionAccordion.vue";
+import { diaryAPI } from "../services/api";
 
 // Images
-import happyImg from '../assets/01.png'
-import calmImg from '../assets/02.png'
-import neutralImg from '../assets/03.png'
-import sadImg from '../assets/04.png'
-import angryImg from '../assets/05.png'
+import happyImg from "../assets/01.png";
+import calmImg from "../assets/02.png";
+import neutralImg from "../assets/03.png";
+import sadImg from "../assets/04.png";
+import angryImg from "../assets/05.png";
 
 export default {
-  name: 'DiaryModal',
+  name: "DiaryModal",
   components: { EmojiSelector, QuestionAccordion },
   props: {
     date: { type: String, required: true },
-    diary: { type: Object, default: null }
+    diary: { type: Object, default: null },
   },
-  emits: ['close', 'saved'],
+  emits: ["close", "saved"],
   setup(props, { emit }) {
     // [DEBUG]
     // alert("🎉 VERSION 3.0 LOADED! 확인을 누르면 날씨를 가져옵니다.");
     console.log("🔥 DiaryModal V3.0 SETUP 🔥");
 
     // === Utils & Data ===
-    const isViewMode = ref(!!props.diary)
-    const showForm = ref(false)
-    const saving = ref(false)
-    const localDiary = ref(null)
-    const panelRef = ref(null)
-    
+    const isViewMode = ref(!!props.diary);
+    const showForm = ref(false);
+    const saving = ref(false);
+    const localDiary = ref(null);
+    const panelRef = ref(null);
+
     // === Weather State ===
-    const weatherInfo = ref(null) 
-    const weatherInsight = ref('')
-    
+    const weatherInfo = ref(null);
+    const weatherInsight = ref("");
+
     // 서울 시청 좌표 (기본값)
     const DEFAULT_LAT = 37.5665;
-    const DEFAULT_LON = 126.9780;
+    const DEFAULT_LON = 126.978;
 
-    const currentDiary = computed(() => localDiary.value || props.diary || {})
+    const currentDiary = computed(() => localDiary.value || props.diary || {});
 
     // === AI State ===
-    const isProcessing = ref(false)
-    const progressPercent = ref(0)
-    const loadingMessage = ref('AI 분석 준비 중...')
-    const eta = ref(0)
-    const timerIds = ref([]) 
+    const isProcessing = ref(false);
+    const progressPercent = ref(0);
+    const loadingMessage = ref("AI 분석 준비 중...");
+    const eta = ref(0);
+    const timerIds = ref([]);
 
     // === Constants ===
-    const moodLevelToName = { 1: 'angry', 2: 'sad', 3: 'neutral', 4: 'calm', 5: 'happy' }
+    const moodLevelToName = { 1: "angry", 2: "sad", 3: "neutral", 4: "calm", 5: "happy" };
     const emojiMap = {
-      1: { icon: angryImg, name: '화나' }, 2: { icon: sadImg, name: '우울해' },
-      3: { icon: neutralImg, name: '그저그래' }, 4: { icon: calmImg, name: '편안해' },
-      5: { icon: happyImg, name: '행복해' }
-    }
+      1: { icon: angryImg, name: "화나" },
+      2: { icon: sadImg, name: "우울해" },
+      3: { icon: neutralImg, name: "그저그래" },
+      4: { icon: calmImg, name: "편안해" },
+      5: { icon: happyImg, name: "행복해" },
+    };
 
-    const formData = ref({ mood: 'neutral', question1: '', question2: '', question3: '', question4: '' })
+    const formData = ref({
+      mood: "neutral",
+      question_sleep: "",
+      question1: "",
+      question2: "",
+      question3: "",
+      question4: "",
+    });
 
     // === Weather Helper Function ===
     const getWeatherFromAPI = async (lat, lon, date = null) => {
-        try {
-            console.log(`🌦️ Call Weather API: ${lat}, ${lon}, ${date || 'Today'}`);
-            let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
-            let isPast = false;
-            let targetDate = date;
+      try {
+        console.log(`🌦️ Call Weather API: ${lat}, ${lon}, ${date || "Today"}`);
+        let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+        let isPast = false;
+        let targetDate = date;
 
-            // Date comparison (Local)
-            // Date comparison (Local)
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth()+1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const todayStr = `${year}-${month}-${day}`;
+        // Date comparison (Local)
+        // Date comparison (Local)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
 
-            console.log(`📅 Date Check: Target(${date}) vs Today(${todayStr})`);
+        console.log(`📅 Date Check: Target(${date}) vs Today(${todayStr})`);
 
-            if (date && date < todayStr) {
-                // Past Date -> Use Archive API
-                isPast = true;
-                url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max&timezone=auto`;
-            }
-
-            const res = await fetch(url);
-            if(!res.ok) throw new Error('API Res Error');
-            const data = await res.json();
-            console.log("📦 Weather Data:", data);
-
-            let code, temp;
-            if (isPast && data.daily) {
-                code = data.daily.weathercode[0];
-                temp = data.daily.temperature_2m_max[0];
-            } else if (data.current_weather) {
-                code = data.current_weather.weathercode;
-                temp = data.current_weather.temperature;
-            }
-
-            if (code !== undefined) {
-                const map = {
-                    0: '맑음 ☀️', 1: '대체로 맑음 🌤️', 2: '구름 조금 ⛅', 3: '흐림 ☁️',
-                    45: '안개 🌫️', 48: '안개 🌫️', 51: '이슬비 🌧️', 53: '이슬비 🌧️', 55: '이슬비 🌧️',
-                    61: '비 ☔', 63: '비 ☔', 65: '비 ☔', 80: '소나기 ☔', 95: '뇌우 ⚡'
-                };
-                weatherInfo.value = { temp, desc: map[code] || '흐림' };
-                console.log("✅ Weather Updated:", weatherInfo.value);
-
-                // 날씨 정보가 업데이트된 후 스마트 인사이트 호출
-                if (!props.diary) {
-                    fetchMindsetInsight();
-                }
-            }
-        } catch (e) {
-            console.error("Weather Fail:", e);
-            // 날씨 실패해도 인사이트는 보여줘야 함
-            if (!props.diary) fetchMindsetInsight();
+        if (date && date < todayStr) {
+          // Past Date -> Use Archive API
+          isPast = true;
+          url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max&timezone=auto`;
         }
-    }
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("API Res Error");
+        const data = await res.json();
+        console.log("📦 Weather Data:", data);
+
+        let code, temp;
+        if (isPast && data.daily) {
+          code = data.daily.weathercode[0];
+          temp = data.daily.temperature_2m_max[0];
+        } else if (data.current_weather) {
+          code = data.current_weather.weathercode;
+          temp = data.current_weather.temperature;
+        }
+
+        if (code !== undefined) {
+          const map = {
+            0: "맑음 ☀️",
+            1: "대체로 맑음 🌤️",
+            2: "구름 조금 ⛅",
+            3: "흐림 ☁️",
+            45: "안개 🌫️",
+            48: "안개 🌫️",
+            51: "이슬비 🌧️",
+            53: "이슬비 🌧️",
+            55: "이슬비 🌧️",
+            61: "비 ☔",
+            63: "비 ☔",
+            65: "비 ☔",
+            80: "소나기 ☔",
+            95: "뇌우 ⚡",
+          };
+          weatherInfo.value = { temp, desc: map[code] || "흐림" };
+          console.log("✅ Weather Updated:", weatherInfo.value);
+
+          // 날씨 정보가 업데이트된 후 스마트 인사이트 호출
+          if (!props.diary) {
+            fetchMindsetInsight();
+          }
+        }
+      } catch (e) {
+        console.error("Weather Fail:", e);
+        // 날씨 실패해도 인사이트는 보여줘야 함
+        if (!props.diary) fetchMindsetInsight();
+      }
+    };
 
     // === Main Weather Logic ===
     const checkWeather = async (date = null) => {
-        console.log("📡 checkWeather Start...", date);
-        // 1. 일단 서울 날씨로 즉시 시도 (Fallback 먼저)
+      console.log("📡 checkWeather Start...", date);
+      // 1. 일단 서울 날씨로 즉시 시도 (Fallback 먼저)
+      if (!weatherInfo.value) {
+        console.log("🏙️ Using Default Seoul Weather as placeholder...");
+        getWeatherFromAPI(DEFAULT_LAT, DEFAULT_LON, date);
+      }
+
+      // 3초 후에도 날씨가 안 오면 그냥 진행 (강제 타임아웃)
+      setTimeout(() => {
         if (!weatherInfo.value) {
-             console.log("🏙️ Using Default Seoul Weather as placeholder...");
-             getWeatherFromAPI(DEFAULT_LAT, DEFAULT_LON, date);
+          console.warn("⏱️ Weather strongly delayed. Proceeding with insight anyway.");
+          if (!props.diary) fetchMindsetInsight();
         }
+      }, 5000);
 
-        // 3초 후에도 날씨가 안 오면 그냥 진행 (강제 타임아웃)
-        setTimeout(() => {
-            if (!weatherInfo.value) {
-                console.warn("⏱️ Weather strongly delayed. Proceeding with insight anyway.");
-                if (!props.diary) fetchMindsetInsight();
-            }
-        }, 5000);
-
-        // 2. 실제 위치 찾기 시도 (비동기)
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    console.log("📍 Geo Success:", pos.coords.latitude, pos.coords.longitude);
-                    getWeatherFromAPI(pos.coords.latitude, pos.coords.longitude, date);
-                },
-                (err) => {
-                    console.warn("⚠️ Geo Failed, trying IP...", err.code);
-                    fetch('https://ipapi.co/json/')
-                        .then(r => r.json())
-                        .then(d => {
-                            console.log("📍 IP Success:", d.latitude);
-                            if(d.latitude) getWeatherFromAPI(d.latitude, d.longitude, date);
-                        })
-                        .catch(e => console.error(e));
-                },
-                { timeout: 3000 }
-            );
-        } else {
-             console.warn("❌ Geo Not Supported in Browser");
-             if (!props.diary) fetchMindsetInsight();
-        }
-    }
+      // 2. 실제 위치 찾기 시도 (비동기)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            console.log("📍 Geo Success:", pos.coords.latitude, pos.coords.longitude);
+            getWeatherFromAPI(pos.coords.latitude, pos.coords.longitude, date);
+          },
+          (err) => {
+            console.warn("⚠️ Geo Failed, trying IP...", err.code);
+            fetch("https://ipapi.co/json/")
+              .then((r) => r.json())
+              .then((d) => {
+                console.log("📍 IP Success:", d.latitude);
+                if (d.latitude) getWeatherFromAPI(d.latitude, d.longitude, date);
+              })
+              .catch((e) => console.error(e));
+          },
+          { timeout: 3000 },
+        );
+      } else {
+        console.warn("❌ Geo Not Supported in Browser");
+        if (!props.diary) fetchMindsetInsight();
+      }
+    };
 
     // === Computed Helpers ===
     const formattedDate = computed(() => {
-        if (!props.date) return ''
-        const parts = props.date.split('-')
-        if (parts.length < 3) return props.date
-        return `${parseInt(parts[1])}월 ${parseInt(parts[2])}일`
-    })
+      if (!props.date) return "";
+      const parts = props.date.split("-");
+      if (parts.length < 3) return props.date;
+      return `${parseInt(parts[1])}월 ${parseInt(parts[2])}일`;
+    });
 
     const formattedDateTime = computed(() => {
-        const dStr = currentDiary.value.created_at || props.diary?.created_at
-        if (!dStr) return ''
-        const d = new Date(dStr)
-        return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-    })
-    
-    const isValid = computed(() => formData.value.mood && formData.value.question1.trim())
-    const getMoodEmoji = (lvl) => emojiMap[lvl]?.icon || ''
-    const getMoodName = (lvl) => emojiMap[lvl]?.name || ''
+      const dStr = currentDiary.value.created_at || props.diary?.created_at;
+      if (!dStr) return "";
+      const d = new Date(dStr);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    });
+
+    const isValid = computed(() => formData.value.mood && formData.value.question1.trim() && formData.value.question_sleep.trim());
+    const getMoodEmoji = (lvl) => emojiMap[lvl]?.icon || "";
+    const getMoodName = (lvl) => emojiMap[lvl]?.name || "";
 
     // === Polling & Save Handlers ===
-    const clearTimers = () => { timerIds.value.forEach(id => clearInterval(id)); timerIds.value = []; }
+    const clearTimers = () => {
+      timerIds.value.forEach((id) => clearInterval(id));
+      timerIds.value = [];
+    };
 
     const finishPolling = async () => {
-        clearTimers(); isProcessing.value = false; progressPercent.value = 100; emit('saved');
-        if (currentDiary.value.id) localDiary.value = await diaryAPI.getDiary(currentDiary.value.id)
-    }
-    
+      clearTimers();
+      isProcessing.value = false;
+      progressPercent.value = 100;
+      emit("saved");
+      if (currentDiary.value.id) localDiary.value = await diaryAPI.getDiary(currentDiary.value.id);
+    };
+
     const startRealPolling = (taskId) => {
-        isProcessing.value = true; progressPercent.value = 5; loadingMessage.value = "AI 분석 중..."; eta.value = 15;
-        timerIds.value.push(setInterval(() => { if(eta.value > 0) eta.value-- }, 1000));
-        timerIds.value.push(setInterval(async () => {
-            try {
-                const status = await diaryAPI.getTaskStatus(taskId)
-                if (status.state === 'PROGRESS') { progressPercent.value = status.process_percent; loadingMessage.value = status.message; } 
-                else if (status.state === 'SUCCESS') { finishPolling() } 
-                else if (status.state === 'FAILURE') { isProcessing.value = false; clearTimers(); }
-            } catch (e) {}
-        }, 1000));
-    }
+      isProcessing.value = true;
+      progressPercent.value = 5;
+      loadingMessage.value = "AI 분석 중...";
+      eta.value = 15;
+      timerIds.value.push(
+        setInterval(() => {
+          if (eta.value > 0) eta.value--;
+        }, 1000),
+      );
+      timerIds.value.push(
+        setInterval(async () => {
+          try {
+            const status = await diaryAPI.getTaskStatus(taskId);
+            if (status.state === "PROGRESS") {
+              progressPercent.value = status.process_percent;
+              loadingMessage.value = status.message;
+            } else if (status.state === "SUCCESS") {
+              finishPolling();
+            } else if (status.state === "FAILURE") {
+              isProcessing.value = false;
+              clearTimers();
+            }
+          } catch (e) {}
+        }, 1000),
+      );
+    };
 
     const startFakePolling = () => {
-        isProcessing.value = true; loadingMessage.value = "이전 분석 확인..."; progressPercent.value = 30; eta.value = 10;
-        timerIds.value.push(setInterval(async () => {
-            if (progressPercent.value < 90) progressPercent.value += 5; if (eta.value > 0) eta.value--;
-            if (currentDiary.value.id) {
-                try {
-                    const fresh = await diaryAPI.getDiary(currentDiary.value.id)
-                    if (fresh.ai_prediction && !fresh.ai_prediction.includes('분석 중')) { localDiary.value = fresh; finishPolling(); }
-                } catch(e) {}
-            }
-        }, 2000));
-    }
+      isProcessing.value = true;
+      loadingMessage.value = "이전 분석 확인...";
+      progressPercent.value = 30;
+      eta.value = 10;
+      timerIds.value.push(
+        setInterval(async () => {
+          if (progressPercent.value < 90) progressPercent.value += 5;
+          if (eta.value > 0) eta.value--;
+          if (currentDiary.value.id) {
+            try {
+              const fresh = await diaryAPI.getDiary(currentDiary.value.id);
+              if (fresh.ai_prediction && !fresh.ai_prediction.includes("분석 중")) {
+                localDiary.value = fresh;
+                finishPolling();
+              }
+            } catch (e) {}
+          }
+        }, 2000),
+      );
+    };
 
     const handleSave = async () => {
-        saving.value = true
-        try {
-            const payload = {
-                date: props.date,
-                mood: formData.value.mood,
-                question1: formData.value.question1, question2: formData.value.question2,
-                question3: formData.value.question3, question4: formData.value.question4,
-                weather: weatherInfo.value ? weatherInfo.value.desc : null,
-                temperature: weatherInfo.value ? weatherInfo.value.temp : null
-            }
-            let result = props.diary ? await diaryAPI.updateDiary(props.diary.id, payload) : await diaryAPI.createDiary(payload)
-            localDiary.value = result; isViewMode.value = true; showForm.value = false;
-            if (result.task_id) startRealPolling(result.task_id); else startFakePolling();
-            emit('saved')
-        } catch (e) { alert('저장 실패: ' + e.message) } finally { saving.value = false }
-    }
+      saving.value = true;
+      try {
+        const payload = {
+          date: props.date,
+          mood: formData.value.mood,
+          sleep_condition: formData.value.question_sleep,
+          question1: formData.value.question1,
+          question2: formData.value.question2,
+          question3: formData.value.question3,
+          question4: formData.value.question4,
+          weather: weatherInfo.value ? weatherInfo.value.desc : null,
+          temperature: weatherInfo.value ? weatherInfo.value.temp : null,
+        };
+        let result = props.diary
+          ? await diaryAPI.updateDiary(props.diary.id, payload)
+          : await diaryAPI.createDiary(payload);
+        localDiary.value = result;
+        isViewMode.value = true;
+        showForm.value = false;
+        if (result.task_id) startRealPolling(result.task_id);
+        else startFakePolling();
+        emit("saved");
+      } catch (e) {
+        alert("저장 실패: " + e.message);
+      } finally {
+        saving.value = false;
+      }
+    };
 
     // === Mindset Insight ===
-    const mindsetInsight = ref('')
-    const isLoadingInsight = ref(false)
+    const mindsetInsight = ref("");
+    const isLoadingInsight = ref(false);
 
     const fetchMindsetInsight = async () => {
-        if (mindsetInsight.value || isLoadingInsight.value) return 
-        
-        isLoadingInsight.value = true
-        const weatherDesc = weatherInfo.value ? weatherInfo.value.desc : null
-        
-        try {
-            // Timeout increased to 60s
-            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 60000))
-            const res = await Promise.race([
-                diaryAPI.getMindsetInsight(props.date, weatherDesc),
-                timeout
-            ])
-            
-            if (res.message && res.message.trim().length > 0) {
-                 mindsetInsight.value = res.message
-            } else {
-                 mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
-            }
-        } catch (e) {
-            console.error("Insight Error/Timeout:", e)
-            mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
-        } finally {
-            isLoadingInsight.value = false
-        }
-    }
+      if (mindsetInsight.value || isLoadingInsight.value) return;
 
-    const startWriting = () => { 
-        showForm.value = true
-    }
-    const cancelWriting = () => { showForm.value = false; emit('close') }
-    const handleEdit = () => {
-        isViewMode.value = false; showForm.value = true;
-        const d = currentDiary.value
-        formData.value = {
-            mood: moodLevelToName[d.mood_level] || 'neutral',
-            question1: d.event||'', question2: d.emotion_desc||'',
-            question3: d.emotion_meaning||'', question4: d.self_talk||''
+      isLoadingInsight.value = true;
+      const weatherDesc = weatherInfo.value ? weatherInfo.value.desc : null;
+
+      try {
+        // Timeout increased to 60s
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Timeout")), 60000),
+        );
+        const res = await Promise.race([
+          diaryAPI.getMindsetInsight(props.date, weatherDesc),
+          timeout,
+        ]);
+
+        if (res.message && res.message.trim().length > 0) {
+          mindsetInsight.value = res.message;
+        } else {
+          mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요.";
         }
-        nextTick(() => {
-            if (panelRef.value) panelRef.value.scrollTop = 0;
-        })
-    }
+      } catch (e) {
+        console.error("Insight Error/Timeout:", e);
+        mindsetInsight.value = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요.";
+      } finally {
+        isLoadingInsight.value = false;
+      }
+    };
+
+    const startWriting = () => {
+      showForm.value = true;
+    };
+    const cancelWriting = () => {
+      showForm.value = false;
+      emit("close");
+    };
+    const handleEdit = () => {
+      isViewMode.value = false;
+      showForm.value = true;
+      const d = currentDiary.value;
+      formData.value = {
+        mood: moodLevelToName[d.mood_level] || "neutral",
+        question_sleep: d.sleep_condition || "",
+        question1: d.event || "",
+        question2: d.emotion_desc || "",
+        question3: d.emotion_meaning || "",
+        question4: d.self_talk || "",
+      };
+      nextTick(() => {
+        if (panelRef.value) panelRef.value.scrollTop = 0;
+      });
+    };
     const handleDelete = async () => {
-        if(!confirm('삭제?')) return;
-        try { await diaryAPI.deleteDiary(currentDiary.value.id); emit('saved'); emit('close'); } catch(e) {}
-    }
+      if (!confirm("삭제?")) return;
+      try {
+        await diaryAPI.deleteDiary(currentDiary.value.id);
+        emit("saved");
+        emit("close");
+      } catch (e) {}
+    };
 
     // === Voice Recording Logic ===
-    const isRecording = ref(false)
-    const isTranscribing = ref(false)
-    const activeField = ref(null) // question1, question2, ...
-    let mediaRecorder = null
-    let audioChunks = []
+    const isRecording = ref(false);
+    const isTranscribing = ref(false);
+    const activeField = ref(null); // question1, question2, ...
+    let mediaRecorder = null;
+    let audioChunks = [];
 
     const toggleRecording = (field) => {
-        if (activeField.value === field && isRecording.value) {
-            stopRecording()
-        } else if (isRecording.value) {
-            // Stop current, start new? Or just ignore? 
-            // Better to stop current first.
-            alert("이미 녹음 중입니다. 먼저 종료해주세요.")
-        } else {
-            startRecording(field)
-        }
-    }
+      if (activeField.value === field && isRecording.value) {
+        stopRecording();
+      } else if (isRecording.value) {
+        // Stop current, start new? Or just ignore?
+        // Better to stop current first.
+        alert("이미 녹음 중입니다. 먼저 종료해주세요.");
+      } else {
+        startRecording(field);
+      }
+    };
 
     const startRecording = async (field) => {
-        if (!navigator.mediaDevices) { alert("마이크를 찾을 수 없어요."); return; }
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            
-            // [iOS Fix] 지원하는 MIME Type 확인
-            let options = {};
-            if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/webm')) {
-                options = { mimeType: 'audio/webm' };
-            } else if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
-                options = { mimeType: 'audio/mp4' };
-            }
-            
-            mediaRecorder = new MediaRecorder(stream, options)
-            audioChunks = []
-            activeField.value = field
-            
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data && event.data.size > 0) {
-                    audioChunks.push(event.data)
-                }
-            }
-            
-            mediaRecorder.onstop = async () => {
-                const targetField = activeField.value 
-                isRecording.value = false
-                activeField.value = null
-                
-                // [Validation] 녹음 데이터 확인
-                if (audioChunks.length === 0) {
-                    alert("녹음된 음성이 없어요. (권한 또는 코덱 문제)");
-                    stream.getTracks().forEach(track => track.stop()); // Stream cleanup check
-                    return;
-                }
+      if (!navigator.mediaDevices) {
+        alert("마이크를 찾을 수 없어요.");
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-                isTranscribing.value = true
-                
-                // Determine Blob Type and Extension
-                const mimeType = mediaRecorder.mimeType || 'audio/webm'; // Default fallback
-                const audioBlob = new Blob(audioChunks, { type: mimeType })
-                
-                console.log(`🎤 Recording finished. Size: ${audioBlob.size}, Type: ${mimeType}`);
-
-                if (audioBlob.size === 0) {
-                   alert("녹음 파일 크기가 0입니다. 다시 시도해주세요.");
-                   isTranscribing.value = false;
-                   return;
-                }
-                
-                // iOS prefers m4a/mp4
-                const ext = (mimeType.includes('mp4') || mimeType.includes('aac')) ? 'm4a' : 'webm';
-
-                const fd = new FormData()
-                fd.append('file', audioBlob, `diary.${ext}`)
-                fd.append('auto_fill', 'false') 
-                
-                try {
-                    const res = await diaryAPI.transcribeVoice(fd)
-                    if (res.text) {
-                        const currentText = formData.value[targetField] || ''
-                        formData.value[targetField] = currentText ? currentText + " " + res.text : res.text
-                    }
-                } catch (e) {
-                    console.error("Transcribe Error:", e);
-                    const msg = e.response?.data?.message || e.message || "서버 오류";
-                    alert("음성 변환 실패: " + msg);
-                } finally {
-                    isTranscribing.value = false
-                    stream.getTracks().forEach(track => track.stop())
-                }
-            }
-            
-            mediaRecorder.start()
-            isRecording.value = true
-        } catch (e) {
-            console.error(e)
-            alert("마이크 권한이 필요하거나 지원하지 않는 브라우저입니다.")
+        // [iOS Fix] 지원하는 MIME Type 확인
+        let options = {};
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/webm")) {
+          options = { mimeType: "audio/webm" };
+        } else if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("audio/mp4")) {
+          options = { mimeType: "audio/mp4" };
         }
-    }
+
+        mediaRecorder = new MediaRecorder(stream, options);
+        audioChunks = [];
+        activeField.value = field;
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          const targetField = activeField.value;
+          isRecording.value = false;
+          activeField.value = null;
+
+          // [Validation] 녹음 데이터 확인
+          if (audioChunks.length === 0) {
+            alert("녹음된 음성이 없어요. (권한 또는 코덱 문제)");
+            stream.getTracks().forEach((track) => track.stop()); // Stream cleanup check
+            return;
+          }
+
+          isTranscribing.value = true;
+
+          // Determine Blob Type and Extension
+          const mimeType = mediaRecorder.mimeType || "audio/webm"; // Default fallback
+          const audioBlob = new Blob(audioChunks, { type: mimeType });
+
+          console.log(`🎤 Recording finished. Size: ${audioBlob.size}, Type: ${mimeType}`);
+
+          if (audioBlob.size === 0) {
+            alert("녹음 파일 크기가 0입니다. 다시 시도해주세요.");
+            isTranscribing.value = false;
+            return;
+          }
+
+          // iOS prefers m4a/mp4
+          const ext = mimeType.includes("mp4") || mimeType.includes("aac") ? "m4a" : "webm";
+
+          const fd = new FormData();
+          fd.append("file", audioBlob, `diary.${ext}`);
+          fd.append("auto_fill", "false");
+
+          try {
+            const res = await diaryAPI.transcribeVoice(fd);
+            if (res.text) {
+              const currentText = formData.value[targetField] || "";
+              formData.value[targetField] = currentText ? currentText + " " + res.text : res.text;
+            }
+          } catch (e) {
+            console.error("Transcribe Error:", e);
+            const msg = e.response?.data?.message || e.message || "서버 오류";
+            alert("음성 변환 실패: " + msg);
+          } finally {
+            isTranscribing.value = false;
+            stream.getTracks().forEach((track) => track.stop());
+          }
+        };
+
+        mediaRecorder.start();
+        isRecording.value = true;
+      } catch (e) {
+        console.error(e);
+        alert("마이크 권한이 필요하거나 지원하지 않는 브라우저입니다.");
+      }
+    };
 
     const stopRecording = () => {
-        if (mediaRecorder && isRecording.value) {
-            mediaRecorder.stop()
-            // State update happens in onstop
-        }
-    }
+      if (mediaRecorder && isRecording.value) {
+        mediaRecorder.stop();
+        // State update happens in onstop
+      }
+    };
 
     // === Lifecycle & Watch ===
     // === Lifecycle & Watch ===
-    watch([() => props.diary, () => props.date], ([newDiary, newDate]) => {
-        isViewMode.value = !!newDiary
-        showForm.value = false
-        localDiary.value = null
-        clearTimers()
-        isProcessing.value = false
-        weatherInfo.value = null // Reset
-        
+    watch(
+      [() => props.diary, () => props.date],
+      ([newDiary, newDate]) => {
+        isViewMode.value = !!newDiary;
+        showForm.value = false;
+        localDiary.value = null;
+        clearTimers();
+        isProcessing.value = false;
+        weatherInfo.value = null; // Reset
+
         // Reset Insight
-        mindsetInsight.value = ''
+        mindsetInsight.value = "";
 
         if (newDiary) {
-            // 수정/보기 모드
-            formData.value = {
-                mood: moodLevelToName[newDiary.mood_level] || 'neutral',
-                question1: newDiary.event||'', question2: newDiary.emotion_desc||'',
-                question3: newDiary.emotion_meaning||'', question4: newDiary.self_talk||''
-            }
-            
-            if (newDiary.weather) {
-                weatherInfo.value = { desc: newDiary.weather, temp: newDiary.temperature }
-            } else {
-                checkWeather(newDate)
-            }
+          // 수정/보기 모드
+          formData.value = {
+            mood: moodLevelToName[newDiary.mood_level] || "neutral",
+            question_sleep: newDiary.sleep_condition || "",
+            question1: newDiary.event || "",
+            question2: newDiary.emotion_desc || "",
+            question3: newDiary.emotion_meaning || "",
+            question4: newDiary.self_talk || "",
+          };
 
-            if (newDiary.ai_prediction && newDiary.ai_prediction.includes('분석 중')) {
-                startFakePolling()
-            }
+          if (newDiary.weather) {
+            weatherInfo.value = { desc: newDiary.weather, temp: newDiary.temperature };
+          } else {
+            checkWeather(newDate);
+          }
+
+          if (newDiary.ai_prediction && newDiary.ai_prediction.includes("분석 중")) {
+            startFakePolling();
+          }
         } else {
-            // 새 글 작성 모드
-            checkWeather(newDate)
-            
-            // 폼 초기화 (이전 데이터 잔상 제거)
-            formData.value = { 
-                mood: 'neutral', 
-                question1: '', 
-                question2: '', 
-                question3: '', 
-                question4: '' 
-            }
-        }
-    }, { immediate: true })
+          // 새 글 작성 모드
+          checkWeather(newDate);
 
-    onUnmounted(() => clearTimers())
+          // 폼 초기화 (이전 데이터 잔상 제거)
+          formData.value = {
+            mood: "neutral",
+            question_sleep: "",
+            question1: "",
+            question2: "",
+            question3: "",
+            question4: "",
+          };
+        }
+      },
+      { immediate: true },
+    );
+
+    onUnmounted(() => clearTimers());
 
     const getWeatherIcon = (desc) => {
-        if (!desc) return '✨';
-        if (desc.includes('맑음')) return '☀️';
-        if (desc.includes('구름') || desc.includes('흐림')) return '☁️';
-        if (desc.includes('비')) return '🌧️';
-        if (desc.includes('눈')) return '❄️';
-        return '✨';
-    }
+      if (!desc) return "✨";
+      if (desc.includes("맑음")) return "☀️";
+      if (desc.includes("구름") || desc.includes("흐림")) return "☁️";
+      if (desc.includes("비")) return "🌧️";
+      if (desc.includes("눈")) return "❄️";
+      return "✨";
+    };
 
     const getMoodColorClass = (lvl) => {
-        const map = { 1: 'mood-angry', 2: 'mood-sad', 3: 'mood-neutral', 4: 'mood-calm', 5: 'mood-happy' }
-        return map[lvl] || 'mood-neutral'
-    }
+      const map = {
+        1: "mood-angry",
+        2: "mood-sad",
+        3: "mood-neutral",
+        4: "mood-calm",
+        5: "mood-happy",
+      };
+      return map[lvl] || "mood-neutral";
+    };
 
     return {
-        isViewMode, showForm, saving, formData, weatherInfo, weatherInsight, panelRef,
-        currentDiary, formattedDate, formattedDateTime, isValid, getMoodEmoji, getMoodName,
-        handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
-        isProcessing, progressPercent, loadingMessage, eta,
-        getWeatherIcon, getMoodColorClass,
-        isProcessing, progressPercent, loadingMessage, eta,
-        getWeatherIcon, getMoodColorClass,
-        mindsetInsight, isLoadingInsight,
-        isRecording, isTranscribing, toggleRecording, activeField
-    }
-  }
-}
+      isViewMode,
+      showForm,
+      saving,
+      formData,
+      weatherInfo,
+      weatherInsight,
+      panelRef,
+      currentDiary,
+      formattedDate,
+      formattedDateTime,
+      isValid,
+      getMoodEmoji,
+      getMoodName,
+      handleSave,
+      startWriting,
+      cancelWriting,
+      handleEdit,
+      handleDelete,
+      isProcessing,
+      progressPercent,
+      loadingMessage,
+      eta,
+      getWeatherIcon,
+      getMoodColorClass,
+      isProcessing,
+      progressPercent,
+      loadingMessage,
+      eta,
+      getWeatherIcon,
+      getMoodColorClass,
+      mindsetInsight,
+      isLoadingInsight,
+      isRecording,
+      isTranscribing,
+      toggleRecording,
+      activeField,
+    };
+  },
+};
 </script>
 
 <style scoped>
-.diary-panel { height: 100%; overflow-y: auto; padding: 0 32px 32px 32px; background: #fafafa; scroll-behavior: smooth; }
-.modal-header { 
-  position: sticky; 
-  top: 0; 
+.diary-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding: 0 32px 32px 32px;
+  background: #fafafa;
+  scroll-behavior: smooth;
+}
+.modal-header {
+  position: sticky;
+  top: 0;
   z-index: 10; /* 헤더가 컨텐츠 위에 오도록 충분히 높게 설정 */
   padding-top: 32px;
   padding-bottom: 24px; /* 패딩 약간 축소 */
   background: #fafafa; /* 투명 배경 제거하고 불투명 배경색 적용하여 겹침 방지 */
-  border-bottom: 1px solid rgba(0,0,0,0.03); /* 스크롤 시 구분을 위한 미세한 경계선 */
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03); /* 스크롤 시 구분을 위한 미세한 경계선 */
 }
-.modal-title { font-size: 24px; font-weight: 800; color: #1d1d1f; display: flex; align-items: center; justify-content: space-between; }
-.diary-timestamp { font-size: 13px; color: #999; margin-top: 4px; }
+.modal-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1d1d1f;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.diary-timestamp {
+  font-size: 13px;
+  color: #999;
+  margin-top: 4px;
+}
 
-.weather-badge-premium { display: flex; align-items: center; gap: 8px; background: white; padding: 6px 12px; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.03); }
-.weather-icon { font-size: 16px; }
-.weather-text { font-size: 12px; font-weight: 600; color: #555; }
+.weather-badge-premium {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.03);
+}
+.weather-icon {
+  font-size: 16px;
+}
+.weather-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+}
 
-.weather-loading { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
-.pulse { width: 8px; height: 8px; background: #ff4757; border-radius: 50%; display: inline-block; animation: pulse-anim 1.5s infinite; }
-@keyframes pulse-anim { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+.weather-loading {
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pulse {
+  width: 8px;
+  height: 8px;
+  background: #ff4757;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse-anim 1.5s infinite;
+}
+@keyframes pulse-anim {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 
-.diary-empty { text-align: center; padding: 60px 20px; }
-.empty-message { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.empty-hint { font-size: 14px; color: #aaa; margin-top: 8px; }
+.diary-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+.empty-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.empty-hint {
+  font-size: 14px;
+  color: #aaa;
+  margin-top: 8px;
+}
 
-.insight-bubble { 
-  background: white; 
-  padding: 16px 24px; 
-  border-radius: 20px; 
-  box-shadow: 0 4px 16px rgba(0,0,0,0.06); 
-  border: 1px solid rgba(0,0,0,0.04);
-  font-size: 15px; 
-  color: #444; 
-  font-weight: 600; 
+.insight-bubble {
+  background: white;
+  padding: 16px 24px;
+  border-radius: 20px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  font-size: 15px;
+  color: #444;
+  font-weight: 600;
   max-width: 320px;
   line-height: 1.5;
   display: flex;
@@ -682,20 +901,20 @@ export default {
 }
 .insight-bubble::before {
   /* Border Triangle */
-  content: '';
+  content: "";
   position: absolute;
-  top: -8px; 
+  top: -8px;
   left: 50%;
   transform: translateX(-50%);
   border-left: 7px solid transparent;
   border-right: 7px solid transparent;
-  border-bottom: 7px solid rgba(0,0,0,0.04);
+  border-bottom: 7px solid rgba(0, 0, 0, 0.04);
 }
 .insight-bubble::after {
   /* Background Mask Triangle */
-  content: '';
+  content: "";
   position: absolute;
-  top: -6px; 
+  top: -6px;
   left: 50%;
   transform: translateX(-50%);
   border-left: 6px solid transparent;
@@ -706,99 +925,301 @@ export default {
 /* ... existing code ... */
 
 .insight-bubble-purple {
-    background: #F3E5F5;
-    border-color: rgba(74, 20, 140, 0.1);
+  background: #f3e5f5;
+  border-color: rgba(74, 20, 140, 0.1);
 }
 .insight-bubble-purple::before {
-    border-bottom-color: rgba(74, 20, 140, 0.1);
+  border-bottom-color: rgba(74, 20, 140, 0.1);
 }
 .insight-bubble-purple::after {
-    border-bottom-color: #F3E5F5;
+  border-bottom-color: #f3e5f5;
 }
-.insight-icon { font-size: 20px; }
-.fade-in { animation: fadeIn 0.6s ease-out forwards; opacity: 0; transform: translateY(10px); }
-@keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+.insight-icon {
+  font-size: 20px;
+}
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+  opacity: 0;
+  transform: translateY(10px);
+}
+@keyframes fadeIn {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-.btn { padding: 12px 24px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-.btn-primary { background: #1d1d1f; color: white; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-.btn-large { padding: 16px 40px; font-size: 16px; }
-.btn-secondary { background: #f2f2f7; color: #1d1d1f; }
-.btn-danger { background: #ff3b30; color: white; }
-.btn-ghost { background: transparent; color: #ff3b30; border: 1px solid rgba(255, 59, 48, 0.15); }
-.btn-ghost:hover { background: rgba(255, 59, 48, 0.05); border-color: #ff3b30; }
+.btn {
+  padding: 12px 24px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.btn-primary {
+  background: #1d1d1f;
+  color: white;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.btn-large {
+  padding: 16px 40px;
+  font-size: 16px;
+}
+.btn-secondary {
+  background: #f2f2f7;
+  color: #1d1d1f;
+}
+.btn-danger {
+  background: #ff3b30;
+  color: white;
+}
+.btn-ghost {
+  background: transparent;
+  color: #ff3b30;
+  border: 1px solid rgba(255, 59, 48, 0.15);
+}
+.btn-ghost:hover {
+  background: rgba(255, 59, 48, 0.05);
+  border-color: #ff3b30;
+}
 
-.modal-actions-inline { 
-  display: flex; 
-  justify-content: flex-end; 
-  gap: 16px; 
-  margin-top: 60px; 
-  padding: 40px 0 20px; 
-  border-top: 1px solid rgba(0,0,0,0.06);
+.modal-actions-inline {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 60px;
+  padding: 40px 0 20px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
   position: relative;
   z-index: 5;
 }
 
-.diary-view { position: relative; }
-.view-content-wrapper { 
-  position: relative; 
+.diary-view {
+  position: relative;
+}
+.view-content-wrapper {
+  position: relative;
   z-index: 2; /* 헤더를 덮기 위해 더 높은 z-index 부여 */
   background: #fafafa; /* 헤더를 가릴 solid 배경색 */
   margin-top: -20px; /* 자연스러운 겹침을 위한 마진 조절 */
   padding-top: 1px; /* 마진 상쇄 방지 */
 }
 
-.view-emoji-premium { border-radius: 28px; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 24px; margin-bottom: 32px; transition: all 0.4s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-.mood-happy { background: linear-gradient(135deg, #FFFDE7 0%, #FFE082 100%); }
-.mood-calm { background: linear-gradient(135deg, #F1F8E9 0%, #A5D6A7 100%); }
-.mood-neutral { background: linear-gradient(135deg, #FAFAFA 0%, #E0E0E0 100%); }
-.mood-sad { background: linear-gradient(135deg, #E3F2FD 0%, #90CAF9 100%); }
-.mood-angry { background: linear-gradient(135deg, #FFEBEE 0%, #EF9A9A 100%); }
+.view-emoji-premium {
+  border-radius: 28px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  transition: all 0.4s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+}
+.mood-happy {
+  background: linear-gradient(135deg, #fffde7 0%, #ffe082 100%);
+}
+.mood-calm {
+  background: linear-gradient(135deg, #f1f8e9 0%, #a5d6a7 100%);
+}
+.mood-neutral {
+  background: linear-gradient(135deg, #fafafa 0%, #e0e0e0 100%);
+}
+.mood-sad {
+  background: linear-gradient(135deg, #e3f2fd 0%, #90caf9 100%);
+}
+.mood-angry {
+  background: linear-gradient(135deg, #ffebee 0%, #ef9a9a 100%);
+}
 
-.emoji-container { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 8px; }
-.emoji-large { width: 110px; height: 110px; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.12)); }
-.anim-float { animation: float 4s ease-in-out infinite; }
-@keyframes float { 0% { transform: translateY(0); } 50% { transform: translateY(-12px); } 100% { transform: translateY(0); } }
+.emoji-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.emoji-large {
+  width: 110px;
+  height: 110px;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.12));
+}
+.anim-float {
+  animation: float 4s ease-in-out infinite;
+}
+@keyframes float {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
 
-.emoji-label { font-size: 26px; font-weight: 800; color: rgba(0,0,0,0.8); letter-spacing: -0.5px; }
-.primary-label { margin-bottom: 8px; }
-.ai-prediction-badge-premium { font-size: 13px; font-weight: 700; color: white; background: rgba(0,0,0,0.25); padding: 7px 16px; border-radius: 24px; backdrop-filter: blur(8px); }
+.emoji-label {
+  font-size: 26px;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.8);
+  letter-spacing: -0.5px;
+}
+.primary-label {
+  margin-bottom: 8px;
+}
+.ai-prediction-badge-premium {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 7px 16px;
+  border-radius: 24px;
+  backdrop-filter: blur(8px);
+}
 
-.ai-letter-box { background: rgba(255,255,255,0.96); padding: 28px; border-radius: 24px; width: 100%; box-shadow: 0 12px 32px rgba(0,0,0,0.06); border: 1px solid rgba(255,255,255,0.8); }
-.letter-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.ai-icon { font-size: 22px; }
-.ai-sender { font-size: 15px; font-weight: 700; color: #222; }
-.ai-comment-text { font-size: 16px; line-height: 1.8; color: #444; white-space: pre-wrap; font-weight: 500; }
+.ai-letter-box {
+  background: rgba(255, 255, 255, 0.96);
+  padding: 28px;
+  border-radius: 24px;
+  width: 100%;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+.letter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.ai-icon {
+  font-size: 22px;
+}
+.ai-sender {
+  font-size: 15px;
+  font-weight: 700;
+  color: #222;
+}
+.ai-comment-text {
+  font-size: 16px;
+  line-height: 1.8;
+  color: #444;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
 
-.ai-loading-section { width: 100%; background: rgba(255,255,255,0.6); padding: 24px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.3); }
-.progress-track { width: 100%; height: 8px; background: rgba(0,0,0,0.06); border-radius: 10px; overflow: hidden; margin-top: 12px; }
-.progress-fill { height: 100%; background: #1d1d1f; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.ai-loading-section {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.6);
+  padding: 24px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+.progress-fill {
+  height: 100%;
+  background: #1d1d1f;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-.view-answers { display: flex; flex-direction: column; gap: 28px; padding-bottom: 60px; }
-.answer-item-premium { background: white; padding: 32px; border-radius: 24px; border: 1px solid rgba(0,0,0,0.02); box-shadow: 0 6px 20px rgba(0,0,0,0.03); transition: transform 0.3s ease; }
-.answer-item-premium:hover { transform: translateY(-4px); }
-.answer-question { font-size: 14px; color: #999; margin-bottom: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-.answer-text { font-size: 17px; color: #1d1d1f; line-height: 1.7; white-space: pre-wrap; font-weight: 500; }
+.view-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding-bottom: 60px;
+}
+.answer-item-premium {
+  background: white;
+  padding: 32px;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.02);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.03);
+  transition: transform 0.3s ease;
+}
+.answer-item-premium:hover {
+  transform: translateY(-4px);
+}
+.answer-question {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.answer-text {
+  font-size: 17px;
+  color: #1d1d1f;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  font-weight: 500;
+}
 
 .mindset-bubble {
-    background: #F3E5F5; /* Gentle Purple */
-    padding: 16px 20px;
-    border-radius: 16px;
-    margin-bottom: 24px;
-    border: 1px solid rgba(0,0,0,0.03);
-    animation: slideDown 0.4s ease-out;
+  background: #f3e5f5; /* Gentle Purple */
+  padding: 16px 20px;
+  border-radius: 16px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.03);
+  animation: slideDown 0.4s ease-out;
 }
-.mindset-content { display: flex; gap: 12px; align-items: center; }
-.mindset-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
-.mindset-text { font-size: 15px; color: #4A148C; font-weight: 600; line-height: 1.5; word-break: keep-all; }
+.mindset-content {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.mindset-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.mindset-text {
+  font-size: 15px;
+  color: #4a148c;
+  font-weight: 600;
+  line-height: 1.5;
+  word-break: keep-all;
+}
 
 .mindset-loading {
-    text-align: center; color: #999; font-size: 13px; margin-bottom: 20px;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
-.pulse-mini { width: 6px; height: 6px; background: #999; border-radius: 50%; animation: pulse-anim 1s infinite; }
+.pulse-mini {
+  width: 6px;
+  height: 6px;
+  background: #999;
+  border-radius: 50%;
+  animation: pulse-anim 1s infinite;
+}
 
-@keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 /* Voice UI */
 .voice-section {
@@ -814,12 +1235,12 @@ export default {
   gap: 10px;
   padding: 14px 24px;
   border-radius: 30px;
-  border: 1px solid rgba(0,0,0,0.08); /* Subtle border */
+  border: 1px solid rgba(0, 0, 0, 0.08); /* Subtle border */
   background: white;
   color: #333;
   font-weight: 700;
   font-size: 15px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
   width: 100%;
   justify-content: center;
@@ -827,7 +1248,7 @@ export default {
 }
 .btn-voice:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
   border-color: #1d1d1f;
 }
 .btn-voice.recording {
@@ -844,28 +1265,41 @@ export default {
   gap: 8px;
 }
 @keyframes pulse-red {
-  0% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(255, 59, 48, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 59, 48, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+  }
 }
 
 .voice-loading-overlay {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(255,255,255, 0.7);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 20;
-    backdrop-filter: blur(2px);
-    border-radius: 20px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  backdrop-filter: blur(2px);
+  border-radius: 20px;
 }
 .voice-loader-box {
-    background: white;
-    padding: 16px 24px;
-    border-radius: 30px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    display: flex; align-items: center; gap: 10px;
-    font-size: 14px; color: #555; font-weight: 600;
+  background: white;
+  padding: 16px 24px;
+  border-radius: 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #555;
+  font-weight: 600;
 }
-
-
 </style>

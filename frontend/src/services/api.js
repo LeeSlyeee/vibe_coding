@@ -92,6 +92,7 @@ export const diaryAPI = {
     const mappedData = {
       created_at: data.date, // 날짜
       event: data.question1 || '', // 오늘 무슨일이 있었나요?
+      sleep_condition: data.sleep_condition || '', // 잠은 잘 주무셨나요? 
       emotion_desc: data.question2 || '', // 어떤 감정이 들었나요?
       emotion_meaning: data.question3 || '', // 마지막으로 더 깊게 자신의 감정을 써보세요.
       self_talk: data.question4 || '', // 나에게 따듯한 위로를 보내세요.
@@ -117,6 +118,7 @@ export const diaryAPI = {
     // 프론트엔드 필드 → 백엔드 필드 매핑
     const mappedData = {
       event: data.question1 || '',
+      sleep_condition: data.sleep_condition || '',
       emotion_desc: data.question2 || '',
       emotion_meaning: data.question3 || '',
       self_talk: data.question4 || '',

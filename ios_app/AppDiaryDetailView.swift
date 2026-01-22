@@ -50,6 +50,12 @@ struct AppDiaryDetailView: View {
                     Text(diary.event ?? "")
                         .padding(.bottom)
                     
+                    if let sleep = diary.sleep_desc, !sleep.isEmpty {
+                        label("잠은 잘 주무셨나요?")
+                        Text(sleep)
+                            .padding(.bottom)
+                    }
+                    
                     label("어떤 감정이 들었나요?")
                     Text(diary.emotion_desc ?? "")
                         .padding(.bottom)
@@ -130,12 +136,34 @@ struct AppDiaryDetailView: View {
     }
     
     func formatDate(_ dateStr: String) -> String {
+        // 1. Try ISO8601 (standard)
         let iso = ISO8601DateFormatter()
+        // Allow for fractional seconds just in case
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
         if let date = iso.date(from: dateStr) {
             let f = DateFormatter()
-            f.dateFormat = "yyyy년 M월 d일"
+            f.dateFormat = "yy-MM-dd"
             return f.string(from: date)
         }
+        
+        // 2. Try ISO8601 without fractional options (some parsers are strict)
+        iso.formatOptions = [.withInternetDateTime]
+        if let date = iso.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "yy-MM-dd"
+            return f.string(from: date)
+        }
+
+        // 3. Fallback: specific string format for "yyyy-MM-ddTHH:mm:ss" (no timezone)
+        let parser = DateFormatter()
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let date = parser.date(from: dateStr) {
+            let f = DateFormatter()
+            f.dateFormat = "yy-MM-dd"
+            return f.string(from: date)
+        }
+        
         return dateStr
     }
     

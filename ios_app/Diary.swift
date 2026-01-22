@@ -10,6 +10,7 @@ struct Diary: Codable, Identifiable {
     var emotion_desc: String?
     var emotion_meaning: String?
     var self_talk: String?
+    var sleep_desc: String?
     var weather: String?
     var temperature: Double?
     
@@ -35,6 +36,7 @@ struct Diary: Codable, Identifiable {
         case emotion_desc
         case emotion_meaning
         case self_talk
+        case sleep_desc
         case weather
         case temperature
         case ai_prediction

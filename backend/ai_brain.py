@@ -680,15 +680,25 @@ class EmotionAnalysis:
                     f"(지침: 위 과거 기록의 흐름을 참고하여, 맥락이 이어지는 깊이 있는 공감 멘트를 작성해줘.)\n\n"
                 )
 
-            # Simple Structured Text Prompt (Faster & Safer than JSON mode for 2B models)
+            # Extract Sleep Info if available in text (which logic passes as simple text usually? No, caller passes string)
+            # Actually, caller passes combined string. Let's assume input text has structure or we rely on the text content.
+            # But the user asked to tune analysis based on required sleep input.
+            # Let's see how 'analyze_diary_logic' calls this. It calls with `full_text`.
+            # We should probably update the prompt to explicitly look for sleep mentions if possible, or just emphasize it.
+            
+            # Better: The prompt format below.
+            
             prompt_text = (
-                f"다음 일기를 읽고 분석 결과를 아래 형식으로 작성해줘.\n"
+                f"너는 심리 상담 전문가야. 다음 내담자의 일기를 읽고 분석해줘.\n"
                 f"{context_section}"
-                f"### [오늘의 일기]:\n{text}\n\n"
-                f"형식:\n"
+                f"### [오늘의 일기 데이터]:\n{text}\n\n"
+                f"### [분석 지침]:\n"
+                f"1. 내담자의 '수면 상태(잠)'와 '감정'의 연관성을 깊이 있게 분석해줘. (예: 잠을 못 자서 예민한지, 푹 자서 개운한지)\n"
+                f"2. 단순한 공감을 넘어, 수면 패턴이 감정에 미친 영향을 언급하며 위로해줘.\n\n"
+                f"### [답변 형식]:\n"
                 f"Emotion: (happy, sad, angry, neutral, panic 중 하나)\n"
                 f"Confidence: (0~100 숫자만)\n"
-                f"Comment: (과거 맥락을 고려한 50자 이내의 따뜻한 한국어 위로)\n"
+                f"Comment: (수면 상태를 언급하며 50자 이내의 따뜻한 한국어 위로)\n"
                 f"반드시 위 형식만 지켜서 답변해."
             )
             

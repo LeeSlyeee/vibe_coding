@@ -56,10 +56,11 @@ def analyze_diary_logic(diary_id_str, update_progress_callback=None):
             
         # 2. Prepare text for analysis (Decrypt first)
         event = crypto_manager.decrypt(diary.get('event', ''))
+        sleep_condition = crypto_manager.decrypt(diary.get('sleep_condition', ''))
         emotion_desc = crypto_manager.decrypt(diary.get('emotion_desc', ''))
         emotion_meaning = crypto_manager.decrypt(diary.get('emotion_meaning', ''))
         
-        content = f"사건: {event}\n감정: {emotion_desc}\n생각: {emotion_meaning}"
+        content = f"수면 상태: {sleep_condition}\n사건: {event}\n감정: {emotion_desc}\n생각: {emotion_meaning}"
         
         # 2.5 Fetch 7-Day History Context
         history_context = ""

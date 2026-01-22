@@ -81,6 +81,8 @@
           :selected-date="selectedDate"
           @date-click="handleDateClick"
         />
+
+
       </div>
 
       <!-- 오른쪽: 일기 작성/상세보기 패널 -->
@@ -102,6 +104,7 @@
 
 <script>
 import { ref, computed, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import CalendarGrid from "../components/CalendarGrid.vue";
 import DiaryModal from "../components/DiaryModal.vue";
 import { diaryAPI } from "../services/api";
@@ -113,6 +116,7 @@ export default {
     DiaryModal,
   },
   setup() {
+    const router = useRouter();
     const currentYear = ref(new Date().getFullYear());
     const currentMonth = ref(new Date().getMonth() + 1);
     const diaries = ref([]);
@@ -306,6 +310,7 @@ export default {
             date: loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : loadedDiary.date,
             mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
             question1: loadedDiary.event || "",
+            sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",
             question2: loadedDiary.emotion_desc || "",
             question3: loadedDiary.emotion_meaning || "",
             question4: loadedDiary.self_talk || "",
@@ -357,6 +362,7 @@ export default {
                 : loadedDiary.date,
               mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
               question1: loadedDiary.event || "",
+              sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",
               question2: loadedDiary.emotion_desc || "",
               question3: loadedDiary.emotion_meaning || "",
               question4: loadedDiary.self_talk || "",
@@ -374,6 +380,8 @@ export default {
       loadDiaries();
     });
 
+
+
     return {
       currentYear,
       currentMonth,
@@ -390,6 +398,8 @@ export default {
       searchResults,
       isSearching,
       dominantMood,
+      handleSearch,
+      closeSearch,
       handleSearch,
       closeSearch,
       handleSearch,
@@ -565,6 +575,45 @@ body {
 
 .search-btn-v2:hover {
   opacity: 1;
+}
+
+/* 퀵 링크 스타일 */
+.quick-links {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.quick-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.guide-btn {
+    background: #eef2ff;
+    color: #4f46e5;
+}
+
+.stats-btn-main {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.quick-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(0.95);
 }
 
 .stats-premium-banner {

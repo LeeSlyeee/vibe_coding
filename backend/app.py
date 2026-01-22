@@ -213,7 +213,7 @@ from crypto_utils import crypto_manager
 # Helper to Decrypt Doc
 def decrypt_doc(doc):
     if not doc: return None
-    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'ai_prediction', 'ai_comment', 'mindset']
+    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'sleep_condition', 'sleep_desc', 'ai_prediction', 'ai_comment', 'mindset']
     for field in sensitive_fields:
         if field in doc and isinstance(doc[field], str):
             doc[field] = crypto_manager.decrypt(doc[field])
@@ -240,7 +240,7 @@ def map_ai_to_mood(ai_text):
 # Helper to Encrypt Data (for saving)
 def encrypt_data(data):
     encrypted = {}
-    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'ai_prediction', 'ai_comment', 'mindset']
+    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'sleep_condition', 'sleep_desc', 'ai_prediction', 'ai_comment', 'mindset']
     for k, v in data.items():
         if k in sensitive_fields and isinstance(v, str):
             encrypted[k] = crypto_manager.encrypt(v)
@@ -276,6 +276,8 @@ def get_diaries():
 def create_diary():
     current_user_id = get_jwt_identity()
     data = request.get_json()
+    print(f"🔍 [DEBUG] Received diary data: {data}")
+    print(f"🔍 [DEBUG] sleep_condition value: '{data.get('sleep_condition', 'NOT_FOUND')}'")
     created_at_str = data.get('created_at')
     if created_at_str and created_at_str.endswith('Z'): created_at_str = created_at_str[:-1]
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
@@ -284,6 +286,7 @@ def create_diary():
     raw_diary = {
         'user_id': current_user_id,
         'event': data.get('event', ''),
+        'sleep_condition': data.get('sleep_condition', ''),
         'emotion_desc': data.get('emotion_desc', ''),
         'emotion_meaning': data.get('emotion_meaning', ''),
         'self_talk': data.get('self_talk', ''),
@@ -353,6 +356,7 @@ def update_diary(id):
     # Prepare update fields
     updates = {
         'event': data.get('event', crypto_manager.decrypt(diary.get('event'))), # Use existing decrypted if not provided
+        'sleep_condition': data.get('sleep_condition', crypto_manager.decrypt(diary.get('sleep_condition'))),
         'emotion_desc': data.get('emotion_desc', crypto_manager.decrypt(diary.get('emotion_desc'))),
         'emotion_meaning': data.get('emotion_meaning', crypto_manager.decrypt(diary.get('emotion_meaning'))),
         'self_talk': data.get('self_talk', crypto_manager.decrypt(diary.get('self_talk'))),

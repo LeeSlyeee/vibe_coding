@@ -30,7 +30,13 @@
 
     <!-- 모바일용 상단 헤더 (앱 타이틀만) -->
     <header class="navbar mobile-header" v-if="showNavbar">
-      <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+      <div class="mobile-navbar-content">
+        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+        <div class="mobile-nav-actions" v-if="isAuthenticated">
+          <button @click="$router.push('/guide')" class="mobile-icon-btn" title="가이드">📘</button>
+          <button @click="$router.push('/stats')" class="mobile-icon-btn" title="분석">📊</button>
+        </div>
+      </div>
     </header>
 
     <!-- 라우터 뷰 -->
@@ -206,11 +212,41 @@ export default {
 /* === Mobile & Responsive Styles === */
 .mobile-header {
   display: none;
-  justify-content: center;
-  padding: 12px;
-  padding-top: max(12px, env(safe-area-inset-top)); /* Handle Notch */
   background-color: white;
   z-index: 1000;
+  border-bottom: 1px solid #f2f2f7;
+}
+
+.mobile-navbar-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.mobile-nav-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.mobile-icon-btn {
+  background: #f5f5f7;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mobile-icon-btn:active {
+  background: #e8e8ed;
 }
 
 .bottom-nav {

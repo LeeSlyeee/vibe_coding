@@ -1,4 +1,14 @@
+
 import { createRouter, createWebHistory } from 'vue-router'
+
+// 정적 임포트로 변경하여 빌드 오류 해결 시도
+import LoginPage from '../views/LoginPage.vue'
+import SignupPage from '../views/SignupPage.vue'
+import CalendarPage from '../views/CalendarPage.vue'
+import StatsPage from '../views/StatsPage.vue'
+import GuidePage from '../views/GuidePage.vue'
+import DiaryWritePage from '../views/DiaryWritePage.vue'
+import DiaryDetailPage from '../views/DiaryDetailPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -10,41 +20,41 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: () => import('../views/LoginPage.vue')
+      component: LoginPage
     },
     {
       path: '/signup',
       name: 'signup',
-      component: () => import('../views/SignupPage.vue')
+      component: SignupPage
     },
     {
       path: '/calendar',
       name: 'calendar',
-      component: () => import('../views/CalendarPage.vue'),
+      component: CalendarPage,
       meta: { requiresAuth: true }
     },
     {
       path: '/stats',
       name: 'stats',
-      component: () => import('../views/StatsPage.vue'),
+      component: StatsPage,
       meta: { requiresAuth: true }
     },
     {
       path: '/guide',
       name: 'guide',
-      component: () => import('../views/GuidePage.vue'),
+      component: GuidePage,
       meta: { requiresAuth: true }
     },
     {
       path: '/diary/write/:date?',
       name: 'diary-write',
-      component: () => import('../views/DiaryWritePage.vue'),
+      component: DiaryWritePage,
       meta: { requiresAuth: true }
     },
     {
       path: '/diary/:id',
       name: 'diary-detail',
-      component: () => import('../views/DiaryDetailPage.vue'),
+      component: DiaryDetailPage,
       meta: { requiresAuth: true }
     }
   ]
