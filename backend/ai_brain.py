@@ -33,7 +33,7 @@ except ImportError as e:
 
 
 class EmotionAnalysis:
-    def __init__(self):
+    def __init__(self, light_mode=False):
         self.tokenizer = None
         self.model = None
         self.max_len = 50
@@ -66,7 +66,10 @@ class EmotionAnalysis:
 
                
         # === Tensorflow / LSTM Model Logic ===
-        if TENSORFLOW_AVAILABLE:
+        # [User Request] Switch to Full LLM (Gemma) Mode. Disabling LSTM loading.
+        self.use_lstm = False 
+        
+        if self.use_lstm and TENSORFLOW_AVAILABLE and not light_mode:
             self.tokenizer = Tokenizer()
             # Check for saved model
             base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -95,8 +98,8 @@ class EmotionAnalysis:
             
             print("AI Model initialization finished.")
 
-        else: # TENSORFLOW NOT AVAILABLE
-             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
+        else: 
+             print("Initializing Gemma-based Emotion Analysis (LSTM Disabled)...")
 
         # Load Comment Bank (Safety Net) - Always load this
         self.load_comment_bank()
@@ -293,17 +296,17 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "gemma2:2b",
+                "model": "maum-on-gemma",
                 "prompt": prompt_text,
                 "stream": False,
                 # No 'format': 'json' here because we want free text
                 "options": {
-                    "temperature": 0.7,
+                    "temperature": 0.5,
                     "num_predict": 100 
                 }
             }
             
-            print(f"🦙 [Insight] Requesting Ollama (Gemma 2:2b)...")
+            print(f"🦙 [Insight] Requesting Ollama (Maum-On Gemma)...")
             url = "http://localhost:11434/api/generate"
             
             # Timeout Increased to 60s (OCI CPU might be slow or busy)
@@ -327,9 +330,64 @@ class EmotionAnalysis:
             print(f"❌ [Insight] Inference Failed: {str(e)}")
             return None
 
+    def generate_chat_reaction(self, user_text):
+        """
+        Generates a rich, empathetic reaction to the user's chat input.
+        """
+        if not user_text: return None
+        
+        sanitized = self._sanitize_context(user_text)
+        
+        prompt_text = (
+            f"내담자의 말: \"{sanitized}\"\n\n"
+            "너는 다정하고 통찰력 있는 심리 상담사야. 내담자의 말을 듣고 **풍부한 공감과 긍정적인 피드백**을 해줘.\n"
+            "지시사항:\n"
+            "1. 내담자의 감정이나 행동을 구체적으로 언급하며 '그렇군요', '정말 ~하셨겠어요'라고 공감해.\n"
+            "2. 그 행동이나 감정이 얼마나 소중한지, 또는 잘 대처했는지 칭찬해줘. (피드백)\n"
+            "3. 말투는 따뜻하고 부드러운 '해요체'를 써.\n"
+            "4. 질문은 하지 마. (다음 질문은 정해져 있어)\n"
+            "5. 2~3문장으로 100자 이내로 작성해.\n\n"
+            "리액션:"
+        )
+        
+        try:
+            payload = {
+                "model": "maum-on-gemma",
+                "prompt": prompt_text,
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 150
+                }
+            }
+            
+            url = "http://localhost:11434/api/generate"
+            response = requests.post(url, json=payload, timeout=20)
+            
+            if response.status_code == 200:
+                result = response.json()
+                reaction = result.get('response', '').strip()
+                if reaction.startswith('"') and reaction.endswith('"'):
+                    reaction = reaction[1:-1]
+                return reaction
+            return None
+        except Exception as e:
+            print(f"❌ Reaction Gen Error: {e}")
+            # Fallback Reactions (Safety Net)
+            fallbacks = [
+                "그렇군요. 이야기해주셔서 정말 고마워요. 😌",
+                "저런, 그런 일이 있으셨군요. 마음이 쓰이네요. 🥺",
+                "정말 공감이 가요. 💭",
+                "네, 계속 이야기해주세요. 제가 듣고 있어요. 👂",
+                "어떤 기분인지 조금은 알 것 같아요. 💫"
+            ]
+            return random.choice(fallbacks)
+
     def _rebuild_inference_models(self):
         # Seq2Seq Removed
-        pass 
+        pass
+
+    # Function moved to end of file to fix indentation 
 
     def train_comment_model(self):
         # Seq2Seq Removed
@@ -344,26 +402,22 @@ class EmotionAnalysis:
 
         emotion_result = "분석 불가"
         
-        # 1. Emotion Classification (LSTM or Keyword)
-        if TENSORFLOW_AVAILABLE and self.model:
-            try:
-                tf_start = time.time()
-                sequences = self.tokenizer.texts_to_sequences([text])
-                padded = pad_sequences(sequences, maxlen=self.max_len)
-                prediction = self.model.predict(padded, verbose=0)[0]
-                predicted_class_idx = np.argmax(prediction)
-                confidence = prediction[predicted_class_idx]
-                predicted_label = self.classes[predicted_class_idx]
-                emotion_result = f"{predicted_label} ({(confidence * 100):.1f}%)"
-                print(f"⏱️ [Timer] TensorFlow Prediction took: {time.time() - tf_start:.3f}s")
-            except Exception as e:
-                print(f"Prediction error: {e}")
-                emotion_result = self._fallback_predict(text)
-        else:
-            emotion_result = self._fallback_predict(text)
+        # [User Request] Gemma-First Analysis
+        try:
+            llm_emotion, llm_comment = self.analyze_diary_with_local_llm(text)
+            if llm_emotion:
+                 emotion_result = llm_emotion
+            else:
+                 emotion_result = self._fallback_predict(text)
             
-        # 2. Comment Generation (Priority: Local LLM -> Keyword)
-        comment_result = ""
+            # Store comment for next step
+            self.temp_llm_comment = llm_comment
+        except:
+            emotion_result = self._fallback_predict(text)
+            self.temp_llm_comment = None
+            
+        # 2. Comment Generation
+        comment_result = getattr(self, 'temp_llm_comment', None)
         
 
 
@@ -371,7 +425,7 @@ class EmotionAnalysis:
         
         # Final Fallback
         if not comment_result:
-            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 정말 고생 많으셨어요."
+            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 정말 수고하셨어요."
             
         print(f"✨ [Timer] Total AI Analysis took: {time.time() - start_time:.3f}s")
         return {
@@ -667,7 +721,7 @@ class EmotionAnalysis:
         import json
         
         # Local Ollama URL
-        print(f"🦙 [Local AI] Requesting Ollama (Gemma 2:2b)...", end=" ", flush=True)
+        print(f"🦙 [Local AI] Requesting Ollama (Maum-On Gemma)...", end=" ", flush=True)
         try:
             url = "http://localhost:11434/api/generate"
             
@@ -703,7 +757,7 @@ class EmotionAnalysis:
             )
             
             payload = {
-                "model": "gemma2:2b",
+                "model": "maum-on-gemma",
                 "prompt": prompt_text,
                 "stream": False,
                 # "format": "json"  <-- REMOVED: Cause of hanging
@@ -978,4 +1032,82 @@ class EmotionAnalysis:
             session.rollback()
         finally:
             session.close()
+
+# Standalone Function: Bypasses EmotionAnalysis class init for stability
+def generate_analysis_reaction_standalone(user_text, mode='reaction'):
+    print(f"DEBUG: generate_analysis_reaction_standalone called. Mode={mode}, Text={user_text[:20]}...")
+    if not user_text: return None
+    import re
+    import requests
+    import random
+    
+    # 1. Sanitize
+    text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', user_text)
+    sanitized = text[:300]
+    
+    # 2. Prompt Switching
+    if mode == 'question':
+        # Follow-up Question Prompt
+        prompt_text = (
+            f"내담자의 말: \"{sanitized}\"\n\n"
+            "내담자가 너무 짧고 단답형으로 대답했어. 대화를 더 깊게 이끌어내기 위해 **자연스러운 꼬리 질문**을 하나 던져줘.\n"
+            "지시사항:\n"
+            "1. 내담자의 말을 반복하기보다, 그 이면의 이유나 구체적인 내용을 물어봐.\n"
+            "2. '그렇군요' 같은 짧은 공감 후 바로 질문해.\n"
+            "3. 말투는 다정하고 궁금해하는 '해요체'를 써.\n"
+            "4. 100자 이내로.\n\n"
+            "꼬리 질문:"
+        )
+    else:
+        # Standard Reaction Prompt
+        prompt_text = (
+            f"내담자의 말: \"{sanitized}\"\n\n"
+            "너는 깊은 통찰력을 지닌 따뜻한 심리 상담사야. 내담자의 말을 듣고 **상황을 분석**하고 **지지하는 코멘트**를 해줘.\n"
+            "지시사항:\n"
+            "1. 먼저 내담자의 말 속에 숨겨진 감정이나 욕구를 분석해서 언급해줘. (예: '기대감과 동시에 걱정도 있으신 것 같군요.')\n"
+            "2. 그 다음, 그 감정이 타당함을 지지해주고 따뜻하게 격려해줘.\n"
+            "3. 말투는 전문적이고 부드러운 '해요체'를 써.\n"
+            "4. 질문은 하지 마.\n"
+            "5. 150자 이내로.\n\n"
+            "분석 및 리액션:"
+        )
+    
+    try:
+        payload = {
+            "model": "maum-on-gemma",
+            "prompt": prompt_text,
+            "stream": False,
+            "options": {
+                "temperature": 0.7, 
+                "num_predict": 180
+            }
+        }
+        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=60)
+        
+        if res.status_code == 200:
+            result = res.json().get('response', '').strip()
+            if result.startswith('"') and result.endswith('"'):
+                result = result[1:-1]
+            if result: return result
+            
+    except Exception as e:
+        print(f"❌ Standalone AI Error: {e}")
+        
+    # 3. Fallback (Mode Specific)
+    if mode == 'question':
+        fallbacks = [
+            "그렇군요. 혹시 조금 더 자세히 이야기해주실 수 있나요? 궁금해요.",
+            "저런, 특별한 이유가 있었는지 듣고 싶어요.",
+            "짧게 말씀하시니 더 깊은 속마음이 궁금해지네요. 편하게 털어놓아주세요.",
+            "그 일이 내담자님께 어떤 의미였는지 조금만 더 들려주세요."
+        ]
+    else:
+        fallbacks = [
+            "말씀하신 내용에서 깊은 고민과 진심이 느껴지네요. 잘하고 계십니다.",
+            "상황을 차분히 들여다보면, 그 안에서 스스로의 성장을 발견하실 수 있을 거예요.",
+            "지금 느끼시는 감정은 매우 자연스러운 반응이에요. 스스로를 믿어보세요.",
+            "이야기를 들어보니, 그동안 마음속에 담아두셨던 생각들이 많으셨던 것 같아 마음이 쓰이네요."
+        ]
+        
+    return random.choice(fallbacks)
 
