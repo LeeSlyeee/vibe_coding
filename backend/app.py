@@ -277,7 +277,7 @@ def create_diary():
     current_user_id = get_jwt_identity()
     data = request.get_json()
     print(f"🔍 [DEBUG] Received diary data: {data}")
-    print(f"🔍 [DEBUG] sleep_condition value: '{data.get('sleep_condition', 'NOT_FOUND')}'")
+    print(f"🔍 [DEBUG] sleep_desc value: '{data.get('sleep_desc', 'NOT_FOUND')}'")
     created_at_str = data.get('created_at')
     if created_at_str and created_at_str.endswith('Z'): created_at_str = created_at_str[:-1]
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
@@ -286,7 +286,7 @@ def create_diary():
     raw_diary = {
         'user_id': current_user_id,
         'event': data.get('event', ''),
-        'sleep_condition': data.get('sleep_condition', ''),
+        'sleep_desc': data.get('sleep_desc', ''),
         'emotion_desc': data.get('emotion_desc', ''),
         'emotion_meaning': data.get('emotion_meaning', ''),
         'self_talk': data.get('self_talk', ''),
@@ -305,22 +305,59 @@ def create_diary():
         result = mongo.db.diaries.insert_one(encrypted_diary)
         new_diary_id = str(result.inserted_id)
         
-        # Trigger Task (Threading)
-        task_id = "local-thread"
-        try:
-            # Use threading to run analysis in background logic directly
-            
-            # Note: We need to pass the ID string
-            threading.Thread(
-                target=analyze_diary_logic, 
-                args=(new_diary_id,)
-            ).start()
-            
-            mongo.db.diaries.update_one({'_id': result.inserted_id}, {'$set': {'task_id': task_id}})
-        except Exception as e:
-            print(f"Failed to start thread: {e}")
+        # Trigger Task (Threading) only if AI analysis is missing
+        request_ai_pred = data.get('ai_prediction', '').strip()
+        request_ai_comment = data.get('ai_comment', '').strip()
         
-        # Return Decrypted Response (which is just raw_diary with ID)
+        # Check if client provided valid analysis (Hybrid Logic)
+        # Note: "분석 중..." or similar placeholders mean no analysis provided.
+        is_client_analyzed = (
+            request_ai_pred and 
+            request_ai_comment and 
+            "분석 중" not in request_ai_pred and 
+            "기다려주세요" not in request_ai_comment
+        )
+
+        task_id = "local-thread"
+        
+        if is_client_analyzed:
+            print("📱 [Hybrid] Client provided AI analysis. Back-end analysis skipped.")
+            task_id = "client-side"
+            # Update the stored document with the provided AI fields if raw_diary had placeholders
+            # But wait, raw_diary was initialized with placeholders above. 
+            # We need to update raw_diary BEFORE encryption or update the DB after.
+            # Let's adjust raw_diary creation.
+            
+            # Actually, raw_diary logic above set default placeholders. 
+            # We should used the provided values if they exist.
+            # Let's correct the workflow:
+            # 1. We already inserted the doc. If we want to use client values, we should have used them in insert.
+            # To fix this without massive refactor: We update the doc immediately if client provided data.
+            
+            # Re-encrypt client provided values
+            ai_updates = {
+                'ai_prediction': crypto_manager.encrypt(request_ai_pred),
+                'ai_comment': crypto_manager.encrypt(request_ai_comment),
+                'task_id': 'client-side'
+            }
+            mongo.db.diaries.update_one({'_id': result.inserted_id}, {'$set': ai_updates})
+            
+            # Update response data to reflect this
+            raw_diary['ai_prediction'] = request_ai_pred
+            raw_diary['ai_comment'] = request_ai_comment
+            
+        else:
+            print("☁️ [Hybrid] No AI analysis provided. Triggering Server AI...")
+            try:
+                threading.Thread(
+                    target=analyze_diary_logic, 
+                    args=(new_diary_id,)
+                ).start()
+                mongo.db.diaries.update_one({'_id': result.inserted_id}, {'$set': {'task_id': task_id}})
+            except Exception as e:
+                print(f"Failed to start thread: {e}")
+        
+        # Return Decrypted Response
         raw_diary['_id'] = result.inserted_id
         response_data = serialize_doc(raw_diary)
         response_data['task_id'] = task_id
@@ -356,7 +393,7 @@ def update_diary(id):
     # Prepare update fields
     updates = {
         'event': data.get('event', crypto_manager.decrypt(diary.get('event'))), # Use existing decrypted if not provided
-        'sleep_condition': data.get('sleep_condition', crypto_manager.decrypt(diary.get('sleep_condition'))),
+        'sleep_desc': data.get('sleep_desc', crypto_manager.decrypt(diary.get('sleep_desc'))),
         'emotion_desc': data.get('emotion_desc', crypto_manager.decrypt(diary.get('emotion_desc'))),
         'emotion_meaning': data.get('emotion_meaning', crypto_manager.decrypt(diary.get('emotion_meaning'))),
         'self_talk': data.get('self_talk', crypto_manager.decrypt(diary.get('self_talk'))),
@@ -372,15 +409,50 @@ def update_diary(id):
     
     mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
     
-    # Trigger AI (Threading)
-    try:
-        threading.Thread(
-            target=analyze_diary_logic,
-            args=(id,)
-        ).start()
-        mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': 'local-thread'}})
-    except Exception as e: 
-        print(f"Failed to start thread: {e}")
+    mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
+    
+    # [Hybrid Logic for Update]
+    # Check if client provided valid analysis in this update request
+    req_ai_pred = data.get('ai_prediction', '').strip()
+    req_ai_comment = data.get('ai_comment', '').strip()
+    
+    is_client_analyzed = (
+        req_ai_pred and 
+        req_ai_comment and 
+        "재분석 중" not in req_ai_pred and 
+        "기다려주세요" not in req_ai_comment
+    )
+
+    if is_client_analyzed:
+        print(f"📱 [Hybrid-Update] Client provided AI analysis for {id}. Server analysis skipped.")
+        # We don't need to do anything extra because we already saved the encrypted_updates above,
+        # which included ai_prediction/ai_comment if they were present in 'data'.
+        # Wait, let's double check 'encrypted_updates' creation above.
+        
+        # 'updates' dict above sets ai_prediction to "재분석 중..." by default.
+        # We need to override that default if client provided data.
+        
+        # Correct logic:
+        # If client provided data, we should have used it in 'updates' dict.
+        # Since 'updates' dict was hardcoded with placeholders, we must update DB again here.
+        
+        ai_fix = {
+            'ai_prediction': crypto_manager.encrypt(req_ai_pred),
+            'ai_comment': crypto_manager.encrypt(req_ai_comment),
+            'task_id': 'client-side-update'
+        }
+        mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': ai_fix})
+        
+    else:
+        print(f"☁️ [Hybrid-Update] No AI provided. Triggering Server AI Re-analysis for {id}...")
+        try:
+            threading.Thread(
+                target=analyze_diary_logic,
+                args=(id,)
+            ).start()
+            mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': 'local-thread'}})
+        except Exception as e: 
+            print(f"Failed to start thread: {e}")
     
     # Return decrypted
     updated_diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})

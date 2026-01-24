@@ -1,4 +1,3 @@
-
 import SwiftUI
 
 struct AppDiaryWriteView: View {
@@ -7,12 +6,17 @@ struct AppDiaryWriteView: View {
     var date: Date
     var onSave: () -> Void
     
-    // ✅ Base URL
+    // 수정할 일기 데이터 (nil이면 새 글 작성)
+    var diaryToEdit: Diary? = nil
+    
+    // Base URL
     let baseURL = "https://217.142.253.35.nip.io"
     
     // Voice Recorder
     @StateObject private var voiceRecorder = VoiceRecorder()
-    @State private var activeRecordingField: Int? = nil // 1: q1, 2: q2, 3: q3, 4: q4
+    @State private var activeRecordingField: Int? = nil 
+    // Field IDs: 
+    // 0: qs (수면), 1: q1 (사건), 2: q2 (감정), 3: q3 (의미), 4: q4 (독백)
     @State private var baseTextBeforeRecording: String = ""
     
     @State private var mood: Int = 3
@@ -21,11 +25,11 @@ struct AppDiaryWriteView: View {
     @State private var isLoadingInsight = true
     
     // Form State
-    @State private var q1: String = "" // Event
-    @State private var q2: String = "" // Emotion
-    @State private var q3: String = "" // Meaning
-    @State private var q4: String = "" // Self talk
-    @State private var qs: String = "" // Sleep
+    @State private var q1: String = "" // Event (무슨 일)
+    @State private var q2: String = "" // Emotion (어떤 감정)
+    @State private var q3: String = "" // Meaning (감정 의미)
+    @State private var q4: String = "" // Self talk (나에게 말)
+    @State private var qs: String = "" // Sleep (잠)
     @State private var isSaving = false
     
     // Weather State
@@ -35,18 +39,17 @@ struct AppDiaryWriteView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // 기본 배경
                 Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all)
                 
                 if showForm {
-                    // 일기 작성 폼 (디자인 개선 & 음성 녹음 추가)
+                    // 일기 작성 폼
                     VStack(spacing: 0) {
                         // 커스텀 헤더
                         HStack {
                             Button("취소") { isPresented = false }
                                 .foregroundColor(.gray)
                             Spacer()
-                            Text(dateString(date)).font(.headline)
+                            Text(diaryToEdit != nil ? "일기 수정" : dateStringLocal(date)).font(.headline)
                             Spacer()
                             Button(action: saveDiary) {
                                 if isSaving { ProgressView() } else { Text("저장").fontWeight(.bold) }
@@ -69,7 +72,7 @@ struct AppDiaryWriteView: View {
                                             let asset = getMoodAsset(level: m)
                                             Button(action: { withAnimation { mood = m } }) {
                                                 VStack(spacing: 8) {
-                                                    Image(uiImage: UIImage(named: asset.image) ?? UIImage()) // Safety fallback
+                                                    Image(uiImage: UIImage(named: asset.image) ?? UIImage())
                                                         .resizable()
                                                         .scaledToFit()
                                                         .frame(width: 40, height: 40)
@@ -103,33 +106,13 @@ struct AppDiaryWriteView: View {
                                 // 질문 카드들
                                 questionCard(
                                     title: "잠은 잘 주무셨나요?",
-                                    binding: $qs,
+                                    binding: $qs, 
                                     fieldId: 0
                                 )
-                                
-                                questionCard(
-                                    title: "오늘 무슨 일이 있었나요?",
-                                    binding: $q1,
-                                    fieldId: 1
-                                )
-                                
-                                questionCard(
-                                    title: "어떤 감정이 들었나요?",
-                                    binding: $q2,
-                                    fieldId: 2
-                                )
-                                
-                                questionCard(
-                                    title: "감정의 의미는 무엇인가요? (선택)",
-                                    binding: $q3,
-                                    fieldId: 3
-                                )
-                                
-                                questionCard(
-                                    title: "나에게 해주고 싶은 말 (선택)",
-                                    binding: $q4,
-                                    fieldId: 4
-                                )
+                                questionCard(title: "오늘 무슨 일이 있었나요?", binding: $q1, fieldId: 1)
+                                questionCard(title: "어떤 감정이 들었나요?", binding: $q2, fieldId: 2)
+                                questionCard(title: "감정의 의미는 무엇인가요? (선택)", binding: $q3, fieldId: 3)
+                                questionCard(title: "나에게 해주고 싶은 말 (선택)", binding: $q4, fieldId: 4)
                                 
                                 Spacer(minLength: 50)
                             }
@@ -138,7 +121,7 @@ struct AppDiaryWriteView: View {
                     }
                     .transition(.opacity)
                 } else {
-                    // Insight View (기존 유지)
+                    // Insight View (작성 모드일 때만)
                     VStack {
                         // 상단 날짜 및 닫기 버튼 영역
                         HStack {
@@ -146,7 +129,7 @@ struct AppDiaryWriteView: View {
                                 Text("닫기").foregroundColor(.gray)
                             }
                             Spacer()
-                            Text(dateString(date)).font(.headline).foregroundColor(.gray)
+                            Text(dateStringLocal(date)).font(.headline).foregroundColor(.gray)
                             Spacer()
                             Button(action: {}) { Text("    ") }
                         }
@@ -160,9 +143,8 @@ struct AppDiaryWriteView: View {
                         .font(.subheadline)
                         .foregroundColor(.blue)
                         .padding(.bottom, 20)
-
+                        
                         if isLoadingInsight {
-                            // 로딩화면
                             VStack(spacing: 40) {
                                 Spacer()
                                 ZStack {
@@ -180,7 +162,6 @@ struct AppDiaryWriteView: View {
                                 Spacer()
                             }
                         } else {
-                            // 인사이트 결과 화면
                             VStack(spacing: 30) {
                                 Spacer()
                                 Circle().fill(Color.purple.opacity(0.1)).frame(width: 80, height: 80)
@@ -204,12 +185,40 @@ struct AppDiaryWriteView: View {
             .navigationBarHidden(true)
         }
         .navigationViewStyle(StackNavigationViewStyle())
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { fetchWeather() }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
-                if isLoadingInsight {
-                    isLoadingInsight = false
-                    if insightMessage.isEmpty { insightMessage = "오늘 하루도 수고 많으셨어요." }
+                .onAppear {
+            if let edit = diaryToEdit {
+                // [강제 업데이트] 약간의 딜레이를 주어 State 반영 보장
+                DispatchQueue.main.async {
+                    print("🛠️ [DEBUG] 수정 데이터 로드: \(edit)")
+                    self.q1 = edit.event ?? ""
+                    self.q2 = edit.emotion_desc ?? ""
+                    self.q3 = edit.emotion_meaning ?? ""
+                    self.q4 = edit.self_talk ?? ""
+                    
+                    // 🚨 핵심 수정: sleep_desc 값이 있으면 넣고, 없으면 sleep_condition 확인
+                    if let sleep = edit.sleep_desc ?? edit.sleep_condition {
+                        print("💤 수면 데이터 발견: \(sleep)")
+                        self.qs = sleep
+                    } else {
+                        print("⚠️ 수면 데이터 없음(nil)")
+                        self.qs = ""
+                    }
+                    
+                    self.mood = edit.mood_level
+                    self.weatherDesc = edit.weather ?? "맑음"
+                    self.temp = edit.temperature ?? 20.0
+                    
+                    self.showForm = true
+                    self.isLoadingInsight = false
+                }
+            } else {
+                // 새 글 작성
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { fetchWeather() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
+                    if isLoadingInsight {
+                        isLoadingInsight = false
+                        if insightMessage.isEmpty { insightMessage = "오늘 하루도 수고 많으셨어요." }
+                    }
                 }
             }
         }
@@ -229,15 +238,12 @@ struct AppDiaryWriteView: View {
         }
     }
     
-    // MARK: - Components
+    // Components (질문 카드)
     func questionCard(title: String, binding: Binding<String>, fieldId: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(title)
-                    .font(.headline)
-                    .foregroundColor(Color(UIColor.darkGray))
+                Text(title).font(.headline).foregroundColor(Color(UIColor.darkGray))
                 Spacer()
-                
                 // 마이크 버튼
                 Button(action: { toggleRecording(for: fieldId, currentText: binding.wrappedValue) }) {
                     Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
@@ -247,7 +253,6 @@ struct AppDiaryWriteView: View {
                         .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
                 }
             }
-            
             TextEditor(text: binding)
                 .frame(height: 100)
                 .padding(8)
@@ -260,67 +265,47 @@ struct AppDiaryWriteView: View {
         .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
     
-    // MARK: - Logic
+    // Logic: 녹음 토글
     func toggleRecording(for fieldId: Int, currentText: String) {
         if activeRecordingField == fieldId && voiceRecorder.isRecording {
-            // Stop
             voiceRecorder.stopRecording()
             activeRecordingField = nil
         } else {
-            // Start
-            // 다른 곳 녹음 중이면 중지
             if voiceRecorder.isRecording { voiceRecorder.stopRecording() }
-            
             activeRecordingField = fieldId
             baseTextBeforeRecording = currentText
-            voiceRecorder.startRecording()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                if self.activeRecordingField == fieldId { self.voiceRecorder.startRecording() }
+            }
         }
     }
     
-    // (이하 기존 로직 동일)
+    // Logic: 날씨 API
     func fetchWeather() {
-        guard let url = URL(string: "https://ipapi.co/json/") else {
-            fetchInsight(); return
-        }
+        guard let url = URL(string: "https://ipapi.co/json/") else { fetchInsight(); return }
         
         URLSession.shared.dataTask(with: url) { data, _, error in
-            var lat = 37.5665
-            var lon = 126.9780
-            
-            if error == nil, let data = data,
-               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let l = json["latitude"] as? Double,
-               let g = json["longitude"] as? Double {
+            var lat = 37.5665; var lon = 126.9780
+            if error == nil, let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let l = json["latitude"] as? Double, let g = json["longitude"] as? Double {
                 lat = l; lon = g
             }
             
             let weatherUrlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current_weather=true&timezone=auto"
-            guard let wUrl = URL(string: weatherUrlString) else {
-                DispatchQueue.main.async { self.fetchInsight() }
-                return
-            }
+            guard let wUrl = URL(string: weatherUrlString) else { DispatchQueue.main.async { self.fetchInsight() }; return }
             
             URLSession.shared.dataTask(with: wUrl) { wData, _, _ in
-                if let wData = wData,
-                   let wJson = try? JSONSerialization.jsonObject(with: wData) as? [String: Any],
+                if let wData = wData, let wJson = try? JSONSerialization.jsonObject(with: wData) as? [String: Any],
                    let current = wJson["current_weather"] as? [String: Any] {
-                    
                     let code = current["weathercode"] as? Int ?? 0
-                    let temperature = current["temperature"] as? Double ?? 20.0
-                    let map: [Int: String] = [
-                        0: "맑음 ☀️", 1: "대체로 맑음 🌤️", 2: "구름 조금 ⛅", 3: "흐림 ☁️",
-                        45: "안개 🌫️", 48: "안개 🌫️", 51: "이슬비 🌧️", 53: "이슬비 🌧️", 55: "이슬비 🌧️",
-                        61: "비 ☔", 63: "비 ☔", 65: "비 ☔", 80: "소나기 ☔", 95: "뇌우 ⚡"
-                    ]
-                    
+                    let temp = current["temperature"] as? Double ?? 20.0
+                    let map: [Int: String] = [0: "맑음 ☀️", 1: "대체로 맑음 🌤️", 2: "구름 조금 ⛅", 3: "흐림 ☁️", 45: "안개 🌫️", 48: "안개 🌫️", 51: "이슬비 🌧️", 53: "이슬비 🌧️", 55: "이슬비 🌧️", 61: "비 ☔", 63: "비 ☔", 65: "비 ☔", 80: "소나기 ☔", 95: "뇌우 ⚡"]
                     DispatchQueue.main.async {
                         self.weatherDesc = map[code] ?? "흐림"
-                        self.temp = temperature
+                        self.temp = temp
                         self.fetchInsight()
                     }
-                } else {
-                    DispatchQueue.main.async { self.fetchInsight() }
-                }
+                } else { DispatchQueue.main.async { self.fetchInsight() } }
             }.resume()
         }.resume()
     }
@@ -331,56 +316,63 @@ struct AppDiaryWriteView: View {
             insightMessage = "로그인이 필요합니다."
             return 
         }
-        
         let encodedWeather = weatherDesc.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "맑음"
-        let dateStr = dateString(date)
+        let dateStr = dateStringLocal(date)
         guard let url = URL(string: "\(baseURL)/api/insight?date=\(dateStr)&weather=\(encodedWeather)") else { return }
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
-        let task = URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.dataTask(with: request) { data, _, error in
             DispatchQueue.main.async {
                 isLoadingInsight = false
-                if let error = error {
-                    print("Insight Error: \(error)")
-                    if insightMessage.isEmpty {
-                        insightMessage = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
-                    }
-                    return
-                }
-                
-                guard let data = data else { return }
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let msg = json["message"] as? String, !msg.isEmpty {
-                        insightMessage = msg
-                    } else {
-                        insightMessage = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
-                    }
-                } catch {
-                     insightMessage = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
+                if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let msg = json["message"] as? String, !msg.isEmpty {
+                    insightMessage = msg
+                } else {
+                    insightMessage = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
                 }
             }
-        }
-        task.resume()
+        }.resume()
     }
     
+    // Logic: 저장
     func saveDiary() {
         guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-        guard let url = URL(string: "\(baseURL)/api/diaries") else { return }
         
+        var url: URL?
+        var method = "POST"
+        
+        if let editId = diaryToEdit?.realId {
+            url = URL(string: "\(baseURL)/api/diaries/\(editId)")
+            method = "PUT"
+        } else {
+            url = URL(string: "\(baseURL)/api/diaries")
+            method = "POST"
+        }
+        guard let finalUrl = url else { return }
         isSaving = true
         
-        let now = Date()
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.hour, .minute, .second], from: now)
-        components.year = calendar.component(.year, from: date)
-        components.month = calendar.component(.month, from: date)
-        components.day = calendar.component(.day, from: date)
-        let finalDate = calendar.date(from: components) ?? date
-        
-        let isoDate = ISO8601DateFormatter().string(from: finalDate)
+        // Data Preparation
+        let isoDate: String
+        if method == "PUT", let existing = diaryToEdit?.created_at {
+             isoDate = existing // 수정 시 기존 생성일 유지
+        } else {
+            // 저장 시 UTC 시간으로 정확히 변환하여 전송
+            let now = Date()
+            let calendar = Calendar.current
+            var components = calendar.dateComponents([.hour, .minute, .second], from: now)
+            components.year = calendar.component(.year, from: date)
+            components.month = calendar.component(.month, from: date)
+            components.day = calendar.component(.day, from: date)
+            let finalDate = calendar.date(from: components) ?? now
+            
+            // ISO8601 (UTC)
+            let formatter = ISO8601DateFormatter()
+            formatter.timeZone = TimeZone(secondsFromGMT: 0) // UTC 강제
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            isoDate = formatter.string(from: finalDate)
+        }
         
         let body: [String: Any] = [
             "created_at": isoDate,
@@ -394,29 +386,29 @@ struct AppDiaryWriteView: View {
             "temperature": temp
         ]
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        var request = URLRequest(url: finalUrl)
+        request.httpMethod = method
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, _, error in
-            DispatchQueue.main.async { isSaving = false }
-            
-            if let error = error {
-                print("Save Error: \(error)")
-                return
-            }
-            
             DispatchQueue.main.async {
-                onSave()
-                isPresented = false
+                isSaving = false
+                if error == nil {
+                    onSave()
+                    isPresented = false
+                }
             }
         }.resume()
     }
     
-    func dateString(_ d: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d)
+    func dateStringLocal(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        // 로컬 타임존 기준 문자열 반환
+        f.timeZone = TimeZone.current 
+        return f.string(from: d)
     }
     
     func moodEmoji(_ l: Int) -> String {

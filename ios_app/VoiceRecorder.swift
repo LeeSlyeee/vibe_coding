@@ -29,11 +29,11 @@ class VoiceRecorder: ObservableObject {
     func startRecording() {
         guard permissionGranted else { return }
         
-        // Cancel existing task
-        if recognitionTask != nil {
-            recognitionTask?.cancel()
-            recognitionTask = nil
-        }
+        // 1. 기존 녹음 강제 정리 (Reset)
+        stopRecording()
+        
+        // 잠시 대기 (AudioEngine 리셋 시간 확보)
+        // 실제로는 비동기 처리 없이 바로 해도 되지만, 안전을 위해 로직 분리
         
         let audioSession = AVAudioSession.sharedInstance()
         do {
@@ -47,6 +47,9 @@ class VoiceRecorder: ObservableObject {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         
         let inputNode = audioEngine.inputNode
+        // ⚠️ 중요: 기존 Tap이 남아있다면 제거 (방어 코드)
+        inputNode.removeTap(onBus: 0)
+        
         guard let recognitionRequest = recognitionRequest else { return }
         
         recognitionRequest.shouldReportPartialResults = true
@@ -60,6 +63,7 @@ class VoiceRecorder: ObservableObject {
             }
             
             if error != nil || isFinal {
+                // 종료 시 Cleanup
                 self.audioEngine.stop()
                 inputNode.removeTap(onBus: 0)
                 
@@ -87,6 +91,8 @@ class VoiceRecorder: ObservableObject {
         if audioEngine.isRunning {
             audioEngine.stop()
             recognitionRequest?.endAudio()
+            // 안전하게 Tap 제거
+            audioEngine.inputNode.removeTap(onBus: 0) 
             isRecording = false
         }
     }

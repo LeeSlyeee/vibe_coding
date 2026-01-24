@@ -1,23 +1,35 @@
-
 import SwiftUI
 
 struct AppDiaryDetailView: View {
     let diary: Diary
     var onDelete: () -> Void
+    var onEdit: (() -> Void)? = nil 
+    
     @Environment(\.presentationMode) var presentationMode
     @State private var isDeleting = false
+    @State private var showingEditSheet = false
     
     let baseURL = "https://217.142.253.35.nip.io"
     
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // 상단 날짜 및 삭제 버튼
+                // 상단 날짜 및 버튼 영역
                 HStack {
                     Text(formatDate(diary.created_at ?? ""))
                         .font(.title2)
                         .fontWeight(.bold)
                     Spacer()
+                    
+                    // 수정 버튼
+                    Button(action: { showingEditSheet = true }) {
+                        Image(systemName: "pencil.circle")
+                            .font(.title2)
+                            .foregroundColor(.blue)
+                    }
+                    .padding(.trailing, 10)
+                    
+                    // 삭제 버튼
                     Button(action: deleteDiary) {
                         Image(systemName: "trash")
                             .foregroundColor(.red)
@@ -46,15 +58,15 @@ struct AppDiaryDetailView: View {
                 .padding(.vertical)
                 
                 Group {
-                    label("무슨 일이 있었나요?")
-                    Text(diary.event ?? "")
-                        .padding(.bottom)
-                    
-                    if let sleep = diary.sleep_desc, !sleep.isEmpty {
+                    if let sleep = getSleepContent(), !sleep.trimmingCharacters(in: .whitespaces).isEmpty {
                         label("잠은 잘 주무셨나요?")
                         Text(sleep)
                             .padding(.bottom)
                     }
+                    
+                    label("무슨 일이 있었나요?")
+                    Text(diary.event ?? "")
+                        .padding(.bottom)
                     
                     label("어떤 감정이 들었나요?")
                     Text(diary.emotion_desc ?? "")
@@ -73,8 +85,7 @@ struct AppDiaryDetailView: View {
                     }
                 }
                 
-                // AI 분석 영역 (Fallback Logic 적용)
-                // ai_analysis가 없으면 ai_prediction을 사용
+                // AI 분석 영역
                 if let ai = (diary.ai_analysis?.isEmpty == false ? diary.ai_analysis : diary.ai_prediction), !ai.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("🤖 AI 심리 분석")
@@ -88,7 +99,7 @@ struct AppDiaryDetailView: View {
                     .padding(.top)
                 }
                 
-                // ai_advice가 없으면 ai_comment를 사용
+                // AI 조언 영역
                 if let advice = (diary.ai_advice?.isEmpty == false ? diary.ai_advice : diary.ai_comment), !advice.isEmpty {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("💡 AI 조언")
@@ -108,6 +119,21 @@ struct AppDiaryDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(.light)
+        // 수정 시트 연결 (+수정 완료 시 닫기 & 새로고침)
+        .sheet(isPresented: $showingEditSheet) {
+            // 날짜 파싱 (임시, WriteView 내부에서 다시 계산함)
+            let parsedDate = parseDateString(diary.created_at ?? "") ?? Date()
+            
+            AppDiaryWriteView(
+                isPresented: $showingEditSheet,
+                date: parsedDate,
+                onSave: {
+                    onDelete() // 목록 갱신
+                    presentationMode.wrappedValue.dismiss() // 상세 뷰 닫기
+                },
+                diaryToEdit: diary
+            )
+        }
     }
     
     func label(_ text: String) -> some View {
@@ -135,62 +161,55 @@ struct AppDiaryDetailView: View {
         }.resume()
     }
     
+    // UTC 시간을 한국 시간으로 정확히 변환하여 표시
+    // UTC 시간을 한국 시간으로 정확히 변환하여 표시
     func formatDate(_ dateStr: String) -> String {
-        // 1. Try ISO8601 (standard)
-        let iso = ISO8601DateFormatter()
-        // Allow for fractional seconds just in case
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let validDate = parseDateString(dateStr) else { return dateStr }
         
-        if let date = iso.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
+        // 화면 표시용 Formatter (현재 기기 로컬 타임존 반영)
+        let displayFormatter = DateFormatter()
+        displayFormatter.timeZone = TimeZone.current
+        displayFormatter.dateFormat = "yy년 MM월 dd일 / a h시 mm분"
+        displayFormatter.amSymbol = "오전"
+        displayFormatter.pmSymbol = "오후"
         
-        // 2. Try ISO8601 without fractional options (some parsers are strict)
-        iso.formatOptions = [.withInternetDateTime]
-        if let date = iso.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
-
-        // 3. Fallback: specific string format for "yyyy-MM-ddTHH:mm:ss" (no timezone)
-        let parser = DateFormatter()
-        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        if let date = parser.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
-
-        // 4. Fallback: "yyyy-MM-dd HH:mm:ss" (no T separator)
-        parser.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        if let date = parser.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
-        
-        // 5. Explicit Fallback for "yyyy-MM-dd'T'HH:mm:ss.SSSSSS" (Microseconds)
-        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-        if let date = parser.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
-        
-        // 6. Explicit Fallback for "yyyy-MM-dd'T'HH:mm:ss.SSS" (Milliseconds)
-        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
-        if let date = parser.date(from: dateStr) {
-            let f = DateFormatter()
-            f.dateFormat = "yy년 MM월 dd일 / HH시mm분"
-            return f.string(from: date)
-        }
-        
-        // All strict parsing failed
-        return dateStr
+        return displayFormatter.string(from: validDate)
     }
     
-
+    // 강력한 날짜 파싱 헬퍼 (마이크로세컨드 지원 포함)
+    func parseDateString(_ dateStr: String) -> Date? {
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = isoFormatter.date(from: dateStr) { return date }
+        
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        if let date = isoFormatter.date(from: dateStr) { return date }
+        
+        let parser = DateFormatter()
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.timeZone = TimeZone(secondsFromGMT: 0) // UTC
+        
+        // Python default isoformat() often has 6 digits for microseconds (iOS default is 3)
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+        if let date = parser.date(from: dateStr) { return date }
+        
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        if let date = parser.date(from: dateStr) { return date }
+        
+        parser.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        if let date = parser.date(from: dateStr) { return date }
+        
+        parser.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        if let date = parser.date(from: dateStr) { return date }
+        
+        return nil
+    }
+    
+    func getSleepContent() -> String? {
+        // 우선순위: sleep_desc (구체적) > sleep_condition (레거시/간단)
+        if let desc = diary.sleep_desc, !desc.isEmpty {
+            return desc
+        }
+        return diary.sleep_condition
+    }
 }

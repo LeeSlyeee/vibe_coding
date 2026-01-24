@@ -11,3 +11,9 @@ ssh-key
 backend/server.log
 
 mood_diary_backup.json
+
+models/
+huggingface_cache/
+data/
+adapters_maumon/
+adapters_maumon_full/
