@@ -276,7 +276,7 @@ export default {
         console.log(`🌦️ Call Weather API: ${lat}, ${lon}, ${date || "Today"}`);
         let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
         let isPast = false;
-        let targetDate = date;
+        const targetDate = date;
 
         // Date comparison (Local)
         // Date comparison (Local)
@@ -479,7 +479,7 @@ export default {
           weather: weatherInfo.value ? weatherInfo.value.desc : null,
           temperature: weatherInfo.value ? weatherInfo.value.temp : null,
         };
-        let result = props.diary
+        const result = props.diary
           ? await diaryAPI.updateDiary(props.diary.id, payload)
           : await diaryAPI.createDiary(payload);
         localDiary.value = result;

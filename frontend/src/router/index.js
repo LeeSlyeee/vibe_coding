@@ -56,6 +56,12 @@ const router = createRouter({
       name: 'diary-detail',
       component: DiaryDetailPage,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/diary/chat/:date?',
+      name: 'diary-chat',
+      component: () => import('../views/ChatDiaryPage.vue'), // Lazy loading
+      meta: { requiresAuth: true }
     }
   ]
 })

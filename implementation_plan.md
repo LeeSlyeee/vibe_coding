@@ -1,28 +1,110 @@
-# 구현 계획: iOS 앱 AI 분석 결과 표시 로직 수정
+# 채팅형 감정 일기 작성 기능 구현 계획 (Advanced)
 
-## 목표
+사용자가 친근한 봇과 대화하며 일기를 작성하는 기능입니다. 단순 MVP를 넘어, **텍스트 처리, 수정 기능, 자동 저장** 등 실제 사용성을 고려한 완성형 기능을 목표로 합니다.
 
-- 사용자가 iOS 앱의 통계(StatsView) 탭에 진입했을 때, 이미 생성된 AI 분석 결과가 있다면 '분석 시작' 버튼 대신 결과 내용을 바로 보여줍니다.
+## 1. 개요 및 목표
 
-## 문제 상황
+- **목표**: 대화 흐름을 통해 자연스럽게 일기 데이터 완성 + 중간 이탈 방지 및 수정 편의성 제공.
+- **핵심 가치**: "쓰는 부담"을 없애고 "이야기하는 즐거움" 제공.
+- **기술 스택**: Vue.js 3 (Composition API), Pinia (상태 관리), localStorage (임시 저장).
 
-- 현재 `StatsView`는 진입 시 `/api/statistics`만 호출하여 통계 데이터만 가져옵니다.
-- AI 리포트(`/api/analysis/report`)는 '분석 시작' 버튼을 눌러야만 생성/조회 로직이 시작됩니다.
-- 따라서 이미 분석을 완료한 사용자라도 앱을 껐다 켜거나 탭을 이동하면 다시 '분석 시작' 화면이 나옵니다.
+## 2. 데이터 매핑 및 대화 흐름
 
-## 구현 상세
+질문 순서는 사용자 요청에 따라 **수면 → 사건 → 감정** 순으로 진행됩니다.
 
-### 1. `StatsView.swift` 수정
+| 순서 | 질문 요약                         | 매핑 필드         | UI 컴포넌트                          |
+| :--: | :-------------------------------- | :---------------- | :----------------------------------- |
+|  1   | 수면 상태 (어제 잘 잤나요?)       | `sleep_desc`      | 텍스트 + 추천 키워드 버튼            |
+|  2   | 오늘의 문답 (가장 큰 사건은?)     | `event`           | 자동 크기 조절 텍스트박스            |
+|  3   | 감정 묘사 (그때 기분이 어땠나요?) | `emotion_desc`    | 텍스트박스                           |
+|  4   | 감정의 의미 (왜 그랬을까요?)      | `emotion_meaning` | 텍스트박스                           |
+|  5   | 셀프 토크 (나에게 한마디)         | `self_talk`       | 텍스트박스                           |
+|  6   | 날씨 선택                         | `weather`         | 아이콘 그리드 선택 (맑음/흐림/비 등) |
+|  7   | 기분 점수 (1~5점)                 | `mood_level`      | 이모지 슬라이더 or 버튼              |
+|  8   | 마무리 및 저장                    | (Submit)          | 저장 애니메이션                      |
 
-- **`fetchExistingReports` 함수 추가**:
-  - GET `/api/analysis/report/status`: 단기 분석(심층 리포트) 상태 확인
-  - GET `/api/analysis/report/longterm/status`: 장기 분석(메타 분석) 상태 확인
-  - 각 API 응답의 `status`가 `"completed"`인 경우, `reportContent` 및 `longTermContent` 상태 변수를 업데이트.
+## 3. 주요 기술적 문제 해결 전략
 
-- **`onAppear` 로직 변경**:
-  - 기존 `perform: fetchStats` 방식에서 클로저 블록 `{ fetchStats(); fetchExistingReports() }`으로 변경하여 두 함수를 모두 실행.
+### 3.1 긴 텍스트 입력 및 UI 처리
 
-## 기대 효과
+- **문제**: 사용자가 장문의 일기를 쓸 때 입력창이 작거나 말풍선이 터지는 현상.
+- **해결**:
+  - **입력창**: `Event.target.style.height`를 활용해 내용에 따라 늘어나는 **Auto-growing Textarea** 구현 (최대 5줄, 그 이후 스크롤).
+  - **말풍선**: CSS `word-break: break-word`, `white-space: pre-wrap`을 적용해 줄바꿈과 긴 단어 완벽 대응.
+  - **스크롤**: 새 메시지가 추가될 때 `scrollIntoView({ behavior: 'smooth' })`로 항상 최신 대화 유지.
 
-- 사용자는 자신의 AI 분석 결과를 다시 분석할 필요 없이 즉시 확인할 수 있습니다.
-- 앱의 사용자 경험(UX)이 개선됩니다.
+### 3.2 답변 수정 기능 (Backtracking)
+
+- **문제**: 채팅 특성상 이미 지나간 답변을 고치기 어려움.
+- **해결**:
+  - **답변 클릭 수정**: 사용자가 자신이 보낸 말풍선을 클릭하면 **수정 모드(인라인 입력창)**로 전환.
+  - 수정 완료 시 해당 데이터(`answers` 객체) 업데이트 및 말풍선 내용 갱신.
+  - 진행 흐름은 깨지 않되 데이터만 조용히 업데이트.
+
+### 3.3 자동 저장 및 복원 (Data Persistence)
+
+- **문제**: 작성 도중 브라우저를 닫거나 실수로 뒤로가기를 눌렀을 때 데이터 유실.
+- **해결**:
+  - **LocalStorage 연동**: 답변이 입력될 때마다 `chat_diary_draft` 키로 로컬 스토리지에 자동 저장.
+  - **세션 복원**: 페이지 진입 시 `localStorage`를 확인하여 "작성 중인 내용이 있어요. 불러올까요?" 묻기.
+  - **완료 시 삭제**: 일기 저장이 성공하면 스토리지 초기화.
+
+### 3.4 모바일 키보드 대응 (Viewport Issue)
+
+- **문제**: iOS 등에서 키보드가 올라오면 입력창이 가려지거나 화면이 밀리는 현상.
+- **해결**:
+  - 입력창을 `position: fixed; bottom: 0`으로 두되, `window.visualViewport` 이벤트를 감지하여 키보드 높이만큼 `padding-bottom`을 동적으로 조절.
+  - 혹은 간단하게 Vue의 포커스 이벤트 시 `setTimeout(() => window.scrollTo(...))` 테크닉 사용.
+
+## 4. 프론트엔드 상세 설계
+
+### 4.1 상태 관리 (`useChatStore`)
+
+- 컴포넌트 내 지역 상태 대신 Pinia Store를 사용할 수도 있으나, 단일 페이지 기능이므로 **Page Component 내 상태 + LocalStorage 유틸** 조합이 가벼움.
+- **State 구조**:
+  ```javascript
+  const state = reactive({
+    step: 0,
+    messages: [], // { id, text, sender, type... }
+    answers: {}, // { sleep_desc: '...', event: '...' }
+    isTyping: false,
+  });
+  ```
+
+### 4.2 컴포넌트 구조
+
+- `views/ChatDiaryPage.vue`: 메인 컨테이너
+  - `components/ChatMessageList.vue`: 메시지 렌더링 (bot/user 분기)
+  - `components/ChatInputArea.vue`: 입력창 (텍스트/버튼/날씨 등 타입별 렌더링)
+  - `components/TypingIndicator.vue`: '...' 애니메이션
+
+## 5. 실행 계획 (Step-by-Step)
+
+1.  **기반 구축**
+    - `views/ChatDiaryPage.vue` 생성 및 라우터(`/diary/chat`) 등록.
+    - 기본 레이아웃 (헤더, 채팅 영역, 하단 입력바) 잡기.
+
+2.  **대화 엔진 구현**
+    - 질문 시나리오 배열 정의.
+    - `nextStep()` 함수: 인덱스 기반으로 봇 메시지 투입.
+    - `TypingIndicator` 적용으로 자연스러운 턴 넘기기 구현.
+
+3.  **입력 컴포넌트 고도화**
+    - **Auto-resize Textarea** 적용.
+    - 날씨/기분 선택용 커스텀 입력 UI 구현.
+
+4.  **고급 기능 적용**
+    - **수정 기능**: 사용자 말풍선 클릭 이벤트 핸들러 및 수정 로직 추가.
+    - **자동 저장**: `watch(answers, saveToLocal, { deep: true })` 구현.
+
+5.  **API 연동 및 마무리**
+    - 최종 `submit` 시 데이터 암호화(기존 로직 재사용) 및 POST 전송.
+    - 전송 성공 후 캘린더 페이지 이동 및 축하 메시지 모달.
+
+## 6. 예상 소요 시간
+
+- 기본 UI 및 로직: 1일
+- 고급 기능(수정, 저장, 예외처리): 0.5일
+- 디자인 폴리싱 및 테스트: 0.5일
+
+이 계획은 사용자의 편의성을 최우선으로 고려하여 설계되었습니다.

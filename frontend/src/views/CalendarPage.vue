@@ -99,8 +99,14 @@
         </div>
       </div>
     </div>
+    
+    <!-- Chat Diary FAB -->
+    <button class="chat-fab" @click="goToChatDiary" title="AI와 대화하며 쓰기">
+      <span class="material-icons">chat</span>
+    </button>
   </div>
 </template>
+
 
 <script>
 import { ref, computed, onMounted } from "vue";
@@ -156,7 +162,7 @@ export default {
           const match = d.ai_prediction.match(/'([^']+)'/);
           if (match && match[1]) {
             // "평온해 (90%)" -> "평온해"
-            let label = match[1].split("(")[0].trim();
+            const label = match[1].split("(")[0].trim();
             if (labelToKey[label]) {
               key = labelToKey[label];
             }
@@ -405,6 +411,13 @@ export default {
       handleSearch,
       closeSearch,
       viewDiary,
+      goToChatDiary: () => {
+        if (selectedDate.value) {
+          router.push(`/diary/chat/${selectedDate.value}`);
+        } else {
+          router.push('/diary/chat');
+        }
+      }
     };
   },
 };
@@ -440,6 +453,33 @@ body {
   background-color: var(--bg-primary);
   overflow: hidden; /* Prevent scroll */
   box-sizing: border-box;
+}
+
+/* Chat Diary FAB - Global */
+.chat-fab {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #4a90e2; /* Primary Blue */
+  color: white;
+  border: none;
+  box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 9999 !important; /* Always on top */
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.chat-fab:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.5);
+}
+.chat-fab:active {
+  transform: scale(0.95);
 }
 
 .calendar-layout {
@@ -793,10 +833,12 @@ body {
 
   .stats-premium-banner {
     flex-direction: column;
-    align-items: flex-start;
     gap: 12px;
     padding: 20px;
   }
+
+
+
 
   .stat-divider-v2 {
     display: none;
