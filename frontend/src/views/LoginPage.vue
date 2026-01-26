@@ -72,17 +72,48 @@ export default {
       errorMessage.value = ''
       loading.value = true
 
+      // 로그인 시도 전 기존 세션 데이터 정리
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('token');
+      localStorage.removeItem('risk_level');
+      localStorage.removeItem('assessment_completed');
+
+
       try {
         const response = await authAPI.login(userId.value, password.value)
         
         // 토큰 저장 (백엔드는 access_token으로 반환)
         localStorage.setItem('authToken', response.access_token || response.token || 'demo-token')
+        localStorage.setItem('token', response.access_token || response.token || 'demo-token') // Duplicate for compatibility
         
-        // 캘린더 페이지로 이동
-        router.push('/calendar')
+        // assessment_completed 플래그 저장
+        const isAssessed = response.assessment_completed;
+        localStorage.setItem('assessment_completed', isAssessed);
+        
+        // Fetch User Info to get Risk Level immediately
+        try {
+            const userRes = await authAPI.getUserInfo();
+            if (userRes && userRes.risk_level) {
+                localStorage.setItem('risk_level', userRes.risk_level);
+            }
+        } catch (e) {
+            console.error("Failed to fetch user info on login", e);
+        }
+        
+        // 캘린더 페이지로 이동 (미검사자라면 '/assessment'로 이동)
+        if (!isAssessed) {
+            router.push('/assessment');
+        } else {
+            router.push('/calendar');
+        }
       } catch (error) {
         console.error('Login failed:', error)
-        errorMessage.value = error.response?.data?.message || '로그인에 실패했습니다.'
+        const msg = error.response?.data?.message
+        if (msg === 'Invalid credentials' || error.response?.status === 401) {
+             errorMessage.value = '존재하지 않는 계정이거나 비밀번호가 올바르지 않습니다.'
+        } else {
+             errorMessage.value = msg || '로그인에 실패했습니다.'
+        }
       } finally {
         loading.value = false
       }

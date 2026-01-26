@@ -2,40 +2,34 @@ import requests
 import re
 import random
 
-def generate_analysis_reaction_standalone(user_text, mode='reaction'):
-    print(f"DEBUG: generate_analysis_reaction_standalone called. Mode={mode}, Text={user_text[:20]}...")
+def generate_analysis_reaction_standalone(user_text, mode='reaction', history=None):
+    print(f"DEBUG: generate_analysis_reaction_standalone called. Mode={mode}, HistoryLen={len(history) if history else 0}")
     if not user_text: return None
     
     # 1. Sanitize
     text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', user_text)
     sanitized = text[:300]
     
-    # 2. Prompt Switching
-    if mode == 'question':
-        # Follow-up Question Prompt
-        prompt_text = (
-            f"내담자의 말: \"{sanitized}\"\n\n"
-            "내담자가 너무 짧고 단답형으로 대답했어. 대화를 더 깊게 이끌어내기 위해 **자연스러운 꼬리 질문**을 하나 던져줘.\n"
-            "지시사항:\n"
-            "1. 내담자의 말을 반복하기보다, 그 이면의 이유나 구체적인 내용을 물어봐.\n"
-            "2. '그렇군요' 같은 짧은 공감 후 바로 질문해.\n"
-            "3. 말투는 다정하고 궁금해하는 '해요체'를 써.\n"
-            "4. 100자 이내로.\n\n"
-            "꼬리 질문:"
-        )
-    else:
-        # Standard Reaction Prompt
-        prompt_text = (
-            f"내담자의 말: \"{sanitized}\"\n\n"
-            "너는 깊은 통찰력을 지닌 따뜻한 심리 상담사야. 내담자의 말을 듣고 **상황을 분석**하고 **지지하는 코멘트**를 해줘.\n"
-            "지시사항:\n"
-            "1. 먼저 내담자의 말 속에 숨겨진 감정이나 욕구를 분석해서 언급해줘. (예: '기대감과 동시에 걱정도 있으신 것 같군요.')\n"
-            "2. 그 다음, 그 감정이 타당함을 지지해주고 따뜻하게 격려해줘.\n"
-            "3. 말투는 전문적이고 부드러운 '해요체'를 써.\n"
-            "4. 질문은 하지 마.\n"
-            "5. 150자 이내로.\n\n"
-            "분석 및 리액션:"
-        )
+    # 2. History Formatting
+    context_str = ""
+    if history:
+        # history is expected to be a string or list of "User: ... / AI: ..."
+        context_str = f"### [이전 대화 기록]\n{history}\n\n"
+
+    # 3. Prompt Switching
+    # Combined Prompt for continuous conversation
+    prompt_text = (
+        f"너는 다정하고 통찰력 있는 '심리 상담사'야.\n"
+        f"{context_str}"
+        f"### [내담자의 현재 말]: \"{sanitized}\"\n\n"
+        "### [지시사항]:\n"
+        "1. 이전 대화 기록이 있다면 그 흐름을 자연스럽게 이어서 답변해.\n"
+        "2. 내담자의 감정을 읽어주고, 그 말이 타당함을 지지해줘.\n"
+        "3. 딱딱한 분석보다는, 옆에서 이야기하듯 따뜻하고 부드러운 '해요체'를 사용해.\n"
+        "4. 혼자 떠들지 말고, 내담자가 이야기를 계속 할 수 있도록 이끌어줘.\n"
+        "5. 150자 이내로 간결하게.\n\n"
+        "상담사 답변:"
+    )
     
     try:
         payload = {
@@ -76,3 +70,69 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction'):
         ]
         
     return random.choice(fallbacks)
+
+def analyze_chat_sentiment_background(user_text, ai_reaction):
+    """
+    Background Task: Analyze the chat turn to extract structured psychological data.
+    Returns a dict with:
+    - primary_emotion (str)
+    - stress_level (int 1-10)
+    - risk_flag (bool)
+    - keywords (list)
+    """
+    print(f"DEBUG: Analyzing chat sentiment for: {user_text[:20]}...")
+    if not user_text: return None
+    
+    # Sanitize
+    sanitized = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', user_text)[:500]
+    
+    prompt_text = (
+        f"분석할 발화:\n"
+        f"내담자: \"{sanitized}\"\n"
+        f"상담사 반응: \"{ai_reaction[:100]}...\"\n\n"
+        "위 내담자의 발화를 심리학적으로 분석하여 다음 **JSON 형식**으로만 출력하시오.\n"
+        "다른 말은 절대 하지 마시오.\n\n"
+        "{\n"
+        "  \"primary_emotion\": \"(60가지 감정 중 가장 핵심적인 감정 단어 1개, 한국어)\",\n"
+        "  \"stress_level\": (1~10 사이 정수, 높을수록 스트레스 심함),\n"
+        "  \"risk_flag\": (자살, 자해, 타해 위험이 감지되면 true, 아니면 false),\n"
+        "  \"keywords\": [\"(핵심 키워드 1)\", \"(핵심 키워드 2)\"]\n"
+        "}"
+    )
+    
+    try:
+        payload = {
+            "model": "maum-on-gemma",
+            "prompt": prompt_text,
+            "stream": False,
+            "options": {
+                "temperature": 0.2, # Low temp for consistent JSON
+                "num_predict": 120
+            }
+        }
+        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=30)
+        
+        if res.status_code == 200:
+            result_str = res.json().get('response', '').strip()
+            # Extract JSON block if wrapped in code fences
+            if "```json" in result_str:
+                import re
+                match = re.search(r"```json(.*?)```", result_str, re.DOTALL)
+                if match: result_str = match.group(1)
+            elif "```" in result_str:
+                 match = re.search(r"```(.*?)```", result_str, re.DOTALL)
+                 if match: result_str = match.group(1)
+
+            import json
+            data = json.loads(result_str)
+            print(f"✅ Chat Analysis Result: {data}")
+            return data
+            
+    except Exception as e:
+        print(f"❌ Chat Analysis Error: {e}")
+        return {
+            "primary_emotion": "분석 실패",
+            "stress_level": 0,
+            "risk_flag": False,
+            "keywords": []
+        }

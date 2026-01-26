@@ -4,7 +4,6 @@
       <!-- 왼쪽: 캘린더 -->
       <div class="calendar-section">
         <!-- 월 네비게이션 & 검색 바 -->
-        <!-- 상단 네비게이션 (시원시원한 디자인) -->
         <div class="calendar-header-v2">
           <div class="month-navigation-v2">
             <button @click="previousMonth" class="nav-btn-v2" type="button">‹</button>
@@ -12,21 +11,32 @@
             <button @click="nextMonth" class="nav-btn-v2" type="button">›</button>
           </div>
 
-          <div class="search-box-v2">
-            <div class="search-input-wrapper">
-              <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="어떤 기록을 찾으시나요?"
-                class="search-input-v2"
-                @keyup.enter="handleSearch"
-              />
-              <button @click="handleSearch" class="search-btn-v2">🔍</button>
+          <div class="header-right-section">
+             <!-- Premium Small Button -->
+            <button 
+              v-if="!isPremium && userRiskLevel < 3"
+              class="premium-capsule-btn"
+              @click="showPremiumModal = true"
+            >
+              <span class="p-icon">✨</span>
+              <span class="p-text">Upgrade</span>
+            </button>
+
+            <div class="search-box-v2">
+              <div class="search-input-wrapper">
+                <input
+                  v-model="searchQuery"
+                  type="text"
+                  placeholder="검색"
+                  class="search-input-v2"
+                  @keyup.enter="handleSearch"
+                />
+                <button @click="handleSearch" class="search-btn-v2">🔍</button>
+              </div>
             </div>
           </div>
         </div>
         <!-- 일기 요약 통계 -->
-        <!-- 일기 요약 통계 (고급스럽고 미니멀한 버젼) -->
         <transition name="fade">
           <div
             v-if="diaries.length > 0 && !isSearching"
@@ -36,14 +46,14 @@
             <div class="stat-group">
               <span class="stat-icon">📅</span>
               <span class="stat-info"
-                >이번 달 <strong>{{ diaries.length }}개</strong>의 기록이 있습니다</span
+                >이번 달 <strong>{{ diaries.length }}개</strong>의 기록</span
               >
             </div>
             <div class="stat-divider-v2"></div>
             <div class="stat-group">
               <span class="stat-icon">{{ dominantMood.emoji }}</span>
               <span class="stat-info"
-                >주로 <strong>{{ dominantMood.name }}</strong> 감정을 느끼셨네요</span
+                >주로 <strong>{{ dominantMood.name }}</strong> 감정</span
               >
             </div>
 
@@ -51,6 +61,59 @@
             <div class="stat-arrow">›</div>
           </div>
         </transition>
+
+        <!-- Premium Modal -->
+         <div v-if="showPremiumModal" class="modal-overlay">
+          <div class="modal-card premium-modal">
+            <button class="close-btn" @click="showPremiumModal = false">×</button>
+            <div class="premium-header">
+              <h1>마음챙김 플러스 +</h1>
+              <p>더 깊은 이해와 치유를 위한 선택</p>
+            </div>
+            
+            <div class="premium-features">
+              <div class="feature-item">
+                <span class="icon">📊</span>
+                <div class="text">
+                  <h3>심층 분석 리포트</h3>
+                  <p>나의 감정 패턴과 원인을 깊이 있게 분석해드려요.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="icon">💬</span>
+                <div class="text">
+                  <h3>AI 심리 상담사</h3>
+                  <p>24시간 언제든 내 마음을 털어놓고 위로받으세요.</p>
+                </div>
+              </div>
+              <div class="feature-item">
+                <span class="icon">📈</span>
+                <div class="text">
+                  <h3>월간 감정 통계</h3>
+                  <p>한 달간의 감정 변화를 그래프로 한눈에 확인하세요.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="dobong-notice" style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; border: 1px solid #dcfce7;">
+               <p style="margin: 0; color: #15803d; font-size: 13px; line-height: 1.5; font-weight: 500;">
+                 <strong>🏥 도봉구청 상담 안내</strong><br/>
+                 도봉구청에서 상담을 받으시면 무료 업그레이드가 가능합니다.
+               </p>
+            </div>
+
+            <div class="price-section">
+              <span class="original-price">₩9,900</span>
+              <span class="current-price">₩4,900 <small>/월</small></span>
+              <span class="badge">런칭 특가 50%</span>
+            </div>
+
+            <button class="btn-primary full-width" @click="handleUpgrade">
+              지금 시작하기
+            </button>
+            <p class="terms">언제든 해지 가능합니다.</p>
+          </div>
+        </div>
 
         <!-- 검색 결과 리스트 (검색 중일 때) -->
         <div v-if="isSearching" class="search-results-overlay">
@@ -113,7 +176,7 @@ import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import CalendarGrid from "../components/CalendarGrid.vue";
 import DiaryModal from "../components/DiaryModal.vue";
-import { diaryAPI } from "../services/api";
+import { diaryAPI, authAPI } from "../services/api";
 
 export default {
   name: "CalendarPage",
@@ -131,6 +194,34 @@ export default {
     const searchQuery = ref("");
     const searchResults = ref([]);
     const isSearching = ref(false);
+    
+    // Premium Logic
+    const isPremium = ref(false);
+    const userRiskLevel = ref(1);
+    const showPremiumModal = ref(false);
+    
+    const checkUserStatus = async () => {
+        try {
+            const user = await authAPI.getUserInfo();
+            isPremium.value = user.is_premium || false;
+            userRiskLevel.value = user.risk_level || 1;
+        } catch(e) {
+            console.error("User info check failed", e);
+        }
+    }
+    
+    const handleUpgrade = async () => {
+        if(confirm("4,900원을 결제하시겠습니까? (테스트)")) {
+            try {
+               await authAPI.upgradeAccount();
+               alert("결제가 완료되었습니다! 이제 프리미엄 기능을 사용하실 수 있습니다.");
+               showPremiumModal.value = false;
+               await checkUserStatus(); // Refresh status
+            } catch(e) {
+                alert("결제 처리에 실패했습니다.");
+            }
+        }
+    }
 
     const formattedMonth = computed(() => {
       return `${currentYear.value}년 ${currentMonth.value}월`;
@@ -384,6 +475,7 @@ export default {
 
     onMounted(() => {
       loadDiaries();
+      checkUserStatus();
     });
 
 
@@ -406,10 +498,10 @@ export default {
       dominantMood,
       handleSearch,
       closeSearch,
-      handleSearch,
-      closeSearch,
-      handleSearch,
-      closeSearch,
+      isPremium,
+      userRiskLevel,
+      showPremiumModal,
+      handleUpgrade,
       viewDiary,
       goToChatDiary: () => {
         if (selectedDate.value) {
@@ -573,8 +665,14 @@ body {
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
+.header-right-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .search-box-v2 {
-  flex: 0 0 320px;
+  flex: 0 0 240px;
 }
 
 .search-input-wrapper {
@@ -594,12 +692,176 @@ body {
   transition: all 0.3s ease;
 }
 
-.search-input-v2:focus {
+
+
+/* Premium Capsule Button (Small Header Style) */
+.premium-capsule-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s;
+  height: 40px;
+}
+
+.premium-capsule-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
+}
+
+.premium-capsule-btn .p-text {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-card {
   background: white;
-  box-shadow:
-    0 0 0 3px rgba(0, 0, 0, 0.03),
-    0 4px 12px rgba(0, 0, 0, 0.05);
-  outline: none;
+  border-radius: 24px;
+  width: 100%;
+  max-width: 480px;
+  position: relative;
+  animation: slideUp 0.3s ease-out;
+}
+
+.premium-modal {
+  padding: 40px;
+  text-align: center;
+}
+
+.premium-header h1 {
+  font-size: 28px;
+  color: #1d1d1f;
+  margin-bottom: 8px;
+}
+
+.premium-header p {
+  color: #555;
+  margin-bottom: 32px;
+}
+
+.premium-features {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.feature-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.feature-item .icon {
+  font-size: 24px;
+  background: #f5f5f7;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.feature-item .text h3 {
+  font-size: 16px;
+  margin: 0 0 4px 0;
+  color: #1d1d1f;
+}
+
+.feature-item .text p {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.price-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.original-price {
+  text-decoration: line-through;
+  color: #999;
+  font-size: 16px;
+}
+
+.current-price {
+  font-size: 32px;
+  font-weight: 800;
+  color: #6366F1;
+}
+
+.current-price small {
+  font-size: 16px;
+  color: #666;
+  font-weight: 400;
+}
+
+.badge {
+  background: #FFE4E6;
+  color: #E11D48;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.full-width {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 16px;
+}
+
+.terms {
+  font-size: 12px;
+  color: #999;
+  margin-top: 16px;
+}
+
+.close-btn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #999;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 .search-btn-v2 {

@@ -3,48 +3,123 @@ import SwiftUI
 
 struct AppMainTabView: View {
     @EnvironmentObject var authManager: AuthManager
+    @State private var showAssessment = false
+    @State private var selection = 0
+    @State private var showEmergencySheet = false
     
     var body: some View {
-        TabView {
-            MoodCalendarView()
-                .tabItem {
-                    Label("캘린더", systemImage: "calendar")
+        ZStack(alignment: .bottomTrailing) {
+            TabView(selection: $selection) {
+                MoodCalendarView()
+                    .tabItem { Label("캘린더", systemImage: "calendar") }
+                    .tag(0)
+                
+                // RBAC Check: If Level 1 (Mild), Show Lock or Limited View
+                // But for better UX, let AppStatsView handle the internal lock UI.
+                AppStatsView()
+                    .tabItem { Label("통계", systemImage: "chart.bar.fill") }
+                    .tag(1)
+                
+                AppGuideView()
+                    .tabItem { Label("가이드", systemImage: "book.fill") }
+                    .tag(2)
+                
+                AppChatView()
+                    .tabItem { Label("상담", systemImage: "message.fill") }
+                    .tag(3)
+                
+                VStack {
+                    Spacer()
+                    // Debug Info
+                    Text("Current Risk Level: \(authManager.riskLevel)")
+                        .font(.caption).foregroundColor(.gray).padding()
+                    
+                    Button(action: { authManager.logout() }) {
+                        HStack {
+                            Text("로그아웃")
+                                .fontWeight(.bold)
+                            Image(systemName: "arrow.right.circle.fill")
+                        }
+                        .foregroundColor(.white)
+                        .padding()
+                        .frame(width: 200)
+                        .background(Color.red)
+                        .cornerRadius(10)
+                        .shadow(radius: 5)
+                    }
+                    Spacer()
                 }
+                .tabItem { Label("설정", systemImage: "gearshape.fill") }
+                .tag(4)
+            }
+            .accentColor(.black)
             
-            AppStatsView()
-                .tabItem {
-                    Label("통계", systemImage: "chart.bar.fill")
-                }
-            
-            AppGuideView()
-                .tabItem {
-                    Label("가이드", systemImage: "book.fill")
-                }
-            
-            VStack {
-                Spacer()
-                Button(action: {
-                    authManager.logout()
-                }) {
-                    HStack {
-                        Text("로그아웃")
+            // SOS Button (Only for High Risk Users)
+            if authManager.riskLevel >= 3 {
+                Button(action: { showEmergencySheet = true }) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 20))
+                        Text("긴급 도움")
                             .fontWeight(.bold)
-                        Image(systemName: "arrow.right.circle.fill")
                     }
                     .foregroundColor(.white)
-                    .padding()
-                    .frame(width: 200)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 20)
                     .background(Color.red)
-                    .cornerRadius(10)
-                    .shadow(radius: 5)
+                    .cornerRadius(30)
+                    .shadow(color: Color.red.opacity(0.4), radius: 5, x: 0, y: 5)
                 }
-                Spacer()
-            }
-            .tabItem {
-                Label("설정", systemImage: "gearshape.fill")
+                .padding(.trailing, 20)
+                .padding(.bottom, 100)
+                .confirmationDialog("긴급 연결", isPresented: $showEmergencySheet, titleVisibility: .visible) {
+                    Button("자살예방 상담전화 (1393)") {
+                        callNumber("1393")
+                    }
+                    Button("정신건강 위기상담전화 (1577-0199)") {
+                        callNumber("15770199")
+                    }
+                    Button("경찰청 긴급신고 (112)") {
+                        callNumber("112")
+                    }
+                    Button("취소", role: .cancel) { }
+                } message: {
+                    Text("도움이 필요한 곳을 선택해주세요.")
+                }
             }
         }
-        .accentColor(.black)
+        .fullScreenCover(isPresented: $showAssessment) {
+            AppAssessmentView()
+                .onDisappear {
+                    // After assessment, mark as done locally too
+                    UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+                }
+        }
+        .onAppear {
+            checkAssessmentStatus()
+            // Listen for Chat Redirection
+            NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
+                self.selection = 3 // Switch to Chat Tab
+            }
+        }
+    }
+    
+    func checkAssessmentStatus() {
+        // If user logged in but hasn't done assessment (local flag check)
+        // Or if we rely on riskLevel being 1 (default)? 
+        // Let's use a local flag "hasCompletedAssessment" to force it once.
+        let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
+        if !hasDone {
+            // Give a small delay for smooth transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showAssessment = true
+            }
+        }
+    }
+    
+    func callNumber(_ number: String) {
+        guard let url = URL(string: "tel://\(number)") else { return }
+        UIApplication.shared.open(url)
     }
 }
 

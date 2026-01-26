@@ -15,11 +15,19 @@
           </button>
           <button
             v-if="isAuthenticated"
-            @click="$router.push('/stats')"
+            @click="goToStats"
             class="stats-btn"
             title="통계 분석"
           >
             📊 분석
+          </button>
+          <button
+            v-if="isAuthenticated"
+            @click="goToMedication"
+            class="stats-btn"
+            title="약물 관리"
+          >
+            💊 약물
           </button>
           <button v-if="isAuthenticated" @click="handleLogout" class="logout-btn" title="로그아웃">
             👤 로그아웃
@@ -34,7 +42,7 @@
         <h1 class="logo" @click="goHome">MOOD DIARY</h1>
         <div class="mobile-nav-actions" v-if="isAuthenticated">
           <button @click="$router.push('/guide')" class="mobile-icon-btn" title="가이드">📘</button>
-          <button @click="$router.push('/stats')" class="mobile-icon-btn" title="분석">📊</button>
+          <button @click="goToStats" class="mobile-icon-btn" title="분석">📊</button>
         </div>
       </div>
     </header>
@@ -58,10 +66,19 @@
       <button
         class="nav-item"
         :class="{ active: $route.path === '/stats' }"
-        @click="$router.push('/stats')"
+        @click="goToStats"
       >
         <span class="nav-icon">📊</span>
         <span class="nav-label">분석</span>
+      </button>
+
+      <button
+        class="nav-item"
+        :class="{ active: $route.path === '/medication' }"
+        @click="goToMedication"
+      >
+        <span class="nav-icon">💊</span>
+        <span class="nav-label">약물</span>
       </button>
 
       <button
@@ -78,32 +95,169 @@
         <span class="nav-label">MY</span>
       </button>
     </nav>
+    <button
+      v-if="isAuthenticated"
+      class="safety-fab"
+      @click="showSafetyModal = true"
+      title="긴급 도움 요청"
+    >
+      🆘
+    </button>
+    <SafetyModal v-if="showSafetyModal" @close="showSafetyModal = false" />
+    
+    <!-- Logout Confirmation Modal -->
+    <div v-if="showLogoutModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3>로그아웃</h3>
+            <p>정말 로그아웃 하시겠습니까?</p>
+            <div class="modal-actions">
+                <button @click="showLogoutModal = false" class="cancel-btn">취소</button>
+                <button @click="confirmLogout" class="confirm-btn">로그아웃</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Restricted Access Modal -->
+    <div v-if="showRestrictedModal" class="modal-overlay" @click.self="showRestrictedModal = false">
+        <div class="modal-content">
+            <h3 style="color: #ff3b30">⛔️ 접근 제한</h3>
+            <p style="white-space: pre-line; line-height: 1.5;">보건소 및 병원 사용자<br>또는 유료사용자 전용 기능입니다.</p>
+            <div class="modal-actions">
+                <button @click="showRestrictedModal = false" class="confirm-btn" style="background-color: #007aff; width: 100%;">확인</button>
+            </div>
+        </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+/* Logout Modal Styles */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+    background: white;
+    padding: 24px;
+    border-radius: 20px;
+    width: 90%;
+    max-width: 320px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-content h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.2rem;
+    color: #1d1d1f;
+}
+
+.modal-content p {
+    color: #86868b;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.modal-actions button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+.modal-actions button:active {
+    transform: scale(0.96);
+}
+
+.cancel-btn {
+    background: #f5f5f7;
+    color: #1d1d1f;
+}
+
+.confirm-btn {
+    background: #ff3b30;
+    color: white;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Rest of Styles */
+</style>
 
 <script>
 import { RouterView } from "vue-router";
 import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import SafetyModal from "./components/SafetyModal.vue";
+import { authAPI } from "./services/api"; // Import authAPI
 
 export default {
   name: "App",
   components: {
     RouterView,
+    SafetyModal
   },
   setup() {
     const route = useRoute();
     const router = useRouter();
+    const showSafetyModal = ref(false);
+    const showLogoutModal = ref(false);
+    const showRestrictedModal = ref(false);
+    
+    // Risk Level Logic
+    const userRiskLevel = ref(1);
+    const isSevere = computed(() => userRiskLevel.value >= 3);
 
     const showNavbar = computed(() => {
+      // Assessment page doesn't need navbar
+      if (route.name === 'assessment') return false;
       return route.name !== "login" && route.name !== "signup";
     });
 
     const isAuthenticated = ref(false);
 
-    const checkAuth = () => {
+    const checkAuth = async () => {
       isAuthenticated.value =
         localStorage.getItem("token") !== null || localStorage.getItem("authToken") !== null;
+        
+      if (isAuthenticated.value) {
+          try {
+              const userData = await authAPI.getUserInfo();
+              if (userData && userData.risk_level) {
+                  userRiskLevel.value = userData.risk_level;
+              }
+          } catch (e) {
+              console.error("User Info Fetch Failed", e);
+          }
+      }
     };
 
     watch(
@@ -113,13 +267,35 @@ export default {
       },
       { immediate: true },
     );
+    
+    const handleRestrictedAccess = (featureName) => {
+        showRestrictedModal.value = true;
+    };
+    
+    const goToStats = () => {
+        if (isSevere.value) router.push('/stats');
+        else handleRestrictedAccess('분석');
+    };
+
+    const goToMedication = () => {
+        if (isSevere.value) router.push('/medication');
+        else handleRestrictedAccess('약물');
+    };
+
+    // Event Listerner for Safety Modal
+    window.addEventListener('open-safety-modal', () => {
+        showSafetyModal.value = true;
+    });
 
     const handleLogout = () => {
-      if (confirm("로그아웃 하시겠습니까?")) {
+      showLogoutModal.value = true;
+    };
+
+    const confirmLogout = () => {
+        showLogoutModal.value = false;
         localStorage.removeItem("token");
         localStorage.removeItem("authToken");
         router.push("/login");
-      }
     };
 
     const goHome = () => {
@@ -134,7 +310,14 @@ export default {
       showNavbar,
       isAuthenticated,
       handleLogout,
+      confirmLogout,
+      showLogoutModal,
       goHome,
+      showSafetyModal,
+      isSevere,
+      goToStats,
+      goToMedication,
+      showRestrictedModal
     };
   },
 };
@@ -231,7 +414,7 @@ export default {
   gap: 12px;
 }
 
-.mobile-icon-btn {
+  .mobile-icon-btn {
   background: #f5f5f7;
   border: none;
   width: 36px;
@@ -243,6 +426,32 @@ export default {
   font-size: 18px;
   cursor: pointer;
   transition: background 0.2s;
+}
+
+/* Safety Floating Button */
+.safety-fab {
+  position: fixed;
+  bottom: 100px;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ff6b6b;
+  color: white;
+  border: none;
+  box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 9999;
+  transition: transform 0.2s;
+}
+
+.safety-fab:hover {
+  transform: scale(1.1);
+  background: #fa5252;
 }
 
 .mobile-icon-btn:active {
@@ -309,9 +518,6 @@ export default {
   }
 
   /* Adjust main content for bottom nav */
-  .main-content {
-    /* No extra padding needed as bottom nav is flex item, not fixed overlay */
-  }
 }
 </style>
 

@@ -3,7 +3,9 @@ import axios from 'axios'
 // API 베이스 URL 설정
 // Nginx Reverse Proxy를 사용하기 위해 상대 경로로 변경 (웹)
 // 앱에서는 .env 파일의 VITE_API_URL을 사용
-const API_BASE_URL = 'https://217.142.253.35.nip.io/api'
+// 로컬 개발 환경용 설정 (Mac 5000번 포트 충돌 대응 -> 5001)
+// 로컬 개발 환경용 설정 (Mac 5000번 포트 충돌 대응 -> 5001)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
 
 // axios 인스턴스 생성
 const api = axios.create({
@@ -32,9 +34,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('authToken')
-      window.location.href = '/login'
+    // 401 에러 발생 시 로그아웃 처리 (단, 로그인 요청 자체의 실패는 제외)
+    // 또한, 이미 로그인 페이지에 있다면 리다이렉트(새로고침) 하지 않음
+    if (error.response?.status === 401 && !error.config.url.includes('/login')) {
+      if (window.location.pathname !== '/login') {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('token'); // 호환성 유지
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error)
   }
@@ -51,6 +58,17 @@ export const authAPI = {
   // 회원가입
   signup: async (username, password) => {
     const response = await api.post('/register', { username, password })
+    return response.data
+  },
+
+  getUserInfo: async () => {
+    const response = await api.get('/user/me')
+    return response.data
+  },
+
+  // 유료 결제 (모의)
+  upgradeAccount: async () => {
+    const response = await api.post('/payment/upgrade')
     return response.data
   }
 }
@@ -98,7 +116,14 @@ export const diaryAPI = {
       self_talk: data.question4 || '', // 나에게 따듯한 위로를 보내세요.
       mood_level: moodToLevel[data.mood] || 3, // 감정 이모지 (문자열 → 숫자 변환)
       weather: data.weather || null,
-      temperature: data.temperature || null
+      temperature: data.temperature || null,
+      
+      // New Fields (UI Branching)
+      mode: data.mode || 'green',
+      mood_intensity: data.mood_intensity || 0,
+      symptoms: data.symptoms || [],
+      gratitude_note: data.gratitude_note || '',
+      safety_flag: data.safety_flag || false
     }
     const response = await api.post('/diaries', mappedData)
     return response.data
@@ -124,7 +149,14 @@ export const diaryAPI = {
       self_talk: data.question4 || '',
       mood_level: moodToLevel[data.mood] || 3, // 감정 이모지 (문자열 → 숫자 변환)
       weather: data.weather || null,
-      temperature: data.temperature || null
+      temperature: data.temperature || null,
+      
+      // New Fields (UI Branching)
+      mode: data.mode,
+      mood_intensity: data.mood_intensity,
+      symptoms: data.symptoms,
+      gratitude_note: data.gratitude_note,
+      safety_flag: data.safety_flag
     }
     const response = await api.put(`/diaries/${id}`, mappedData)
     return response.data

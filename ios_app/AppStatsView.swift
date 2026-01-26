@@ -35,6 +35,7 @@ extension Color {
 
 // MARK: - Main View
 struct AppStatsView: View {
+    @EnvironmentObject var authManager: AuthManager
     @State private var currentTab = "flow"
     @State private var stats: StatisticsResponse?
     @State private var isLoading = true
@@ -59,11 +60,40 @@ struct AppStatsView: View {
             ZStack {
                 Color.bgMain.edgesIgnoringSafeArea(.all)
                 
-                VStack(spacing: 0) {
-                    // Header
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("마음 분석")
+                // [RBAC] Access Control for Mild Users (Level 1)
+                if authManager.riskLevel == 1 {
+                    VStack(spacing: 24) {
+                        Spacer()
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 80))
+                            .foregroundColor(.gray.opacity(0.5))
+                        
+                        VStack(spacing: 8) {
+                            Text("전문 분석 기능 잠김")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            Text("현재 '경증(안정)' 상태로 분류되어\n심층 통계 분석이 제한됩니다.")
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Text("더 자세한 분석을 원하시면\n전문 상담사 모드로 전환해주세요.")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 20)
+                            
+                        Spacer()
+                    }
+                    .padding()
+                } else {
+                    // Full Feature for Severe (Level 2+) Users
+                    VStack(spacing: 0) {
+                        // Header
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("마음 분석")
                                 .font(.system(size: 28, weight: .bold))
                                 .foregroundColor(.primaryText)
                             Text("데이터로 보는 나의 하루")
@@ -129,11 +159,14 @@ struct AppStatsView: View {
                         }
                     }
                 }
+                } // End of Else (Full Features)
             }
             .navigationBarHidden(true)
             .onAppear {
-                fetchStats()
-                fetchExistingReports()
+                if authManager.riskLevel > 1 {
+                    fetchStats()
+                    fetchExistingReports()
+                }
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제

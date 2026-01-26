@@ -1,30 +1,24 @@
-# Task: iOS 앱 AI 분석 결과 표시 수정
+# 임무: OCI 웹 업그레이드 배너 수정 (OCI Web Upgrade Banner Update)
 
-## Status: Completed
+## 상태
 
-## User Objective
+- [x] **완료됨**
 
-- iOS 앱의 'AI 분석' 탭에서 이미 분석 결과가 있는 계정임에도 불구하고, 결과 대신 '새로 분석하기' 버튼이 나타나는 문제를 해결하고자 합니다.
+## 요약
 
-## Solution
+OCI에 배포된 웹 애플리케이션의 업그레이드 유도 배너(프리미엄 모달)에 "도봉구청 상담 시 무료 업그레이드" 안내 문구를 추가하여, 지역 연계 상담을 통한 혜택을 사 용자가 쉽게 인지할 수 있도록 개선했습니다.
 
-- **iOS 클라이언트 수정 (`StatsView.swift`)**:
-  - 뷰가 로드될 때(`onAppear`), 기존의 통계 데이터뿐만 아니라 AI 분석 리포트의 상태도 조회하도록 수정했습니다.
-  - `fetchExistingReports()` 함수를 새로 추가하여 `/api/analysis/report/status` 엔드포인트를 호출합니다.
-  - 분석 상태가 `completed`인 경우, 즉시 리포트 내용을 화면에 표시합니다.
+## 주요 변경 사항
 
-## Changes Implemented
+1.  **배너 문구 추가 (Frontend)**:
+    - `CalendarPage.vue` 파일의 프리미엄 모달(`custom-modal`) 내부, 가격 정보 상단에 **도봉구청 상담 안내** 섹션을 추가했습니다.
+    - 눈에 띄는 배경색과 아이콘(🏥)을 사용하여 상담 안내가 사용자에게 잘 전달되도록 디자인했습니다.
 
-### `StatsView.swift`
+2.  **OCI 서버 배포**:
+    - 수정된 `CalendarPage.vue` 파일을 OCI 서버(`217.142.253.35`)로 안전하게 전송(`SCP`)했습니다.
+    - 서버에서 프론트엔드 빌드(`npm run build`)를 수행하여 변경 사항을 즉시 반영했습니다.
 
-- `fetchExistingReports()` 메서드 추가:
-  - 단기 리포트와 장기 리포트(Insight)의 상태를 각각 확인.
-  - 완료된 리포트가 있으면 상태 변수(`reportContent`, `longTermContent`) 업데이트.
-- `onAppear` 수정:
-  - `fetchStats()`와 `fetchExistingReports()`를 동시에 실행하도록 변경.
+## 결과
 
-## Verification
-
-1. iOS 앱 실행 및 '마음 분석' 탭 이동.
-2. 'AI분석' 탭 선택.
-3. 이전에 분석을 수행한 계정이라면, '분석 시작하기' 버튼 대신 분석 결과 텍스트가 바로 표시되어야 함.
+- 이제 사용자가 업그레이드 모달을 열었을 때, 도봉구청 상담을 받으면 무료로 업그레이드할 수 있다는 정보를 명확하게 확인할 수 있습니다.
+- 로컬 개발 환경과 운영 서버(OCI) 간의 코드 동기화가 완료되었습니다.

@@ -28,6 +28,12 @@ const router = createRouter({
       component: SignupPage
     },
     {
+      path: '/care-survey',
+      name: 'assessment',
+      component: () => import('../views/AssessmentPage.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/calendar',
       name: 'calendar',
       component: CalendarPage,
@@ -62,20 +68,34 @@ const router = createRouter({
       name: 'diary-chat',
       component: () => import('../views/ChatDiaryPage.vue'), // Lazy loading
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/medication',
+      name: 'medication',
+      component: () => import('../views/MedicationPage.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })
 
 // 네비게이션 가드
 router.beforeEach((to, from, next) => {
-  const isAuthenticated = localStorage.getItem('authToken')
+  const isAuthenticated = localStorage.getItem('authToken') || localStorage.getItem('token')
+  const isAssessed = localStorage.getItem('assessment_completed') === 'true'
   
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login')
   } else if ((to.name === 'login' || to.name === 'signup') && isAuthenticated) {
     next('/calendar')
   } else {
-    next()
+    // Triage Check: If authenticated but not assessed, and trying to go to calendar/main, force assessment.
+    // Exception: If already on assessment page or logout/medication? No, medication also needs assessment probably.
+    // Let's force assessment for everything except assessment page itself.
+    if (isAuthenticated && !isAssessed && to.name !== 'assessment') {
+        next({ name: 'assessment' })
+    } else {
+        next()
+    }
   }
 })
 

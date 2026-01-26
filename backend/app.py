@@ -7,9 +7,7 @@ from bson.objectid import ObjectId
 import os
 from config import Config
 from config import Config
-# Imports moved down to prevent circular dependency
-# from tasks import process_diary_ai, analyze_diary_logic
-# from ai_brain import EmotionAnalysis
+from standalone_ai import generate_analysis_reaction_standalone
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -33,11 +31,48 @@ def chat_reaction():
     data = request.json
     text = data.get('text', '')
     mode = data.get('mode', 'reaction') # Accept 'mode'
+    history = data.get('history') # Accept conversation history
+
     if not text:
         return jsonify({'reaction': ""}), 200
         
     # Directly call function, bypassing class instantiation issues
-    reaction = generate_analysis_reaction_standalone(text, mode=mode)
+    reaction = generate_analysis_reaction_standalone(text, mode=mode, history=history)
+    
+    # [Async Analysis & Logging]
+    # Fire and forget thread to analyze sentiment and save to DB
+    current_user_id = get_jwt_identity()
+    
+    def background_chat_log(user_id, u_text, a_react):
+        # Allow running outside request context manually or establish context if needed
+        # Since we use mongo.db directly, we might need app context
+        with app.app_context():
+            try:
+                # 1. Analyze
+                from standalone_ai import analyze_chat_sentiment_background
+                analysis_data = analyze_chat_sentiment_background(u_text, a_react)
+                
+                # 2. Save
+                log_entry = {
+                    'user_id': user_id,
+                    'user_message': u_text,
+                    'ai_response': a_react,
+                    'analysis': analysis_data,
+                    'created_at': datetime.utcnow()
+                }
+                
+                # Encrypt sensitive text if needed? 
+                # For now let's keep chat logs plain or minimal encryption for analysis stats
+                # If we want full privacy, we should encrypt 'user_message'.
+                
+                mongo.db.chat_logs.insert_one(log_entry)
+                print(f"✅ Chat Log Saved for {user_id}")
+                
+            except Exception as e:
+                print(f"❌ Background Log Error: {e}")
+
+    threading.Thread(target=background_chat_log, args=(current_user_id, text, reaction)).start()
+
     return jsonify({'reaction': reaction}), 200
 
 # ... (Previous code)
@@ -88,10 +123,15 @@ def get_insight():
         
         recent_diaries = []
         for doc in cursor:
+            # Decrypt event for meaningful insight
+            event_text = doc.get('event', '')
+            if isinstance(event_text, str):
+                event_text = safe_decrypt(event_text)
+            
             recent_diaries.append({
                 'date': doc.get('created_at').strftime('%Y-%m-%d') if doc.get('created_at') else '',
                 'mood': doc.get('mood_level', '보통'),
-                'event': doc.get('event', '')[:50]
+                'event': event_text[:50]
             })
         
         print(f"📊 [Insight] Found {len(recent_diaries)} diaries for context.")
@@ -132,7 +172,7 @@ def get_insight():
         # If message is None (filtered or failed), return empty
         if not message:
              print("💡 [Insight] Final result is None (Fallback triggered)")
-             return jsonify({'message': ""}), 200
+             return jsonify({'message': "오늘 하루는 어떠셨나요? 편안하게 기록해보세요."}), 200
              
         print(f"✅ [Insight] Final Response: {message[:30]}...")
         return jsonify({'message': message}), 200
@@ -158,13 +198,22 @@ mongo = PyMongo(app)
 # CORS Setup
 # CORS Setup
 # CORS Setup - Allow All (Debug Mode)
-# CORS(app, resources={
-#     r"/*": {
-#         "origins": "*",
-#         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-#         "allow_headers": ["Content-Type", "Authorization"],
-#     }
-# })
+# CORS Setup - Enable for Local Development with Credentials
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173", 
+            "http://127.0.0.1:5173",
+            "http://217.142.253.35",
+            "https://217.142.253.35",
+            "http://217.142.253.35.nip.io",
+            "https://217.142.253.35.nip.io"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
+     }
+})
 
 jwt = JWTManager(app)
 
@@ -219,9 +268,97 @@ def login():
     if check_password_hash(user['password_hash'], password):
         # Use ObjectId string as identity
         access_token = create_access_token(identity=str(user['_id'])) 
-        return jsonify(access_token=access_token, username=user['username']), 200
+        
+        # Check Assessment Status
+        is_assessed = user.get('assessment_completed', False)
+        
+        return jsonify(
+            access_token=access_token, 
+            username=user['username'],
+            assessment_completed=is_assessed
+        ), 200
 
     return jsonify({"message": "Invalid credentials"}), 401
+
+@app.route('/api/user/me', methods=['GET'])
+@jwt_required()
+def get_user_me():
+    user_id = get_jwt_identity()
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+        
+    return jsonify({
+        "username": user.get('username'),
+        "risk_level": user.get('risk_level', 1),
+        "assessment_completed": user.get('assessment_completed', False),
+        "is_premium": user.get('is_premium', False)
+    }), 200
+
+# -------------------- Payment/Premium Route --------------------
+@app.route('/api/payment/upgrade', methods=['POST'])
+@jwt_required()
+def upgrade_premium():
+    user_id = get_jwt_identity()
+    # Mock Payment Success
+    mongo.db.users.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {'is_premium': True}}
+    )
+    return jsonify({"message": "PREMIUM_UPGRADED", "is_premium": True}), 200
+
+
+# -------------------- Assessment Route (Triage) --------------------
+
+@app.route('/api/assessment', methods=['POST'])
+@jwt_required()
+def submit_assessment():
+    user_id = get_jwt_identity()
+    data = request.json
+    score = data.get('score', 0)
+    answers = data.get('answers', []) # List of scores 0-3 for 9 questions
+    
+    # Simple scoring (PHQ-9)
+    # 0-4: Minimal (Level 1)
+    # 5-9: Mild (Level 2)
+    # 10-14: Moderate (Level 3)
+    # 15-19: Moderately Severe (Level 4)
+    # 20-27: Severe (Level 5)
+    
+    severity = 'Minimal'
+    risk_level = 1
+    
+    if 5 <= score <= 9:
+        severity = 'Mild'
+        risk_level = 2
+    elif 10 <= score <= 14:
+        severity = 'Moderate'
+        risk_level = 3
+    elif 15 <= score <= 19:
+        severity = 'Moderately Severe'
+        risk_level = 4
+    elif score >= 20:
+        severity = 'Severe'
+        risk_level = 5
+        
+    print(f"📋 Assessment for {user_id}: Score={score}, Severity={severity}")
+    
+    # Save to User
+    mongo.db.users.update_one(
+        {'_id': ObjectId(user_id)},
+        {'$set': {
+            'phq9_score': score,
+            'risk_level': risk_level,
+            'assessment_completed': True,
+            'assessment_date': datetime.utcnow()
+        }}
+    )
+    
+    return jsonify({
+        'message': 'Assessment saved',
+        'severity': severity,
+        'risk_level': risk_level
+    }), 200
 
 # -------------------- Diary Routes --------------------
 
@@ -229,13 +366,22 @@ from crypto_utils import crypto_manager
 
 # ... imports ...
 
+# Helper for Safe Decryption
+def safe_decrypt(text):
+    if not isinstance(text, str) or not text: return ""
+    try:
+        return crypto_manager.decrypt(text)
+    except Exception as e:
+        print(f"❌ Safe Decrypt Error: {e}")
+        return "[복호화 실패]"
+
 # Helper to Decrypt Doc
 def decrypt_doc(doc):
     if not doc: return None
-    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'sleep_condition', 'sleep_desc', 'ai_prediction', 'ai_comment', 'mindset']
+    sensitive_fields = ['event', 'emotion_desc', 'emotion_meaning', 'self_talk', 'sleep_condition', 'sleep_desc', 'ai_prediction', 'ai_comment', 'mindset', 'gratitude_note', 'followup_question']
     for field in sensitive_fields:
         if field in doc and isinstance(doc[field], str):
-            doc[field] = crypto_manager.decrypt(doc[field])
+            doc[field] = safe_decrypt(doc[field])
     return doc
 
 def map_ai_to_mood(ai_text):
@@ -301,17 +447,35 @@ def create_diary():
     if created_at_str and created_at_str.endswith('Z'): created_at_str = created_at_str[:-1]
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
 
+    # Map Frontend Questions to Backend Fields
+    event_val = data.get('event') or data.get('question1', '')
+    emotion_desc_val = data.get('emotion_desc') or data.get('question2', '')
+    emotion_meaning_val = data.get('emotion_meaning') or data.get('question3', '')
+    self_talk_val = data.get('self_talk') or data.get('question4', '')
+    sleep_val = data.get('sleep_condition') or data.get('sleep_desc') or data.get('question_sleep', '')
+
     # Prepare raw data
     raw_diary = {
         'user_id': current_user_id,
-        'event': data.get('event', ''),
-        'sleep_desc': data.get('sleep_desc', ''),
-        'emotion_desc': data.get('emotion_desc', ''),
-        'emotion_meaning': data.get('emotion_meaning', ''),
-        'self_talk': data.get('self_talk', ''),
+        'event': event_val,
+        'sleep_condition': sleep_val, # Unified field
+        'sleep_desc': sleep_val,      # Legacy support
+        'emotion_desc': emotion_desc_val,
+        'emotion_meaning': emotion_meaning_val,
+        'self_talk': self_talk_val,
         'mood_level': data.get('mood_level', 3),
         'weather': data.get('weather'),
         'temperature': data.get('temperature'),
+        # New Fields for v2 UI (Green/Red Modes)
+        'mode': data.get('mode', 'green'), # green or red
+        'symptoms': data.get('symptoms', []), # List of strings
+        'mood_intensity': data.get('mood_intensity', 0), # integer 1-10
+        'gratitude_note': data.get('gratitude_note', ''),
+        'mood_intensity': data.get('mood_intensity', 0), # integer 1-10
+        'gratitude_note': data.get('gratitude_note', ''),
+        'safety_flag': data.get('safety_flag', False),
+        'medication_taken': data.get('medication_taken', False),
+        
         'ai_prediction': "분석 중... (AI가 곧 답변해드려요!)",
         'ai_comment': "잠시만 기다려주세요... 🤖",
         'created_at': created_at
@@ -342,16 +506,6 @@ def create_diary():
         if is_client_analyzed:
             print("📱 [Hybrid] Client provided AI analysis. Back-end analysis skipped.")
             task_id = "client-side"
-            # Update the stored document with the provided AI fields if raw_diary had placeholders
-            # But wait, raw_diary was initialized with placeholders above. 
-            # We need to update raw_diary BEFORE encryption or update the DB after.
-            # Let's adjust raw_diary creation.
-            
-            # Actually, raw_diary logic above set default placeholders. 
-            # We should used the provided values if they exist.
-            # Let's correct the workflow:
-            # 1. We already inserted the doc. If we want to use client values, we should have used them in insert.
-            # To fix this without massive refactor: We update the doc immediately if client provided data.
             
             # Re-encrypt client provided values
             ai_updates = {
@@ -410,15 +564,25 @@ def update_diary(id):
     data = request.get_json()
     
     # Prepare update fields
+    # Use safe_decrypt for fallback values to prevent 500 error if key mismatch
     updates = {
-        'event': data.get('event', crypto_manager.decrypt(diary.get('event'))), # Use existing decrypted if not provided
-        'sleep_desc': data.get('sleep_desc', crypto_manager.decrypt(diary.get('sleep_desc'))),
-        'emotion_desc': data.get('emotion_desc', crypto_manager.decrypt(diary.get('emotion_desc'))),
-        'emotion_meaning': data.get('emotion_meaning', crypto_manager.decrypt(diary.get('emotion_meaning'))),
-        'self_talk': data.get('self_talk', crypto_manager.decrypt(diary.get('self_talk'))),
+        'event': data.get('event', safe_decrypt(diary.get('event'))), 
+        'sleep_desc': data.get('sleep_desc', safe_decrypt(diary.get('sleep_desc'))),
+        'emotion_desc': data.get('emotion_desc', safe_decrypt(diary.get('emotion_desc'))),
+        'emotion_meaning': data.get('emotion_meaning', safe_decrypt(diary.get('emotion_meaning'))),
+        'self_talk': data.get('self_talk', safe_decrypt(diary.get('self_talk'))),
         'mood_level': data.get('mood_level', diary.get('mood_level')),
         'weather': data.get('weather', diary.get('weather')),
         'temperature': data.get('temperature', diary.get('temperature')),
+        
+        # New Fields Updates
+        'mode': data.get('mode', diary.get('mode', 'green')),
+        'symptoms': data.get('symptoms', diary.get('symptoms', [])),
+        'mood_intensity': data.get('mood_intensity', diary.get('mood_intensity', 0)),
+        'gratitude_note': data.get('gratitude_note', safe_decrypt(diary.get('gratitude_note')) if isinstance(diary.get('gratitude_note'), str) else diary.get('gratitude_note', '')),
+        'safety_flag': data.get('safety_flag', diary.get('safety_flag', False)),
+        'medication_taken': data.get('medication_taken', diary.get('medication_taken', False)),
+        
         'ai_prediction': "재분석 중...",
         'ai_comment': "AI가 다시 생각하고 있어요... 🤔"
     }
@@ -544,6 +708,15 @@ def weather_insight():
 @jwt_required()
 def get_statistics():
     user_id = get_jwt_identity()
+
+    # Check Permission
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    if not user: return jsonify({"message": "User not found"}), 404
+    
+    # Allow if Risk Level >= 3 OR User is Premium
+    if user.get('risk_level', 1) < 3 and not user.get('is_premium', False):
+        return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
+
     diaries = list(mongo.db.diaries.find({'user_id': user_id}).sort('created_at', 1))
     
     from datetime import timedelta
@@ -555,7 +728,10 @@ def get_statistics():
         'weather': {},
         'daily_sum': {},
         'daily_count': {},
-        'timeline': []
+        'timeline': [],
+        'symptoms': {},
+        'medication_count': 0,
+        'medication_total_days': 0
     }
     
     for d in diaries:
@@ -566,7 +742,9 @@ def get_statistics():
         ai_pred_raw = decrypted.get('ai_prediction')
         user_mood = decrypted.get('mood_level')
         weather = decrypted.get('weather')
-        created_at = decrypted.get('created_at') # Should be datetime object from decrypt_doc logic
+        created_at = decrypted.get('created_at')
+        symptoms = decrypted.get('symptoms', [])
+        medication = decrypted.get('medication_taken', False)
 
         # Determine Mood
         ai_mood = map_ai_to_mood(ai_pred_raw)
@@ -599,11 +777,22 @@ def get_statistics():
         stats['daily_sum'][date_str] = stats['daily_sum'].get(date_str, 0) + mood
         stats['daily_count'][date_str] = stats['daily_count'].get(date_str, 0) + 1
         
+        # Symptoms Check
+        if symptoms:
+            for s in symptoms:
+                stats['symptoms'][s] = stats['symptoms'].get(s, 0) + 1
+                
+        # Medication Check
+        stats['medication_total_days'] += 1
+        if medication:
+            stats['medication_count'] += 1
+        
         stats['timeline'].append({
             'date': date_str,
             'mood_level': mood,
             'ai_label': ai_pred_raw if ai_pred_raw else '',
-            'user_mood': user_mood
+            'user_mood': user_mood,
+            'medication': medication
         })
 
     daily_moods = {}
@@ -615,7 +804,10 @@ def get_statistics():
         'moods': sorted([{'_id': k, 'count': v} for k, v in stats['moods'].items()], key=lambda x: x['_id']),
         'daily': sorted([{'_id': k, 'count': v} for k, v in daily_moods.items()], key=lambda x: x['_id']),
         'timeline': stats['timeline'],
-        'weather': []
+        'timeline': stats['timeline'],
+        'weather': [],
+        'symptoms': sorted([{'name': k, 'count': v} for k, v in stats['symptoms'].items()], key=lambda x: x['count'], reverse=True),
+        'medication_rate': round((stats['medication_count'] / stats['medication_total_days'] * 100), 1) if stats['medication_total_days'] > 0 else 0
     }
     
     for w, counts in stats['weather'].items():
@@ -737,6 +929,12 @@ def background_long_term_task(app_instance, user_id, history_data):
 def start_long_term_report():
     user_id = get_jwt_identity()
     
+    # Check Permission
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    if not user: return jsonify({"message": "User not found"}), 404
+    if user.get('risk_level', 1) < 3:
+        return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
+    
     # 1. Fetch Past Reports (Limit 5 most recent)
     cursor = mongo.db.reports.find({'user_id': user_id, 'type': 'comprehensive'}).sort('created_at', -1).limit(5)
     reports = list(cursor)
@@ -785,6 +983,12 @@ def check_long_term_report_status():
 @jwt_required()
 def start_report_generation():
     user_id = get_jwt_identity()
+
+    # Check Permission
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    if not user: return jsonify({"message": "User not found"}), 404
+    if user.get('risk_level', 1) < 3:
+        return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
 
     # 1. Check Diaries
     cursor = mongo.db.diaries.find({'user_id': user_id}).sort('created_at', -1).limit(50)
@@ -891,13 +1095,78 @@ def transcribe_voice():
             traceback.print_exc()
             return jsonify({"message": f"Transcription failed: {str(e)}"}), 500
 
-if __name__ == '__main__':
-    # No SQL create_all() needed
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5001)
+@app.route('/api/report/chat-summary', methods=['GET'])
+@jwt_required()
+def get_chat_summary():
+    user_id = get_jwt_identity()
+    
+    # Range: Last 7 Days
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=7)
+    
+    # Aggregation Pipeline
+    pipeline = [
+        {
+            "$match": {
+                "user_id": user_id, 
+                "created_at": {"$gte": start_date}
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "avg_stress": {"$avg": "$analysis.stress_level"},
+                "emotions": {"$push": "$analysis.primary_emotion"},
+                "keywords": {"$push": "$analysis.keywords"},
+                "total_chats": {"$sum": 1}
+            }
+        }
+    ]
+    
+    try:
+        results = list(mongo.db.chat_logs.aggregate(pipeline))
+        
+        if not results:
+            return jsonify({
+                "has_data": False,
+                "message": "아직 분석 데이터가 충분하지 않아요."
+            }), 200
+            
+        data = results[0]
+        
+        # Process Emotions (Count Frequency)
+        from collections import Counter
+        raw_emotions = [e for e in data.get('emotions', []) if e and e != "분석 실패"]
+        emotion_counts = Counter(raw_emotions).most_common(3) # Top 3
+        
+        # Process Keywords (Flatten list of lists)
+        raw_keywords = []
+        for k_list in data.get('keywords', []):
+            if isinstance(k_list, list):
+                raw_keywords.extend(k_list)
+        keyword_counts = Counter(raw_keywords).most_common(5) # Top 5
+        
+        summary = {
+            "has_data": True,
+            "period": "최근 7일",
+            "total_chats": data.get('total_chats', 0),
+            "avg_stress": round(data.get('avg_stress', 0), 1),
+            "top_emotions": [{"emotion": e[0], "count": e[1]} for e in emotion_counts],
+            "top_keywords": [{"keyword": k[0], "count": k[1]} for k in keyword_counts]
+        }
+        
+        return jsonify(summary), 200
+        
+    except Exception as e:
+        print(f"Report API Error: {e}")
+        return jsonify({"message": "Server Error"}), 500
+
+
+
  
 
 # Standalone Function Injected directly into app.py
-def generate_analysis_reaction_standalone(user_text, mode='reaction'):
+def generate_analysis_reaction_standalone(user_text, mode='reaction', history=None):
     print(f"DEBUG: generate_analysis_reaction_standalone (Local) called. Mode={mode}")
     if not user_text: return None
     import re
@@ -908,28 +1177,31 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction'):
     text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', user_text)
     sanitized = text[:300]
     
-    # 2. Prompt Switching
+    # 0. Keyword Risk Detection (Safety Net)
+    risk_keywords = ['죽고 싶', '죽고싶', '자살', '자해', '뛰어내', '사라지고 싶', '살기 싫', '죽어버리']
+    is_risk = any(k in user_text for k in risk_keywords)
+    
+    # 2. Prompt Switching with Risk Detection
     if mode == 'question':
         prompt_text = (
             f"내담자의 말: \"{sanitized}\"\n\n"
-            "내담자가 너무 짧고 단답형으로 대답했어. 대화를 더 깊게 이끌어내기 위해 **자연스러운 꼬리 질문**을 하나 던져줘.\n"
+            "내담자가 너무 짧고 단답형으로 대답했어. 대화를 이끌어낼 꼬리 질문을 해줘.\n"
+            "단, 내담자의 말에서 '죽고 싶다', '자살', '자해', '살기 싫다' 같은 **위험 신호**가 감지되면 "
+            "반드시 답변 첫머리에 '[RISK]'라고 표기해줘.\n"
             "지시사항:\n"
-            "1. 내담자의 말을 반복하기보다, 그 이면의 이유나 구체적인 내용을 물어봐.\n"
-            "2. '그렇군요' 같은 짧은 공감 후 바로 질문해.\n"
-            "3. 말투는 다정하고 궁금해하는 '해요체'를 써.\n"
-            "4. 100자 이내로.\n\n"
-            "꼬리 질문:"
+            "1. 다정하고 궁금해하는 '해요체'.\n"
+            "2. 100자 이내.\n\n"
+            "답변:"
         )
     else:
         prompt_text = (
             f"내담자의 말: \"{sanitized}\"\n\n"
-            "너는 깊은 통찰력을 지닌 따뜻한 심리 상담사야. 내담자의 말을 듣고 **상황을 분석**하고 **지지하는 코멘트**를 해줘.\n"
+            "너는 깊은 통찰력을 지닌 따뜻한 심리 상담사야. 내담자의 감정을 분석하고 지지해줘.\n"
+            "중요: 내담자의 말에서 '죽음', '자살 충동', '자해' 등 **위험 신호**가 명확하면 "
+            "반드시 답변 첫머리에 '[RISK]'라고 적고, 즉시 전문가의 도움이 필요함을 부드럽게 권유해.\n"
             "지시사항:\n"
-            "1. 먼저 내담자의 말 속에 숨겨진 감정이나 욕구를 분석해서 언급해줘.\n"
-            "2. 그 다음, 그 감정이 타당함을 지지해주고 따뜻하게 격려해줘.\n"
-            "3. 말투는 전문적이고 부드러운 '해요체'를 써.\n"
-            "4. 질문은 하지 마.\n"
-            "5. 150자 이내로.\n\n"
+            "1. 전문적이고 부드러운 '해요체'.\n"
+            "2. 150자 이내.\n\n"
             "분석 및 리액션:"
         )
     
@@ -970,11 +1242,31 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction'):
             "이야기를 들어보니, 그동안 마음속에 담아두셨던 생각들이 많으셨던 것 같아 마음이 쓰이네요."
         ]
         
-    return random.choice(fallbacks)
+
+        
+    chosen_fallback = random.choice(fallbacks)
+    
+    if is_risk:
+        return f"[RISK] {chosen_fallback}"
+        
+    return chosen_fallback
 
 # Late Imports at EOF to avoid Circular Dependency
+print("DEBUG: REACHING EOF BLOCK...") 
 try:
     from tasks import process_diary_ai, analyze_diary_logic
     from ai_brain import EmotionAnalysis
 except ImportError:
     pass
+
+# --- Medication & Expansion Routes ---
+try:
+    from medication_routes import med_bp
+    app.register_blueprint(med_bp)
+    print("✅ Medication Routes Registered")
+except Exception as e:
+    print(f"❌ Failed to register Medication Routes: {e}")
+
+if __name__ == '__main__':
+    # Use 0.0.0.0 for external access if needed, or default
+    app.run(debug=False, host='0.0.0.0', port=5001)

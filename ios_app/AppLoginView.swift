@@ -82,7 +82,6 @@ struct AppLoginView: View {
     }
     
     func performLogin() {
-        // ✅ 수정됨: /api/auth/login -> /api/login 으로 변경 (서버 라우트와 일치)
         guard let url = URL(string: "\(baseURL)/api/login") else { return }
         
         isLoading = true
@@ -98,12 +97,9 @@ struct AppLoginView: View {
         print("🚀 로그인 요청 시작: \(url.absoluteString)")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isLoading = false
-            }
-            
             if let error = error {
                 DispatchQueue.main.async {
+                    isLoading = false
                     print("❌ 네트워크 에러: \(error)")
                     errorMessage = "네트워크 오류: \(error.localizedDescription)"
                 }
@@ -112,31 +108,59 @@ struct AppLoginView: View {
             
             guard let data = data else { return }
             
-            if let str = String(data: data, encoding: .utf8) {
-                print("📩 서버 응답(Raw): \(str)")
-            }
-            
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     if let token = json["access_token"] as? String {
                         print("✅ 로그인 성공! 토큰: \(token.prefix(10))...")
+                        // 1. 토큰 저장
                         DispatchQueue.main.async {
                             authManager.login(token: token)
+                            // 2. 사용자 프로필(위험도) 가져오기
+                            fetchUserProfile(token: token)
                         }
                     } else {
                         let msg = json["message"] as? String ?? "로그인 실패"
-                        print("⚠️ 로그인 실패: \(msg)")
                         DispatchQueue.main.async {
+                            isLoading = false
                             errorMessage = msg
                         }
                     }
                 } else {
-                    print("❌ JSON 형식이 아님")
-                    DispatchQueue.main.async { errorMessage = "서버 오류: 예상치 못한 응답입니다." }
+                    DispatchQueue.main.async { isLoading = false; errorMessage = "서버 오류: JSON 파싱 불가" }
                 }
             } catch {
-                print("❌ JSON 파싱 에러: \(error)")
-                DispatchQueue.main.async { errorMessage = "응답 해석 오류" }
+                DispatchQueue.main.async { isLoading = false; errorMessage = "응답 해석 오류" }
+            }
+        }.resume()
+    }
+    
+    func fetchUserProfile(token: String) {
+        guard let url = URL(string: "\(baseURL)/api/user/me") else { 
+            DispatchQueue.main.async { isLoading = false }
+            return 
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            DispatchQueue.main.async {
+                isLoading = false
+            }
+            
+            if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                // 위험도 동기화 (기본값 1)
+                let rLevel = json["risk_level"] as? Int ?? 1
+                print("📊 사용자 위험도 로드: Level \(rLevel)")
+                
+                DispatchQueue.main.async {
+                    authManager.setRiskLevel(rLevel)
+                    
+                    // 만약 위험도 설정이 안 된 신규 유저(0 or nil)라면? 
+                    // (But backend defaults to 1 usually)
+                    // 필요 시 여기서 가입 직후 진단 화면으로 보내는 로직 추가 가능
+                }
             }
         }.resume()
     }

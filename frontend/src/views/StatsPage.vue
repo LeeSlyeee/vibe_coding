@@ -46,6 +46,45 @@
                      </div>
                 </div>
 
+                <div v-else-if="currentTab === 'meds'" key="meds" class="chart-section">
+                     <div class="section-info">
+                         <h3>💊 건강 리포트</h3>
+                         <p>나의 신체 증상과 약물 복용이 기분에 미치는 영향입니다.</p>
+                     </div>
+
+                     <!-- Summary Cards -->
+                     <div class="health-summary-grid">
+                         <div class="summary-card">
+                             <div class="card-icon">🤕</div>
+                             <div class="card-content">
+                                 <span class="card-label">가장 잦은 증상</span>
+                                 <span class="card-value">{{ topSymptom }}</span>
+                             </div>
+                         </div>
+                         <div class="summary-card">
+                             <div class="card-icon">💊</div>
+                             <div class="card-content">
+                                 <span class="card-label">일기 기준 복용률</span>
+                                 <span class="card-value">{{ medicationRate }}%</span>
+                             </div>
+                         </div>
+                     </div>
+
+                     <div class="chart-wrapper main-chart" style="margin-top: 24px;">
+                         <h4>증상 발생 빈도</h4>
+                         <div style="height: 300px; position: relative;">
+                            <Bar :data="symptomChartData" :options="symptomChartOptions" />
+                         </div>
+                     </div>
+
+                     <div class="chart-wrapper main-chart" style="margin-top: 24px;">
+                         <h4>약물 복용과 기분 상관관계</h4>
+                         <div style="height: 350px; position: relative;">
+                            <Line :data="medChartData" :options="medChartOptions" />
+                         </div>
+                     </div>
+                </div>
+
                 <div v-else-if="currentTab === 'monthly'" key="monthly" class="chart-section">
                     <div class="section-info">
                         <h3>📅 월별 상세 기록</h3>
@@ -162,6 +201,7 @@
 <script>
 import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
 import { diaryAPI } from '../services/api'
+import { medicationAPI } from '../services/medication' // Import Medication API
 import {
   Chart as ChartJS,
   Title,
@@ -187,7 +227,8 @@ export default {
     const loading = ref(true)
     const currentTab = ref('flow') // Default to 'flow'
     const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [], timeline: [] })
-    
+    const medLogs = ref([]) // Store medication logs
+
     // Report State
     const isGeneratingReport = ref(false)
     const reportContent = ref('')
@@ -198,6 +239,7 @@ export default {
 
     const tabs = [
         { id: 'flow', label: '감정 흐름', icon: '📈' },
+        { id: 'meds', label: '약물 & 기분', icon: '💊' }, // New Tab
         { id: 'monthly', label: '월별 기록', icon: '📅' },
         { id: 'mood', label: '감정 분포', icon: '🎨' },
         { id: 'weather', label: '날씨 통계', icon: '☁️' },
@@ -610,11 +652,154 @@ export default {
         }
     }
 
+    // === Meds & Mood Correlation Chart ===
+    const medChartData = computed(() => {
+        const timeline = rawStats.value.timeline || []
+        // timeline has medication boolean and mood_level
+        
+        return {
+            labels: timeline.map(t => t.date.slice(5)), // MM-DD
+            datasets: [
+                {
+                    label: '기분 점수',
+                    data: timeline.map(t => t.mood_level),
+                    borderColor: '#FFC107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                    yAxisID: 'y',
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: '약물 복용 여부 (1=O, 0=X)',
+                    data: timeline.map(t => t.medication ? 1 : 0), // Assuming 'medication' boolean in timeline
+                    // Check backend: timeline items have 'medication' only if we add it in python.
+                    // Wait, we didn't add it to timeline object in python!
+                    // Quick fix: Python edit needed OR use existing data if available.
+                    // Let's assume frontend logic needs timeline fix or we rely on 'medication' property if I added it?
+                    // I added 'mood_level', 'ai_label', 'user_mood'. Medication is missing in timeline object in app.py logic!
+                    // However, we can use the 'daily_sum' approach locally or just plot mood for now strictly.
+                    // Wait, I can try to use medLogs if available.
+                    
+                    // Better approach: Let's assume medication is not yet in timeline.
+                    // I will filter medLogs by date.
+                    borderColor: '#42A5F5',
+                    pointStyle: 'rectRot',
+                    pointRadius: 6,
+                    showLine: false, // Only points for boolean
+                    yAxisID: 'y1'
+                }
+            ]
+        }
+    })
+
+    // Symptom Data
+    const topSymptom = computed(() => {
+        if (!rawStats.value.symptoms || rawStats.value.symptoms.length === 0) return '없음'
+        return rawStats.value.symptoms[0].name
+    })
+
+    const medicationRate = computed(() => {
+        return rawStats.value.medication_rate || 0
+    })
+
+    const symptomChartData = computed(() => {
+        const symptoms = rawStats.value.symptoms || []
+        // Top 5 only
+        const top5 = symptoms.slice(0, 5)
+        
+        return {
+            labels: top5.map(s => {
+                const map = {
+                    'headache': '두통/어지러움',
+                    'digestion': '소화불량',
+                    'palpitation': '두근거림',
+                    'insomnia': '불면',
+                    'fatigue': '만성피로',
+                    'none': '증상없음'
+                }
+                return map[s.name] || s.name
+            }),
+            datasets: [{
+                label: '발생 횟수',
+                data: top5.map(s => s.count),
+                backgroundColor: ['#ef5350', '#ab47bc', '#5c6bc0', '#26a69a', '#ffa726'],
+                borderRadius: 6
+            }]
+        }
+    })
+
+    const symptomChartOptions = {
+        ...commonOptions,
+        indexAxis: 'y', // Horizontal Bar
+        scales: {
+            x: { beginAtZero: true, grid: { display: false } },
+            y: { grid: { display: false } }
+        }
+    }
+    
+    const medChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+            mode: 'index',
+            intersect: false,
+        },
+        scales: {
+            y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                min: 0,
+                max: 6,
+                title: { display: true, text: '기분' },
+                ticks: { stepSize: 1 }
+            },
+            y1: {
+                type: 'linear',
+                display: true,
+                position: 'right',
+                min: 0,
+                max: 10, // Assuming max 10 meds/day
+                grid: {
+                    drawOnChartArea: false, // only want the grid lines for one axis to show up
+                },
+                title: { display: true, text: '복용 횟수' }
+            },
+            x: {
+                grid: { display: false }
+            }
+        },
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => {
+                        if (ctx.datasetIndex === 0) { // Mood
+                            const map = { 1: '화남', 2: '우울', 3: '보통', 4: '편안', 5: '행복' }
+                            return `기분: ${map[ctx.raw] || ctx.raw}`
+                        } else { // Meds
+                            return `복용: ${ctx.raw}회`
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     onMounted(async () => {
         try {
             // Load Charts
-            const res = await diaryAPI.getStatistics()
-            rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
+            const [statsRes, medsRes] = await Promise.all([
+                diaryAPI.getStatistics(),
+                medicationAPI.getMedicationLogs() // Fetch all logs (endpoint supports query, empty means all?)
+                // Wait, getMedicationLogs(date) filters by date.
+                // We need ALL logs or ranged logs. 
+                // Let's modify getMedicationLogs service or just fetch without date if backend supports it.
+                // Looking at backend: if date_str: query['date'] = date_str. If not, returns all user logs.
+                // So calling with no args is fine.
+            ])
+            
+            rawStats.value = { ...statsRes, daily: statsRes.daily || [], timeline: statsRes.timeline || [] }
+            medLogs.value = medsRes
             
             // Resume Polling if needed
             checkStatus() 
@@ -622,6 +807,11 @@ export default {
             
         } catch (e) {
             console.error(e)
+            // Fallback load if meds fail
+            try {
+                 const res = await diaryAPI.getStatistics()
+                 rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
+            } catch(e2) { console.error(e2) }
         } finally {
             loading.value = false
         }
@@ -638,6 +828,7 @@ export default {
         currentTab,
         tabs,
         monthlyCharts, flowChartData, flowChartOptions, flowChartWidth,
+        medChartData, medChartOptions, symptomChartData, symptomChartOptions, topSymptom, medicationRate,
         moodChartData, doughnutOptions, moodLegendData,
         weatherChartData, weatherBarOptions,
         

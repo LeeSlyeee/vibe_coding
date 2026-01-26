@@ -392,10 +392,38 @@ struct AppDiaryWriteView: View {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
-        URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isSaving = false
-                if error == nil {
+                if error == nil, let data = data {
+                    // [Check for Follow-up Trigger]
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        if let required = json["followup_required"] as? Bool, required == true {
+                            print("🚨 Follow-up Required Triggered on iOS!")
+                            
+                            // 1. Prepare Context
+                            let question = json["followup_question"] as? String ?? "오늘 기록하신 내용에 대해 조금 더 듣고 싶어요."
+                            let diaryId = json["id"] as? String ?? ""
+                            
+                            let contextData: [String: Any] = [
+                                "question": question,
+                                "diaryId": diaryId,
+                                "date": dateStringLocal(date)
+                            ]
+                            UserDefaults.standard.set(contextData, forKey: "followup_context")
+                            
+                            // 2. Notify RootView to Switch Tab
+                            NotificationCenter.default.post(name: NSNotification.Name("SwitchToChatTab"), object: nil, userInfo: ["date": date])
+                            
+                            // 3. Dismiss without calling normal onSave (Or call it to refresh list?)
+                            // Calling onSave() updates the list behind the scenes, determining nice UX.
+                            onSave() 
+                            isPresented = false
+                            return
+                        }
+                    }
+                    
+                    // Normal Success
                     onSave()
                     isPresented = false
                 }

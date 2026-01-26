@@ -296,7 +296,7 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "maum-on-gemma",
+                "model": "maum-on-gemma", # Reverted to user requested model
                 "prompt": prompt_text,
                 "stream": False,
                 # No 'format': 'json' here because we want free text
@@ -328,7 +328,14 @@ class EmotionAnalysis:
 
         except Exception as e:
             print(f"❌ [Insight] Inference Failed: {str(e)}")
-            return None
+            # Fallback Messages (Safety Net)
+            fallbacks = [
+                "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요.",
+                "날씨가 당신의 마음에 어떤 영향을 주었나요? 솔직하게 적어보세요.",
+                "가끔은 쉬어가는 날도 필요해요. 오늘의 감정을 들여다볼까요?",
+                "당신의 이야기가 궁금해요. 오늘 어떤 일이 있었나요?"
+            ]
+            return random.choice(fallbacks)
 
     def generate_chat_reaction(self, user_text):
         """
@@ -714,9 +721,8 @@ class EmotionAnalysis:
 
 
 
-    def analyze_diary_with_local_llm(self, text, history_context=None):
+    def analyze_diary_with_local_llm(self, text, history_context=None, user_risk_level=1):
         # [Local AI Mode] Uses Local Ollama (Gemma 2) for Analysis.
-        # Free, Unlimited, Private.
         import requests
         import json
         
@@ -734,25 +740,38 @@ class EmotionAnalysis:
                     f"(지침: 위 과거 기록의 흐름을 참고하여, 맥락이 이어지는 깊이 있는 공감 멘트를 작성해줘.)\n\n"
                 )
 
-            # Extract Sleep Info if available in text (which logic passes as simple text usually? No, caller passes string)
-            # Actually, caller passes combined string. Let's assume input text has structure or we rely on the text content.
-            # But the user asked to tune analysis based on required sleep input.
-            # Let's see how 'analyze_diary_logic' calls this. It calls with `full_text`.
-            # We should probably update the prompt to explicitly look for sleep mentions if possible, or just emphasize it.
+            # Risk Level Context
+            risk_desc = "안정(Normal)"
+            if user_risk_level >= 4: risk_desc = "매우 위험(Severe Risk)"
+            elif user_risk_level == 3: risk_desc = "위험(Moderate Risk)"
             
-            # Better: The prompt format below.
+            # [Hybrid Safeguard] Python-side Keyword Check (Priority 0)
+            print(f"🕵️ [DEBUG] Analyzing Text (Type: {type(text)}): {text}")
+            DANGER_KEYWORDS = ["죽고", "자살", "뛰어", "사라지고", "끝내", "망했", "살기 싫", "칼", "약", "수면제"]
+            found_keywords = [k for k in DANGER_KEYWORDS if k in text]
+            is_urgent_risk = len(found_keywords) > 0
             
+            danger_note = ""
+            if is_urgent_risk:
+                print(f"🚨 [Analysis] Danger Keywords Detected: {found_keywords}")
+                danger_note = f"\n[긴급 알림: 내담자가 '{found_keywords}'와 같은 위험한 표현을 직접적으로 사용했습니다. 무조건 Followup을 YES로 하고 안전을 확인하는 질문을 던지세요.]"
+
             prompt_text = (
                 f"너는 심리 상담 전문가야. 다음 내담자의 일기를 읽고 분석해줘.\n"
+                f"내담자의 현재 상태: {risk_desc} (Level {user_risk_level})\n"
                 f"{context_section}"
+                f"{danger_note}\n"
                 f"### [오늘의 일기 데이터]:\n{text}\n\n"
                 f"### [분석 지침]:\n"
-                f"1. 내담자의 '수면 상태(잠)'와 '감정'의 연관성을 깊이 있게 분석해줘. (예: 잠을 못 자서 예민한지, 푹 자서 개운한지)\n"
-                f"2. 단순한 공감을 넘어, 수면 패턴이 감정에 미친 영향을 언급하며 위로해줘.\n\n"
-                f"### [답변 형식]:\n"
+                f"1. 내담자의 '수면 상태'와 '감정'의 연관성을 깊이 있게 분석해줘.\n"
+                f"2. 만약 내담자가 '죽고 싶다' 등 위험한 표현을 했거나({found_keywords}), 감정이 오랫동안 가라앉아 있다면 '추가 질문'을 생성해줘.\n"
+                f"3. 단순히 내용을 요약하지 말고, 전문적인 심리 분석 코멘트를 해줘.\n\n"
+                f"### [필수 답변 형식]:\n"
                 f"Emotion: (happy, sad, angry, neutral, panic 중 하나)\n"
                 f"Confidence: (0~100 숫자만)\n"
-                f"Comment: (수면 상태를 언급하며 50자 이내의 따뜻한 한국어 위로)\n"
+                f"NeedFollowup: (YES 또는 NO)\n"
+                f"Question: (NeedFollowup이 YES일 때만, 내담자에게 물어볼 추가 질문 1문장. 아니면 'None')\n"
+                f"Comment: (수면 상태를 언급하며 100자 이내의 따뜻한 한국어 위로)\n"
                 f"반드시 위 형식만 지켜서 답변해."
             )
             
@@ -760,10 +779,9 @@ class EmotionAnalysis:
                 "model": "maum-on-gemma",
                 "prompt": prompt_text,
                 "stream": False,
-                # "format": "json"  <-- REMOVED: Cause of hanging
                 "options": {
-                    "temperature": 0.3, # Low temp for stability
-                    "num_predict": 150
+                    "temperature": 0.3, # Keep low for stability, let prompt drive urgency
+                    "num_predict": 250 
                 }
             }
             
@@ -772,28 +790,46 @@ class EmotionAnalysis:
             
             if response.status_code != 200:
                 print(f"❌ Ollama Error {response.status_code}: {response.text}")
-                return None, None
+                return None, None, False, None
                 
             result = response.json()
             response_text = result.get('response', '').strip()
             print(f"🔍 Raw Output: {response_text}")
             
-            # Regex Parsing
             import re
             
-            # 1. Emotion
+            # 1. Emotion (Flexible Regex)
             emotion_match = re.search(r"Emotion:\s*([a-zA-Z]+)", response_text, re.IGNORECASE)
             emotion_str = emotion_match.group(1).lower() if emotion_match else "neutral"
             
             # 2. Confidence
             conf_match = re.search(r"Confidence:\s*(\d+)", response_text)
             confidence = int(conf_match.group(1)) if conf_match else 80
+
+            # 3. Followup Parsing
+            followup_match = re.search(r"NeedFollowup:\s*(YES|NO)", response_text, re.IGNORECASE)
+            need_followup = False
+            if followup_match and followup_match.group(1).upper() == "YES":
+                need_followup = True
             
-            # 3. Comment
+            # [Hybrid Override] If Danger Keyword Found, FORCE True
+            if is_urgent_risk:
+                need_followup = True
+                print("⚡️ [Hybrid] Forcing Follow-up due to keywords.")
+                
+            question_match = re.search(r"Question:\s*(.*)", response_text)
+            followup_question = question_match.group(1).strip() if question_match else ""
+            if followup_question.lower() == "none" or not followup_question: 
+                # Fallback Question if model failed but we forced true
+                if is_urgent_risk:
+                    followup_question = "많이 힘드신 것 같아요. 혹시 위험한 생각이 드시나요? 저에게 솔직하게 털어놓아 주시겠어요?"
+                else:
+                    followup_question = ""
+            
+            # 4. Comment
             comment_match = re.search(r"Comment:\s*(.*)", response_text, re.DOTALL)
             comment = comment_match.group(1).strip() if comment_match else "오늘 하루도 수고 많으셨어요."
             
-            # Remove any trailing quotes if model added them
             if comment.startswith('"') and comment.endswith('"'):
                 comment = comment[1:-1]
 
@@ -809,11 +845,11 @@ class EmotionAnalysis:
             korean_emotion = emotion_map.get(emotion_str, "평온해")
             formatted_prediction = f"'{korean_emotion} ({confidence}%)'"
             
-            return formatted_prediction, comment
+            return formatted_prediction, comment, need_followup, followup_question
                 
         except Exception as e:
             print(f"❌ Local AI Error: {e}")
-            return None, None
+            return None, None, False, None
 
     def generate_comment(self, prediction_text, user_text=None):
         # Generate a supportive comment.
