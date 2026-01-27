@@ -29,8 +29,13 @@
           >
             💊 약물
           </button>
-          <button v-if="isAuthenticated" @click="handleLogout" class="logout-btn" title="로그아웃">
-            👤 로그아웃
+          <button
+            v-if="isAuthenticated"
+            @click="$router.push('/settings')"
+            class="stats-btn"
+            title="설정"
+          >
+            ⚙️ 설정
           </button>
         </div>
       </div>
@@ -90,9 +95,13 @@
         <span class="nav-label">가이드</span>
       </button>
 
-      <button class="nav-item" @click="handleLogout">
-        <span class="nav-icon">👤</span>
-        <span class="nav-label">MY</span>
+      <button 
+        class="nav-item" 
+        :class="{ active: $route.path === '/settings' }"
+        @click="$router.push('/settings')"
+      >
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">설정</span>
       </button>
     </nav>
     <button
