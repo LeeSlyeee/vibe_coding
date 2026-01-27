@@ -8,6 +8,8 @@ struct AppDiaryDetailView: View {
     @Environment(\.presentationMode) var presentationMode
     @State private var isDeleting = false
     @State private var showingEditSheet = false
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
     
     let baseURL = "https://217.142.253.35.nip.io"
     
@@ -117,7 +119,9 @@ struct AppDiaryDetailView: View {
             }
             .padding()
         }
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .preferredColorScheme(.light)
         // 수정 시트 연결 (+수정 완료 시 닫기 & 새로고침)
         .sheet(isPresented: $showingEditSheet) {
@@ -134,6 +138,9 @@ struct AppDiaryDetailView: View {
                 diaryToEdit: diary
             )
         }
+        .alert(isPresented: $showErrorAlert) {
+            Alert(title: Text("삭제 실패"), message: Text(errorMessage), dismissButton: .default(Text("확인")))
+        }
     }
     
     func label(_ text: String) -> some View {
@@ -144,21 +151,21 @@ struct AppDiaryDetailView: View {
     
     func deleteDiary() {
         guard let id = diary.realId else { return }
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-        guard let url = URL(string: "\(baseURL)/api/diaries/\(id)") else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         
         isDeleting = true
-        URLSession.shared.dataTask(with: request) { _, _, _ in
+        
+        LocalDataManager.shared.deleteDiary(id: id) { success in
             DispatchQueue.main.async {
-                isDeleting = false
-                onDelete()
-                presentationMode.wrappedValue.dismiss()
+                self.isDeleting = false
+                if success {
+                    onDelete()
+                    presentationMode.wrappedValue.dismiss()
+                } else {
+                    self.errorMessage = "삭제할 데이터를 찾을 수 없습니다."
+                    self.showErrorAlert = true
+                }
             }
-        }.resume()
+        }
     }
     
     // UTC 시간을 한국 시간으로 정확히 변환하여 표시

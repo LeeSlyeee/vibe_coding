@@ -31,6 +31,8 @@ struct AppDiaryWriteView: View {
     @State private var q4: String = "" // Self talk (나에게 말)
     @State private var qs: String = "" // Sleep (잠)
     @State private var isSaving = false
+    @State private var showError = false
+    @State private var errorMessage = ""
     
     // Weather State
     @State private var weatherDesc: String = "맑음"
@@ -39,7 +41,7 @@ struct AppDiaryWriteView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(UIColor.systemGroupedBackground).edgesIgnoringSafeArea(.all)
+                Color.gray.opacity(0.1).edgesIgnoringSafeArea(.all)
                 
                 if showForm {
                     // 일기 작성 폼
@@ -72,7 +74,7 @@ struct AppDiaryWriteView: View {
                                             let asset = getMoodAsset(level: m)
                                             Button(action: { withAnimation { mood = m } }) {
                                                 VStack(spacing: 8) {
-                                                    Image(uiImage: UIImage(named: asset.image) ?? UIImage())
+                                                    Image(asset.image)
                                                         .resizable()
                                                         .scaledToFit()
                                                         .frame(width: 40, height: 40)
@@ -182,9 +184,16 @@ struct AppDiaryWriteView: View {
                     .transition(.opacity)
                 }
             }
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
+            .alert(isPresented: $showError) {
+                Alert(title: Text("저장 실패"), message: Text(errorMessage), dismissButton: .default(Text("확인")))
+            }
         }
+        #if os(iOS)
         .navigationViewStyle(StackNavigationViewStyle())
+        #endif
                 .onAppear {
             if let edit = diaryToEdit {
                 // [강제 업데이트] 약간의 딜레이를 주어 State 반영 보장
@@ -242,7 +251,7 @@ struct AppDiaryWriteView: View {
     func questionCard(title: String, binding: Binding<String>, fieldId: Int) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(title).font(.headline).foregroundColor(Color(UIColor.darkGray))
+                Text(title).font(.headline).foregroundColor(Color.secondary)
                 Spacer()
                 // 마이크 버튼
                 Button(action: { toggleRecording(for: fieldId, currentText: binding.wrappedValue) }) {
@@ -256,7 +265,7 @@ struct AppDiaryWriteView: View {
             TextEditor(text: binding)
                 .frame(height: 100)
                 .padding(8)
-                .background(Color(UIColor.secondarySystemBackground))
+                .background(Color.gray.opacity(0.1))
                 .cornerRadius(12)
         }
         .padding()
@@ -286,10 +295,14 @@ struct AppDiaryWriteView: View {
         
         URLSession.shared.dataTask(with: url) { data, _, error in
             var lat = 37.5665; var lon = 126.9780
-            if error == nil, let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let l = json["latitude"] as? Double, let g = json["longitude"] as? Double {
-                lat = l; lon = g
-            }
+                if error == nil, let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let l = json["latitude"] as? Double, let g = json["longitude"] as? Double {
+                    lat = l; lon = g
+                } else {
+                     // network fail fallback
+                     DispatchQueue.main.async { self.fetchInsight() }
+                     return
+                }
             
             let weatherUrlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current_weather=true&timezone=auto"
             guard let wUrl = URL(string: weatherUrlString) else { DispatchQueue.main.async { self.fetchInsight() }; return }
@@ -311,124 +324,92 @@ struct AppDiaryWriteView: View {
     }
 
     func fetchInsight() {
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { 
-            isLoadingInsight = false
-            insightMessage = "로그인이 필요합니다."
-            return 
-        }
-        let encodedWeather = weatherDesc.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "맑음"
-        let dateStr = dateStringLocal(date)
-        guard let url = URL(string: "\(baseURL)/api/insight?date=\(dateStr)&weather=\(encodedWeather)") else { return }
-        
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            DispatchQueue.main.async {
-                isLoadingInsight = false
-                if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let msg = json["message"] as? String, !msg.isEmpty {
-                    insightMessage = msg
-                } else {
-                    insightMessage = "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요."
-                }
-            }
-        }.resume()
+        // [Local Mode] No Server Insight
+        isLoadingInsight = false
+        insightMessage = "오늘 하루도 수고 많으셨어요. (Local Mode)"
     }
     
-    // Logic: 저장
+    // Logic: 저장 (Local + LLM)
     func saveDiary() {
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-        
-        var url: URL?
-        var method = "POST"
-        
-        if let editId = diaryToEdit?.realId {
-            url = URL(string: "\(baseURL)/api/diaries/\(editId)")
-            method = "PUT"
-        } else {
-            url = URL(string: "\(baseURL)/api/diaries")
-            method = "POST"
-        }
-        guard let finalUrl = url else { return }
         isSaving = true
         
-        // Data Preparation
-        let isoDate: String
-        if method == "PUT", let existing = diaryToEdit?.created_at {
-             isoDate = existing // 수정 시 기존 생성일 유지
+        var newDiary: Diary
+        if let existing = diaryToEdit {
+            newDiary = existing
         } else {
-            // 저장 시 UTC 시간으로 정확히 변환하여 전송
-            let now = Date()
-            let calendar = Calendar.current
-            var components = calendar.dateComponents([.hour, .minute, .second], from: now)
-            components.year = calendar.component(.year, from: date)
-            components.month = calendar.component(.month, from: date)
-            components.day = calendar.component(.day, from: date)
-            let finalDate = calendar.date(from: components) ?? now
-            
-            // ISO8601 (UTC)
-            let formatter = ISO8601DateFormatter()
-            formatter.timeZone = TimeZone(secondsFromGMT: 0) // UTC 강제
-            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            isoDate = formatter.string(from: finalDate)
+            newDiary = Diary(
+                id: UUID().uuidString,
+                _id: nil,
+                date: dateStringLocal(date),
+                mood_level: mood,
+                event: q1,
+                emotion_desc: q2,
+                emotion_meaning: q3,
+                self_talk: q4,
+                sleep_desc: qs,
+                weather: weatherDesc,
+                temperature: temp,
+                created_at: nil // Will be set in LocalDataManager
+            )
         }
         
-        let body: [String: Any] = [
-            "created_at": isoDate,
-            "mood_level": mood,
-            "event": q1,
-            "sleep_desc": qs,
-            "emotion_desc": q2,
-            "emotion_meaning": q3,
-            "self_talk": q4,
-            "weather": weatherDesc,
-            "temperature": temp
-        ]
+        // Update fields
+        newDiary.mood_level = mood
+        newDiary.event = q1
+        newDiary.sleep_desc = qs
+        newDiary.emotion_desc = q2
+        newDiary.emotion_meaning = q3
+        newDiary.self_talk = q4
         
-        var request = URLRequest(url: finalUrl)
-        request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isSaving = false
-                if error == nil, let data = data {
-                    // [Check for Follow-up Trigger]
-                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        if let required = json["followup_required"] as? Bool, required == true {
-                            print("🚨 Follow-up Required Triggered on iOS!")
-                            
-                            // 1. Prepare Context
-                            let question = json["followup_question"] as? String ?? "오늘 기록하신 내용에 대해 조금 더 듣고 싶어요."
-                            let diaryId = json["id"] as? String ?? ""
-                            
-                            let contextData: [String: Any] = [
-                                "question": question,
-                                "diaryId": diaryId,
-                                "date": dateStringLocal(date)
-                            ]
-                            UserDefaults.standard.set(contextData, forKey: "followup_context")
-                            
-                            // 2. Notify RootView to Switch Tab
-                            NotificationCenter.default.post(name: NSNotification.Name("SwitchToChatTab"), object: nil, userInfo: ["date": date])
-                            
-                            // 3. Dismiss without calling normal onSave (Or call it to refresh list?)
-                            // Calling onSave() updates the list behind the scenes, determining nice UX.
-                            onSave() 
-                            isPresented = false
-                            return
-                        }
-                    }
-                    
-                    // Normal Success
-                    onSave()
-                    isPresented = false
+        // 1. First Save (Synchronous-like)
+        LocalDataManager.shared.saveDiary(newDiary) { success in
+            if success {
+                // 2. Trigger On-Device AI Analysis (Async)
+                triggerAIAnalysis(for: newDiary)
+                
+                DispatchQueue.main.async {
+                    self.isSaving = false
+                    self.onSave()
+                    self.isPresented = false
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isSaving = false
+                    self.errorMessage = "로컬 저장 실패"
+                    self.showError = true
                 }
             }
-        }.resume()
+        }
+    }
+    
+    func triggerAIAnalysis(for diary: Diary) {
+        // Background AI Task
+        Task {
+            // Combine text for AI
+            let fullText = """
+            사건: \(diary.event ?? "")
+            감정: \(diary.emotion_desc ?? "")
+            의미: \(diary.emotion_meaning ?? "")
+            혼잣말: \(diary.self_talk ?? "")
+            """
+            
+            print("🧠 [Local AI] Analyzing diary...")
+            var analysisResult = ""
+            for await token in await LLMService.shared.generateAnalysis(diaryText: fullText) {
+                analysisResult += token
+            }
+            
+            // Update Diary with AI Result
+            var updatedDiary = diary
+            updatedDiary.ai_analysis = analysisResult
+            // Mock Prediction for Calendar (Mood + %)
+            updatedDiary.ai_prediction = "분석 완료 (100%)"
+            
+            // Save again silently
+            LocalDataManager.shared.saveDiary(updatedDiary) { _ in
+                 print("✅ [Local AI] Analysis saved!")
+            }
+        }
     }
     
     func dateStringLocal(_ d: Date) -> String {

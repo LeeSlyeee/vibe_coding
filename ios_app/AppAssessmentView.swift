@@ -61,7 +61,11 @@ struct AppAssessmentView: View {
                 
                 Spacer()
             }
+            #if os(iOS)
             .navigationBarTitle("초기 심리 진단", displayMode: .inline)
+            #else
+            .navigationTitle("초기 심리 진단")
+            #endif
             .padding()
         }
     }
@@ -80,7 +84,7 @@ struct AppAssessmentView: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Color(UIColor.systemGray6))
+            .background(Color.gray.opacity(0.15))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)

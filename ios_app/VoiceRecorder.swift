@@ -35,6 +35,7 @@ class VoiceRecorder: ObservableObject {
         // 잠시 대기 (AudioEngine 리셋 시간 확보)
         // 실제로는 비동기 처리 없이 바로 해도 되지만, 안전을 위해 로직 분리
         
+        #if os(iOS)
         let audioSession = AVAudioSession.sharedInstance()
         do {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -43,6 +44,7 @@ class VoiceRecorder: ObservableObject {
             print("Audio Session Error: \(error)")
             return
         }
+        #endif
         
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         

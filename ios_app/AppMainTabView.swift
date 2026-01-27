@@ -3,13 +3,16 @@ import SwiftUI
 
 struct AppMainTabView: View {
     @EnvironmentObject var authManager: AuthManager
+    @StateObject private var networkMonitor = NetworkMonitor()
     @State private var showAssessment = false
     @State private var selection = 0
     @State private var showEmergencySheet = false
     
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            TabView(selection: $selection) {
+            // Main Content
+            ZStack(alignment: .top) {
+                TabView(selection: $selection) {
                 MoodCalendarView()
                     .tabItem { Label("캘린더", systemImage: "calendar") }
                     .tag(0)
@@ -28,31 +31,36 @@ struct AppMainTabView: View {
                     .tabItem { Label("상담", systemImage: "message.fill") }
                     .tag(3)
                 
-                VStack {
-                    Spacer()
-                    // Debug Info
-                    Text("Current Risk Level: \(authManager.riskLevel)")
-                        .font(.caption).foregroundColor(.gray).padding()
-                    
-                    Button(action: { authManager.logout() }) {
-                        HStack {
-                            Text("로그아웃")
-                                .fontWeight(.bold)
-                            Image(systemName: "arrow.right.circle.fill")
-                        }
-                        .foregroundColor(.white)
-                        .padding()
-                        .frame(width: 200)
-                        .background(Color.red)
-                        .cornerRadius(10)
-                        .shadow(radius: 5)
-                    }
-                    Spacer()
-                }
+                AppSettingsView()
+                    .tabItem { Label("설정", systemImage: "gearshape.fill") }
+                    .tag(4)
                 .tabItem { Label("설정", systemImage: "gearshape.fill") }
                 .tag(4)
             }
             .accentColor(.black)
+            .disabled(!networkMonitor.isConnected) // Disable interaction if offline? Or just show banner. Let's just show banner.
+            
+            // Network Status Banner
+            if !networkMonitor.isConnected {
+                VStack {
+                    HStack {
+                        Image(systemName: "wifi.slash")
+                        Text("네트워크 연결이 불안정합니다.")
+                            .font(.system(size: 14, weight: .bold))
+                        Spacer()
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.red)
+                    .shadow(radius: 2)
+                    
+                    Spacer()
+                }
+                .transition(.move(edge: .top))
+                .animation(.easeInOut, value: networkMonitor.isConnected)
+                .zIndex(100) // Ensure it's on top of everything
+             }
+            }
             
             // SOS Button (Only for High Risk Users)
             if authManager.riskLevel >= 3 {
@@ -88,13 +96,21 @@ struct AppMainTabView: View {
                 }
             }
         }
+        #if os(iOS)
         .fullScreenCover(isPresented: $showAssessment) {
             AppAssessmentView()
                 .onDisappear {
-                    // After assessment, mark as done locally too
                     UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                 }
         }
+        #else
+        .sheet(isPresented: $showAssessment) {
+            AppAssessmentView()
+                .onDisappear {
+                    UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+                }
+        }
+        #endif
         .onAppear {
             checkAssessmentStatus()
             // Listen for Chat Redirection
@@ -119,7 +135,11 @@ struct AppMainTabView: View {
     
     func callNumber(_ number: String) {
         guard let url = URL(string: "tel://\(number)") else { return }
+        #if os(iOS)
         UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 }
 
@@ -186,7 +206,9 @@ struct AppGuideView: View {
                     .padding(24)
                 }
             }
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
         }
     }
 }

@@ -7,31 +7,8 @@ import Charts
 
 
 // MARK: - Design System
-extension Color {
-    static let bgMain = Color(hex: "F7F8FA")
-    static let cardBg = Color.white
-    static let primaryText = Color(hex: "1D1D1F")
-    static let secondaryText = Color(hex: "86868B")
-    static let accent = Color(hex: "0071E3") // Apple Blue
-    
-    // Mood Colors
-    static let mood1 = Color(hex: "FF6B6B") // Angry
-    static let mood2 = Color(hex: "4D96FF") // Sad
-    static let mood3 = Color(hex: "A0A0A0") // Neutral
-    static let mood4 = Color(hex: "6BCB77") // Calm
-    static let mood5 = Color(hex: "FFD93D") // Happy
-    
-    init(hex: String) {
-        let scanner = Scanner(string: hex)
-        _ = scanner.scanString("#")
-        var rgb: UInt64 = 0
-        scanner.scanHexInt64(&rgb)
-        let r = Double((rgb >> 16) & 0xFF) / 255.0
-        let g = Double((rgb >> 8) & 0xFF) / 255.0
-        let b = Double(rgb & 0xFF) / 255.0
-        self.init(red: r, green: g, blue: b)
-    }
-}
+// MARK: - Design System
+// (Moved to ViewExtensions.swift)
 
 // MARK: - Main View
 struct AppStatsView: View {
@@ -161,7 +138,9 @@ struct AppStatsView: View {
                 }
                 } // End of Else (Full Features)
             }
+            #if os(iOS)
             .navigationBarHidden(true)
+            #endif
             .onAppear {
                 if authManager.riskLevel > 1 {
                     fetchStats()

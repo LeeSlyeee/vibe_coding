@@ -8,8 +8,8 @@ struct AppLoginView: View {
     @State private var errorMessage = ""
     @State private var isLoading = false
     
-    // ✅ 사용자분의 OCI 서버 도메인 (경로 문제 해결!)
-    let baseURL = "https://217.142.253.35.nip.io"
+    // ✅ 로컬 모드에서는 서버 URL 불필요
+    // let baseURL = "https://217.142.253.35.nip.io"
     
     init() {}
     
@@ -27,26 +27,27 @@ struct AppLoginView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
+                    Text("On-Device Mode")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(.top, 4)
                 }
                 .padding(.bottom, 20)
                 
                 VStack(spacing: 16) {
-                    TextField("아이디", text: $username)
+                    TextField("닉네임 (로컬 프로필)", text: $username)
                         .padding()
                         .frame(height: 50)
-                        .background(Color.white)
-                        .foregroundColor(.black)
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
                         .cornerRadius(12)
+                        #if os(iOS)
                         .textInputAutocapitalization(.never)
-                        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        #endif
+                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                     
-                    SecureField("비밀번호", text: $password)
-                        .padding()
-                        .frame(height: 50)
-                        .background(Color.white)
-                        .foregroundColor(.black)
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+                    // 로컬 모드에서는 비밀번호 불필요
+                    // SecureField("비밀번호", text: $password) ...
                 }
                 .padding(.horizontal, 24)
                 
@@ -82,86 +83,26 @@ struct AppLoginView: View {
     }
     
     func performLogin() {
-        guard let url = URL(string: "\(baseURL)/api/login") else { return }
+        // 로컬 로그인 (단순 프로필 설정)
+        guard !username.isEmpty else { return }
         
         isLoading = true
-        errorMessage = ""
         
-        let body: [String: String] = ["username": username, "password": password]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        print("🚀 로그인 요청 시작: \(url.absoluteString)")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    isLoading = false
-                    print("❌ 네트워크 에러: \(error)")
-                    errorMessage = "네트워크 오류: \(error.localizedDescription)"
-                }
-                return
-            }
+        // Simulate minor delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            isLoading = false
+            print("✅ 로컬 로그인 성공: \(username)")
             
-            guard let data = data else { return }
+            // Generate a dummy token for local session
+            let dummyToken = "local_token_\(UUID().uuidString)"
+            authManager.login(token: dummyToken)
             
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    if let token = json["access_token"] as? String {
-                        print("✅ 로그인 성공! 토큰: \(token.prefix(10))...")
-                        // 1. 토큰 저장
-                        DispatchQueue.main.async {
-                            authManager.login(token: token)
-                            // 2. 사용자 프로필(위험도) 가져오기
-                            fetchUserProfile(token: token)
-                        }
-                    } else {
-                        let msg = json["message"] as? String ?? "로그인 실패"
-                        DispatchQueue.main.async {
-                            isLoading = false
-                            errorMessage = msg
-                        }
-                    }
-                } else {
-                    DispatchQueue.main.async { isLoading = false; errorMessage = "서버 오류: JSON 파싱 불가" }
-                }
-            } catch {
-                DispatchQueue.main.async { isLoading = false; errorMessage = "응답 해석 오류" }
+            // Set default risk level if not set
+            if UserDefaults.standard.object(forKey: "userRiskLevel") == nil {
+                authManager.setRiskLevel(1)
             }
-        }.resume()
+        }
     }
     
-    func fetchUserProfile(token: String) {
-        guard let url = URL(string: "\(baseURL)/api/user/me") else { 
-            DispatchQueue.main.async { isLoading = false }
-            return 
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            DispatchQueue.main.async {
-                isLoading = false
-            }
-            
-            if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                // 위험도 동기화 (기본값 1)
-                let rLevel = json["risk_level"] as? Int ?? 1
-                print("📊 사용자 위험도 로드: Level \(rLevel)")
-                
-                DispatchQueue.main.async {
-                    authManager.setRiskLevel(rLevel)
-                    
-                    // 만약 위험도 설정이 안 된 신규 유저(0 or nil)라면? 
-                    // (But backend defaults to 1 usually)
-                    // 필요 시 여기서 가입 직후 진단 화면으로 보내는 로직 추가 가능
-                }
-            }
-        }.resume()
-    }
+    // fetchUserProfile is removed in Local Mode
 }

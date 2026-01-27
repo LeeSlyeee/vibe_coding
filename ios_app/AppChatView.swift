@@ -65,7 +65,7 @@ struct AppChatView: View {
                 HStack(spacing: 10) {
                     TextField("메시지 보내기...", text: $inputText)
                         .padding(12)
-                        .background(Color(UIColor.systemGray6))
+                        .background(Color.gray.opacity(0.1))
                         .cornerRadius(20)
                         .disabled(isTyping)
                     
@@ -83,11 +83,13 @@ struct AppChatView: View {
                 .background(Color.white)
                 .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
             }
+            #if os(iOS)
             .navigationBarTitle("마음 톡(Talk)", displayMode: .inline)
             .navigationBarItems(trailing: Button(action: { showReport = true }) {
                 Image(systemName: "chart.pie.fill")
                     .foregroundColor(.black)
             })
+            #endif
             .background(Color.white.edgesIgnoringSafeArea(.all))
             .sheet(isPresented: $showReport) {
                 ChatReportView(authManager: authManager)
@@ -105,74 +107,59 @@ struct AppChatView: View {
         isTyping = true
         
         // Haptic Feedback
+        #if os(iOS)
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
+        #endif
         
-        // Network Request
-        guard let url = URL(string: "\(baseURL)/api/chat/reaction") else { return }
-        guard let token = authManager.token else { return }
+        // Local AI Chat
+        guard !isTyping else { return }
+        isTyping = true
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        // Context
-        let historyCount = min(messages.count, 6)
-        let recentMessages = messages.suffix(historyCount)
-        var historyContext = ""
-        for msg in recentMessages {
-            let role = msg.isUser ? "내담자" : "상담사"
-            historyContext += "\(role): \(msg.text)\n"
-        }
-        
-        let body: [String: String] = [
-            "text": userText,
-            "mode": "reaction",
-            "history": historyContext
-        ]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async {
-                isTyping = false
-                
-                if let error = error {
-                    messages.append(ChatMessage(text: "오류: \(error.localizedDescription)", isUser: false))
-                    return
-                }
-                
-                if let httpResponse = response as? HTTPURLResponse {
-                    if httpResponse.statusCode == 401 || httpResponse.statusCode == 422 {
-                        messages.append(ChatMessage(text: "로그인이 만료되었습니다. 다시 로그인해주세요. 🔐", isUser: false))
-                        return
+        Task {
+            // Combine history
+            // (Simple history combining - just last few messages)
+            let historyCount = min(messages.count, 6)
+            let recentMessages = messages.suffix(historyCount)
+            var historyContext = ""
+            for msg in recentMessages {
+                let role = msg.isUser ? "User" : "Model"
+                historyContext += "\(role): \(msg.text)\n"
+            }
+            
+            // System Prompt is now handled in LLMService
+            let prompt = """
+            [대화 내역]
+            \(historyContext)
+            
+            User: \(userText)
+            """
+            
+            // Streaming Response
+            var fullResponse = ""
+            var responseMsgId = UUID()
+            
+            // Add placeholder message first
+            await MainActor.run {
+                messages.append(ChatMessage(text: "", isUser: false)) // Placeholder
+            }
+            
+            for await token in await LLMService.shared.generateAnalysis(diaryText: prompt) {
+                fullResponse += token
+                // Update last message in real-time
+                await MainActor.run {
+                    if let lastIdx = messages.indices.last {
+                        // Create new object to force refresh (SwiftUI limitation with array update)
+                        let lastMsg = messages[lastIdx]
+                        messages[lastIdx] = ChatMessage(text: fullResponse, isUser: false) 
                     }
-                    if httpResponse.statusCode != 200 {
-                        messages.append(ChatMessage(text: "서버 오류: \(httpResponse.statusCode)", isUser: false))
-                        return
-                    }
-                }
-                
-                guard let data = data else { return }
-                
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let reaction = json["reaction"] as? String {
-                        messages.append(ChatMessage(text: reaction, isUser: false))
-                    } else {
-                        // Error message parsing
-                        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                           let msg = json["message"] as? String {
-                            messages.append(ChatMessage(text: "오류: \(msg)", isUser: false))
-                        } else {
-                            messages.append(ChatMessage(text: "서버 응답 오류", isUser: false))
-                        }
-                    }
-                } catch {
-                    messages.append(ChatMessage(text: "처리 실패", isUser: false))
                 }
             }
-        }.resume()
+            
+            await MainActor.run {
+                isTyping = false
+            }
+        }
     }
     
     private func scrollToBottom(proxy: ScrollViewProxy) {
@@ -217,7 +204,7 @@ struct ChatBubble: View {
                 .font(.system(size: 16))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(message.isUser ? Color.blue : Color(UIColor.systemGray6))
+                .background(message.isUser ? Color.blue : Color.gray.opacity(0.1))
                 .foregroundColor(message.isUser ? .white : .black)
                 .cornerRadius(20)
                 .frame(maxWidth: 250, alignment: message.isUser ? .trailing : .leading)
@@ -243,7 +230,7 @@ struct TypingIndicator: View {
         }
         .foregroundColor(.gray)
         .padding(12)
-        .background(Color(UIColor.systemGray6))
+        .background(Color.gray.opacity(0.1))
         .cornerRadius(20)
         .onAppear {
             withAnimation(Animation.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
@@ -311,7 +298,7 @@ struct ChatReportView: View {
                                     }
                                 }
                                 .padding()
-                                .background(Color(UIColor.systemGray6))
+                                .background(Color.gray.opacity(0.1))
                                 .cornerRadius(16)
                                 .padding(.horizontal)
                                 
@@ -345,7 +332,7 @@ struct ChatReportView: View {
                                         .font(.caption).fontWeight(.bold).padding(.top, 4)
                                 }
                                 .padding()
-                                .background(Color(UIColor.systemGray6))
+                                .background(Color.gray.opacity(0.1))
                                 .cornerRadius(16)
                                 .padding(.horizontal)
                             }
@@ -362,32 +349,26 @@ struct ChatReportView: View {
                     Text("데이터를 불러올 수 없습니다.")
                 }
             }
+            #if os(iOS)
             .navigationBarTitle("분석 리포트", displayMode: .inline)
             .navigationBarItems(trailing: Button("닫기") {
                 presentationMode.wrappedValue.dismiss()
             })
+            #endif
             .onAppear(perform: fetchReport)
         }
     }
     
     func fetchReport() {
-        guard let url = URL(string: "\(baseURL)/api/report/chat-summary") else { return }
-        guard let token = authManager.token else { return }
-        
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            DispatchQueue.main.async { isLoading = false }
-            guard let data = data, error == nil else { return }
-            
-            do {
-                let decoded = try JSONDecoder().decode(ChatSummary.self, from: data)
-                DispatchQueue.main.async { self.reportData = decoded }
-            } catch {
-                print("Decode error: \(error)")
-            }
-        }.resume()
+        // [Local Mode] Report Mock
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            self.isLoading = false
+            self.reportData = ChatSummary(has_data: true, total_chats: 42, avg_stress: 4.5, top_emotions: [
+                ChatSummary.EmotionCount(emotion: "행복", count: 15),
+                ChatSummary.EmotionCount(emotion: "불안", count: 10),
+                ChatSummary.EmotionCount(emotion: "평온", count: 17)
+            ])
+        }
     }
 }
 
