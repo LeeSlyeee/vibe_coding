@@ -17,3 +17,8 @@ huggingface_cache/
 data/
 adapters_maumon/
 adapters_maumon_full/
+
+MindDiaryApp.xcodeproj/
+.swiftpm/
+.build/
+
