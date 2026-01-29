@@ -8,6 +8,8 @@ targets:
     type: application
     platform: iOS
     sources:
+      - path: APIService.swift
+      - path: DataSeeder.swift
       - path: .
         excludes:
           - Package.swift

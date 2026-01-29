@@ -256,8 +256,51 @@ def register():
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username')
+    # Support both 'username' and 'nickname' for compatibility
+    username = data.get('username') or data.get('nickname')
     password = data.get('password')
+    name = data.get('name') # [New] 실명 받기
+
+    if not username or not password:
+        return jsonify({"message": "Username/Nickname and password required"}), 400
+
+    from werkzeug.security import generate_password_hash, check_password_hash
+    
+    user = mongo.db.users.find_one({'username': username})
+    
+    # [Secure Logic]
+    # 1. New User -> Auto Register (with Name)
+    if not user:
+        hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+        user_doc = {
+            'username': username,
+            'nickname': username, 
+            'password_hash': hashed_password,
+            'created_at': datetime.utcnow()
+        }
+        if name:
+            user_doc['name'] = name # 실명 저장
+            
+        user_id = mongo.db.users.insert_one(user_doc).inserted_id
+        
+        user = mongo.db.users.find_one({'_id': user_id})
+        print(f"🆕 [New User] '{username}' ({name}) registered and logged in.")
+        
+    else:
+        # 2. Existing User -> STRICT Password Check
+        if not check_password_hash(user['password_hash'], password):
+            print(f"⛔️ [Auth Failed] Password mismatch for '{username}'")
+            return jsonify({"message": "비밀번호가 일치하지 않습니다."}), 401
+
+    # Create Token
+    access_token = create_access_token(identity=str(user['_id']))
+    
+    return jsonify({
+        "access_token": access_token, 
+        "user_id": str(user['_id']),
+        "nickname": user.get('nickname', username),
+        "name": user.get('name', "")
+    }), 200
 
     user = mongo.db.users.find_one({'username': username})
     
@@ -1266,6 +1309,14 @@ try:
     print("✅ Medication Routes Registered")
 except Exception as e:
     print(f"❌ Failed to register Medication Routes: {e}")
+
+# --- B2G Routes ---
+try:
+    from b2g_routes import b2g_bp
+    app.register_blueprint(b2g_bp)
+    print("✅ B2G Routes Registered")
+except Exception as e:
+    print(f"❌ Failed to register B2G Routes: {e}")
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default

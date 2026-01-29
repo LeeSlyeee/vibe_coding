@@ -9,121 +9,123 @@ struct AppMainTabView: View {
     @State private var showEmergencySheet = false
     
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // Main Content
-            ZStack(alignment: .top) {
-                TabView(selection: $selection) {
-                MoodCalendarView()
-                    .tabItem { Label("캘린더", systemImage: "calendar") }
-                    .tag(0)
-                
-                // RBAC Check: If Level 1 (Mild), Show Lock or Limited View
-                // But for better UX, let AppStatsView handle the internal lock UI.
-                AppStatsView()
-                    .tabItem { Label("통계", systemImage: "chart.bar.fill") }
-                    .tag(1)
-                
-                AppGuideView()
-                    .tabItem { Label("가이드", systemImage: "book.fill") }
-                    .tag(2)
-                
-                AppChatView()
-                    .tabItem { Label("상담", systemImage: "message.fill") }
-                    .tag(3)
-                
-                AppSettingsView()
-                    .tabItem { Label("설정", systemImage: "gearshape.fill") }
-                    .tag(4)
-                .tabItem { Label("설정", systemImage: "gearshape.fill") }
-                .tag(4)
-            }
-            .accentColor(.black)
-            .disabled(!networkMonitor.isConnected) // Disable interaction if offline? Or just show banner. Let's just show banner.
-            
-            // Network Status Banner
-            if !networkMonitor.isConnected {
-                VStack {
-                    HStack {
-                        Image(systemName: "wifi.slash")
-                        Text("네트워크 연결이 불안정합니다.")
-                            .font(.system(size: 14, weight: .bold))
-                        Spacer()
+        if !authManager.isAuthenticated {
+            AppLoginView()
+        } else {
+            ZStack(alignment: .bottomTrailing) {
+                // Main Content
+                ZStack(alignment: .top) {
+                    TabView(selection: $selection) {
+                        MoodCalendarView()
+                            .tabItem { Label("캘린더", systemImage: "calendar") }
+                            .tag(0)
+                        
+                        // RBAC Check: If Level 1 (Mild), Show Lock or Limited View
+                        // But for better UX, let AppStatsView handle the internal lock UI.
+                        AppStatsView()
+                            .tabItem { Label("통계", systemImage: "chart.bar.fill") }
+                            .tag(1)
+                        
+                        AppGuideView()
+                            .tabItem { Label("가이드", systemImage: "book.fill") }
+                            .tag(2)
+                        
+                        AppChatView()
+                            .tabItem { Label("상담", systemImage: "message.fill") }
+                            .tag(3)
+                        
+                        AppSettingsView()
+                            .tabItem { Label("설정", systemImage: "gearshape.fill") }
+                            .tag(4)
                     }
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(Color.red)
-                    .shadow(radius: 2)
+                    .accentColor(.black)
+                    .disabled(!networkMonitor.isConnected) // Disable interaction if offline? Or just show banner. Let's just show banner.
                     
-                    Spacer()
+                    // Network Status Banner
+                    if !networkMonitor.isConnected {
+                        VStack {
+                            HStack {
+                                Image(systemName: "wifi.slash")
+                                Text("네트워크 연결이 불안정합니다.")
+                                    .font(.system(size: 14, weight: .bold))
+                                Spacer()
+                            }
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.red)
+                            .shadow(radius: 2)
+                            
+                            Spacer()
+                        }
+                        .transition(.move(edge: .top))
+                        .animation(.easeInOut, value: networkMonitor.isConnected)
+                        .zIndex(100) // Ensure it's on top of everything
+                    }
                 }
-                .transition(.move(edge: .top))
-                .animation(.easeInOut, value: networkMonitor.isConnected)
-                .zIndex(100) // Ensure it's on top of everything
-             }
+                
+                // SOS Button (Only for High Risk Users)
+                if authManager.riskLevel >= 3 {
+                    Button(action: { showEmergencySheet = true }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 20))
+                            Text("긴급 도움")
+                                .fontWeight(.bold)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 20)
+                        .background(Color.red)
+                        .cornerRadius(30)
+                        .shadow(color: Color.red.opacity(0.4), radius: 5, x: 0, y: 5)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 100)
+                    .confirmationDialog("긴급 연결", isPresented: $showEmergencySheet, titleVisibility: .visible) {
+                        Button("자살예방 상담전화 (1393)") {
+                            callNumber("1393")
+                        }
+                        Button("정신건강 위기상담전화 (1577-0199)") {
+                            callNumber("15770199")
+                        }
+                        Button("경찰청 긴급신고 (112)") {
+                            callNumber("112")
+                        }
+                        Button("취소", role: .cancel) { }
+                    } message: {
+                        Text("도움이 필요한 곳을 선택해주세요.")
+                    }
+                }
             }
-            
-            // SOS Button (Only for High Risk Users)
-            if authManager.riskLevel >= 3 {
-                Button(action: { showEmergencySheet = true }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 20))
-                        Text("긴급 도움")
-                            .fontWeight(.bold)
+            #if os(iOS)
+            .fullScreenCover(isPresented: $showAssessment) {
+                AppAssessmentView()
+                    .onDisappear {
+                        UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
-                    .foregroundColor(.white)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 20)
-                    .background(Color.red)
-                    .cornerRadius(30)
-                    .shadow(color: Color.red.opacity(0.4), radius: 5, x: 0, y: 5)
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 100)
-                .confirmationDialog("긴급 연결", isPresented: $showEmergencySheet, titleVisibility: .visible) {
-                    Button("자살예방 상담전화 (1393)") {
-                        callNumber("1393")
-                    }
-                    Button("정신건강 위기상담전화 (1577-0199)") {
-                        callNumber("15770199")
-                    }
-                    Button("경찰청 긴급신고 (112)") {
-                        callNumber("112")
-                    }
-                    Button("취소", role: .cancel) { }
-                } message: {
-                    Text("도움이 필요한 곳을 선택해주세요.")
-                }
             }
-        }
-        #if os(iOS)
-        .fullScreenCover(isPresented: $showAssessment) {
-            AppAssessmentView()
-                .onDisappear {
-                    UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+            #else
+            .sheet(isPresented: $showAssessment) {
+                AppAssessmentView()
+                    .onDisappear {
+                        UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+                    }
+            }
+            #endif
+            .onAppear {
+                checkAssessmentStatus()
+                // Listen for Chat Redirection
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
+                    self.selection = 3 // Switch to Chat Tab
                 }
-        }
-        #else
-        .sheet(isPresented: $showAssessment) {
-            AppAssessmentView()
-                .onDisappear {
-                    UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
-                }
-        }
-        #endif
-        .onAppear {
-            checkAssessmentStatus()
-            // Listen for Chat Redirection
-            NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
-                self.selection = 3 // Switch to Chat Tab
             }
         }
     }
     
     func checkAssessmentStatus() {
-        // If user logged in but hasn't done assessment (local flag check)
-        // Or if we rely on riskLevel being 1 (default)? 
-        // Let's use a local flag "hasCompletedAssessment" to force it once.
+        // 로그인된 상태에서만 진단 여부를 체크해야 함.
+        guard authManager.isAuthenticated else { return }
+        
         let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
         if !hasDone {
             // Give a small delay for smooth transition

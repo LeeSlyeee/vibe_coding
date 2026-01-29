@@ -1,29 +1,103 @@
 import SwiftUI
 
 struct AppSettingsView: View {
-    @StateObject private var b2gManager = B2GManager.shared
+    @EnvironmentObject var authManager: AuthManager
+    @ObservedObject var b2gManager = B2GManager.shared
+    
     @State private var inputCode = ""
     @State private var showAlert = false
     @State private var alertMessage = ""
     
+    // Login States
+    @State private var loginId = ""
+    @State private var loginPw = ""
+    @State private var isLoggingIn = false
+    
+    // Temporary Dev State
+    @State private var tempInputCode = ""
+    
     var body: some View {
         NavigationView {
             List {
-                // Section 1: 프로필
+                // Section 1: 계정 & 프로필
                 Section(header: Text("내 정보")) {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.largeTitle)
-                            .foregroundColor(.gray)
-                        VStack(alignment: .leading) {
-                            Text("로컬 프로필")
-                                .font(.headline)
-                            Text("On-Device Mode")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                    if authManager.isAuthenticated {
+                        // 로그인 된 상태
+                        HStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.largeTitle)
+                                .foregroundColor(.accent)
+                            VStack(alignment: .leading) {
+                                Text(authManager.username ?? "사용자")
+                                    .font(.headline)
+                                Text("연동 계정 로그인됨")
+                                    .font(.caption)
+                                    .foregroundColor(.blue)
+                            }
+                            Spacer()
+                            Button("로그아웃") {
+                                authManager.logout()
+                            }
+                            .foregroundColor(.red)
+                            .font(.caption)
                         }
+                        .padding(.vertical, 8)
+                    } else {
+                        // 로그인 안 된 상태 (On-Device Mode)
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "person.crop.circle.badge.exclamationmark")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.gray)
+                                VStack(alignment: .leading) {
+                                    Text("로컬 프로필")
+                                        .font(.headline)
+                                    Text("로그인하면 웹과 데이터를 동기화합니다.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            // 로그인 폼
+                            VStack(spacing: 12) {
+                                TextField("아이디", text: $loginId)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .textInputAutocapitalization(.none)
+                                
+                                SecureField("비밀번호", text: $loginPw)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                
+                                Button(action: {
+                                    isLoggingIn = true
+                                    authManager.performLogin(username: loginId, password: loginPw) { success, msg in
+                                        isLoggingIn = false
+                                        alertMessage = msg
+                                        showAlert = true
+                                        if success { 
+                                            loginPw = "" 
+                                            // 로그인 성공 시, 이미 B2G 연동되어 있다면 데이터 동기화 시도
+                                            if b2gManager.isLinked {
+                                                b2gManager.syncData()
+                                            }
+                                        }
+                                    }
+                                }) {
+                                    HStack {
+                                        if isLoggingIn { ProgressView().padding(.trailing, 5) }
+                                        Text("로그인 및 동기화")
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.accent)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                                }
+                                .disabled(loginId.isEmpty || loginPw.isEmpty || isLoggingIn)
+                            }
+                            .padding(.top, 8)
+                        }
+                        .padding(.vertical, 8)
                     }
-                    .padding(.vertical, 8)
                 }
                 
                 // Section 2: B2G 연동 (핵심 기능)
@@ -56,14 +130,35 @@ struct AppSettingsView: View {
                                     .foregroundColor(.gray)
                             }
                             
-                            Button(action: {
-                                b2gManager.disconnect()
-                            }) {
-                                Text("연동 해제")
-                                    .foregroundColor(.red)
-                                    .font(.caption)
+                            HStack(spacing: 20) {
+                                Button(action: {
+                                    b2gManager.syncData()
+                                    alertMessage = "모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)"
+                                    showAlert = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                        Text("데이터 강제 전송 (Force Sync)")
+                                            .fontWeight(.bold)
+                                    }
+                                    .padding()
+                                    .background(Color.blue.opacity(0.1))
+                                    .cornerRadius(8)
+                                }
+                                
+                                Button(action: {
+                                    b2gManager.disconnect()
+                                }) {
+                                    Text("연동 해제")
+                                        .foregroundColor(.red)
+                                        .font(.caption)
+                                }
                             }
                             .padding(.top, 4)
+                            
+                            Text("* 대시보드에 데이터가 뜨지 않으면 위 버튼을 누르세요.")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
                         }
                         .padding(.vertical, 8)
                         
@@ -126,6 +221,85 @@ struct AppSettingsView: View {
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
+                }
+                
+                // Section 4: 개발자 임시 기능 (Requested Feature)
+                Section(header: Text("🛠️ 개발자 임시 기능 (Remove Later)")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("연동 코드 강제 변경")
+                            .font(.headline)
+                            .foregroundColor(.orange)
+                        
+                        Text("기존 연동을 무시하고 새로운 코드로 강제 재연동합니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        HStack {
+                            TextField("새 코드 (예: TEMP-001)", text: $tempInputCode)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                #if os(iOS)
+                                .textInputAutocapitalization(.characters)
+                                #endif
+                            
+                            Button(action: {
+                                guard !tempInputCode.isEmpty else { return }
+                                
+                                // Debug: Print Endpoint
+                                print("⚪️ Requesting Verification for: \(tempInputCode)")
+                                
+                                // APIService를 통한 직접 연동 시도
+                                APIService.shared.verifyCenterCode(tempInputCode) { res in
+                                    switch res {
+                                    case .success(let data):
+                                        // Handle both Int and String IDs (MongoDB ObjectId is String)
+                                        var targetId: Any? = data["center_id"]
+                                        
+                                        if let idInt = data["center_id"] as? Int {
+                                            targetId = idInt
+                                        } else if let idStr = data["center_id"] as? String {
+                                            targetId = idStr
+                                        }
+                                        
+                                        if let validId = targetId {
+                                            APIService.shared.connectToCenter(centerId: validId) { success in
+                                                DispatchQueue.main.async {
+                                                    if success {
+                                                        // B2GManager 상태 강제 동기화
+                                                        b2gManager.centerCode = tempInputCode.uppercased()
+                                                        b2gManager.isLinked = true
+                                                        alertMessage = "✅ 강제 연동 성공!\n코드: \(tempInputCode.uppercased())"
+                                                        tempInputCode = ""
+                                                    } else {
+                                                        alertMessage = "❌ 기관 연결(Connect) API 실패"
+                                                    }
+                                                    showAlert = true
+                                                }
+                                            }
+                                        } else {
+                                            DispatchQueue.main.async {
+                                                alertMessage = "⚠️ 센터 ID를 찾을 수 없습니다 (응답 데이터 오류)."
+                                                showAlert = true
+                                            }
+                                        }
+                                    case .failure(let err):
+                                        DispatchQueue.main.async {
+                                            alertMessage = "❌ 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)"
+                                            showAlert = true
+                                        }
+                                    }
+                                }
+                            }) {
+                                Text("변경")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.orange)
+                                    .cornerRadius(8)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
                 }
             }
             .navigationTitle("설정")

@@ -13,6 +13,7 @@ import Charts
 // MARK: - Main View
 struct AppStatsView: View {
     @EnvironmentObject var authManager: AuthManager
+    @ObservedObject var b2gManager = B2GManager.shared // B2G 연동 상태 관찰
     @State private var currentTab = "flow"
     @State private var stats: StatisticsResponse?
     @State private var isLoading = true
@@ -37,25 +38,35 @@ struct AppStatsView: View {
             ZStack {
                 Color.bgMain.edgesIgnoringSafeArea(.all)
                 
-                // [RBAC] Access Control for Mild Users (Level 1)
-                if authManager.riskLevel == 1 {
+                // [B2G] 무조건 연동해야만 통계 해금
+                if !b2gManager.isLinked {
                     VStack(spacing: 24) {
                         Spacer()
                         Image(systemName: "lock.shield.fill")
                             .font(.system(size: 80))
-                            .foregroundColor(.gray.opacity(0.5))
+                            .foregroundColor(authManager.riskLevel >= 2 ? .red.opacity(0.6) : .gray.opacity(0.5))
                         
                         VStack(spacing: 8) {
                             Text("전문 분석 기능 잠김")
                                 .font(.title2)
                                 .fontWeight(.bold)
                                 .foregroundColor(.primary)
-                            Text("현재 '경증(안정)' 상태로 분류되어\n심층 통계 분석이 제한됩니다.")
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.secondary)
+                            
+                            if authManager.riskLevel >= 2 {
+                                // 중증(위험) 사용자용 메시지
+                                Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/상담센터와 연동해주세요.")
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(.red)
+                                    .fontWeight(.semibold)
+                            } else {
+                                // 경증(일반) 사용자용 메시지
+                                Text("보건소/상담센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
+                                    .multilineTextAlignment(.center)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         
-                        Text("더 자세한 분석을 원하시면\n전문 상담사 모드로 전환해주세요.")
+                        Text("설정 > 기관 연동(B2G) 메뉴에서\n연동 코드를 입력해주세요.")
                             .font(.caption)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
@@ -142,7 +153,15 @@ struct AppStatsView: View {
             .navigationBarHidden(true)
             #endif
             .onAppear {
-                if authManager.riskLevel > 1 {
+                // 연동 상태라면 데이터 로딩 (위험도 상관없음)
+                if b2gManager.isLinked {
+                    fetchStats()
+                    fetchExistingReports()
+                }
+            }
+            // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
+            .onChange(of: b2gManager.isLinked) { linked in
+                if linked {
                     fetchStats()
                     fetchExistingReports()
                 }
@@ -151,63 +170,87 @@ struct AppStatsView: View {
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
     }
     
-    // API Logic
+    // Local Data Logic
     func fetchStats() {
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-        guard let url = URL(string: "\(baseURL)/api/statistics") else { return }
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.dataTask(with: request) { d, _, _ in
-            DispatchQueue.main.async { isLoading = false }
-            guard let d = d else { return }
-            do { self.stats = try JSONDecoder().decode(StatisticsResponse.self, from: d) } catch { print("\(error)") }
-        }.resume()
+        // 로컬 데이터 로딩 시뮬레이션 (빠름)
+        DispatchQueue.main.async {
+            let diaries = LocalDataManager.shared.diaries
+            
+            // 1. Timeline Data
+            let timeline = diaries.map { diary in
+                StatsTimelineItem(
+                    date: diary.date ?? "",
+                    mood_level: diary.mood_level,
+                    ai_label: nil
+                )
+            }.sorted { $0.date < $1.date } // 날짜 오름차순
+            
+            // 2. Daily (Monthly) Data - 사실상 일별 빈도수인데, 여기선 일기 개수를 무드로 표현하는 로직이 있었나봄.
+            // 기존 MonthlyChartView 로직: _id가 "YYYY-MM-DD", count가 무드? 아니면 개수?
+            // "BarMark(y: .value("Mood", item.count))" 코드를 보면 item.count가 Y축(높이)임.
+            // 그리고 color는 `moodColor(item.count)`
+            // 아하, 기존 로직은 "그 날의 기분 점수(count?)"를 보여주는 것 같음. 네이밍이 count라 헷갈리지만.
+            // 여기선 "날짜별 평균 기분"으로 매핑.
+            let daily = diaries.map { diary in
+                StatsDailyItem(_id: diary.date ?? "", count: diary.mood_level)
+            }
+            
+            // 3. Mood Distribution
+            var moodCounts = [Int: Int]()
+            for diary in diaries {
+                moodCounts[diary.mood_level, default: 0] += 1
+            }
+            let moods = moodCounts.map { StatsMoodItem(_id: $0.key, count: $0.value) }
+            
+            // 4. Weather (일기에 날씨 정보가 없으면 생략)
+            let weather: [StatsWeatherItem] = [] // 로컬 DB에 날씨 필드가 없으면 빈 배열
+            
+            self.stats = StatisticsResponse(
+                timeline: timeline,
+                daily: daily,
+                moods: moods,
+                weather: weather
+            )
+            self.isLoading = false
+        }
     }
+    
     func fetchExistingReports() {
-        // Short-term report check
-        apiCall(path: "/api/report/status", method: "GET") { data in
-            guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
-            if res.status == "completed", let report = res.report {
-                DispatchQueue.main.async { self.reportContent = report }
-            }
-        }
-        
-        // Long-term report check
-        apiCall(path: "/api/report/longterm/status", method: "GET") { data in
-            guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
-            if res.status == "completed", let insight = res.insight {
-                DispatchQueue.main.async { self.longTermContent = insight }
-            }
-        }
+        // 로컬 리포트 로직 또는 보건소 연동 리포트 (추후 구현)
+        // 현재는 빈 상태로 둠
+        self.isGeneratingReport = false
+        self.isGeneratingLongTerm = false
     }
 
     func startReport() { 
         isGeneratingReport = true
-        apiCall(path: "/api/report/start", method: "POST") { _ in pollStatus(isLongTerm: false) } 
+        // 로컬 AI 분석 시뮬레이션 (3초 후 완료)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.reportContent = """
+            [AI 분석 리포트]
+            최근 작성하신 일기를 분석해보니, 전반적으로 안정적인 기분을 유지하고 계시네요.
+            특히 어제 기록하신 '편안함'이 긍정적인 영향을 주고 있습니다.
+            보건소 연동이 완료되어 담당 선생님도 님의 상태를 파악하고 계시니 안심하세요.
+            """
+            self.isGeneratingReport = false
+        }
     }
     
     func startLongTermReport() { 
         isGeneratingLongTerm = true
-        apiCall(path: "/api/report/longterm/start", method: "POST") { _ in pollStatus(isLongTerm: true) } 
-    }
-    
-    func pollStatus(isLongTerm: Bool) {
-        let endpoint = isLongTerm ? "/api/report/longterm/status" : "/api/report/status"
-        Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { timer in
-            apiCall(path: endpoint, method: "GET") { data in
-                guard let data = data, let res = try? JSONDecoder().decode(ReportStatusResponse.self, from: data) else { return }
-                if res.status == "completed" {
-                    timer.invalidate()
-                    DispatchQueue.main.async {
-                        if isLongTerm { self.longTermContent = res.insight ?? ""; self.isGeneratingLongTerm = false }
-                        else { self.reportContent = res.report ?? ""; self.isGeneratingReport = false }
-                    }
-                } else if res.status == "failed" {
-                    timer.invalidate(); DispatchQueue.main.async { if isLongTerm { self.isGeneratingLongTerm = false } else { self.isGeneratingReport = false } }
-                }
-            }
+        // 로컬 장기 분석 시뮬레이션
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            self.longTermContent = """
+            [장기 패턴 분석]
+            지난 2주간의 감정 흐름을 보면, 월요일마다 다소 스트레스가 높아지는 경향이 있습니다.
+            하지만 주말로 갈수록 회복탄력성이 높게 나타나고 있어요.
+            규칙적인 수면 패턴이 큰 도움이 되고 있는 것으로 보입니다.
+            """
+            self.isGeneratingLongTerm = false
         }
     }
+    
+    // pollStatus는 더 이상 필요 없음
     func apiCall(path: String, method: String, completion: @escaping (Data?) -> Void) {
         guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
         guard let url = URL(string: "\(baseURL)\(path)") else { return }

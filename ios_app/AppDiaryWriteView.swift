@@ -368,6 +368,12 @@ struct AppDiaryWriteView: View {
                 triggerAIAnalysis(for: newDiary)
                 
                 DispatchQueue.main.async {
+                    // [B2G] 저장 즉시 센터로 데이터 동기화
+                    if B2GManager.shared.isLinked {
+                        print("📤 [AutoSync] Triggering B2G Sync after save...")
+                        B2GManager.shared.syncData()
+                    }
+                    
                     self.isSaving = false
                     self.onSave()
                     self.isPresented = false
