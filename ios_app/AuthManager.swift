@@ -47,9 +47,10 @@ class AuthManager: ObservableObject {
     
     // 실제 서버 로그인 API 호출
     // 실제 서버 로그인 API 호출
-    func performLogin(username: String, password: String, name: String? = nil, completion: @escaping (Bool, String) -> Void) {
+    // 실제 서버 로그인 API 호출
+    func performLogin(username: String, password: String, name: String? = nil, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
         // [SSH Tunnel] 외부 접속용 URL 사용 (로컬 네트워크 권한 우회)
-        guard let url = URL(string: "https://ccf4cf0857dd08.lhr.life/api/login") else {
+        guard let url = URL(string: "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com/api/login") else {
             completion(false, "잘못된 URL")
             return
         }
@@ -64,6 +65,9 @@ class AuthManager: ObservableObject {
         ]
         if let name = name, !name.isEmpty {
             body["name"] = name
+        }
+        if let code = centerCode, !code.isEmpty {
+            body["center_code"] = code
         }
         
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
@@ -80,27 +84,30 @@ class AuthManager: ObservableObject {
                 return
             }
             
-            // 토큰 파싱 (key, token, access 등 백엔드 응답 구조에 맞춤. dj-rest-auth는 'key'를 줌)
-            // 하지만 백엔드 응답을 확인해봐야 함. 보통 {'key': '...'} 또는 {'access': '...'}
-            // 여기선 일단 key, token, access_token 다 찾아봄.
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
                     // 백엔드가 주는 키: access_token
                     let receivedToken = (json["key"] as? String) 
                         ?? (json["token"] as? String) 
                         ?? (json["access"] as? String)
-                        ?? (json["access_token"] as? String) // Flask-JWT-Extended
+                        ?? (json["access_token"] as? String)
                     
                     if let token = receivedToken {
                         DispatchQueue.main.async {
                             self.token = token
                             self.username = username
                             self.isAuthenticated = true
+                            
+                            // [Sync] Login 후 자동 동기화
+                            LocalDataManager.shared.syncWithServer()
+                            
                             completion(true, "로그인 성공")
                         }
                     } else {
                         DispatchQueue.main.async { completion(false, "토큰 파싱 실패") }
                     }
+                } else {
+                     DispatchQueue.main.async { completion(false, "응답 형식 오류") }
                 }
             } catch {
                 DispatchQueue.main.async { completion(false, "응답 처리 오류") }

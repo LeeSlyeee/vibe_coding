@@ -112,13 +112,19 @@ struct AppMainTabView: View {
                     }
             }
             #endif
-            .onAppear {
-                checkAssessmentStatus()
-                // Listen for Chat Redirection
-                NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
-                    self.selection = 3 // Switch to Chat Tab
+                .onAppear {
+                    checkAssessmentStatus()
+                    
+                    // [New] App Launch Sync
+                    if authManager.isAuthenticated {
+                        LocalDataManager.shared.syncWithServer()
+                    }
+                    
+                    // Listen for Chat Redirection
+                    NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
+                        self.selection = 3 // Switch to Chat Tab
+                    }
                 }
-            }
         }
     }
     

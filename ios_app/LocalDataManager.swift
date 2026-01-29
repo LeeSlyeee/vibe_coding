@@ -113,6 +113,22 @@ class LocalDataManager: ObservableObject {
     
     // MARK: - Server Sync
     
+    // [New] Pull from Server & Merge
+    func syncWithServer() {
+        print("🔄 [LocalDataManager] Syncing with server...")
+        APIService.shared.fetchDiaries { [weak self] serverData in
+            guard let self = self, let data = serverData else {
+                print("⚠️ [LocalDataManager] Sync Failed or No Data")
+                return
+            }
+            
+            self.mergeServerDiaries(data) {
+                print("✅ [LocalDataManager] Sync Complete.")
+            }
+        }
+    }
+    
+    
     // 서버 데이터를 로컬에 병합 (서버 우선)
     func mergeServerDiaries(_ serverData: [[String: Any]], completion: @escaping () -> Void = {}) {
         DispatchQueue.main.async {
@@ -125,9 +141,32 @@ class LocalDataManager: ObservableObject {
                 
                 let dateStr = String(createdAt.prefix(10))
                 
-                let moodScore = item["mood_score"] as? Int ?? 3
-                let content = item["content"] as? String ?? ""
-                let analysis = item["analysis_result"] as? [String: Any]
+                // [Robust Parsing] Field Name Fallbacks
+                var moodScore = 3
+                if let ms = item["mood_score"] as? Int { moodScore = ms }
+                else if let ml = item["mood_level"] as? Int { moodScore = ml }
+                
+                var content = ""
+                if let c = item["content"] as? String { content = c }
+                else if let e = item["event"] as? String { content = e }
+                
+                // AI Fields: Check nested 'analysis_result' OR top-level fields
+                let analysisMap = item["analysis_result"] as? [String: Any]
+                
+                let aiComment = (item["ai_comment"] as? String) 
+                    ?? (analysisMap?["comment"] as? String)
+                
+                let aiAnalysis = (item["ai_analysis"] as? String) 
+                    ?? (analysisMap?["analysis"] as? String)
+                    ?? (analysisMap?["advice"] as? String)
+                
+                let aiAdvice = (item["ai_advice"] as? String) // Top-level only usually
+                let aiPrediction = (item["ai_prediction"] as? String) // Top-level only
+                let sleepDesc = (item["sleep_condition"] as? String) ?? (item["sleep_desc"] as? String)
+                let weather = (item["weather"] as? String)
+                let emotionDesc = (item["emotion_desc"] as? String)
+                let emotionMeaning = (item["emotion_meaning"] as? String)
+                let selfTalk = (item["self_talk"] as? String)
                 
                 // 기존 로컬 데이터 확인 (날짜 기준)
                 if let idx = self.diaries.firstIndex(where: { ($0.date ?? "").prefix(10) == dateStr }) {
@@ -136,15 +175,19 @@ class LocalDataManager: ObservableObject {
                     existing.mood_level = moodScore
                     existing._id = id // Server ID binding
                     
-                    if (existing.event == nil || existing.event?.isEmpty == true) {
-                         existing.event = content 
-                    }
+                    // Fields Update
+                    if (existing.event == nil || existing.event?.isEmpty == true) { existing.event = content }
+                    if (existing.emotion_desc?.isEmpty ?? true) { existing.emotion_desc = emotionDesc }
+                    if (existing.emotion_meaning?.isEmpty ?? true) { existing.emotion_meaning = emotionMeaning }
+                    if (existing.self_talk?.isEmpty ?? true) { existing.self_talk = selfTalk }
+                    if (existing.sleep_desc?.isEmpty ?? true) { existing.sleep_desc = sleepDesc }
+                    if (existing.weather?.isEmpty ?? true) { existing.weather = weather }
                     
-                    // AI Result Sync
-                    if let analysis = analysis {
-                        existing.ai_comment = analysis["comment"] as? String
-                        existing.ai_analysis = analysis["advice"] as? String ?? analysis["analysis"] as? String
-                    }
+                    // AI Result Sync (Overwrite if server has data)
+                    if let c = aiComment { existing.ai_comment = c }
+                    if let a = aiAnalysis { existing.ai_analysis = a }
+                    if let d = aiAdvice { existing.ai_advice = d }
+                    if let p = aiPrediction { existing.ai_prediction = p }
                     
                     self.diaries[idx] = existing
                     updatedCount += 1
@@ -156,17 +199,17 @@ class LocalDataManager: ObservableObject {
                         date: dateStr,
                         mood_level: moodScore,
                         event: content,
-                        emotion_desc: "",
-                        emotion_meaning: "",
-                        self_talk: "",
-                        sleep_desc: "",
-                        weather: "",
+                        emotion_desc: emotionDesc,
+                        emotion_meaning: emotionMeaning,
+                        self_talk: selfTalk,
+                        sleep_desc: sleepDesc,
+                        weather: weather,
                         temperature: nil,
                         sleep_condition: nil, // Legacy Field explicit nil
-                        ai_prediction: nil,
-                        ai_comment: analysis?["comment"] as? String,
-                        ai_analysis: analysis?["advice"] as? String ?? analysis?["analysis"] as? String,
-                        ai_advice: nil,
+                        ai_prediction: aiPrediction,
+                        ai_comment: aiComment,
+                        ai_analysis: aiAnalysis, // Advice or Analysis
+                        ai_advice: aiAdvice,
                         created_at: createdAt
                     )
                     self.diaries.append(newDiary)

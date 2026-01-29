@@ -10,7 +10,7 @@ class APIService {
     // 로컬 서버 (테스트용) - 외부 접속용 Tunnel URL (Verified Active)
     // 실기기 테스트용 (Local Network IP - Updated)
     // iPhone과 Mac이 동일한 Wi-Fi에 있어야 합니다.
-    private let baseURL = "http://192.168.0.22:8000/api"
+    private let baseURL = "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com/api"
 
     
     private var token: String? {
@@ -282,14 +282,46 @@ class APIService {
                 return
             }
             
-            guard let data = data else {
+            guard let data = data, let httpResponse = response as? HTTPURLResponse else {
                 completion(.failure(NSError(domain: "No Data", code: -1, userInfo: nil)))
                 return
             }
             
-            // Raw Response Debugging
+            // Raw Response Debugging (Status Code 확인)
+            print("📡 [API] Response: \(httpResponse.statusCode)")
+            
+            // HTTP Status Code Check (200~299만 성공 처리)
+            guard (200...299).contains(httpResponse.statusCode) else {
+                var errorMsg = "서버 에러 (\(httpResponse.statusCode))"
+                
+                // 에러 본문을 읽어서 상세 메시지 추출 시도
+                if let str = String(data: data, encoding: .utf8) {
+                    // Try to parse error message from JSON
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        let serverMsg = json["detail"] as? String 
+                            ?? json["message"] as? String 
+                            ?? json["error"] as? String
+                        
+                        if let validMsg = serverMsg {
+                            errorMsg = validMsg
+                        }
+                    } else {
+                        // JSON 파싱 실패 시 원본 텍스트 일부 표시 (HTML일 수 있음)
+                        if str.contains("<html") {
+                            errorMsg += " - 잘못된 응답 형식 (HTML)"
+                        } else {
+                            errorMsg += " - \(str.prefix(50))"
+                        }
+                    }
+                }
+                
+                completion(.failure(NSError(domain: "HTTPError", code: httpResponse.statusCode, userInfo: [NSLocalizedDescriptionKey: errorMsg])))
+                return
+            }
+            
+            // Raw String Check
             if let rawString = String(data: data, encoding: .utf8) {
-               // print("📩 [API] Raw Response: \(rawString)") // 필요 시 주석 해제
+               // print("📩 [API] Raw Response Body: \(rawString)")
             }
             
             do {
@@ -301,15 +333,21 @@ class APIService {
                 } else {
                     // JSON 형식이지만 Dictionary가 아닌 경우
                      print("⚠️ [API] Unexpected JSON Format")
-                     if let str = String(data: data, encoding: .utf8) { print("   Data: \(str)") }
                      completion(.failure(NSError(domain: "Invalid JSON Format", code: -1, userInfo: nil)))
                 }
             } catch {
                 print("❌ [API] JSON Decode Error: \(error.localizedDescription)")
+                
+                var debugMsg = "데이터 형식이 올바르지 않습니다."
                 if let str = String(data: data, encoding: .utf8) {
-                    print("   👉 Received Data: \(str)") // Parsing 실패 시 원본 데이터 출력
+                    print("   👉 Received Data: \(str)")
+                    if str.contains("<html") {
+                        debugMsg = "서버 URL 오류 (HTML 페이지가 반환됨)"
+                    } else {
+                        debugMsg += " (원본: \(str.prefix(30))...)"
+                    }
                 }
-                completion(.failure(error))
+                completion(.failure(NSError(domain: "JSONError", code: -2, userInfo: [NSLocalizedDescriptionKey: debugMsg])))
             }
         }.resume()
     }

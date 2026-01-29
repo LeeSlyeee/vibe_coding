@@ -15,6 +15,7 @@ struct CalendarDay: Identifiable {
 
 struct MoodCalendarView: View {
     @EnvironmentObject var authManager: AuthManager // ✅ Auth Manager
+    @ObservedObject var dataManager = LocalDataManager.shared // ✅ Data Observer
     @State private var showPremiumModal = false // ✅ Modal State
     
     // ... existing vars ...
@@ -167,6 +168,7 @@ struct MoodCalendarView: View {
                 #endif
                 .onAppear(perform: fetchDiaries)
                 .onChange(of: currentDate) { _ in fetchDiaries() }
+                .onChange(of: dataManager.diaries) { _ in fetchDiaries() } // ✅ Auto Refresh on Sync
                 .alert(isPresented: $showErrorAlert) {
                     Alert(title: Text("알림"), message: Text(errorMessage ?? "알 수 없는 오류가 발생했습니다."), dismissButton: .default(Text("확인")))
                 }

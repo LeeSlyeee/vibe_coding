@@ -1,7 +1,7 @@
 
 import Foundation
 
-struct Diary: Codable, Identifiable {
+struct Diary: Codable, Identifiable, Equatable {
     var id: String?
     var _id: String? // MongoDB ID
     var date: String?

@@ -21,9 +21,16 @@ struct AppStatsView: View {
     @State private var isGeneratingReport = false
     @State private var reportContent: String = ""
     @State private var isGeneratingLongTerm = false
+
     @State private var longTermContent: String = ""
     
-    let baseURL = "https://217.142.253.35.nip.io"
+    // [New] B2G Connection UI State
+    @State private var showingConnectAlert = false
+    @State private var inputCode = ""
+    @State private var connectMessage = ""
+    @State private var showingResultAlert = false
+    
+    let baseURL = "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com"
     
     let tabs = [
         ("flow", "흐름"),
@@ -66,11 +73,33 @@ struct AppStatsView: View {
                             }
                         }
                         
-                        Text("설정 > 기관 연동(B2G) 메뉴에서\n연동 코드를 입력해주세요.")
+                        Text("설정 > 기관 연동(B2G) 메뉴에서도\n언제든 연동할 수 있습니다.")
                             .font(.caption)
                             .foregroundColor(.gray)
                             .multilineTextAlignment(.center)
-                            .padding(.top, 20)
+                            .padding(.top, 10)
+                        
+                        // [New] Direct Connect Button
+                        Button(action: { showingConnectAlert = true }) {
+                            Text("지금 연동하기")
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 24)
+                                .background(Color.blue)
+                                .cornerRadius(12)
+                                .shadow(radius: 3)
+                        }
+                        .padding(.top, 20)
+                        .alert("기관 코드 입력", isPresented: $showingConnectAlert) {
+                            TextField("코드 (예: CENTER001)", text: $inputCode)
+                            Button("취소", role: .cancel) { }
+                            Button("연동") {
+                                connectToCenter()
+                            }
+                        } message: {
+                            Text("보건소나 상담센터에서 발급받은\n코드를 입력해주세요.")
+                        }
                             
                         Spacer()
                     }
@@ -166,8 +195,20 @@ struct AppStatsView: View {
                     fetchExistingReports()
                 }
             }
+            // [New] 결과 알림
+            .alert(isPresented: $showingResultAlert) {
+                Alert(title: Text("알림"), message: Text(connectMessage), dismissButton: .default(Text("확인")))
+            }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
+    }
+    
+    // [New] Connect Helper
+    func connectToCenter() {
+        b2gManager.connect(code: inputCode) { success, msg in
+            self.connectMessage = msg
+            self.showingResultAlert = true
+        }
     }
     
     // Local Data Logic

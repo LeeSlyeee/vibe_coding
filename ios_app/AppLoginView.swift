@@ -6,6 +6,7 @@ struct AppLoginView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var name = "" // [New] 실명
+    @State private var centerCode = "" // [New] 상담 센터 코드
     @State private var errorMessage = ""
     @State private var isLoading = false
     
@@ -64,6 +65,18 @@ struct AppLoginView: View {
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                            
+                        TextField("상담 센터 코드 (선택)", text: $centerCode)
+                            .padding()
+                            .frame(height: 50)
+                            .padding()
+                            .background(Color(hex: "f0fdf4")) // Light Green hint
+                            .cornerRadius(12)
+                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
+                            )
                     }
                     .padding(.horizontal, 24)
                     
@@ -123,7 +136,7 @@ struct AppLoginView: View {
         errorMessage = ""
         
         // 이름(name)을 포함하여 로그인/가입 요청
-        authManager.performLogin(username: username, password: password, name: name) { success, msg in
+        authManager.performLogin(username: username, password: password, name: name, centerCode: centerCode) { success, msg in
             self.isLoading = false
             if !success {
                 self.errorMessage = msg
