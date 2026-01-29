@@ -243,8 +243,20 @@ struct AppStatsView: View {
             }
             let moods = moodCounts.map { StatsMoodItem(_id: $0.key, count: $0.value) }
             
-            // 4. Weather (일기에 날씨 정보가 없으면 생략)
-            let weather: [StatsWeatherItem] = [] // 로컬 DB에 날씨 필드가 없으면 빈 배열
+            // 4. Weather (날씨별 감정 통계 구현)
+            // Group by weatherDesc -> moodLevel -> count
+            var weatherMap = [String: [Int: Int]]()
+            
+            for diary in diaries {
+                let w = diary.weather ?? "알 수 없음"
+                if weatherMap[w] == nil { weatherMap[w] = [:] }
+                weatherMap[w]![diary.mood_level, default: 0] += 1
+            }
+            
+            let weather = weatherMap.map { (weatherDesc, moodCounts) in
+                let moodItems = moodCounts.map { StatsMoodCount(mood: $0.key, count: $0.value) }
+                return StatsWeatherItem(_id: weatherDesc, moods: moodItems)
+            }.sorted { $0._id < $1._id }
             
             self.stats = StatisticsResponse(
                 timeline: timeline,
@@ -529,3 +541,5 @@ struct ReportView: View {
         .modifier(CardModifier())
     }
 }
+
+

@@ -106,11 +106,22 @@ struct MoodCalendarView: View {
                                                 VStack(spacing: 0) {
                                                     // 2. 사용자 선택 이모지 (이미지)
                                                     let asset = getMoodAsset(level: d.mood_level)
-                                                    Image(asset.image)
-                                                        .resizable()
-                                                        .scaledToFit()
-                                                        .frame(width: 28, height: 28)
-                                                        .padding(.bottom, 2)
+                                                    ZStack(alignment: .bottomTrailing) {
+                                                        Image(asset.image)
+                                                            .resizable()
+                                                            .scaledToFit()
+                                                            .frame(width: 28, height: 28)
+                                                        
+                                                        // [New] 약물 복용 표시 💊
+                                                        if d.medication == true {
+                                                            Image(systemName: "pills.fill")
+                                                                .font(.system(size: 10))
+                                                                .foregroundColor(.green)
+                                                                .background(Circle().fill(Color.white).frame(width: 12, height: 12))
+                                                                .offset(x: 4, y: 2)
+                                                        }
+                                                    }
+                                                    .padding(.bottom, 2)
                                                     
                                                     // 3 & 4. AI 예측 (감정 + 퍼센트)
                                                     let (label, percent) = parseAI(d.ai_prediction)

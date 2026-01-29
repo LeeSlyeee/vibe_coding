@@ -34,9 +34,13 @@ struct AppDiaryWriteView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
-    // Weather State
+    // Weather & Medication State
     @State private var weatherDesc: String = "맑음"
     @State private var temp: Double = 20.0
+    @State private var isMedicationTaken: Bool = false // (Legacy & Fallback)
+    @State private var takenMeds: Set<String> = [] // [New] 개별 약물 체크 상태
+    @State private var showingMedSetting = false
+    @State private var savedMeds: [String] = []
     
     var body: some View {
         NavigationView {
@@ -105,6 +109,80 @@ struct AppDiaryWriteView: View {
                                 }
                                 .padding(.top)
                                 
+                                // [New] 1.5 약물 복용 & 날씨
+                                HStack(alignment: .top, spacing: 15) {
+                                    // 약물 체크 (동적 리스트)
+                                    VStack(alignment: .leading, spacing: 10) {
+                                        HStack {
+                                            Text("약물 복용")
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(.primary)
+                                            Spacer()
+                                            Button(action: { showingMedSetting = true }) {
+                                                Image(systemName: "gearshape.fill")
+                                                    .foregroundColor(.gray)
+                                            }
+                                        }
+                                        
+                                        if savedMeds.isEmpty {
+                                            // 등록된 약이 없을 때: 단순 토글
+                                            Button(action: { isMedicationTaken.toggle() }) {
+                                                HStack {
+                                                    Image(systemName: isMedicationTaken ? "checkmark.square.fill" : "square")
+                                                        .foregroundColor(isMedicationTaken ? .green : .gray)
+                                                    Text("복용 완료")
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.primary)
+                                                }
+                                            }
+                                        } else {
+                                            // 등록된 약이 있을 때: 개별 체크
+                                            ForEach(savedMeds, id: \.self) { med in
+                                                Button(action: {
+                                                    if takenMeds.contains(med) {
+                                                        takenMeds.remove(med)
+                                                    } else {
+                                                        takenMeds.insert(med)
+                                                    }
+                                                }) {
+                                                    HStack {
+                                                        Image(systemName: takenMeds.contains(med) ? "checkmark.square.fill" : "square")
+                                                            .foregroundColor(takenMeds.contains(med) ? .green : .gray)
+                                                        Text(med)
+                                                            .font(.subheadline)
+                                                            .foregroundColor(.primary)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.white)
+                                    .cornerRadius(16)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                    
+                                    // 날씨 확인/수정
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("오늘의 날씨")
+                                            .font(.caption)
+                                            .foregroundColor(.gray)
+                                        HStack {
+                                            TextField("날씨", text: $weatherDesc)
+                                                .font(.headline)
+                                            Spacer()
+                                            Text(String(format: "%.0f°", temp))
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding()
+                                    .frame(width: 140) // 날씨 영역 고정 너비
+                                    .background(Color.white)
+                                    .cornerRadius(16)
+                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                }
+                                
                                 // 질문 카드들
                                 questionCard(
                                     title: "잠은 잘 주무셨나요?",
@@ -123,9 +201,9 @@ struct AppDiaryWriteView: View {
                     }
                     .transition(.opacity)
                 } else {
-                    // Insight View (작성 모드일 때만)
+                    // Insight View (작성 모드일 때만) -- 기존 유지
                     VStack {
-                        // 상단 날짜 및 닫기 버튼 영역
+                        // ...
                         HStack {
                             Button(action: { isPresented = false }) {
                                 Text("닫기").foregroundColor(.gray)
@@ -146,6 +224,7 @@ struct AppDiaryWriteView: View {
                         .foregroundColor(.blue)
                         .padding(.bottom, 20)
                         
+                        // (생략: 기존 Insight 로직 유지)
                         if isLoadingInsight {
                             VStack(spacing: 40) {
                                 Spacer()
@@ -204,18 +283,22 @@ struct AppDiaryWriteView: View {
                     self.q3 = edit.emotion_meaning ?? ""
                     self.q4 = edit.self_talk ?? ""
                     
-                    // 🚨 핵심 수정: sleep_desc 값이 있으면 넣고, 없으면 sleep_condition 확인
                     if let sleep = edit.sleep_desc ?? edit.sleep_condition {
-                        print("💤 수면 데이터 발견: \(sleep)")
                         self.qs = sleep
                     } else {
-                        print("⚠️ 수면 데이터 없음(nil)")
                         self.qs = ""
                     }
                     
                     self.mood = edit.mood_level
                     self.weatherDesc = edit.weather ?? "맑음"
                     self.temp = edit.temperature ?? 20.0
+                    
+                    // [New] 약물 데이터 로드
+                    if let desc = edit.medication_desc, !desc.isEmpty {
+                        self.takenMeds = Set(desc.components(separatedBy: ", "))
+                    } else {
+                        self.isMedicationTaken = edit.medication ?? false
+                    }
                     
                     self.showForm = true
                     self.isLoadingInsight = false
@@ -230,6 +313,11 @@ struct AppDiaryWriteView: View {
                     }
                 }
             }
+            loadMedications() // 약물 목록 로드
+        }
+        // [New] 약물 설정 시트
+        .sheet(isPresented: $showingMedSetting, onDismiss: loadMedications) {
+            MedicationSettingView()
         }
         // 음성 인식 텍스트 반영
         .onChange(of: voiceRecorder.transcribedText) { newText in
@@ -295,14 +383,10 @@ struct AppDiaryWriteView: View {
         
         URLSession.shared.dataTask(with: url) { data, _, error in
             var lat = 37.5665; var lon = 126.9780
-                if error == nil, let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let l = json["latitude"] as? Double, let g = json["longitude"] as? Double {
-                    lat = l; lon = g
-                } else {
-                     // network fail fallback
-                     DispatchQueue.main.async { self.fetchInsight() }
-                     return
-                }
+            if error == nil, let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let l = json["latitude"] as? Double, let g = json["longitude"] as? Double {
+                lat = l; lon = g
+            }
             
             let weatherUrlString = "https://api.open-meteo.com/v1/forecast?latitude=\(lat)&longitude=\(lon)&current_weather=true&timezone=auto"
             guard let wUrl = URL(string: weatherUrlString) else { DispatchQueue.main.async { self.fetchInsight() }; return }
@@ -312,9 +396,9 @@ struct AppDiaryWriteView: View {
                    let current = wJson["current_weather"] as? [String: Any] {
                     let code = current["weathercode"] as? Int ?? 0
                     let temp = current["temperature"] as? Double ?? 20.0
-                    let map: [Int: String] = [0: "맑음 ☀️", 1: "대체로 맑음 🌤️", 2: "구름 조금 ⛅", 3: "흐림 ☁️", 45: "안개 🌫️", 48: "안개 🌫️", 51: "이슬비 🌧️", 53: "이슬비 🌧️", 55: "이슬비 🌧️", 61: "비 ☔", 63: "비 ☔", 65: "비 ☔", 80: "소나기 ☔", 95: "뇌우 ⚡"]
+                    let map: [Int: String] = [0: "맑음 ☀️", 1: "대체로 맑음 🌤️", 2: "구름 조금 ⛅", 3: "흐림 ☁️", 4: "안개 🌫️", 45: "안개 🌫️", 48: "안개 🌫️", 51: "이슬비 🌧️", 53: "이슬비 🌧️", 55: "이슬비 🌧️", 61: "비 ☔", 63: "비 ☔", 65: "비 ☔", 80: "소나기 ☔", 95: "뇌우 ⚡"]
                     DispatchQueue.main.async {
-                        self.weatherDesc = map[code] ?? "흐림"
+                        self.weatherDesc = map[code] ?? "흐림 ☁️"
                         self.temp = temp
                         self.fetchInsight()
                     }
@@ -333,6 +417,20 @@ struct AppDiaryWriteView: View {
     func saveDiary() {
         isSaving = true
         
+        // [New] 약물 데이터 병합
+        var finalMedDesc: String? = nil
+        var finalMedication: Bool = false
+        
+        if !savedMeds.isEmpty {
+            if !takenMeds.isEmpty {
+                finalMedDesc = takenMeds.joined(separator: ", ")
+                finalMedication = true
+            }
+        } else {
+            // 목록이 없으면 기존 토글 사용
+            finalMedication = isMedicationTaken
+        }
+
         var newDiary: Diary
         if let existing = diaryToEdit {
             newDiary = existing
@@ -349,7 +447,9 @@ struct AppDiaryWriteView: View {
                 sleep_desc: qs,
                 weather: weatherDesc,
                 temperature: temp,
-                created_at: nil // Will be set in LocalDataManager
+                created_at: nil,
+                medication: finalMedication,
+                medication_desc: finalMedDesc // [New]
             )
         }
         
@@ -360,23 +460,29 @@ struct AppDiaryWriteView: View {
         newDiary.emotion_desc = q2
         newDiary.emotion_meaning = q3
         newDiary.self_talk = q4
+        newDiary.weather = weatherDesc
+        newDiary.medication = finalMedication
+        newDiary.medication_desc = finalMedDesc // [New]
         
         // 1. First Save (Synchronous-like)
         LocalDataManager.shared.saveDiary(newDiary) { success in
             if success {
-                // 2. Trigger On-Device AI Analysis (Async)
-                triggerAIAnalysis(for: newDiary)
-                
-                DispatchQueue.main.async {
-                    // [B2G] 저장 즉시 센터로 데이터 동기화
-                    if B2GManager.shared.isLinked {
-                        print("📤 [AutoSync] Triggering B2G Sync after save...")
-                        B2GManager.shared.syncData()
-                    }
+                // 2. Trigger On-Device AI Analysis (Async & Wait)
+                Task {
+                    await self.triggerAIAnalysis(for: newDiary)
                     
-                    self.isSaving = false
-                    self.onSave()
-                    self.isPresented = false
+                    // 분석 완료 후 UI 업데이트 및 화면 닫기
+                    await MainActor.run {
+                        // [B2G] 저장 즉시 센터로 데이터 동기화
+                        if B2GManager.shared.isLinked {
+                            print("📤 [AutoSync] Triggering B2G Sync after save...")
+                            B2GManager.shared.syncData()
+                        }
+                        
+                        self.isSaving = false
+                        self.onSave()
+                        self.isPresented = false
+                    }
                 }
             } else {
                 DispatchQueue.main.async {
@@ -388,32 +494,35 @@ struct AppDiaryWriteView: View {
         }
     }
     
-    func triggerAIAnalysis(for diary: Diary) {
+    func triggerAIAnalysis(for diary: Diary) async {
         // Background AI Task
-        Task {
-            // Combine text for AI
-            let fullText = """
-            사건: \(diary.event ?? "")
-            감정: \(diary.emotion_desc ?? "")
-            의미: \(diary.emotion_meaning ?? "")
-            혼잣말: \(diary.self_talk ?? "")
-            """
-            
-            print("🧠 [Local AI] Analyzing diary...")
-            var analysisResult = ""
-            for await token in await LLMService.shared.generateAnalysis(diaryText: fullText) {
-                analysisResult += token
-            }
-            
-            // Update Diary with AI Result
-            var updatedDiary = diary
-            updatedDiary.ai_analysis = analysisResult
-            // Mock Prediction for Calendar (Mood + %)
-            updatedDiary.ai_prediction = "분석 완료 (100%)"
-            
-            // Save again silently
+        // Combine text for AI
+        let fullText = """
+        사건: \(diary.event ?? "")
+        감정: \(diary.emotion_desc ?? "")
+        의미: \(diary.emotion_meaning ?? "")
+        혼잣말: \(diary.self_talk ?? "")
+        """
+        
+        print("🧠 [Local AI] Analyzing diary...")
+        var analysisResult = ""
+        
+        // [Feedback] 분석 중임을 알리기 위해 약간의 딜레이가 있는 것처럼 보일 수 있음 (실제 연산)
+        for await token in await LLMService.shared.generateAnalysis(diaryText: fullText) {
+            analysisResult += token
+        }
+        
+        // Update Diary with AI Result
+        var updatedDiary = diary
+        updatedDiary.ai_analysis = analysisResult
+        // Mock Prediction for Calendar (Mood + %)
+        updatedDiary.ai_prediction = "분석 완료 (100%)"
+        
+        // Save again silently (Wait for completion)
+        await withCheckedContinuation { continuation in
             LocalDataManager.shared.saveDiary(updatedDiary) { _ in
                  print("✅ [Local AI] Analysis saved!")
+                 continuation.resume()
             }
         }
     }
@@ -428,5 +537,99 @@ struct AppDiaryWriteView: View {
     
     func moodEmoji(_ l: Int) -> String {
         ["", "😠", "😢", "😐", "😌", "😊"][min(l, 5)]
+    }
+    
+    // [New] 약물 목록 로드
+    func loadMedications() {
+        if let saved = UserDefaults.standard.array(forKey: "savedMedications") as? [String] {
+            savedMeds = saved
+        }
+    }
+}
+
+// MARK: - Medication Setting View
+struct MedicationSettingView: View {
+    @Environment(\.presentationMode) var presentationMode
+    @State private var medications: [String] = []
+    @State private var newMedName: String = ""
+    
+    // UserDefaults Key
+    private let key = "savedMedications"
+    
+    var body: some View {
+        NavigationView {
+            VStack {
+                // 입력창
+                HStack {
+                    TextField("약 이름 (예: 비타민, 혈압약)", text: $newMedName)
+                        .padding()
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(10)
+                    
+                    Button(action: addMedication) {
+                        Image(systemName: "plus")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(newMedName.isEmpty ? Color.gray : Color.blue)
+                            .cornerRadius(10)
+                    }
+                    .disabled(newMedName.isEmpty)
+                }
+                .padding()
+                
+                // 목록
+                List {
+                    ForEach(medications, id: \.self) { med in
+                        HStack {
+                            Image(systemName: "pills")
+                                .foregroundColor(.green)
+                            Text(med)
+                                .font(.body)
+                        }
+                    }
+                    .onDelete(perform: deleteMedication)
+                }
+                .listStyle(InsetGroupedListStyle())
+                
+                Spacer()
+                
+                Text("등록된 약들은 일기 작성 시\n확인할 수 있습니다.")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            }
+            .navigationTitle("나의 약물 관리")
+            .navigationBarItems(trailing: Button("닫기") {
+                presentationMode.wrappedValue.dismiss()
+            })
+            .onAppear(perform: loadMedications)
+        }
+    }
+    
+    func loadMedications() {
+        if let saved = UserDefaults.standard.array(forKey: key) as? [String] {
+            medications = saved
+        }
+    }
+    
+    func addMedication() {
+        guard !newMedName.isEmpty else { return }
+        // 중복 방지
+        if !medications.contains(newMedName) {
+            medications.append(newMedName)
+            saveMedications()
+        }
+        newMedName = ""
+    }
+    
+    func deleteMedication(at offsets: IndexSet) {
+        medications.remove(atOffsets: offsets)
+        saveMedications()
+    }
+    
+    func saveMedications() {
+        UserDefaults.standard.set(medications, forKey: key)
     }
 }

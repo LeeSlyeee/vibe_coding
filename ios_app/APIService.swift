@@ -10,7 +10,7 @@ class APIService {
     // 로컬 서버 (테스트용) - 외부 접속용 Tunnel URL (Verified Active)
     // 실기기 테스트용 (Local Network IP - Updated)
     // iPhone과 Mac이 동일한 Wi-Fi에 있어야 합니다.
-    private let baseURL = "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com/api"
+    private let baseURL = "http://192.168.0.22:5001/api"
 
     
     private var token: String? {
@@ -235,14 +235,45 @@ class APIService {
         ensureAuth { success in
             guard success else { completion(nil); return }
             
-            // GET /diaries/ returns a JSON Array (List) by default in DRF without pagination
-            self.performRequestList(endpoint: "/diaries/", method: "GET") { result in
+            // GET /diaries returns a JSON Array (List) by default in DRF without pagination
+            self.performRequestList(endpoint: "/diaries", method: "GET") { result in
                 switch result {
                 case .success(let list):
                     completion(list)
                 case .failure(let error):
                     print("❌ [API] Fetch Diaries Failed: \(error)")
                     completion(nil)
+                }
+            }
+        }
+    }
+    
+    // MARK: - Chat (Server-based)
+    func sendChatMessage(message: String, history: [[String: String]], completion: @escaping (Result<String, Error>) -> Void) {
+        ensureAuth { success in
+            guard success else {
+                completion(.failure(NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "로그인이 필요합니다."])))
+                return
+            }
+            
+            let payload: [String: Any] = [
+                "message": message,
+                "history": history
+            ]
+            
+            // AI Chat Endpoint: /ai/chat (가정) 또는 /chat
+            // 백엔드 로그를 볼 수 없으므로, 표준적인 /chat 시도 후 실패 시 /ai/chat 시도 로직은 복잡하니, 우선 /chat으로 통일
+            self.performRequest(endpoint: "/chat", method: "POST", body: payload) { result in
+                switch result {
+                case .success(let data):
+                    // 응답 필드: 'response' or 'message' or 'reply'
+                    if let reply = data["response"] as? String ?? data["message"] as? String ?? data["reply"] as? String {
+                        completion(.success(reply))
+                    } else {
+                        completion(.failure(NSError(domain: "API", code: -1, userInfo: [NSLocalizedDescriptionKey: "서버 응답 형식을 알 수 없습니다."])))
+                    }
+                case .failure(let error):
+                    completion(.failure(error))
                 }
             }
         }
@@ -320,9 +351,11 @@ class APIService {
             }
             
             // Raw String Check
+            /*
             if let rawString = String(data: data, encoding: .utf8) {
                // print("📩 [API] Raw Response Body: \(rawString)")
             }
+            */
             
             do {
                 if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
@@ -380,9 +413,16 @@ class APIService {
                     completion(.success(json))
                 } else {
                     print("❌ [API] Expected Array but got something else.")
+                    if let raw = String(data: data, encoding: .utf8) {
+                        print("   👉 Raw Response: \(raw)")
+                    }
                     completion(.failure(NSError(domain: "API", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid JSON format (Not Array)"])))
                 }
             } catch {
+                print("❌ [API] JSON Decode Error: \(error.localizedDescription)")
+                if let raw = String(data: data, encoding: .utf8) {
+                    print("   👉 Raw Response (Caused Error): \(raw)")
+                }
                 completion(.failure(error))
             }
         }.resume()
