@@ -28,7 +28,7 @@ const router = createRouter({
       component: SignupPage
     },
     {
-      path: '/care-survey',
+      path: '/assessment',
       name: 'assessment',
       component: () => import('../views/AssessmentPage.vue'),
       meta: { requiresAuth: true }
@@ -97,7 +97,12 @@ router.beforeEach((to, from, next) => {
     // Triage Check: If authenticated but not assessed, and trying to go to calendar/main, force assessment.
     // Exception: If already on assessment page or logout/medication? No, medication also needs assessment probably.
     // Let's force assessment for everything except assessment page itself.
-    if (isAuthenticated && !isAssessed && to.name !== 'assessment') {
+    // Triage Check: If authenticated but not assessed, and trying to go to calendar/main, force assessment.
+    // [B2G Fix] Skip if center code exists (Linked user)
+    const isLinked = localStorage.getItem('b2g_center_code') || localStorage.getItem('b2g_is_linked');
+    
+    // 이중 잠금 장치 활성화: 인증됨 + 진단 안 함 + 연동 안 됨 -> 진단 페이지로 납치
+    if (isAuthenticated && !isAssessed && !isLinked && to.name !== 'assessment') {
         next({ name: 'assessment' })
     } else {
         next()

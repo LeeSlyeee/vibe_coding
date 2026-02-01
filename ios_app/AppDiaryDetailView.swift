@@ -11,7 +11,7 @@ struct AppDiaryDetailView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "http://150.230.7.76"
     
     var body: some View {
         ScrollView {
@@ -88,12 +88,54 @@ struct AppDiaryDetailView: View {
                 }
                 
                 // AI 분석 영역
-                if let ai = (diary.ai_analysis?.isEmpty == false ? diary.ai_analysis : diary.ai_prediction), !ai.isEmpty {
+                if let prediction = diary.ai_prediction, !prediction.isEmpty {
+                   let (label, percent) = parseAIPrediction(prediction)
+                   
+                   VStack(alignment: .leading, spacing: 10) {
+                       HStack {
+                           Text("🤖 AI 심리 분석")
+                               .font(.headline)
+                               .foregroundColor(.blue)
+                           Spacer()
+                           if !percent.isEmpty {
+                               Text(percent)
+                                   .font(.caption)
+                                   .fontWeight(.bold)
+                                   .padding(.horizontal, 8)
+                                   .padding(.vertical, 4)
+                                   .background(Color.blue)
+                                   .foregroundColor(.white)
+                                   .cornerRadius(8)
+                           }
+                       }
+                       
+                       // 감정 분석 결과 (Label)
+                       if !label.isEmpty {
+                           Text("오늘의 주요 감정: \(label)")
+                               .font(.subheadline)
+                               .fontWeight(.semibold)
+                               .foregroundColor(.primary)
+                               .padding(.bottom, 2)
+                       }
+                       
+                       // 상세 분석 (ai_analysis or fallback)
+                       if let detail = diary.ai_analysis, !detail.isEmpty {
+                           Text(detail)
+                               .font(.body)
+                               .padding()
+                               .frame(maxWidth: .infinity, alignment: .leading) // 왼쪽 정렬
+                               .background(Color.blue.opacity(0.1))
+                               .cornerRadius(10)
+                       }
+                   }
+                   .padding(.top)
+                } else if let aiAnalysisOnly = diary.ai_analysis, !aiAnalysisOnly.isEmpty {
+                     // Fallback for old data without prediction
                     VStack(alignment: .leading, spacing: 10) {
                         Text("🤖 AI 심리 분석")
                             .font(.headline)
                             .foregroundColor(.blue)
-                        Text(ai)
+                        Text(aiAnalysisOnly)
                             .padding()
                             .background(Color.blue.opacity(0.1))
                             .cornerRadius(10)
@@ -218,5 +260,54 @@ struct AppDiaryDetailView: View {
             return desc
         }
         return diary.sleep_condition
+    }
+    
+    // AI 예측 문자열 파싱 헬퍼 (예: 'Happy (80%)' -> ("행복", "80%"))
+    func parseAIPrediction(_ text: String?) -> (String, String) {
+        guard var raw = text, !raw.isEmpty else { return ("", "") }
+        
+        // 1. 작은따옴표 제거
+        if let start = raw.firstIndex(of: "'"), let end = raw.lastIndex(of: "'"), start != end {
+            raw = String(raw[raw.index(after: start)..<end])
+        }
+        
+        var label = ""
+        var percent = ""
+        
+        // 2. 괄호 기준으로 분리
+        if raw.hasSuffix(")"), let openParen = raw.lastIndex(of: "(") {
+            label = String(raw[..<openParen]).trimmingCharacters(in: .whitespaces)
+            percent = String(raw[openParen...])
+        } else {
+            label = raw // 괄호가 없는 경우 전체를 라벨로 취급
+        }
+        
+        // 3. 한글 번역 매핑
+        let emotionTranslation: [String: String] = [
+            "Happy": "행복",
+            "Sad": "슬픔",
+            "Angry": "분노",
+            "Fear": "두려움",
+            "Surprise": "놀람",
+            "Neutral": "평온",
+            "Disgust": "혐오",
+            "Anxiety": "불안",
+            "Depression": "우울",
+            "Stress": "스트레스",
+            "Joy": "기쁨",
+            "Love": "사랑",
+            "Confusion": "혼란",
+            "Excitement": "흥분",
+            "Tired": "지침"
+        ]
+        
+        let translatedLabel = emotionTranslation[label] ?? label // 번역 없으면 원문 사용
+        
+        if !percent.isEmpty && !percent.contains("%") {
+             // 퍼센트 기호가 없으면 빈 문자열 처리 (안전장치)
+             percent = ""
+        }
+        
+        return (translatedLabel, percent)
     }
 }

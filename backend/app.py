@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 import os
 from config import Config
 from config import Config
-from standalone_ai import generate_analysis_reaction_standalone
+# from standalone_ai import generate_analysis_reaction_standalone
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -37,7 +37,8 @@ def chat_reaction():
         return jsonify({'reaction': ""}), 200
         
     # Directly call function, bypassing class instantiation issues
-    reaction = generate_analysis_reaction_standalone(text, mode=mode, history=history)
+    # reaction = generate_analysis_reaction_standalone(text, mode=mode, history=history)
+    reaction = "AI 서버 점검 중입니다."
     
     # [Async Analysis & Logging]
     # Fire and forget thread to analyze sentiment and save to DB
@@ -49,8 +50,9 @@ def chat_reaction():
         with app.app_context():
             try:
                 # 1. Analyze
-                from standalone_ai import analyze_chat_sentiment_background
-                analysis_data = analyze_chat_sentiment_background(u_text, a_react)
+                # from standalone_ai import analyze_chat_sentiment_background
+                # analysis_data = analyze_chat_sentiment_background(u_text, a_react)
+                analysis_data = {}
                 
                 # 2. Save
                 log_entry = {
@@ -77,20 +79,25 @@ def chat_reaction():
 
 # ... (Previous code)
 
+# Global AI (Pre-loaded for Performance)
+print("💡 [Pre-Load] Initializing AI Models... (Please wait ~10s)")
+try:
+    from ai_brain import EmotionAnalysis
+    # Create single instance for both Insight and Reports
+    insight_ai = EmotionAnalysis()
+    print("✅ [Pre-Load] AI Models Ready!")
+except Exception as e:
+    print(f"❌ [Pre-Load] Failed to load AI: {e}")
+    insight_ai = None
+
 @app.route('/api/insight', methods=['GET'])
 @jwt_required()
 def get_insight():
-    global insight_ai
-    current_user_id = get_jwt_identity()
-    
-    # 1. Lazy Load AI
+    # Use global instance directly
     if insight_ai is None:
-        print("💡 Initializing AI for Insight (Lazy Load)...")
-        try:
-            insight_ai = EmotionAnalysis()
-        except Exception as e:
-            print(f"Failed to load AI: {e}")
-            return jsonify({'message': "AI를 준비하는 중입니다. 잠시 후 다시 시도해주세요."}), 503
+        return jsonify({'message': "AI 서버 점검 중입니다. 잠시 후 시도해주세요."}), 503
+
+    current_user_id = get_jwt_identity()
 
     # 2. Date Calculation (Target Date - 3 Weeks)
     target_date_str = request.args.get('date')
@@ -134,7 +141,30 @@ def get_insight():
                 'event': event_text[:50]
             })
         
-        print(f"📊 [Insight] Found {len(recent_diaries)} diaries for context.")
+        print(f"📊 [Insight] Found {len(recent_diaries)} diaries for context in range.")
+
+        # [Fallback] If no data in range, fetch recent 5 global entries
+        if not recent_diaries:
+            print("📉 [Insight] No recent diaries in range. Fetching last 5 global diaries as fallback.")
+            fallback_cursor = mongo.db.diaries.find({
+                'user_id': current_user_id
+            }).sort('created_at', -1).limit(5)
+            
+            # Need to reverse so they are chronological for AI context
+            fallback_docs = list(fallback_cursor) # Newest first
+            fallback_docs.reverse() # Oldest first
+            
+            for doc in fallback_docs:
+                event_text = doc.get('event', '')
+                if isinstance(event_text, str):
+                    event_text = safe_decrypt(event_text)
+                
+                recent_diaries.append({
+                    'date': doc.get('created_at').strftime('%Y-%m-%d') if doc.get('created_at') else '',
+                    'mood': doc.get('mood_level', '보통'),
+                    'event': event_text[:50]
+                })
+            print(f"📊 [Insight] Fallback loaded {len(recent_diaries)} diaries.")
 
         # 3.5. Fetch Weather Stats (Historical Pattern)
         weather = request.args.get('weather')
@@ -260,6 +290,7 @@ def login():
     username = data.get('username') or data.get('nickname')
     password = data.get('password')
     name = data.get('name') # [New] 실명 받기
+    center_code = data.get('center_code') # [New] 기관 코드 확인
 
     if not username or not password:
         return jsonify({"message": "Username/Nickname and password required"}), 400
@@ -279,7 +310,17 @@ def login():
             'created_at': datetime.utcnow()
         }
         if name:
-            user_doc['name'] = name # 실명 저장
+            user_doc['name'] = name 
+        
+        # [B2G] If center_code provided, bypass assessment
+        if center_code:
+            user_doc['center_code'] = center_code
+            user_doc['assessment_completed'] = True
+            user_doc['assessment_date'] = datetime.utcnow()
+            user_doc['phq9_score'] = 0 
+            user_doc['risk_level'] = 1
+            user_doc['is_premium'] = True # [B2G] Institutions get Premium
+            print(f"🏥 [B2G] User '{username}' linked to '{center_code}'. Premium Granted.")
             
         user_id = mongo.db.users.insert_one(user_doc).inserted_id
         
@@ -292,14 +333,78 @@ def login():
             print(f"⛔️ [Auth Failed] Password mismatch for '{username}'")
             return jsonify({"message": "비밀번호가 일치하지 않습니다."}), 401
 
+        # [B2G] Late Binding (Existing User Login with Code)
+        # Fix: Always check if center_code is provided to upgrade
+        if center_code:
+             # Check if already linked or needs upgrade
+             update_fields = {}
+             if not user.get('assessment_completed'):
+                 update_fields['assessment_completed'] = True
+                 update_fields['assessment_date'] = datetime.utcnow()
+             
+             if not user.get('is_premium'):
+                 update_fields['is_premium'] = True
+                 
+             if not user.get('center_code'):
+                 update_fields['center_code'] = center_code
+                 
+             if update_fields:
+                mongo.db.users.update_one({'_id': user['_id']}, {'$set': update_fields})
+                print(f"🏥 [B2G] Existing User '{username}' upgraded with code '{center_code}'. Fields: {update_fields.keys()}")
+
     # Create Token
     access_token = create_access_token(identity=str(user['_id']))
     
+    # [Check Linked Center]
+    # DB에 저장된 연동 코드 확인 (linked_center_code or center_code)
+    db_center_code = user.get('linked_center_code') or user.get('center_code')
+    
+    # [Self-Healing] DB에 코드가 없으면 150 서버에서 조회 (FIRST)
+    if not db_center_code:
+        try:
+            from b2g_routes import recover_center_code
+            recovered = recover_center_code(user.get('nickname', username))
+            if recovered:
+                db_center_code = recovered
+                # DB Update immediately
+                mongo.db.users.update_one(
+                    {'_id': user['_id']}, 
+                    {'$set': {
+                        'linked_center_code': recovered,
+                        'center_code': recovered,
+                        'is_premium': True
+                    }}
+                )
+                print(f"🏥 [B2G Recovery] Restored code '{recovered}' for '{username}'")
+        except Exception as rec_err:
+             print(f"⚠️ [B2G Recovery] Error: {rec_err}")
+
+    # [B2G Sync Hook]
+    # 로그인 시 150 서버(Admin)에서 데이터 Pull (SECOND - After Recovery)
+    try:
+        from b2g_routes import pull_from_insight_mind
+        # Run Synchronously (Wait for data)
+        pull_from_insight_mind(str(user['_id']), run_async=False)
+    except Exception as e:
+        print(f"❌ [B2G Sync] Pull Trigger Error: {e}")
+    
+    # [Auto-Pass Assessment]
+    # 연동된 유저는 심리검사 자동 패스
+    is_assessed = user.get('assessment_completed', False)
+    if db_center_code and not is_assessed:
+        is_assessed = True
+        # DB Update for consistency
+        mongo.db.users.update_one({'_id': user['_id']}, {'$set': {'assessment_completed': True, 'assessment_date': datetime.utcnow()}})
+        print(f"🏥 [B2G] User '{username}' has center code '{db_center_code}'. Auto-passing assessment.")
+
     return jsonify({
         "access_token": access_token, 
         "user_id": str(user['_id']),
         "nickname": user.get('nickname', username),
-        "name": user.get('name', "")
+        "name": user.get('name', ""),
+        "assessment_completed": is_assessed, # Frontend uses this to show/hide modal
+        "is_premium": user.get('is_premium', False), # or True if db_center_code else ...
+        "linked_center_code": db_center_code
     }), 200
 
     user = mongo.db.users.find_one({'username': username})
@@ -335,7 +440,8 @@ def get_user_me():
         "username": user.get('username'),
         "risk_level": user.get('risk_level', 1),
         "assessment_completed": user.get('assessment_completed', False),
-        "is_premium": user.get('is_premium', False)
+        "is_premium": user.get('is_premium', False),
+        "linked_center_code": user.get('linked_center_code') or user.get('center_code')
     }), 200
 
 # -------------------- Payment/Premium Route --------------------
@@ -486,7 +592,7 @@ def create_diary():
     data = request.get_json()
     print(f"🔍 [DEBUG] Received diary data: {data}")
     print(f"🔍 [DEBUG] sleep_desc value: '{data.get('sleep_desc', 'NOT_FOUND')}'")
-    created_at_str = data.get('created_at')
+    created_at_str = data.get('created_at') or data.get('date')
     if created_at_str and created_at_str.endswith('Z'): created_at_str = created_at_str[:-1]
     created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
 
@@ -521,7 +627,8 @@ def create_diary():
         
         'ai_prediction': "분석 중... (AI가 곧 답변해드려요!)",
         'ai_comment': "잠시만 기다려주세요... 🤖",
-        'created_at': created_at
+        'created_at': created_at,
+        'date': created_at.strftime("%Y-%m-%d") # Essential for Calendar Matching
     }
     
     # Encrypt before insert
@@ -557,6 +664,21 @@ def create_diary():
                 'task_id': 'client-side'
             }
             mongo.db.diaries.update_one({'_id': result.inserted_id}, {'$set': ai_updates})
+        
+        # [B2G Sync Hook]
+        # Web에서 작성된 일기도 Admin(150)으로 자동 전송
+        try:
+            from b2g_routes import sync_to_insight_mind
+            # raw_diary has decrypted data + AI placeholders
+            # If client provided analysis, update raw_diary to reflect it for sync
+            if is_client_analyzed:
+                raw_diary['ai_prediction'] = request_ai_pred
+                raw_diary['ai_comment'] = request_ai_comment
+            
+            # Pass raw_diary (decrypted) and user_id
+            sync_to_insight_mind(raw_diary, current_user_id)
+        except Exception as sync_err:
+            print(f"❌ [B2G Hook] Sync Failed: {sync_err}")
             
             # Update response data to reflect this
             raw_diary['ai_prediction'] = request_ai_pred
@@ -582,6 +704,36 @@ def create_diary():
     except Exception as e:
         return jsonify({"message": f"Create failed: {str(e)}"}), 500
 
+
+
+@app.route('/api/diaries/date/<date_str>', methods=['GET'])
+@jwt_required()
+def get_diary_by_date(date_str):
+    current_user_id = get_jwt_identity()
+    try:
+        # Parse 'YYYY-MM-DD'
+        target_date = datetime.strptime(date_str, '%Y-%m-%d')
+        end_date = target_date + timedelta(days=1)
+        
+        diary = mongo.db.diaries.find_one({
+            'user_id': current_user_id,
+            'created_at': {
+                '$gte': target_date,
+                '$lt': end_date
+            }
+        })
+        
+        if not diary:
+            return jsonify({"message": "Not found"}), 404
+            
+        return jsonify(serialize_doc(decrypt_doc(diary))), 200
+        
+    except ValueError:
+        return jsonify({"message": "Invalid date format"}), 400
+    except Exception as e:
+        print(f"Error fetching diary by date: {e}")
+        return jsonify({"message": "Error"}), 500
+
 @app.route('/api/diaries/<id>', methods=['GET'])
 @jwt_required()
 def get_diary(id):
@@ -606,81 +758,106 @@ def update_diary(id):
     
     data = request.get_json()
     
-    # Prepare update fields
-    # Use safe_decrypt for fallback values to prevent 500 error if key mismatch
-    updates = {
-        'event': data.get('event', safe_decrypt(diary.get('event'))), 
-        'sleep_desc': data.get('sleep_desc', safe_decrypt(diary.get('sleep_desc'))),
-        'emotion_desc': data.get('emotion_desc', safe_decrypt(diary.get('emotion_desc'))),
-        'emotion_meaning': data.get('emotion_meaning', safe_decrypt(diary.get('emotion_meaning'))),
-        'self_talk': data.get('self_talk', safe_decrypt(diary.get('self_talk'))),
-        'mood_level': data.get('mood_level', diary.get('mood_level')),
-        'weather': data.get('weather', diary.get('weather')),
-        'temperature': data.get('temperature', diary.get('temperature')),
+    # [Field Mapping & Updates Construction]
+    # Only update fields that are explicitly provided in the request or mapped keys.
+    # If a field is NOT in data, we should NOT touch it (MongoDB keeps existing value).
+    # We map frontend keys (questionX) to backend keys (event, etc.)
+    
+    updates = {}
+    
+    # 1. Text Fields (Check mapped keys)
+    # logic: if 'event' is in data, use it. Else if 'question1' is in data, use it.
+    # We use explicit checks to allow updates to empty strings.
+    
+    if 'event' in data: updates['event'] = data['event']
+    elif 'question1' in data: updates['event'] = data['question1']
         
-        # New Fields Updates
-        'mode': data.get('mode', diary.get('mode', 'green')),
-        'symptoms': data.get('symptoms', diary.get('symptoms', [])),
-        'mood_intensity': data.get('mood_intensity', diary.get('mood_intensity', 0)),
-        'gratitude_note': data.get('gratitude_note', safe_decrypt(diary.get('gratitude_note')) if isinstance(diary.get('gratitude_note'), str) else diary.get('gratitude_note', '')),
-        'safety_flag': data.get('safety_flag', diary.get('safety_flag', False)),
-        'medication_taken': data.get('medication_taken', diary.get('medication_taken', False)),
+    if 'sleep_condition' in data: 
+        updates['sleep_condition'] = data['sleep_condition']
+        updates['sleep_desc'] = data['sleep_condition'] # Sync legacy
+    elif 'sleep_desc' in data:
+        updates['sleep_condition'] = data['sleep_desc']
+        updates['sleep_desc'] = data['sleep_desc']
+    elif 'question_sleep' in data:
+        updates['sleep_condition'] = data['question_sleep']
+        updates['sleep_desc'] = data['question_sleep']
         
-        'ai_prediction': "재분석 중...",
-        'ai_comment': "AI가 다시 생각하고 있어요... 🤔"
-    }
+    if 'emotion_desc' in data: updates['emotion_desc'] = data['emotion_desc']
+    elif 'question2' in data: updates['emotion_desc'] = data['question2']
+        
+    if 'emotion_meaning' in data: updates['emotion_meaning'] = data['emotion_meaning']
+    elif 'question3' in data: updates['emotion_meaning'] = data['question3']
+        
+    if 'self_talk' in data: updates['self_talk'] = data['self_talk']
+    elif 'question4' in data: updates['self_talk'] = data['question4']
+
+    if 'gratitude_note' in data: updates['gratitude_note'] = data['gratitude_note']
+
+    # 2. Non-Text Fields
+    if 'mood_level' in data: updates['mood_level'] = data['mood_level']
+    if 'weather' in data: updates['weather'] = data['weather']
+    if 'temperature' in data: updates['temperature'] = data['temperature']
+    if 'mode' in data: updates['mode'] = data['mode']
+    if 'symptoms' in data: updates['symptoms'] = data['symptoms']
+    if 'mood_intensity' in data: updates['mood_intensity'] = data['mood_intensity']
+    if 'safety_flag' in data: updates['safety_flag'] = data['safety_flag']
+    if 'medication_taken' in data: updates['medication_taken'] = data['medication_taken']
     
-    # Encrypt updates
-    encrypted_updates = encrypt_data(updates)
-    
-    mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
-    
-    mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
-    
-    # [Hybrid Logic for Update]
-    # Check if client provided valid analysis in this update request
+    # 3. Always Reset AI Analysis on Update (unless client provides it)
+    # Check Client-Side Analysis First
     req_ai_pred = data.get('ai_prediction', '').strip()
     req_ai_comment = data.get('ai_comment', '').strip()
     
     is_client_analyzed = (
         req_ai_pred and 
         req_ai_comment and 
-        "재분석 중" not in req_ai_pred and 
+        "분석 중" not in req_ai_pred and 
         "기다려주세요" not in req_ai_comment
     )
-
-    if is_client_analyzed:
-        print(f"📱 [Hybrid-Update] Client provided AI analysis for {id}. Server analysis skipped.")
-        # We don't need to do anything extra because we already saved the encrypted_updates above,
-        # which included ai_prediction/ai_comment if they were present in 'data'.
-        # Wait, let's double check 'encrypted_updates' creation above.
-        
-        # 'updates' dict above sets ai_prediction to "재분석 중..." by default.
-        # We need to override that default if client provided data.
-        
-        # Correct logic:
-        # If client provided data, we should have used it in 'updates' dict.
-        # Since 'updates' dict was hardcoded with placeholders, we must update DB again here.
-        
-        ai_fix = {
-            'ai_prediction': crypto_manager.encrypt(req_ai_pred),
-            'ai_comment': crypto_manager.encrypt(req_ai_comment),
-            'task_id': 'client-side-update'
-        }
-        mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': ai_fix})
-        
-    else:
-        print(f"☁️ [Hybrid-Update] No AI provided. Triggering Server AI Re-analysis for {id}...")
-        try:
-            threading.Thread(
-                target=analyze_diary_logic,
-                args=(id,)
-            ).start()
-            mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': 'local-thread'}})
-        except Exception as e: 
-            print(f"Failed to start thread: {e}")
     
-    # Return decrypted
+    task_id = None
+    
+    if is_client_analyzed:
+        print(f"📱 [Hybrid-Update] Client provided AI analysis for {id}.")
+        updates['ai_prediction'] = req_ai_pred
+        updates['ai_comment'] = req_ai_comment
+        updates['task_id'] = 'client-side-update'
+    else:
+        # Check if "re-analysis" is requested. 
+        # Ideally, any content update triggers re-analysis.
+        # We set placeholders.
+        updates['ai_prediction'] = "재분석 중... (잠시만 기다려주세요)"
+        updates['ai_comment'] = "AI가 작성된 내용을 다시 읽고 있어요... ✍️"
+        # task_id will be set after thread start
+    
+    # 4. Encrypt specific fields before DB update
+    encrypted_updates = encrypt_data(updates)
+    
+    # 5. Perform Update
+    mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': encrypted_updates})
+    
+    # 6. Trigger Server-Side AI if needed (Using Celery for Queueing)
+    if not is_client_analyzed:
+        print(f"☁️ [Hybrid-Update] Triggering Server AI Re-analysis for {id}...")
+        try:
+            # Prepare Text Context for efficiency
+            full_text = f"{updates.get('event', diary.get('event',''))} {updates.get('emotion_desc', diary.get('emotion_desc',''))}"
+            
+            # Dispatch to Celery Queue
+            from celery_app import run_ai_analysis_task
+            task = run_ai_analysis_task.apply_async(args=[str(id), full_text])
+            
+            mongo.db.diaries.update_one({'_id': ObjectId(id)}, {'$set': {'task_id': f"queued-{task.id}"}})
+            print(f"✅ [Celery] Task {task.id} Dispatched!")
+            
+        except Exception as e: 
+            print(f"❌ [Celery] Failed to dispatch: {e}. Falling back to Thread.")
+            # Fallback to Thread
+            try:
+                threading.Thread(target=analyze_diary_logic, args=(id,)).start()
+            except: pass
+            
+    # 7. Return Updated Document (Decrypted)
     updated_diary = mongo.db.diaries.find_one({'_id': ObjectId(id)})
     return jsonify(serialize_doc(decrypt_doc(updated_diary))), 200
 
@@ -757,7 +934,10 @@ def get_statistics():
     if not user: return jsonify({"message": "User not found"}), 404
     
     # Allow if Risk Level >= 3 OR User is Premium
-    if user.get('risk_level', 1) < 3 and not user.get('is_premium', False):
+    # Allow if Risk Level >= 3 OR User is Premium OR Linked to Center
+    is_linked = user.get('linked_center_code') and str(user.get('linked_center_code')).strip() != ""
+    
+    if user.get('risk_level', 1) < 3 and not user.get('is_premium', False) and not is_linked:
         return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
 
     diaries = list(mongo.db.diaries.find({'user_id': user_id}).sort('created_at', 1))
@@ -898,12 +1078,9 @@ import threading
 global_ai_brain = None
 
 def get_ai_brain():
-    global global_ai_brain
-    if global_ai_brain is None:
-        from ai_brain import EmotionAnalysis
-        print("🧠 [App] Initializing Global EmotionAnalysis Instance...")
-        global_ai_brain = EmotionAnalysis()
-    return global_ai_brain
+    # Use the pre-loaded global instance (Singleton)
+    global insight_ai
+    return insight_ai
 
 def background_generate_task(app_instance, user_id, final_input):
     """Background thread to generate report without blocking"""
@@ -1297,8 +1474,9 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
 # Late Imports at EOF to avoid Circular Dependency
 print("DEBUG: REACHING EOF BLOCK...") 
 try:
-    from tasks import process_diary_ai, analyze_diary_logic
-    from ai_brain import EmotionAnalysis
+    # from tasks import process_diary_ai, analyze_diary_logic
+    # from ai_brain import EmotionAnalysis
+    pass
 except ImportError:
     pass
 
@@ -1320,4 +1498,4 @@ except Exception as e:
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default
-    app.run(debug=False, host='0.0.0.0', port=5001)
+    app.run(debug=False, host='0.0.0.0', port=5050, threaded=False)

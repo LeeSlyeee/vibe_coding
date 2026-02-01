@@ -1,3 +1,5 @@
+import { authAPI } from './api';
+
 const CARD_KEY = "b2g_center_code";
 const LINK_STATUS_KEY = "b2g_is_linked";
 const LAST_SYNC_KEY = "b2g_last_sync";
@@ -16,41 +18,52 @@ export const B2GService = {
     return localStorage.getItem(LAST_SYNC_KEY);
   },
 
-  // 기관 연결 시도 (Mock Logic)
+  // 기관 연결 시도 (Real Server Logic)
   async connect(code) {
-    return new Promise((resolve, reject) => {
-      // 서버 통신 딜레이 시뮬레이션
-      setTimeout(() => {
-        const upperCode = code.toUpperCase().trim();
+    try {
+        console.log(`🔗 [B2G] Connecting to server with code: ${code}`);
+        
+        // 실제 서버 API 호출
+        // 백엔드 엔드포인트: /centers/verify-code/
+        const response = await authAPI.post('/centers/verify-code/', { 
+            center_code: code,
+            // 닉네임이 있다면 함께 전송하여 유저 매핑 시도
+            user_nickname: localStorage.getItem('user_nickname') || 'Guest'
+        });
 
-        // 유효성 검사 (시뮬레이션)
-        if (!upperCode) {
-          reject("코드를 입력해주세요.");
-          return;
-        }
+        const data = response.data;
 
-        // 특정 접두어만 허용 (보안 코스프레)
-        // SEOUL, TEST, CENTER로 시작하는 코드만 승인
-        const validPrefixes = ["SEOUL", "TEST", "CENTER", "HOSPITAL"];
-        const isValid = validPrefixes.some((prefix) => upperCode.startsWith(prefix));
-
-        if (isValid) {
-          // 연동 성공 저장
-          localStorage.setItem(CARD_KEY, upperCode);
-          localStorage.setItem(LINK_STATUS_KEY, "true");
-
-          // 즉시 첫 동기화 실행
-          this.syncData();
-
-          resolve({
-            success: true,
-            message: "연동에 성공했습니다!\n이제 담당 선생님이 상태를 확인할 수 있습니다.",
-          });
+        if (data.valid) {
+             // 연동 성공 저장
+             // 화면에 표시할 코드는 입력한 코드 그대로 사용
+             localStorage.setItem(CARD_KEY, code.toUpperCase()); 
+             localStorage.setItem(LINK_STATUS_KEY, "true");
+             
+             // 즉시 첫 동기화 실행 (비동기)
+             this.syncData();
+             
+             return {
+                 success: true,
+                 message: data.message || "연동에 성공했습니다!\n이제 담당 선생님이 상태를 확인할 수 있습니다."
+             };
         } else {
-          reject("유효하지 않은 기관 코드입니다.\n코드를 다시 확인해주세요.");
+            // valid: false인 경우
+            throw data.error || "유효하지 않은 코드입니다.";
         }
-      }, 1000); // 1초 딜레이
-    });
+    } catch (error) {
+        console.error("❌ [B2G] Connect Error:", error);
+        // 에러 메시지 추출
+        let serverMsg = "알 수 없는 오류가 발생했습니다.";
+        if (error.response && error.response.data && error.response.data.error) {
+            serverMsg = error.response.data.error;
+        } else if (typeof error === 'string') {
+            serverMsg = error;
+        } else if (error.message) {
+            serverMsg = error.message;
+        }
+        
+        throw serverMsg; // UI 컴포넌트로 에러 전파
+    }
   },
 
   // 연동 해제
@@ -61,19 +74,20 @@ export const B2GService = {
     console.log("🔗 [B2G] 연동 해제 완료");
   },
 
-  // 백그라운드 데이터 동기화 시뮬레이션
-  syncData() {
+  // 백그라운드 데이터 동기화 (Real Logic Placeholder)
+  async syncData() {
     if (!this.isLinked()) return;
 
-    console.log("🔄 [B2G] 보건소 서버로 데이터 전송 시작...");
-
-    // 타임스탬프 갱신
-    const now = new Date().toISOString();
-    localStorage.setItem(LAST_SYNC_KEY, now);
-
-    // 실제로는 여기서 axios.postWithCrypto(...) 등을 호출
-    setTimeout(() => {
-      console.log(`✅ [B2G Sync] Data sent to center: ${this.getCenterCode()}`);
-    }, 500);
+    console.log("🔄 [B2G] 보건소 서버로 데이터 동기화 시도...");
+    
+    try {
+        // TODO: 실제 일기 데이터를 수집하여 /centers/sync-data/ 로 전송하는 로직 구현 필요
+        // 현재는 타임스탬프만 갱신
+        const now = new Date().toISOString();
+        localStorage.setItem(LAST_SYNC_KEY, now);
+        console.log("✅ [B2G Sync] Sync timestamp updated");
+    } catch (e) {
+        console.error("❌ [B2G Sync] Error:", e);
+    }
   },
 };

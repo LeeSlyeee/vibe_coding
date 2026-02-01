@@ -150,7 +150,7 @@ struct AppGuideView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hex: "F5F5F7").edgesIgnoringSafeArea(.all)
+                Color(hexString: "F5F5F7").edgesIgnoringSafeArea(.all)
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 30) {
@@ -158,10 +158,10 @@ struct AppGuideView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("📖 사용 설명서")
                                 .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(Color(hex: "1D1D1F"))
+                                .foregroundColor(Color(hexString: "1D1D1F"))
                             Text("마음 온(Maum-on)을 100% 활용하는 방법을 알려드려요.")
                                 .font(.system(size: 15))
-                                .foregroundColor(Color(hex: "86868B"))
+                                .foregroundColor(Color(hexString: "86868B"))
                         }
                         .padding(.top, 20)
                         
@@ -223,10 +223,10 @@ struct GuideSectionHeader: View {
             Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(Color(hex: "1D1D1F"))
+                .foregroundColor(Color(hexString: "1D1D1F"))
             Text(desc)
                 .font(.subheadline)
-                .foregroundColor(Color(hex: "666666"))
+                .foregroundColor(Color(hexString: "666666"))
         }
     }
 }
@@ -240,7 +240,7 @@ struct GuideStepCard: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "1D1D1F"))
+                    .fill(Color(hexString: "1D1D1F"))
                     .frame(width: 28, height: 28)
                     .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 4)
                 Text(num)
@@ -252,20 +252,20 @@ struct GuideStepCard: View {
                 Text(title)
                     .font(.custom("Pretendard-Bold", size: 16)) // Fallback to system bold if custom font missing
                     .fontWeight(.bold)
-                    .foregroundColor(Color(hex: "1D1D1F"))
+                    .foregroundColor(Color(hexString: "1D1D1F"))
                 Text(desc)
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hex: "555555"))
+                    .foregroundColor(Color(hexString: "555555"))
                     .lineSpacing(4)
             }
             Spacer()
         }
         .padding(20)
-        .background(Color(hex: "FBFBFD"))
+        .background(Color(hexString: "FBFBFD"))
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "F2F2F7"), lineWidth: 1)
+                .stroke(Color(hexString: "F2F2F7"), lineWidth: 1)
         )
     }
 }
@@ -282,23 +282,23 @@ struct GuideFeatureCard: View {
                 Text(title)
                     .font(.headline)
                     .fontWeight(.bold)
-                    .foregroundColor(Color(hex: "1D1D1F"))
+                    .foregroundColor(Color(hexString: "1D1D1F"))
                 
                 // Simple Markdown-like bold parsing manually or just Text
                 Text(parseBold(desc))
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hex: "555555"))
+                    .foregroundColor(Color(hexString: "555555"))
                     .lineSpacing(4)
             }
             Spacer()
             Text(icon).font(.system(size: 32))
         }
         .padding(24)
-        .background(highlight ? Color.white : Color(hex: "FBFBFD"))
+        .background(highlight ? Color.white : Color(hexString: "FBFBFD"))
         .cornerRadius(20)
         .overlay(
             RoundedRectangle(cornerRadius: 20)
-                .stroke(highlight ? Color(hex: "34C759") : Color(hex: "F0F0F5"), lineWidth: highlight ? 2 : 1)
+                .stroke(highlight ? Color(hexString: "34C759") : Color(hexString: "F0F0F5"), lineWidth: highlight ? 2 : 1)
         )
         .shadow(color: highlight ? Color.green.opacity(0.05) : Color.clear, radius: 10, x: 0, y: 5)
     }
@@ -317,140 +317,21 @@ struct GuideSmallFeatureCard: View {
             Text(title)
                 .font(.headline)
                 .fontWeight(.bold)
-                .foregroundColor(Color(hex: "1D1D1F"))
+                .foregroundColor(Color(hexString: "1D1D1F"))
             Text(desc)
                 .font(.caption)
-                .foregroundColor(Color(hex: "555555"))
+                .foregroundColor(Color(hexString: "555555"))
                 .lineSpacing(2)
             Spacer()
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(hex: "FBFBFD"))
+        .background(Color(hexString: "FBFBFD"))
         .cornerRadius(16)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hex: "F0F0F5"), lineWidth: 1)
+                .stroke(Color(hexString: "F0F0F5"), lineWidth: 1)
         )
     }
 }
-
-// MARK: - App Emergency View (Embedded to resolve file reference issues)
-struct AppEmergencyView: View {
-    @Binding var isPresented: Bool
-    
-    var body: some View {
-        ZStack {
-            // 배경: 반투명 오버레이 효과
-            Color.black.opacity(0.4)
-                .edgesIgnoringSafeArea(.all)
-                .onTapGesture {
-                    withAnimation {
-                        isPresented = false
-                    }
-                }
-            
-            // Safety Card
-            VStack(spacing: 0) {
-                // Header
-                HStack {
-                    Text("🆘 긴급 도움 요청")
-                        .font(.title3)
-                        .fontWeight(.black)
-                        .foregroundColor(Color(hex: "E74C3C"))
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        withAnimation {
-                            isPresented = false
-                        }
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 24))
-                            .foregroundColor(Color.gray.opacity(0.5))
-                    }
-                }
-                .padding(24)
-                
-                // Contacts List
-                VStack(spacing: 12) {
-                    ContactRow(icon: "📞", name: "자살예방 상담전화", number: "1393", isHighlight: true)
-                    ContactRow(icon: "🏥", name: "정신건강 상담전화", number: "1577-0199")
-                    ContactRow(icon: "👮", name: "경찰청 (긴급신고)", number: "112")
-                }
-                .padding(.horizontal, 24)
-                
-                // Message
-                VStack(spacing: 8) {
-                    Text("당신은 혼자가 아닙니다.")
-                        .fontWeight(.bold)
-                    Text("지금 힘든 순간도 반드시 지나갑니다.\n전문가의 도움을 받아보세요.")
-                        .multilineTextAlignment(.center)
-                        .font(.system(size: 14))
-                        .foregroundColor(.gray)
-                }
-                .padding(24)
-                .padding(.top, 10)
-                
-            }
-            .background(Color.white)
-            .cornerRadius(24)
-            .padding(20)
-            .shadow(radius: 20)
-        }
-        .edgesIgnoringSafeArea(.all)
-    }
-}
-
-// Sub Component: Contact Row (Embedded)
-struct ContactRow: View {
-    let icon: String
-    let name: String
-    let number: String
-    var isHighlight: Bool = false
-    
-    var body: some View {
-        Button(action: {
-            callNumber(number.replacingOccurrences(of: "-", with: ""))
-        }) {
-            HStack(spacing: 16) {
-                Text(icon)
-                    .font(.system(size: 24))
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(Color.black.opacity(0.7))
-                    Text(number)
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.black)
-                }
-                
-                Spacer()
-                
-                Text("전화하기")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.vertical, 6)
-                    .padding(.horizontal, 12)
-                    .background(isHighlight ? Color(hex: "E74C3C") : Color(hex: "212529"))
-                    .cornerRadius(20)
-            }
-            .padding(16)
-            .background(isHighlight ? Color(hex: "FFF5F5") : Color(hex: "F8F9FA"))
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isHighlight ? Color(hex: "FFC9C9") : Color.clear, lineWidth: 1)
-            )
-        }
-    }
-    
-    func callNumber(_ number: String) {
-        guard let url = URL(string: "tel://\(number)") else { return }
-        UIApplication.shared.open(url)
-    }
-}
-
 

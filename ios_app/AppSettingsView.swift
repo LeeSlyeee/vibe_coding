@@ -15,6 +15,10 @@ struct AppSettingsView: View {
     
     // Temporary Dev State
     @State private var tempInputCode = ""
+    @State private var showPremiumModal = false // New Modal State
+    @State private var showExitAlert = false // Exit Confirmation
+    @State private var isPwVisible = false // Password Reveal Only
+    @State private var useCustomLogin = false // Toggle between Auto-Account and Custom Login
     
     var body: some View {
         NavigationView {
@@ -43,48 +47,111 @@ struct AppSettingsView: View {
                         }
                         .padding(.vertical, 8)
                     } else {
-                        // 로그인 안 된 상태 (On-Device Mode)
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "person.crop.circle.badge.exclamationmark")
-                                    .font(.largeTitle)
-                                    .foregroundColor(.gray)
-                                VStack(alignment: .leading) {
-                                    Text("로컬 프로필")
-                                        .font(.headline)
-                                    Text("로그인하면 웹과 데이터를 동기화합니다.")
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
+                        // [Dual Mode] Auto Account vs Custom Login
+                        if !useCustomLogin {
+                            // [Auto-Auth Info] 앱이 자동 생성한 계정 정보 표시
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Image(systemName: "person.crop.circle.fill.badge.checkmark")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.green)
+                                    VStack(alignment: .leading) {
+                                        Text("내 앱 계정")
+                                            .font(.headline)
+                                        Text("웹(Web)에서 이 정보로 로그인하세요.")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
+                                
+                                // 1. ID Display
+                                HStack {
+                                    Text("아이디:")
+                                        .foregroundColor(.gray)
+                                    Spacer()
+                                    Text(UserDefaults.standard.string(forKey: "app_username") ?? "생성 중...")
+                                        .fontWeight(.bold)
+                                        .textSelection(.enabled)
+                                }
+                                .padding(.vertical, 4)
+                                
+                                // 2. PW Display
+                                HStack {
+                                    Text("비밀번호:")
+                                        .foregroundColor(.gray)
+                                    Spacer()
+                                    if isPwVisible {
+                                        Text(UserDefaults.standard.string(forKey: "app_password") ?? "****")
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.orange)
+                                    } else {
+                                        Text("••••••••")
+                                            .fontWeight(.bold)
+                                    }
+                                    
+                                    Button(action: { isPwVisible.toggle() }) {
+                                        Image(systemName: isPwVisible ? "eye.slash" : "eye")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                                
+                                Divider()
+                                
+                                // Switch to Custom Login
+                                Button(action: {
+                                    withAnimation { useCustomLogin = true }
+                                }) {
+                                    HStack {
+                                        Image(systemName: "arrow.right.circle")
+                                        Text("기존 웹(Web) 계정으로 로그인")
+                                    }
+                                    .font(.subheadline)
+                                    .foregroundColor(.blue)
+                                    .frame(maxWidth: .infinity)
+                                }
+                                .padding(.top, 4)
                             }
-                            
-                            // 로그인 폼
-                            VStack(spacing: 12) {
-                                TextField("아이디", text: $loginId)
+                            .padding(.vertical, 8)
+                        } else {
+                            // [Custom Login Form] 기존 계정 로그인
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("기존 계정 로그인")
+                                    .font(.headline)
+                                
+                                TextField("아이디 (Web)", text: $loginId)
+                                    .keyboardType(.default) // [Fix] Allow Korean/English switch
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     .textInputAutocapitalization(.none)
                                 
                                 SecureField("비밀번호", text: $loginPw)
+                                    .keyboardType(.default) // [User Request] Allow user's keyboard choice
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                 
                                 Button(action: {
                                     isLoggingIn = true
-                                    authManager.performLogin(username: loginId, password: loginPw) { success, msg in
+                                    // 1. Overwrite Credentials
+                                    UserDefaults.standard.set(loginId, forKey: "app_username")
+                                    UserDefaults.standard.set(loginPw, forKey: "app_password")
+                                    UserDefaults.standard.set(loginId, forKey: "userNickname") // Display Name
+                                    
+                                    // 2. Auth Check
+                                    APIService.shared.ensureAuth { success in
                                         isLoggingIn = false
-                                        alertMessage = msg
-                                        showAlert = true
-                                        if success { 
-                                            loginPw = "" 
-                                            // 로그인 성공 시, 이미 B2G 연동되어 있다면 데이터 동기화 시도
-                                            if b2gManager.isLinked {
-                                                b2gManager.syncData()
-                                            }
+                                        if success {
+                                            alertMessage = "로그인 성공! 이제 이 계정으로 동기화됩니다."
+                                            authManager.username = loginId // Update UI state if needed
+                                        } else {
+                                            alertMessage = "로그인 실패. 아이디/비밀번호를 확인하세요."
+                                            // Revert if failed? Maybe let them try again.
                                         }
+                                        showAlert = true
+                                        // loginPw = "" // Keep it for retry convenience
                                     }
                                 }) {
                                     HStack {
                                         if isLoggingIn { ProgressView().padding(.trailing, 5) }
-                                        Text("로그인 및 동기화")
+                                        Text("로그인 하기")
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding()
@@ -93,10 +160,18 @@ struct AppSettingsView: View {
                                     .cornerRadius(10)
                                 }
                                 .disabled(loginId.isEmpty || loginPw.isEmpty || isLoggingIn)
+                                
+                                Button(action: {
+                                    withAnimation { useCustomLogin = false }
+                                }) {
+                                    Text("취소 (앱 계정 사용)")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                                .frame(maxWidth: .infinity)
                             }
-                            .padding(.top, 8)
+                            .padding(.vertical, 8)
                         }
-                        .padding(.vertical, 8)
                     }
                 }
                 
@@ -132,7 +207,7 @@ struct AppSettingsView: View {
                             
                             HStack(spacing: 20) {
                                 Button(action: {
-                                    b2gManager.syncData()
+                                    b2gManager.syncData(force: true)
                                     alertMessage = "모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)"
                                     showAlert = true
                                 }) {
@@ -147,7 +222,7 @@ struct AppSettingsView: View {
                                 }
                                 
                                 Button(action: {
-                                    b2gManager.disconnect()
+                                    b2gManager.disconnect(force: true)
                                 }) {
                                     Text("연동 해제")
                                         .foregroundColor(.red)
@@ -173,6 +248,7 @@ struct AppSettingsView: View {
                             
                             HStack {
                                 TextField("예: SEOUL-001", text: $inputCode)
+                                    .keyboardType(.default) // [Fix] Allow Korean input
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     #if os(iOS)
                                     .textInputAutocapitalization(.characters)
@@ -198,7 +274,57 @@ struct AppSettingsView: View {
                     }
                 }
                 
-                // Section 3: 앱 정보
+                
+                
+                
+                
+                // Section 3: 멤버십 (Membership)
+                Section(header: Text("멤버십")) {
+                    if b2gManager.isLinked {
+                        // Case A: 기관 연동 사용자 (보건소 연동 유저)
+                        HStack {
+                            Image(systemName: "building.columns.fill")
+                                .foregroundColor(.blue)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("기관 연동 멤버십")
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.blue)
+                                Text("보건소 연동으로 프리미엄 혜택이 적용됩니다.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                        .padding(.vertical, 4)
+                        
+                    } else {
+                        // Case B: 일반 사용자 (업그레이드 유도)
+                        // 프리미엄 결제 여부와 상관없이 연동이 안되어 있으면 무조건 노출
+                        Button(action: { showPremiumModal = true }) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("마음챙김 플러스 +")
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.purple)
+                                    Text("더 깊은 분석과 무제한 상담을 받아보세요.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+                }
+                
+                // Section 4: 앱 정보
                 Section(header: Text("앱 정보")) {
                     HStack {
                         Text("버전")
@@ -220,6 +346,32 @@ struct AppSettingsView: View {
                         Text("[개발자용] 테스트 데이터 생성 (Demo)")
                             .font(.caption)
                             .foregroundColor(.blue)
+                    }
+                }
+                
+                // Section 5: 앱 종료 (Safe Exit)
+                Section {
+                    Button(action: {
+                        showExitAlert = true
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("앱 종료 (Exit)")
+                                .fontWeight(.bold)
+                                .foregroundColor(.red)
+                            Spacer()
+                        }
+                    }
+                    .alert(isPresented: $showExitAlert) {
+                        Alert(
+                            title: Text("앱 종료"),
+                            message: Text("앱을 완전히 종료하시겠습니까?"),
+                            primaryButton: .destructive(Text("종료")) {
+                                print("👋 [App] User confirmed exit.")
+                                exit(0)
+                            },
+                            secondaryButton: .cancel(Text("취소"))
+                        )
                     }
                 }
                 
@@ -264,9 +416,8 @@ struct AppSettingsView: View {
                                             APIService.shared.connectToCenter(centerId: validId) { success in
                                                 DispatchQueue.main.async {
                                                     if success {
-                                                        // B2GManager 상태 강제 동기화
-                                                        b2gManager.centerCode = tempInputCode.uppercased()
-                                                        b2gManager.isLinked = true
+                                                        // B2GManager 상태 강제 동기화 (Updated for encapsulation)
+                                                        b2gManager.forceLink(code: tempInputCode.uppercased())
                                                         alertMessage = "✅ 강제 연동 성공!\n코드: \(tempInputCode.uppercased())"
                                                         tempInputCode = ""
                                                     } else {
@@ -305,6 +456,16 @@ struct AppSettingsView: View {
             .navigationTitle("설정")
             .alert(isPresented: $showAlert) {
                 Alert(title: Text("알림"), message: Text(alertMessage), dismissButton: .default(Text("확인")))
+            }
+            
+            .sheet(isPresented: $showPremiumModal) {
+                PremiumModalView(isPresented: $showPremiumModal, onUpgrade: {
+                     // Simple Mock Upgrade
+                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                         authManager.setPremium(true)
+                         showPremiumModal = false
+                     }
+                })
             }
         }
     }

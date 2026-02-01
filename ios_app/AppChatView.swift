@@ -16,134 +16,262 @@ struct AppChatView: View {
     @State private var isCrisis: Bool = false
     @State private var showSOSModal: Bool = false
     
+    // [Gatekeeper] Mode Selection State
+    @State private var showModeSelection: Bool = true
+    
     // Server Configuration
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "http://150.230.7.76"
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // [New] Model Loading Indicator
-                if !llmService.isModelLoaded {
-                    VStack(spacing: 8) {
-                        Text(llmService.modelLoadingProgress > 0 ? "AI 모델 준비 중 (\(Int(llmService.modelLoadingProgress * 100))%)" : "AI 모델 다운로드 대기 중...")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                        ProgressView(value: llmService.modelLoadingProgress)
-                            .progressViewStyle(LinearProgressViewStyle())
-                            .frame(height: 2)
+        ZStack {
+            // Main Chat UI
+            NavigationView {
+                VStack(spacing: 0) {
+                    // [New] Model Loading Indicator
+                    if !llmService.isModelLoaded && llmService.modelLoadingProgress > 0 {
+                        VStack(spacing: 8) {
+                            Text(llmService.modelLoadingProgress > 0 ? "AI 모델 준비 중 (\(Int(llmService.modelLoadingProgress * 100))%)" : "AI 모델 다운로드 대기 중...")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            ProgressView(value: llmService.modelLoadingProgress)
+                                .progressViewStyle(LinearProgressViewStyle())
+                                .frame(height: 2)
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top))
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 8)
-                    .transition(.move(edge: .top))
-                }
 
-                // Chat List
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            // Intro Message
-                            if messages.isEmpty {
-                                VStack(spacing: 10) {
-                                    Text("👋")
-                                        .font(.system(size: 40))
-                                    Text("안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.")
-                                        .multilineTextAlignment(.center)
-                                        .font(.body)
-                                        .foregroundColor(.gray)
+                    // Chat List
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 12) {
+                                // Intro Message
+                                if messages.isEmpty {
+                                    VStack(spacing: 10) {
+                                        Text("👋")
+                                            .font(.system(size: 40))
+                                        Text(llmService.useServerAI ? "안녕하세요!\n(서버 AI 모드 동작 중)" : "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.")
+                                            .multilineTextAlignment(.center)
+                                            .font(.body)
+                                            .foregroundColor(.gray)
+                                    }
+                                    .padding(.top, 40)
                                 }
-                                .padding(.top, 40)
-                            }
-                            
-                            ForEach(messages) { message in
-                                ChatBubble(message: message)
-                                    .id(message.id)
-                            }
-                            
-                            if isTyping {
-                                HStack {
-                                    TypingIndicator()
-                                    Spacer()
+                                
+                                ForEach(messages) { message in
+                                    ChatBubble(message: message)
+                                        .id(message.id)
                                 }
-                                .padding(.leading, 16)
-                                .id("typingIndicator")
+                                
+                                if isTyping {
+                                    HStack {
+                                        TypingIndicator()
+                                        Spacer()
+                                    }
+                                    .padding(.leading, 16)
+                                    .id("typingIndicator")
+                                }
+                            }
+                            .padding(.vertical, 16)
+                        }
+                        .onAppear {
+                            self.scrollViewProxy = proxy
+                            
+                            // [Sync & Greeting] 서버에서 최신 실명 가져온 뒤 인사
+                            APIService.shared.syncUserInfo { success in
+                                DispatchQueue.main.async {
+                                    // [Name Fix] 실명 우선 사용
+                                    var userName = UserDefaults.standard.string(forKey: "realName") 
+                                                ?? UserDefaults.standard.string(forKey: "userNickname") 
+                                                ?? "회원"
+                                    
+                                    if userName.hasPrefix("User ") || userName.hasPrefix("user_") {
+                                        userName = "회원"
+                                    }
+                                    
+                                    // 이미 메시지가 있으면 인사 생략 (단, 텅 빈 경우에만 인사)
+                                    if messages.isEmpty {
+                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n오늘 하루는 어떠셨나요?\n기억에 남는 사건이나 감정을 편하게 이야기해 주세요.\n\n제가 꼼꼼히 듣고 마음을 분석해 드릴게요."
+                                        
+                                        // 약간의 딜레이 후 등장
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            if messages.isEmpty { 
+                                                withAnimation {
+                                                    messages.append(ChatMessage(text: welcomeText, isUser: false))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // [New] Trigger Model Load ONLY if Local Mode is confirmed
+                            if !showModeSelection && !llmService.useServerAI && !llmService.isModelLoaded {
+                                Task { await llmService.loadModel() }
                             }
                         }
-                        .padding(.vertical, 16)
-                    }
-                    .onAppear {
-                        self.scrollViewProxy = proxy
-                        // [New] Trigger Model Load
-                        if !llmService.isModelLoaded {
-                            Task {
-                                await llmService.loadModel()
-                            }
+                        .onChangeCompat(of: messages.count) { _ in
+                            scrollToBottom(proxy: proxy)
+                        }
+                        .onChangeCompat(of: isTyping) { _ in
+                            scrollToBottom(proxy: proxy)
                         }
                     }
-                    .onChange(of: messages.count) { _ in
-                        scrollToBottom(proxy: proxy)
+                    
+                    // [New] Crisis Banner (위기 감지 시 노출)
+                    if isCrisis {
+                        Button(action: { showSOSModal = true }) {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.white)
+                                Text("전문가의 도움이 필요하신가요? (긴급 연락처)")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.white)
+                            }
+                            .padding()
+                            .background(Color.red.opacity(0.9))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                            .padding(.bottom, 4)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
-                    .onChange(of: isTyping) { _ in
-                        scrollToBottom(proxy: proxy)
+                    
+                    // Input Area
+                    HStack(spacing: 10) {
+                        TextField("메시지 보내기...", text: $inputText)
+                            .padding(12)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(20)
+                            .disabled(isTyping || showModeSelection)
+                        
+                        Button(action: sendMessage) {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(inputText.isEmpty ? .gray : .blue)
+                                .padding(10)
+                                .background(Color.blue.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        .disabled(inputText.isEmpty || isTyping || showModeSelection)
                     }
+                    .padding()
+                    .background(Color.white)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
                 }
-                
-                // [New] Crisis Banner (위기 감지 시 노출)
-                if isCrisis {
-                    Button(action: { showSOSModal = true }) {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundColor(.white)
-                            Text("전문가의 도움이 필요하신가요? (긴급 연락처)")
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
+                #if os(iOS)
+                .navigationBarTitle("마음 톡(Talk)", displayMode: .inline)
+                .navigationBarItems(
+                    leading: Button(action: { showReport = true }) {
+                        Image(systemName: "chart.pie.fill")
+                            .foregroundColor(.black)
+                    },
+                    trailing: Button(action: { 
+                        // Re-open Selector
+                        withAnimation { showModeSelection = true }
+                    }) {
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundColor(.black)
+                    }
+                )
+                #endif
+                .background(Color.white.edgesIgnoringSafeArea(.all))
+                .sheet(isPresented: $showReport) {
+                    ChatReportView(authManager: authManager)
+                }
+                .sheet(isPresented: $showSOSModal) {
+                    SOSView()
+                }
+            }
+            .blur(radius: showModeSelection ? 5 : 0) // Blur background
+            
+            // [Gatekeeper] AI Mode Selection Overlay
+            if showModeSelection {
+                Color.black.opacity(0.4)
+                    .edgesIgnoringSafeArea(.all)
+                    .onTapGesture {
+                        // Prevent dismissal by tapping background (Force selection)
+                    }
+                    
+                VStack(spacing: 24) {
+                    // Header
+                    VStack(spacing: 8) {
+                        Text("🤖 AI 모드 선택")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("원활한 상담을 위해 실행 방식을 선택해주세요.")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    
+                    // Option 1: Server (Recommended)
+                    Button(action: {
+                        llmService.useServerAI = true
+                        withAnimation { showModeSelection = false }
+                    }) {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle().fill(Color.blue.opacity(0.1)).frame(width: 50, height: 50)
+                                Image(systemName: "cloud.fill").foregroundColor(.blue).font(.title2)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("서버 연결 (권장)")
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                                Text("데이터를 사용하여 빠르고 쾌적합니다.\n모든 기기에서 원활하게 작동합니다.")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundColor(.white)
+                            Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
                         }
                         .padding()
-                        .background(Color.red.opacity(0.9))
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                        .padding(.bottom, 4)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     }
-                }
-                
-                // Input Area
-                HStack(spacing: 10) {
-                    TextField("메시지 보내기...", text: $inputText)
-                        .padding(12)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(20)
-                        .disabled(isTyping)
                     
-                    Button(action: sendMessage) {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 20))
-                            .foregroundColor(inputText.isEmpty ? .gray : .blue)
-                            .padding(10)
-                            .background(Color.blue.opacity(0.1))
-                            .clipShape(Circle())
+                    // Option 2: Local (Pro)
+                    Button(action: {
+                        llmService.useServerAI = false
+                        withAnimation { showModeSelection = false }
+                        // Trigger Load
+                        Task { await llmService.loadModel() }
+                    }) {
+                        HStack(spacing: 16) {
+                            ZStack {
+                                Circle().fill(Color.purple.opacity(0.1)).frame(width: 50, height: 50)
+                                Image(systemName: "iphone.gen3").foregroundColor(.purple).font(.title2)
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("내 기기에서 실행 (Pro)")
+                                    .font(.headline)
+                                    .foregroundColor(.black)
+                                Text("데이터 없이 오프라인에서 작동합니다.\n*최신 고성능 아이폰 필요 (발열 주의)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                            }
+                            Spacer()
+                        }
+                        .padding()
+                        .background(Color.white)
+                        .cornerRadius(16)
+                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
                     }
-                    .disabled(inputText.isEmpty || isTyping)
+                    
                 }
-                .padding()
+                .padding(24)
                 .background(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
-            }
-            #if os(iOS)
-            .navigationBarTitle("마음 톡(Talk)", displayMode: .inline)
-            .navigationBarItems(leading: Button(action: { showReport = true }) {
-                Image(systemName: "chart.pie.fill")
-                    .foregroundColor(.black)
-            })
-            #endif
-            .background(Color.white.edgesIgnoringSafeArea(.all))
-            .sheet(isPresented: $showReport) {
-                ChatReportView(authManager: authManager)
-            }
-            .sheet(isPresented: $showSOSModal) {
-                SOSView()
+                .cornerRadius(24)
+                .padding(.horizontal, 20)
+                .shadow(radius: 20)
+                .transition(.scale.combined(with: .opacity))
             }
         }
     }
@@ -154,7 +282,17 @@ struct AppChatView: View {
         guard !isTyping else { return }
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        // 2. 상태 업데이트 (UI 즉시 반영)
+        // 2. 상태 체크 (LLM Busy check)
+        // [Gatekeeper] 분석 중이면 채팅 불가 (1-by-1 정책)
+        if !llmService.useServerAI && (llmService.isProcessingQueue || !llmService.analysisQueue.isEmpty) {
+            // Alert logic (SwiftUI Alert State binding needed, but for now simple print or shake)
+            print("⛔️ [Chat] LLM Busy. Cannot start chat.")
+            // 임시로 채팅창에 시스템 메시지 추가
+            let sysMsg = ChatMessage(text: "⚠️ 현재 일기 분석 중입니다. 잠시 후 다시 시도해주세요.", isUser: false)
+            messages.append(sysMsg)
+            return
+        }
+        
         let userText = inputText
         inputText = ""
         isTyping = true 
@@ -175,20 +313,17 @@ struct AppChatView: View {
             var historyContext = ""
             
             // [Memory & Logic Fix] 상황별 컨텍스트 길이 조절 (Dynamic Context Window)
-            // 사용자가 "반복"을 지적하거나 짧게 따질 때, 과거 기억을 지워버려야(Cut-off) 고장난 루프에서 탈출 가능함.
-            // 또한 메모리도 획기적으로 절약됨.
-            // [Memory & Logic Fix] 상황별 컨텍스트 길이 조절 (Dynamic Context Window)
-            // 사용자가 "반복"을 지적하거나 짧게 따질 때(30자 미만), 과거 기억을 지워버려야(Cut-off) 고장난 루프에서 탈출 가능함.
-            // 하지만 "매일 똑같은 일을 해서 힘들어" 같은 긴 문장은 오탐지하면 안 되므로 길이 제한 추가!
             let triggers = ["반복", "그만", "똑같", "뭐하", "장난", "tq", "시발", "답답", "멍충", "바보"] 
-            // 조건: (트리거 단어 포함) AND (문장이 30자보다 짧음) -> 화난 상태로 간주
             let isComplaint = (triggers.contains { userText.contains($0) }) && (userText.count < 30)
             
-            // [Memory Fix] 10개는 OOM 발생함. 5개로 타협 (안정성 우선)
-            let historyLimit = isComplaint ? 0 : 5 
+            // [Memory & Performance] 대화가 길어지면 서버가 힘들어하므로 최근 4개(2번의 티키타카)만 기억
+            // 불만 토로 시에는 빠른 전환을 위해 기억을 지움
+            let historyLimit = isComplaint ? 0 : 4 
             
             if isComplaint {
                 print("🚨 [Dynamic Context] Complaint detected (Short Anger). Clearing history to break loop.")
+            } else {
+                print("🧠 [Context] Sending last \(historyLimit) messages for context.")
             }
             
             // [New] Crisis Detection (위기 키워드 감지)
@@ -220,13 +355,14 @@ struct AppChatView: View {
             var fullResponse = ""
             
             // 스트림 구독 (LLMService.generateAnalysis는 이미 백그라운드에서 동작)
-            for await token in await LLMService.shared.generateAnalysis(diaryText: prompt) {
+            for await token in await LLMService.shared.generateAnalysis(
+                diaryText: prompt, 
+                userText: userText,        // Server Mode용
+                historyString: historyContext // Server Mode용
+            ) {
                 // [RESET] 명령 감지 시 텍스트 초기화 (안전 장치 발동 시 기존 영어 텍스트 날리기)
                 if token.contains("[RESET]") {
                     fullResponse = ""
-                    // [RESET] 이후 문구는 새로고침됨.
-                    // 만약 [RESET]과 텍스트가 섞여오면 분리해야 하지만, 
-                    // LLMService에서 [RESET]을 단독 yield 하도록 설계하면 됨.
                     continue
                 }
                 
@@ -329,7 +465,7 @@ struct ChatReportView: View {
     @State private var reportData: ChatSummary?
     @State private var isLoading = true
     
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "http://150.230.7.76"
     
     var body: some View {
         NavigationView {

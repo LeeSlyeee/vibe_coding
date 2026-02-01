@@ -48,71 +48,99 @@ class AuthManager: ObservableObject {
     // 실제 서버 로그인 API 호출
     // 실제 서버 로그인 API 호출
     // 실제 서버 로그인 API 호출
+    // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
     func performLogin(username: String, password: String, name: String? = nil, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
-        // [SSH Tunnel] 외부 접속용 URL 사용 (로컬 네트워크 권한 우회)
-        guard let url = URL(string: "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com/api/login") else {
-            completion(false, "잘못된 URL")
-            return
-        }
+        // [Fix] Use HTTPS and Correct API V1 Endpoint
+        let baseUrl = "https://150.230.7.76.nip.io/api/v1" 
         
-        var request = URLRequest(url: url)
+        // 1. Attempt Login First
+        let loginUrl = URL(string: "\(baseUrl)/auth/login/")!
+        var request = URLRequest(url: loginUrl)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // [Fix] Add explicit ngrok skip header just in case
+        request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        
+        let body: [String: Any] = ["username": username, "password": password]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        
+        print("🔐 [Auth] Trying Login for \(username)...")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                // Login Success
+                self.handleLoginResponse(data: data, username: username, completion: completion)
+            } else {
+                // Login Failed -> Try Registration
+                print("⚠️ [Auth] Login Failed. Attempting Registration for \(username)...")
+                self.performRegister(baseUrl: baseUrl, username: username, password: password, name: name, centerCode: centerCode, completion: completion)
+            }
+        }.resume()
+    }
+    
+    private func performRegister(baseUrl: String, username: String, password: String, name: String?, centerCode: String?, completion: @escaping (Bool, String) -> Void) {
+        let regUrl = URL(string: "\(baseUrl)/auth/register/")!
+        var request = URLRequest(url: regUrl)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         var body: [String: Any] = [
             "username": username,
-            "password": password
+            "password": password,
+            "email": "" // Optional but often required struct
         ]
-        if let name = name, !name.isEmpty {
-            body["name"] = name
-        }
-        if let code = centerCode, !code.isEmpty {
-            body["center_code"] = code
-        }
+        // Profile or extra fields handling depends on backend implementation
         
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                DispatchQueue.main.async { completion(false, error.localizedDescription) }
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode),
-                  let data = data else {
-                DispatchQueue.main.async { completion(false, "로그인 실패: 아이디 또는 비밀번호를 확인하세요.") }
-                return
-            }
-            
-            do {
-                if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    // 백엔드가 주는 키: access_token
-                    let receivedToken = (json["key"] as? String) 
-                        ?? (json["token"] as? String) 
-                        ?? (json["access"] as? String)
-                        ?? (json["access_token"] as? String)
-                    
-                    if let token = receivedToken {
-                        DispatchQueue.main.async {
-                            self.token = token
-                            self.username = username
-                            self.isAuthenticated = true
-                            
-                            // [Sync] Login 후 자동 동기화
-                            LocalDataManager.shared.syncWithServer()
-                            
-                            completion(true, "로그인 성공")
-                        }
-                    } else {
-                        DispatchQueue.main.async { completion(false, "토큰 파싱 실패") }
-                    }
+            if let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) {
+                // Register Success -> Retry Login
+                print("✅ [Auth] Registration Success. Retrying Login...")
+                // Retry Login (Recursion safe? Yes, because login will succeed or fail definitely)
+                // But better to just call login-endpoint code block again usually.
+                // For simplicity, I'll allow one level of retry by calling performLogin WITHOUT fallback?
+                // Actually, just handle login token here if returned, or call login API again.
+                // DJ-Rest-Auth often returns token on register usually.
+                
+                if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], json["key"] != nil || json["access"] != nil {
+                     self.handleLoginResponse(data: data, username: username, completion: completion)
                 } else {
-                     DispatchQueue.main.async { completion(false, "응답 형식 오류") }
+                    // Call Login Explicitly
+                    // Recurse? We need to be careful of infinite loop if logic logic is flawed.
+                    // But here we are in 'performRegister'.
+                    // Let's just manually call login URL logic again.
+                    self.performLogin(username: username, password: password, name: name, centerCode: centerCode, completion: completion)
                 }
-            } catch {
-                DispatchQueue.main.async { completion(false, "응답 처리 오류") }
+            } else {
+                // Register Failed
+                let msg = "로그인 및 가입 실패. 아이디/비밀번호를 확인하거나 다른 아이디를 사용하세요."
+                DispatchQueue.main.async { completion(false, msg) }
             }
         }.resume()
+    }
+    
+    private func handleLoginResponse(data: Data?, username: String, completion: @escaping (Bool, String) -> Void) {
+        guard let data = data,
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            DispatchQueue.main.async { completion(false, "응답 오류") }
+            return
+        }
+        
+        let token = (json["key"] as? String) ?? (json["access"] as? String) ?? (json["access_token"] as? String)
+        
+        if let token = token {
+            DispatchQueue.main.async {
+                self.token = token
+                self.username = username
+                self.isAuthenticated = true
+                LocalDataManager.shared.syncWithServer()
+                completion(true, "로그인 성공")
+            }
+        } else {
+            DispatchQueue.main.async { completion(false, "토큰 없음") }
+        }
     }
     
     func setRiskLevel(_ level: Int) {

@@ -22,7 +22,7 @@ struct AppEmergencyView: View {
                     Text("🆘 긴급 도움 요청")
                         .font(.title3)
                         .fontWeight(.black)
-                        .foregroundColor(Color(hex: "E74C3C")) // 웹: #e74c3c
+                        .foregroundColor(Color(hexString: "E74C3C")) // 웹: #e74c3c
                     
                     Spacer()
                     
@@ -99,15 +99,15 @@ struct ContactRow: View {
                     .foregroundColor(.white)
                     .padding(.vertical, 6)
                     .padding(.horizontal, 12)
-                    .background(isHighlight ? Color(hex: "E74C3C") : Color(hex: "212529")) // 웹 스타일 적용
+                    .background(isHighlight ? Color(hexString: "E74C3C") : Color(hexString: "212529")) // 웹 스타일 적용
                     .cornerRadius(20)
             }
             .padding(16)
-            .background(isHighlight ? Color(hex: "FFF5F5") : Color(hex: "F8F9FA"))
+            .background(isHighlight ? Color(hexString: "FFF5F5") : Color(hexString: "F8F9FA"))
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isHighlight ? Color(hex: "FFC9C9") : Color.clear, lineWidth: 1)
+                    .stroke(isHighlight ? Color(hexString: "FFC9C9") : Color.clear, lineWidth: 1)
             )
         }
     }
@@ -118,30 +118,4 @@ struct ContactRow: View {
     }
 }
 
-// Color Hex Extension (If not exists)
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
 
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}

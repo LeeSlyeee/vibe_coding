@@ -18,21 +18,21 @@ extension View {
 // MARK: - Color Extensions
 extension Color {
     // Design System Colors
-    static let bgMain = Color(hex: "F7F8FA")
+    static let bgMain = Color(hexString: "F7F8FA")
     static let cardBg = Color.white
-    static let primaryText = Color(hex: "1D1D1F")
-    static let secondaryText = Color(hex: "86868B")
-    static let accent = Color(hex: "0071E3") // Apple Blue
+    static let primaryText = Color(hexString: "1D1D1F")
+    static let secondaryText = Color(hexString: "86868B")
+    static let accent = Color(hexString: "0071E3") // Apple Blue
     
     // Mood Colors
-    static let mood1 = Color(hex: "FF6B6B") // Angry
-    static let mood2 = Color(hex: "4D96FF") // Sad
-    static let mood3 = Color(hex: "A0A0A0") // Neutral
-    static let mood4 = Color(hex: "6BCB77") // Calm
-    static let mood5 = Color(hex: "FFD93D") // Happy
+    static let mood1 = Color(hexString: "FF6B6B") // Angry
+    static let mood2 = Color(hexString: "4D96FF") // Sad
+    static let mood3 = Color(hexString: "A0A0A0") // Neutral
+    static let mood4 = Color(hexString: "6BCB77") // Calm
+    static let mood5 = Color(hexString: "FFD93D") // Happy
     
-    init(hex: String) {
-        let scanner = Scanner(string: hex)
+    init(hexString: String) {
+        let scanner = Scanner(string: hexString)
         _ = scanner.scanString("#")
         var rgb: UInt64 = 0
         scanner.scanHexInt64(&rgb)

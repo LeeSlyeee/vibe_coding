@@ -30,7 +30,7 @@ struct AppStatsView: View {
     @State private var connectMessage = ""
     @State private var showingResultAlert = false
     
-    let baseURL = "https://c0d59716dedc5de2-58-122-29-203.serveousercontent.com"
+    let baseURL = "http://150.230.7.76"
     
     let tabs = [
         ("flow", "흐름"),
@@ -189,7 +189,7 @@ struct AppStatsView: View {
                 }
             }
             // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
-            .onChange(of: b2gManager.isLinked) { linked in
+            .onChangeCompat(of: b2gManager.isLinked) { linked in
                 if linked {
                     fetchStats()
                     fetchExistingReports()
@@ -520,7 +520,7 @@ struct ReportView: View {
                     HStack { Text("💬 3줄 요약").font(.headline); Spacer() }
                     Text(content).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
                 }
-                .padding(20).background(Color(hex: "F8F9FE")).cornerRadius(16)
+                .padding(20).background(Color(hexString: "F8F9FE")).cornerRadius(16)
                 
                 if longContent.isEmpty && !isGeneratingLong {
                     Button(action: startLongTerm) {
@@ -533,7 +533,7 @@ struct ReportView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("🧠 메타 분석").font(.headline).foregroundColor(.green)
                         Text(longContent).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
-                    }.padding(20).background(Color(hex: "F0FDF4")).cornerRadius(16)
+                    }.padding(20).background(Color(hexString: "F0FDF4")).cornerRadius(16)
                 }
                 Button("🔄 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
             }

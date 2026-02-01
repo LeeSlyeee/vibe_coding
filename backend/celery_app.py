@@ -1,29 +1,84 @@
+
 from celery import Celery
 from config import Config
 
 def make_celery(app_name=__name__):
-    """
-    Create and configure a Celery instance.
-    This instance will be used by both the Flask app (client) 
-    and the Celery worker (consumer).
-    """
-    
-    # Initialize Celery
     celery = Celery(
         app_name,
         broker=Config.CELERY_BROKER_URL,
-        backend=Config.CELERY_RESULT_BACKEND,
-        include=['tasks'] # Load tasks from tasks.py
+        backend=Config.CELERY_RESULT_BACKEND
     )
-    
-    # Configure Celery
     celery.conf.update(
         result_expires=3600,
-        enable_utc=False,
-        timezone='Asia/Seoul',
     )
-
     return celery
 
-# Create a global Celery instance (used by the worker process)
 celery_app = make_celery()
+
+@celery_app.task(bind=True)
+def run_ai_analysis_task(self, diary_id, full_text):
+    """
+    Celery Task for Async Analysis
+    """
+    import os
+    import sys
+    
+    # Manually ensure path context
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    
+    from ai_brain import EmotionAnalysis
+    from crypto_utils import crypto_manager
+    from pymongo import MongoClient
+    from bson.objectid import ObjectId
+    from config import Config
+
+    print(f"🥦 [Celery] Processing Task {self.request.id} for Diary {diary_id}")
+
+    try:
+        # Re-init Dependencies inside Worker
+        client = MongoClient(Config.MONGO_URI)
+        db = client.get_database()
+        
+        # Load AI (Worker needs its own model instance)
+        brain = EmotionAnalysis()
+        
+        print(f"🥦 [Celery] AI Model Loaded. Starting Prediction...")
+        
+        # 1. Analyze
+        # Use simple text predict for now (Risk level support TBD or fetch fromUser)
+        # Fetch user risk level? For now default 1
+        result = brain.predict(full_text)
+        
+        # 2. Encrypt
+        enc_emotion = crypto_manager.encrypt(result['emotion'])
+        enc_comment = crypto_manager.encrypt(result['comment'])
+        
+        # 3. Update DB
+        db.diaries.update_one(
+            {'_id': ObjectId(diary_id)},
+            {'$set': {
+                'ai_prediction': enc_emotion,
+                'ai_comment': enc_comment,
+                'task_id': f"celery-{self.request.id}",
+                'thread_status': 'completed'
+            }}
+        )
+        print(f"🥦 [Celery] DB Updated for {diary_id}!")
+        return {'status': 'success', 'emotion': result['emotion']}
+
+    except Exception as e:
+        print(f"🥦 [Celery] Error: {e}")
+        # Mark error in DB
+        try:
+             client = MongoClient(Config.MONGO_URI)
+             db = client.get_database()
+             db.diaries.update_one(
+                {'_id': ObjectId(diary_id)},
+                {'$set': {
+                    'ai_prediction': crypto_manager.encrypt("분석 실패"),
+                    'ai_comment': crypto_manager.encrypt("잠시 후 다시 시도해주세요."),
+                    'task_id': f"celery-failed-{self.request.id}"
+                }}
+            )
+        except: pass
+        return {'status': 'failed', 'error': str(e)}

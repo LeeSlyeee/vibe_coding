@@ -10,7 +10,7 @@ struct AppDiaryWriteView: View {
     var diaryToEdit: Diary? = nil
     
     // Base URL
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "http://150.230.7.76"
     
     // Voice Recorder
     @StateObject private var voiceRecorder = VoiceRecorder()
@@ -305,7 +305,41 @@ struct AppDiaryWriteView: View {
                 }
             } else {
                 // 새 글 작성
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { fetchWeather() }
+                // [Crash Recovery] 미저장 데이터 복구
+                if let data = UserDefaults.standard.data(forKey: "diary_crash_snapshot"),
+                   let snapshot = try? JSONDecoder().decode(Diary.self, from: data) {
+                    
+                    print("🚑 [Recovery] Restoring crash snapshot...")
+                    DispatchQueue.main.async {
+                        self.q1 = snapshot.event ?? ""
+                        self.q2 = snapshot.emotion_desc ?? ""
+                        self.q3 = snapshot.emotion_meaning ?? ""
+                        self.q4 = snapshot.self_talk ?? ""
+                        
+                        if let sleep = snapshot.sleep_desc ?? snapshot.sleep_condition {
+                             self.qs = sleep
+                        }
+                        
+                        self.mood = snapshot.mood_level
+                        self.weatherDesc = snapshot.weather ?? "맑음"
+                        // 약물 복구
+                        if let desc = snapshot.medication_desc {
+                            self.takenMeds = Set(desc.components(separatedBy: ", "))
+                        } else {
+                            self.isMedicationTaken = snapshot.medication ?? false
+                        }
+                        
+                        // 복구 알림을 위해 폼 즉시 노출
+                        self.showForm = true
+                        self.isLoadingInsight = false
+                    }
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { 
+                    // 복구된 날씨가 없으면 새로 가져오기
+                    if self.weatherDesc == "맑음" { self.fetchWeather() }
+                }
+                
                 DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
                     if isLoadingInsight {
                         isLoadingInsight = false
@@ -320,7 +354,7 @@ struct AppDiaryWriteView: View {
             MedicationSettingView()
         }
         // 음성 인식 텍스트 반영
-        .onChange(of: voiceRecorder.transcribedText) { newText in
+        .onChangeCompat(of: voiceRecorder.transcribedText) { newText in
             guard let field = activeRecordingField, !newText.isEmpty else { return }
             let combined = (baseTextBeforeRecording.isEmpty ? "" : baseTextBeforeRecording + " ") + newText
             
@@ -408,9 +442,40 @@ struct AppDiaryWriteView: View {
     }
 
     func fetchInsight() {
-        // [Local Mode] No Server Insight
-        isLoadingInsight = false
-        insightMessage = "오늘 하루도 수고 많으셨어요. (Local Mode)"
+        // [Local Mode] Fetch from Local LLM
+        print("🧠 [Insight] Generating Mind Guide via Local LLM...")
+        isLoadingInsight = true
+        
+        // 1. Get Local Data Context
+        let recentDiaries = LocalDataManager.shared.diaries.prefix(5) // Last 5 diaries
+        var context = ""
+        for diary in recentDiaries {
+            let date = diary.date ?? ""
+            let mood = moodEmoji(diary.mood_level)
+            let event = diary.event ?? ""
+            context += "- [\(date)] 기분:\(mood) / 내용: \(event.prefix(30))...\n"
+        }
+        
+        if context.isEmpty {
+            // First time user
+            isLoadingInsight = false
+            insightMessage = "오늘의 날씨는 \(weatherDesc)이네요. 첫 기록을 기다리고 있어요!"
+            return
+        }
+
+        // 2. Call Local LLM
+        Task {
+            let message = await LLMService.shared.generateMindGuide(
+                recentDiaries: context, 
+                weather: weatherDesc, 
+                weatherStats: nil
+            )
+            
+            await MainActor.run {
+                self.isLoadingInsight = false
+                self.insightMessage = message
+            }
+        }
     }
     
     // Logic: 저장 (Local + LLM)
@@ -462,26 +527,56 @@ struct AppDiaryWriteView: View {
         newDiary.self_talk = q4
         newDiary.weather = weatherDesc
         newDiary.medication = finalMedication
+        newDiary.medication = finalMedication
         newDiary.medication_desc = finalMedDesc // [New]
+        
+        // [Crash Prevention] Safety Snapshot (저장 전 백업)
+        if let encoded = try? JSONEncoder().encode(newDiary) {
+            UserDefaults.standard.set(encoded, forKey: "diary_crash_snapshot")
+            print("🛡️ [Safety] Diary Snapshot saved for crash recovery.")
+        }
+        
+        // [UX] 재분석 중임을 표시 (캘린더 즉시 반영)
+        // AI 큐에서 분석이 완료되면 실제 결과로 덮어씌워짐
+        newDiary.ai_prediction = "재분석 중..."
         
         // 1. First Save (Synchronous-like)
         LocalDataManager.shared.saveDiary(newDiary) { success in
             if success {
-                // 2. Trigger On-Device AI Analysis (Async & Wait)
-                Task {
-                    await self.triggerAIAnalysis(for: newDiary)
+                // [Safety] 성공 시 스냅샷 제거
+                UserDefaults.standard.removeObject(forKey: "diary_crash_snapshot")
+                
+                // 2. Enqueue AI Task (Background Queue)
+                // [OOM Prevention] UI Dismiss 후 메모리가 안정화될 때까지 0.5초 지연
+                print("📤 [UI] requesting AI Analysis...")
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    let accepted = LLMService.shared.tryEnqueueDiaryAnalysis(newDiary)
                     
-                    // 분석 완료 후 UI 업데이트 및 화면 닫기
-                    await MainActor.run {
-                        // [B2G] 저장 즉시 센터로 데이터 동기화
-                        if B2GManager.shared.isLinked {
-                            print("📤 [AutoSync] Triggering B2G Sync after save...")
-                            B2GManager.shared.syncData()
+                    if accepted {
+                         // 성공 시 화면 닫기 (기존 로직)
+                         DispatchQueue.main.async {
+                             // [B2G] 저장 즉시 센터로 데이터 동기화
+                             if B2GManager.shared.isLinked {
+                                 print("📤 [AutoSync] Triggering B2G Sync after save...")
+                                 B2GManager.shared.syncData()
+                             }
+                             
+                             self.isSaving = false
+                             self.onSave()
+                             self.isPresented = false
+                         }
+                    } else {
+                        // 실패 시 (분석 중) 화면 유지 + 알림
+                        DispatchQueue.main.async {
+                            // [UX] 재분석 중 상태 해제? -> 아니요, 이미 저장됨.
+                            // 하지만 사용자에게 '분석 대기' 임을 알림.
+                            self.isSaving = false
+                            
+                            // 분석 거절 알림
+                            self.errorMessage = "현재 다른 일기를 분석 중입니다.\n기존 분석이 끝난 후 다시 시도해주세요."
+                            self.showError = true
                         }
-                        
-                        self.isSaving = false
-                        self.onSave()
-                        self.isPresented = false
                     }
                 }
             } else {
@@ -489,43 +584,13 @@ struct AppDiaryWriteView: View {
                     self.isSaving = false
                     self.errorMessage = "로컬 저장 실패"
                     self.showError = true
+                    // 실패 시 스냅샷 유지 (재시도 가능하게)
                 }
             }
         }
     }
     
-    func triggerAIAnalysis(for diary: Diary) async {
-        // Background AI Task
-        // Combine text for AI
-        let fullText = """
-        사건: \(diary.event ?? "")
-        감정: \(diary.emotion_desc ?? "")
-        의미: \(diary.emotion_meaning ?? "")
-        혼잣말: \(diary.self_talk ?? "")
-        """
-        
-        print("🧠 [Local AI] Analyzing diary...")
-        var analysisResult = ""
-        
-        // [Feedback] 분석 중임을 알리기 위해 약간의 딜레이가 있는 것처럼 보일 수 있음 (실제 연산)
-        for await token in await LLMService.shared.generateAnalysis(diaryText: fullText) {
-            analysisResult += token
-        }
-        
-        // Update Diary with AI Result
-        var updatedDiary = diary
-        updatedDiary.ai_analysis = analysisResult
-        // Mock Prediction for Calendar (Mood + %)
-        updatedDiary.ai_prediction = "분석 완료 (100%)"
-        
-        // Save again silently (Wait for completion)
-        await withCheckedContinuation { continuation in
-            LocalDataManager.shared.saveDiary(updatedDiary) { _ in
-                 print("✅ [Local AI] Analysis saved!")
-                 continuation.resume()
-            }
-        }
-    }
+
     
     func dateStringLocal(_ d: Date) -> String {
         let f = DateFormatter()

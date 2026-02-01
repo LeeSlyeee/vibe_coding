@@ -64,6 +64,35 @@
         </div>
       </section>
 
+      <!-- [New] Section 3: 멤버십 (Membership) -->
+      <section class="settings-section">
+        <h3 class="section-title">멤버십</h3>
+        
+        <!-- Case 1: 보건소 연동 사용자 -->
+        <div v-if="isLinked" class="link-card linked" style="background-color: #f0f9ff; border-color: #bae6fd;">
+            <div class="linked-header">
+                <span class="check-icon">🏢</span>
+                <span class="linked-title" style="color: #0369a1;">기관 연동 멤버십</span>
+            </div>
+            <p class="linked-desc" style="color: #0284c7;">보건소 연동으로 프리미엄 혜택이 적용됩니다.</p>
+            <div class="code-display" style="margin-top: 8px;">
+                <span style="color: #16a34a; font-weight: bold;">✅ 적용됨</span>
+            </div>
+        </div>
+
+        <!-- Case 2: 일반 사용자 (미연동) -->
+        <div v-else class="link-card not-linked" @click="handleUpgrade" style="cursor: pointer; background-color: #faf5ff; border-color: #e9d5ff;">
+            <div class="card-header" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+                 <div>
+                    <h4 style="color: #6b21a8; font-weight: bold; font-size: 1.1rem; margin: 0;">마음챙김 플러스 +</h4>
+                    <p style="color: #9333ea; margin-top: 4px; font-size: 0.9rem;">더 깊은 분석과 무제한 상담을 받아보세요.</p>
+                 </div>
+                 <div style="font-size: 1.5rem; color: #a855f7;">✨</div>
+            </div>
+            <div style="text-align: right; color: #94a3b8; margin-top: 8px; font-weight: bold;">➔</div>
+        </div>
+      </section>
+
       <!-- Section 3: 앱 정보 -->
       <section class="settings-section">
         <h3 class="section-title">앱 정보</h3>
@@ -99,7 +128,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { B2GService } from '../services/B2GService';
-import { authAPI } from '../services/api';
+import api from '../services/api'; 
 
 export default {
   name: 'SettingsPage',
@@ -116,12 +145,11 @@ export default {
     const showAlert = ref(false);
     const alertMessage = ref('');
 
-    // Fetch user info for profile name could be added here
-    
     const refreshStatus = () => {
-      isLinked.value = B2GService.isLinked();
-      centerCode.value = B2GService.getCenterCode();
-      lastSyncDate.value = B2GService.getLastSyncDate();
+      // [Direct Check] B2GService 캐시 우회
+      isLinked.value = localStorage.getItem("b2g_is_linked") === "true";
+      centerCode.value = localStorage.getItem("b2g_center_code") || "";
+      lastSyncDate.value = localStorage.getItem("b2g_last_sync");
     };
 
     onMounted(() => {
@@ -135,15 +163,55 @@ export default {
       errorMsg.value = '';
 
       try {
-        const result = await B2GService.connect(inputCode.value);
-        if (result.success) {
-            alertMessage.value = result.message;
+        // [Direct API Call]
+        console.log(`🚀 [Settings] Connecting to OCI server: ${inputCode.value}`);
+        
+        // [Standard API Call] api.js가 OCI를 가리키므로 상대 경로 사용
+        // [Standard API Call] Fix: Remove /v1 prefix to avoid Nginx proxying to OCI.
+        // This ensures the request hits the local Flask server (via /api location block).
+        const response = await api.post('/centers/verify-code/', { 
+            center_code: inputCode.value,
+            user_nickname: localStorage.getItem('user_nickname') || 'WebUser'
+        });
+
+        if (response.data.valid) {
+            // [New] Step 2: Persist to DB immediately
+            try {
+                 await api.post('/b2g_sync/connect/', { center_id: response.data.center_id })
+                 console.log("DB Linked from Settings")
+            } catch (connErr) {
+                 console.error("Connect failed in Settings", connErr)
+            }
+
+            // 성공 처리
+            localStorage.setItem("b2g_center_code", inputCode.value.toUpperCase());
+            localStorage.setItem("b2g_is_linked", "true");
+            
+            alertMessage.value = response.data.message || "연동되었습니다!";
             showAlert.value = true;
-            inputCode.value = ''; // clear
+            inputCode.value = ''; 
             refreshStatus();
         }
       } catch (err) {
-        errorMsg.value = err;
+        console.error("❌ [Settings] Connection Error:", err);
+        // 상세 에러 표시 (디버깅용)
+        let msg = `⛔ 오류 발생: ${err.message}`;
+        if (err.code) msg += ` (${err.code})`;
+        
+        if (err.response) {
+            msg += `\n[Server ${err.response.status}] `;
+            if (err.response.data && err.response.data.error) {
+                msg += err.response.data.error;
+            } else {
+                 msg += JSON.stringify(err.response.data).substring(0, 50) + "...";
+            }
+        }
+        
+        errorMsg.value = msg;
+        // 디버깅 메시지도 띄움
+        alertMessage.value = msg; 
+        showAlert.value = true;
+
       } finally {
         isLoading.value = false;
       }
@@ -151,7 +219,9 @@ export default {
 
     const handleDisconnect = () => {
       if(confirm('정말 연동을 해제하시겠습니까?')) {
-        B2GService.disconnect();
+        localStorage.removeItem("b2g_center_code");
+        localStorage.removeItem("b2g_is_linked");
+        localStorage.removeItem("b2g_last_sync");
         refreshStatus();
       }
     };
@@ -164,6 +234,11 @@ export default {
             localStorage.removeItem("authToken");
             router.push("/login");
         }
+    };
+
+    const handleUpgrade = () => {
+        alertMessage.value = "🌟 마음챙김 플러스\n\n현재 도봉구민 대상 무료 시범 운영 중입니다.\n가까운 보건소에 문의하세요!";
+        showAlert.value = true;
     };
 
     const formatDate = (isoString) => {
@@ -192,15 +267,19 @@ export default {
 
 <style scoped>
 .settings-page {
-  padding-bottom: 80px; /* Bottom Nav Space */
   background-color: #f5f5f7;
-  min-height: 100vh;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .page-header {
   background: white;
   padding: 20px 24px;
   border-bottom: 1px solid #eee;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
 .page-header h2 {
@@ -214,6 +293,10 @@ export default {
   padding: 24px;
   max-width: 600px;
   margin: 0 auto;
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  padding-bottom: 120px; /* Safe area for bottom navigation */
 }
 
 .settings-section {

@@ -43,6 +43,23 @@
           </button>
         </div>
       </div>
+      <!-- 기관 코드 연동 섹션 (새로 추가됨) -->
+      <div class="linkage-section" v-if="currentStep < questions.length">
+          <p class="linkage-title">혹시 기관 코드가 있으신가요?</p>
+          <div class="input-group">
+            <input 
+              type="text" 
+              class="input-code"
+              v-model="inputCode" 
+              placeholder="코드 입력" 
+              @keyup.enter="handleConnect"
+            />
+            <button class="btn-connect" @click="handleConnect" :disabled="isLoadingCode || !inputCode">
+              {{ isLoadingCode ? '확인..' : '인증' }}
+            </button>
+          </div>
+          <p v-if="errorCode" class="error-text">{{ errorCode }}</p>
+      </div>
     </div>
   </div>
 </template>
@@ -50,8 +67,8 @@
 <script>
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { diaryAPI } from "../services/api";
-import axios from "axios";
+import { medicationAPI } from "../services/medication";
+import api from "../services/api";
 
 export default {
   name: "AssessmentPage",
@@ -98,12 +115,9 @@ export default {
     const submitResult = async () => {
       loading.value = true;
       try {
-        const token = localStorage.getItem("token");
-        const res = await axios.post("/api/assessment", {
+        await medicationAPI.submitAssessment({
           score: totalScore.value,
           answers: answers.value
-        }, {
-             headers: { Authorization: `Bearer ${token}` }
         });
         
         loading.value = false;
@@ -145,6 +159,55 @@ export default {
         router.push("/calendar");
     };
 
+    // --- [New] Center Code Linkage Logic ---
+    const inputCode = ref('');
+    const isLoadingCode = ref(false);
+    const errorCode = ref('');
+
+    const handleConnect = async () => {
+      if (!inputCode.value) return;
+      
+      isLoadingCode.value = true;
+      errorCode.value = '';
+
+      try {
+        console.log(`🚀 [Assessment] Connecting to OCI server: ${inputCode.value}`);
+        
+        // [Standard API Call] 
+        const response = await api.post('/centers/verify-code/', { 
+            center_code: inputCode.value,
+            user_nickname: localStorage.getItem('user_nickname') || 'WebUser'
+        });
+
+        if (response.data.valid) {
+            // [New] Step 2: Persist to DB immediately
+            try {
+                 await api.post('/b2g_sync/connect/', { center_id: response.data.center_id })
+                 console.log("DB Linked from Assessment")
+            } catch (connErr) {
+                 console.error("Connect failed in Assessment", connErr)
+            }
+
+            // 성공 처리
+            localStorage.setItem("b2g_center_code", inputCode.value.toUpperCase());
+            localStorage.setItem("b2g_is_linked", "true");
+            localStorage.setItem("assessment_completed", "true"); // Force Pass!
+            
+            alert(response.data.message || "연동되었습니다! 검사를 건너뜁니다.");
+            router.push('/calendar');
+        }
+      } catch (err) {
+        console.error("❌ [Assessment] Connection Error:", err);
+        let msg = "오류가 발생했습니다.";
+        if (err.response && err.response.data && err.response.data.error) {
+            msg = err.response.data.error;
+        }
+        errorCode.value = msg;
+      } finally {
+        isLoadingCode.value = false;
+      }
+    };
+
     return {
       currentStep,
       questions,
@@ -156,11 +219,64 @@ export default {
       severityLabel,
       severityClass,
       severityDescription,
-      goToCalendar
+      goToCalendar,
+      // New
+      inputCode,
+      isLoadingCode,
+      errorCode,
+      handleConnect
     };
   },
 };
 </script>
+
+<style scoped>
+/* New Linkage Section Styles */
+.linkage-section {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+.linkage-title {
+    font-size: 14px;
+    color: #86868b;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.input-group {
+    display: flex;
+    gap: 8px;
+    max-width: 300px;
+    margin: 0 auto;
+}
+.input-code {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    font-size: 15px;
+    text-transform: uppercase;
+}
+.btn-connect {
+    padding: 0 16px;
+    background: #5856d6;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-connect:disabled {
+    background: #d1d1d6;
+}
+.error-text {
+    color: #ff3b30;
+    font-size: 13px;
+    margin-top: 8px;
+}
+/* ... Existing Styles ... */
 
 <style scoped>
 .assessment-container {
@@ -299,5 +415,51 @@ export default {
 @media (max-width: 600px) {
     .assessment-card { padding: 24px; }
     .question-text { font-size: 18px; }
+}
+
+/* New Linkage Section Styles */
+.linkage-section {
+    margin-top: 40px;
+    padding-top: 30px;
+    border-top: 1px solid #eee;
+    text-align: center;
+}
+.linkage-title {
+    font-size: 14px;
+    color: #86868b;
+    margin-bottom: 12px;
+    font-weight: 600;
+}
+.input-group {
+    display: flex;
+    gap: 8px;
+    max-width: 300px;
+    margin: 0 auto;
+}
+.input-code {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    font-size: 15px;
+    text-transform: uppercase;
+}
+.btn-connect {
+    padding: 0 16px;
+    background: #5856d6;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-connect:disabled {
+    background: #d1d1d6;
+}
+.error-text {
+    color: #ff3b30;
+    font-size: 13px;
+    margin-top: 8px;
 }
 </style>

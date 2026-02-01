@@ -29,6 +29,23 @@
             />
           </div>
 
+          <!-- 기관 코드 입력 (선택, 토글형) -->
+          <div class="center-code-toggle" style="text-align: right; margin-bottom: 8px;">
+              <span @click="showCenterInput = !showCenterInput" class="toggle-link" style="font-size: 13px; color: #5856d6; cursor: pointer;">
+                  {{ showCenterInput ? '입력창 닫기' : '기관 코드가 있으신가요?' }}
+              </span>
+          </div>
+
+          <div class="form-group" v-if="showCenterInput">
+            <input
+              v-model="centerCode"
+              type="text"
+              class="input"
+              placeholder="기관 코드 (선택: 보건소/병원)"
+              style="border-color: #5856d6; background-color: #f5f5ff;"
+            />
+          </div>
+
           <div v-if="errorMessage" class="error-message">
             {{ errorMessage }}
           </div>
@@ -65,6 +82,8 @@ export default {
     const router = useRouter()
     const userId = ref('')
     const password = ref('')
+    const centerCode = ref('') // New
+    const showCenterInput = ref(false) // Toggle
     const loading = ref(false)
     const errorMessage = ref('')
 
@@ -80,7 +99,7 @@ export default {
 
 
       try {
-        const response = await authAPI.login(userId.value, password.value)
+        const response = await authAPI.login(userId.value, password.value, centerCode.value)
         
         // 토큰 저장 (백엔드는 access_token으로 반환)
         localStorage.setItem('authToken', response.access_token || response.token || 'demo-token')
@@ -90,21 +109,44 @@ export default {
         const isAssessed = response.assessment_completed;
         localStorage.setItem('assessment_completed', isAssessed);
         
-        // Fetch User Info to get Risk Level immediately
-        try {
-            const userRes = await authAPI.getUserInfo();
-            if (userRes && userRes.risk_level) {
-                localStorage.setItem('risk_level', userRes.risk_level);
+        // [B2G] Center Info Persist from Login Response
+        let finalCenterCode = response.linked_center_code || response.center_code;
+
+        if (finalCenterCode) {
+            localStorage.setItem('b2g_center_code', finalCenterCode);
+            localStorage.setItem('b2g_is_linked', 'true');
+            // If linked, force assessment true locally
+            localStorage.setItem('assessment_completed', 'true');
+            console.log("🏥 [Login] Linked Center (from Response): " + finalCenterCode);
+        } else {
+             // [Double Check] If response missed it, fetch user info immediately
+             try {
+                const userRes = await authAPI.getUserInfo();
+                if (userRes) {
+                    if (userRes.risk_level) localStorage.setItem('risk_level', userRes.risk_level);
+                    
+                    if (userRes.linked_center_code) {
+                        finalCenterCode = userRes.linked_center_code;
+                        localStorage.setItem('b2g_center_code', finalCenterCode);
+                        localStorage.setItem('b2g_is_linked', 'true');
+                        localStorage.setItem('assessment_completed', 'true'); // Force Pass
+                        console.log("🏥 [Login] Linked Center (from UserInfo): " + finalCenterCode);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to fetch user info on login", e);
             }
-        } catch (e) {
-            console.error("Failed to fetch user info on login", e);
         }
         
-        // 캘린더 페이지로 이동 (미검사자라면 '/assessment'로 이동)
-        if (!isAssessed) {
-            router.push('/assessment');
+        // Refresh Assessed Flag
+        const finalAssessed = localStorage.getItem('assessment_completed') === 'true';
+        
+        // 캘린더 페이지로 이동
+        // [Logic] 연동 코드(finalCenterCode)가 있거나, 진단이 완료되었으면 캘린더로 이동
+        if (finalAssessed || finalCenterCode) {
+             router.push('/calendar');
         } else {
-            router.push('/calendar');
+             router.push('/assessment');
         }
       } catch (error) {
         console.error('Login failed:', error)
@@ -122,6 +164,8 @@ export default {
     return {
       userId,
       password,
+      centerCode,
+      showCenterInput,
       loading,
       errorMessage,
       handleLogin
@@ -218,5 +262,8 @@ export default {
 
 .footer-credit {
   font-style: italic;
+}
+.toggle-link:hover {
+    text-decoration: underline;
 }
 </style>

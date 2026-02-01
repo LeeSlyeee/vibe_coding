@@ -13,12 +13,7 @@
           >
             📘 가이드
           </button>
-          <button
-            v-if="isAuthenticated"
-            @click="goToStats"
-            class="stats-btn"
-            title="통계 분석"
-          >
+          <button v-if="isAuthenticated" @click="goToStats" class="stats-btn" title="통계 분석">
             📊 분석
           </button>
           <button
@@ -68,11 +63,7 @@
         <span class="nav-label">일기</span>
       </button>
 
-      <button
-        class="nav-item"
-        :class="{ active: $route.path === '/stats' }"
-        @click="goToStats"
-      >
+      <button class="nav-item" :class="{ active: $route.path === '/stats' }" @click="goToStats">
         <span class="nav-icon">📊</span>
         <span class="nav-label">분석</span>
       </button>
@@ -95,8 +86,8 @@
         <span class="nav-label">가이드</span>
       </button>
 
-      <button 
-        class="nav-item" 
+      <button
+        class="nav-item"
         :class="{ active: $route.path === '/settings' }"
         @click="$router.push('/settings')"
       >
@@ -113,28 +104,36 @@
       🆘
     </button>
     <SafetyModal v-if="showSafetyModal" @close="showSafetyModal = false" />
-    
+
     <!-- Logout Confirmation Modal -->
     <div v-if="showLogoutModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3>로그아웃</h3>
-            <p>정말 로그아웃 하시겠습니까?</p>
-            <div class="modal-actions">
-                <button @click="showLogoutModal = false" class="cancel-btn">취소</button>
-                <button @click="confirmLogout" class="confirm-btn">로그아웃</button>
-            </div>
+      <div class="modal-content">
+        <h3>로그아웃</h3>
+        <p>정말 로그아웃 하시겠습니까?</p>
+        <div class="modal-actions">
+          <button @click="showLogoutModal = false" class="cancel-btn">취소</button>
+          <button @click="confirmLogout" class="confirm-btn">로그아웃</button>
         </div>
+      </div>
     </div>
 
     <!-- Restricted Access Modal -->
     <div v-if="showRestrictedModal" class="modal-overlay" @click.self="showRestrictedModal = false">
-        <div class="modal-content">
-            <h3 style="color: #ff3b30">⛔️ 접근 제한</h3>
-            <p style="white-space: pre-line; line-height: 1.5;">보건소 및 병원 사용자<br>또는 유료사용자 전용 기능입니다.</p>
-            <div class="modal-actions">
-                <button @click="showRestrictedModal = false" class="confirm-btn" style="background-color: #007aff; width: 100%;">확인</button>
-            </div>
+      <div class="modal-content">
+        <h3 style="color: #ff3b30">⛔️ 접근 제한</h3>
+        <p style="white-space: pre-line; line-height: 1.5">
+          보건소 및 병원 사용자<br />또는 유료사용자 전용 기능입니다.
+        </p>
+        <div class="modal-actions">
+          <button
+            @click="showRestrictedModal = false"
+            class="confirm-btn"
+            style="background-color: #007aff; width: 100%"
+          >
+            확인
+          </button>
         </div>
+      </div>
     </div>
   </div>
 </template>
@@ -142,80 +141,90 @@
 <style scoped>
 /* Logout Modal Styles */
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2000;
-    backdrop-filter: blur(4px);
-    animation: fadeIn 0.2s ease-out;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
 }
 
 .modal-content {
-    background: white;
-    padding: 24px;
-    border-radius: 20px;
-    width: 90%;
-    max-width: 320px;
-    text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .modal-content h3 {
-    margin: 0 0 12px 0;
-    font-size: 1.2rem;
-    color: #1d1d1f;
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+  color: #1d1d1f;
 }
 
 .modal-content p {
-    color: #86868b;
-    margin-bottom: 24px;
-    font-size: 0.95rem;
+  color: #86868b;
+  margin-bottom: 24px;
+  font-size: 0.95rem;
 }
 
 .modal-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
 }
 
 .modal-actions button {
-    flex: 1;
-    padding: 12px;
-    border: none;
-    border-radius: 12px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.1s;
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s;
 }
 .modal-actions button:active {
-    transform: scale(0.96);
+  transform: scale(0.96);
 }
 
 .cancel-btn {
-    background: #f5f5f7;
-    color: #1d1d1f;
+  background: #f5f5f7;
+  color: #1d1d1f;
 }
 
 .confirm-btn {
-    background: #ff3b30;
-    color: white;
+  background: #ff3b30;
+  color: white;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes slideUp {
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Rest of Styles */
@@ -232,7 +241,7 @@ export default {
   name: "App",
   components: {
     RouterView,
-    SafetyModal
+    SafetyModal,
   },
   setup() {
     const route = useRoute();
@@ -240,32 +249,62 @@ export default {
     const showSafetyModal = ref(false);
     const showLogoutModal = ref(false);
     const showRestrictedModal = ref(false);
-    
+
     // Risk Level Logic
     const userRiskLevel = ref(1);
     const isSevere = computed(() => userRiskLevel.value >= 3);
 
     const showNavbar = computed(() => {
       // Assessment page doesn't need navbar
-      if (route.name === 'assessment') return false;
+      if (route.name === "assessment") return false;
       return route.name !== "login" && route.name !== "signup";
     });
 
     const isAuthenticated = ref(false);
 
+    const isLinked = ref(localStorage.getItem('b2g_is_linked') === 'true');
+    const isPremium = ref(false);
+
     const checkAuth = async () => {
       isAuthenticated.value =
         localStorage.getItem("token") !== null || localStorage.getItem("authToken") !== null;
-        
+
       if (isAuthenticated.value) {
-          try {
-              const userData = await authAPI.getUserInfo();
-              if (userData && userData.risk_level) {
-                  userRiskLevel.value = userData.risk_level;
-              }
-          } catch (e) {
-              console.error("User Info Fetch Failed", e);
+        // [Fast-Load] Local Storage Priority
+        if (localStorage.getItem('b2g_is_linked') === 'true') isLinked.value = true;
+
+        try {
+          const userData = await authAPI.getUserInfo();
+          
+          if (userData) {
+              if (userData.risk_level) userRiskLevel.value = userData.risk_level;
+              if (userData.is_premium) isPremium.value = true;
           }
+          
+          // [B2G Sync] Check Linkage Status
+          if (userData && userData.linked_center_code) {
+             isLinked.value = true;
+             localStorage.setItem('b2g_center_code', userData.linked_center_code);
+             localStorage.setItem('b2g_is_linked', 'true');
+             
+             // Force Assessment Flag if Linked
+             if (!userData.assessment_completed) {
+                 localStorage.setItem('assessment_completed', 'true');
+             }
+          } else {
+             // If not linked in DB, clear local state (unless premium)
+             if (!userData?.linked_center_code) {
+                 isLinked.value = false;
+                 localStorage.removeItem('b2g_is_linked');
+             }
+          }
+
+          if (userData && userData.assessment_completed) {
+              localStorage.setItem('assessment_completed', 'true');
+          }
+        } catch (e) {
+          console.error("User Info Fetch Failed", e);
+        }
       }
     };
 
@@ -276,24 +315,25 @@ export default {
       },
       { immediate: true },
     );
-    
+
     const handleRestrictedAccess = (featureName) => {
-        showRestrictedModal.value = true;
+      showRestrictedModal.value = true;
     };
-    
+
     const goToStats = () => {
-        if (isSevere.value) router.push('/stats');
-        else handleRestrictedAccess('분석');
+      // 분석 탭: 고위험군(3단계 이상) 또는 기관 연동 사용자만 접근 허용
+      if (isSevere.value || isLinked.value) router.push("/stats");
+      else handleRestrictedAccess("분석");
     };
 
     const goToMedication = () => {
-        if (isSevere.value) router.push('/medication');
-        else handleRestrictedAccess('약물');
+      // 약물 탭: 모든 사용자 접근 허용
+      router.push("/medication");
     };
 
     // Event Listerner for Safety Modal
-    window.addEventListener('open-safety-modal', () => {
-        showSafetyModal.value = true;
+    window.addEventListener("open-safety-modal", () => {
+      showSafetyModal.value = true;
     });
 
     const handleLogout = () => {
@@ -301,10 +341,10 @@ export default {
     };
 
     const confirmLogout = () => {
-        showLogoutModal.value = false;
-        localStorage.removeItem("token");
-        localStorage.removeItem("authToken");
-        router.push("/login");
+      showLogoutModal.value = false;
+      localStorage.removeItem("token");
+      localStorage.removeItem("authToken");
+      router.push("/login");
     };
 
     const goHome = () => {
@@ -326,7 +366,7 @@ export default {
       isSevere,
       goToStats,
       goToMedication,
-      showRestrictedModal
+      showRestrictedModal,
     };
   },
 };
@@ -396,7 +436,8 @@ export default {
 
 .main-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto; /* Key fix: Allow pages to scroll */
+  -webkit-overflow-scrolling: touch;
   position: relative;
   width: 100%;
 }
@@ -423,7 +464,7 @@ export default {
   gap: 12px;
 }
 
-  .mobile-icon-btn {
+.mobile-icon-btn {
   background: #f5f5f7;
   border: none;
   width: 36px;

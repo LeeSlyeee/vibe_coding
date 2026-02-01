@@ -22,7 +22,7 @@ struct AppAssessmentView: View {
     @State private var currentStep = 0
     @State private var isSubmitting = false
     
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "https://150.230.7.76.nip.io"
     
     var body: some View {
         NavigationView {
@@ -113,7 +113,7 @@ struct AppAssessmentView: View {
         let totalScore = ratings.reduce(0, +)
         print("📊 Assessment Score: \(totalScore)")
         
-        guard let url = URL(string: "\(baseURL)/api/assessment") else { return }
+        guard let url = URL(string: "\(baseURL)/api/v1/diaries/assessment/") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -125,10 +125,12 @@ struct AppAssessmentView: View {
         ]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
-        URLSession.shared.dataTask(with: request) { data, _, error in
+        URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 isSubmitting = false
-                if error == nil {
+                
+                if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                    print("✅ Assessment Submitted: \(httpResponse.statusCode)")
                     // Refresh Profile or Estimate Risk
                     // Simple Logic: 0-4 (1), 5-9 (2), 10-14 (3), 15-19 (4), 20+ (5)
                     var newLevel = 1
@@ -139,6 +141,13 @@ struct AppAssessmentView: View {
                     
                     authManager.setRiskLevel(newLevel)
                     presentationMode.wrappedValue.dismiss()
+                } else {
+                    print("❌ Assessment Failed: \(error?.localizedDescription ?? "Unknown Error")")
+                    if let data = data, let str = String(data: data, encoding: .utf8) {
+                        print("Server Response: \(str)")
+                    }
+                    // 실패 시에도 일단 넘겨주려면 주석 해제 (지금은 Strict하게 감)
+                    // presentationMode.wrappedValue.dismiss()
                 }
             }
         }.resume()

@@ -1,11 +1,7 @@
 import axios from 'axios'
 
-// API 베이스 URL 설정
-// Nginx Reverse Proxy를 사용하기 위해 상대 경로로 변경 (웹)
-// 앱에서는 .env 파일의 VITE_API_URL을 사용
-// 로컬 개발 환경용 설정 (Mac 5000번 포트 충돌 대응 -> 5001)
-// 로컬 개발 환경용 설정 (Mac 5000번 포트 충돌 대응 -> 5001)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api'
+// [Fix] Point to 217 Backend (Flask) where 'test' account exists
+const API_BASE_URL = 'https://217.142.253.35.nip.io/api'
 
 // axios 인스턴스 생성
 const api = axios.create({
@@ -50,8 +46,8 @@ api.interceptors.response.use(
 // 인증 API
 export const authAPI = {
   // 로그인
-  login: async (username, password) => {
-    const response = await api.post('/login', { username, password })
+  login: async (username, password, centerCode = null) => {
+    const response = await api.post('/login', { username, password, center_code: centerCode })
     return response.data
   },
 
@@ -251,4 +247,3 @@ export const diaryAPI = {
 }
 
 export default api
-// FORCE UPDATE Wed Jan 21 09:40:43 KST 2026

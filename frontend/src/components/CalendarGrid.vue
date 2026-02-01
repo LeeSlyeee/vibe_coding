@@ -118,40 +118,70 @@ export default {
 
         // [Parsing AI Prediction]
         // "AI가 예측한 당신의 감정은 '행복해 (95%)'입니다." -> "행복해 (95%)"
-        // Then split into: { label: "행복해", percent: "(95%)" }
+        // Also supports: "Emotion: 행복 (95%)" or just "행복 (95%)"
         let predictionData = null
         if (diary?.ai_prediction) {
           try {
-             // Match content inside single quotes
-             const match = diary.ai_prediction.match(/'([^']+)'/)
-             if (match && match[1]) {
-                const fullText = match[1] // e.g. "슬픔 (한탄) (49.5%)"
-                
-                // Try to split the last parenthesis part (Percentage)
-                // Regex: Look for last occurrence of ( ... )
-                const percentMatch = fullText.match(/(.*)(\s\(\d+(\.\d+)?%\))$/)
-                
-                if (percentMatch) {
-                    predictionData = {
-                        label: percentMatch[1].trim(), // "슬픔 (한탄)"
-                        percent: percentMatch[2].trim() // "(49.5%)"
-                    }
-                } else {
-                    // Fallback for non-percentage format (just text)
-                    predictionData = {
-                        label: fullText,
-                        percent: null
-                    }
-                }
+             let fullText = diary.ai_prediction;
+             
+             // [Loading State Check]
+             if (fullText.includes("재분석 중") || fullText.includes("분석 중") || fullText.includes("기다려주세요")) {
+                 predictionData = {
+                     label: '⏳', // Hourglass for waiting
+                     percent: null,
+                     isLoading: true
+                 }
              } else {
-                // [FIX] Fallback if no quotes found (Old data or different format)
-                // Just use the text as is, maybe truncate if too long
-                predictionData = {
-                    label: diary.ai_prediction.length > 20 ? diary.ai_prediction.slice(0,18) + '..' : diary.ai_prediction,
-                    percent: null
-                }
+                 // 1. Try to find quoted text first: '행복 (95%)'
+                 const quoteMatch = fullText.match(/'([^']+)'/);
+                 if (quoteMatch && quoteMatch[1]) {
+                    fullText = quoteMatch[1];
+                 }
+
+                 // 2. Parse Label and Percent
+                 // Regex extracts: (Label) + ( (Percent%) )?
+                 const parts = fullText.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
+                 
+                 if (parts) {
+                    const rawLabel = parts[1].trim();
+                    const percentStr = parts[2] ? parts[2].trim() : null;
+
+                    // [English -> Korean Mapping]
+                    const map = {
+                        "Happy": "행복",
+                        "Sad": "우울",
+                        "Angry": "분노",
+                        "Neutral": "평온", 
+                        "Calm": "편안",
+                        "Fear": "불안",
+                        "Surprise": "놀람",
+                        "Disgust": "싫어",
+                        "Panic": "공황",
+                        "Soso": "평온"
+                    };
+                    
+                    // Case-insensitive lookup
+                    const lowerRaw = rawLabel.toLowerCase();
+                    const matchedKey = Object.keys(map).find(k => k.toLowerCase() === lowerRaw);
+                    const finalLabel = matchedKey ? map[matchedKey] : rawLabel;
+
+                    predictionData = {
+                        label: finalLabel,
+                        percent: percentStr,
+                        isLoading: false
+                    }
+                 } else {
+                     // Fallback: Just show text
+                     predictionData = {
+                        label: fullText.length > 5 ? fullText.slice(0, 4) + '..' : fullText,
+                        percent: null,
+                        isLoading: false
+                     }
+                 }
              }
+
           } catch (e) {
+            console.error("AI Pred Parse Error", e);
             predictionData = { label: '?', percent: null }
           }
         }

@@ -12,16 +12,6 @@
           </div>
 
           <div class="header-right-section">
-             <!-- Premium Small Button -->
-            <button 
-              v-if="!isPremium && userRiskLevel < 3"
-              class="premium-capsule-btn"
-              @click="showPremiumModal = true"
-            >
-              <span class="p-icon">✨</span>
-              <span class="p-text">Upgrade</span>
-            </button>
-
             <div class="search-box-v2">
               <div class="search-input-wrapper">
                 <input

@@ -16,7 +16,7 @@ struct CalendarDay: Identifiable {
 struct MoodCalendarView: View {
     @EnvironmentObject var authManager: AuthManager // ✅ Auth Manager
     @ObservedObject var dataManager = LocalDataManager.shared // ✅ Data Observer
-    @State private var showPremiumModal = false // ✅ Modal State
+    // State Removed
     
     // ... existing vars ...
     @State private var currentDate = Date()
@@ -34,7 +34,7 @@ struct MoodCalendarView: View {
     @State private var writeTarget: WriteTargetDate?
     
     // ✅ Base URL
-    let baseURL = "https://217.142.253.35.nip.io"
+    let baseURL = "http://150.230.7.76"
     
     let columns = Array(repeating: GridItem(.flexible()), count: 7)
     
@@ -51,24 +51,9 @@ struct MoodCalendarView: View {
                         Text(monthYearString(currentDate)).font(.title2).fontWeight(.bold)
                         Spacer()
                         
-                        // ✅ Premium Button (If Eligible)
-                        if !authManager.isPremium && authManager.riskLevel < 3 {
-                            Button(action: { showPremiumModal = true }) {
-                                HStack(spacing: 4) {
-                                    Text("✨")
-                                    Text("Upgrade")
-                                        .fontWeight(.bold)
-                                        .font(.caption)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(LinearGradient(gradient: Gradient(colors: [Color(hex: "6366F1"), Color(hex: "8B5CF6")]), startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .foregroundColor(.white)
-                                .cornerRadius(20)
-                                .shadow(radius: 2)
-                            }
-                            .padding(.trailing, 8)
-                        }
+
+                        // Button Removed
+
                         
                         Button(action: { changeMonth(by: 1) }) {
                             Image(systemName: "chevron.right").font(.title2).foregroundColor(.black)
@@ -178,8 +163,8 @@ struct MoodCalendarView: View {
                 .navigationBarHidden(true)
                 #endif
                 .onAppear(perform: fetchDiaries)
-                .onChange(of: currentDate) { _ in fetchDiaries() }
-                .onChange(of: dataManager.diaries) { _ in fetchDiaries() } // ✅ Auto Refresh on Sync
+                .onChangeCompat(of: currentDate) { _ in fetchDiaries() }
+                .onChangeCompat(of: dataManager.diaries) { _ in fetchDiaries() } // ✅ Auto Refresh on Sync
                 .alert(isPresented: $showErrorAlert) {
                     Alert(title: Text("알림"), message: Text(errorMessage ?? "알 수 없는 오류가 발생했습니다."), dismissButton: .default(Text("확인")))
                 }
@@ -209,33 +194,15 @@ struct MoodCalendarView: View {
                 )
             }
             
-            // ✅ Premium Modal Overlay
-            if showPremiumModal {
-                ZStack {
-                    Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
-                        .onTapGesture {
-                            showPremiumModal = false
-                        }
-                    
-                    PremiumModalView(isPresented: $showPremiumModal, onUpgrade: performUpgrade)
-                }
-                .zIndex(100)
-            }
+            
+            // Modal Removed
+
         }
     }
     
     // MARK: - Logic
     
-    // ✅ Handle Upgrade (Local Mock)
-    func performUpgrade() {
-        isLoading = true
-        // Simulate network delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            isLoading = false
-            authManager.setPremium(true)
-            showPremiumModal = false
-        }
-    }
+    // Logic Removed
 
     func parseAI(_ text: String?) -> (String, String) {
         guard var raw = text, !raw.isEmpty else { return ("", "") }
@@ -245,18 +212,44 @@ struct MoodCalendarView: View {
             raw = String(raw[raw.index(after: start)..<end])
         }
         
+        var label = ""
+        var percent = ""
+        
         // 2. Extract Label and Percent
         // Check for format "Label (N%)"
         if raw.hasSuffix(")"), let openParen = raw.lastIndex(of: "(") {
-            let label = String(raw[..<openParen]).trimmingCharacters(in: .whitespaces)
-            let percent = String(raw[openParen...])
-            if percent.contains("%") {
-                 return (label, percent)
-            }
+            label = String(raw[..<openParen]).trimmingCharacters(in: .whitespaces)
+            percent = String(raw[openParen...])
+        } else {
+            label = raw
+        }
+
+        // 3. Korean Translation Map
+        let emotionTranslation: [String: String] = [
+            "Happy": "행복",
+            "Sad": "슬픔",
+            "Angry": "분노",
+            "Fear": "두려움",
+            "Surprise": "놀람",
+            "Neutral": "평온",
+            "Disgust": "혐오",
+            "Anxiety": "불안",
+            "Depression": "우울",
+            "Stress": "스트레스",
+            "Joy": "기쁨",
+            "Love": "사랑",
+            "Confusion": "혼란",
+            "Excitement": "흥분",
+            "Tired": "지침"
+        ]
+        
+        let translatedLabel = emotionTranslation[label] ?? label
+        
+        if !percent.isEmpty && !percent.contains("%") {
+             percent = ""
         }
         
-        // Fallback: Return raw string as label if parsing fails
-        return (raw, "")
+        return (translatedLabel, percent)
     }
 
     func handleDateTap(_ date: Date, diary: Diary?) {
@@ -274,7 +267,11 @@ struct MoodCalendarView: View {
         LocalDataManager.shared.fetchDiaries { list in
             var newMap: [String: Diary] = [:]
             for item in list {
-                if let dStr = item.created_at {
+                // [Fix] 날짜 매핑 시 created_at(작성시점) 대신 date(일기날짜)를 우선 사용
+                if let dateStr = item.date, !dateStr.isEmpty {
+                    let dateKey = String(dateStr.prefix(10))
+                    newMap[dateKey] = item
+                } else if let dStr = item.created_at {
                     let dateKey = String(dStr.prefix(10))
                     newMap[dateKey] = item
                 }
@@ -323,142 +320,4 @@ struct MoodCalendarView: View {
     func moodColor(_ l: Int) -> Color { [Color.clear, .red, .blue, .gray, .green, .yellow][l] }
 }
 
-// MARK: - Premium Modal View
-struct PremiumModalView: View {
-    @Binding var isPresented: Bool
-    var onUpgrade: () -> Void
-    @State private var showingAlert = false
-    
-    var body: some View {
-        VStack(spacing: 24) {
-            // Close Button
-            HStack {
-                Spacer()
-                Button(action: { isPresented = false }) {
-                    Image(systemName: "xmark")
-                        .foregroundColor(.gray)
-                        .padding(5)
-                }
-            }
-            
-            // Header
-            VStack(spacing: 8) {
-                Text("마음챙김 플러스 +")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Text("더 깊은 이해와 치유를 위한 선택")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            
-            // Features
-            VStack(alignment: .leading, spacing: 16) {
-                FeatureRow(icon: "chart.bar.fill", title: "심층 분석 리포트", desc: "나의 감정 패턴과 원인을 깊이 있게 분석해드려요.")
-                FeatureRow(icon: "message.fill", title: "AI 심리 상담사", desc: "24시간 언제든 내 마음을 털어놓고 위로받으세요.")
-                FeatureRow(icon: "calendar", title: "월간 감정 통계", desc: "한 달간의 감정 변화를 그래프로 확인하세요.")
-            }
-            .padding(.vertical)
-            
-            // ✅ Dobong-gu Notice (Green Box)
-            HStack(alignment: .top, spacing: 10) {
-                Text("🏥")
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("도봉구청 상담 안내")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Color(hex: "15803d"))
-                    Text("도봉구청에서 상담을 받으면 무료 업그레이드가 가능합니다.")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "15803d"))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer()
-            }
-            .padding(15)
-            .background(Color(hex: "f0fdf4"))
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(hex: "dcfce7"), lineWidth: 1)
-            )
-            
-            // Price
-            HStack(alignment: .lastTextBaseline, spacing: 8) {
-                Text("₩9,900")
-                    .font(.callout)
-                    .strikethrough()
-                    .foregroundColor(.gray)
-                
-                Text("₩4,900")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                
-                Text("/월")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                Text("런칭 특가 50%")
-                    .font(.caption)
-                    .fontWeight(.bold)
-                    .padding(4)
-                    .background(Color.red.opacity(0.1))
-                    .foregroundColor(.red)
-                    .cornerRadius(4)
-            }
-            
-            Button(action: { showingAlert = true }) {
-                Text("지금 시작하기")
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(14)
-            }
-            .alert(isPresented: $showingAlert) {
-                Alert(
-                    title: Text("결제 확인"),
-                    message: Text("4,900원을 결제하시겠습니까? (테스트)"),
-                    primaryButton: .default(Text("결제하기"), action: onUpgrade),
-                    secondaryButton: .cancel()
-                )
-            }
-            
-            Text("언제든 해지 가능합니다.")
-                .font(.caption)
-                .foregroundColor(.gray)
-        }
-        .padding(24)
-        .background(Color.white)
-        .cornerRadius(24)
-        .shadow(radius: 20)
-        .padding(20)
-    }
-}
-
-struct FeatureRow: View {
-    let icon: String
-    let title: String
-    let desc: String
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundColor(.black)
-                .frame(width: 40, height: 40)
-                .background(Color(hex: "F5F5F7"))
-                .cornerRadius(10)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                Text(desc)
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-}
+// MARK: - PremiumModalView Moved to PremiumModalView.swift

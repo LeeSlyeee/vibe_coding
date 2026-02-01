@@ -1,197 +1,171 @@
 <template>
   <div class="stats-page">
     <div class="stats-container">
-      <header class="stats-header">
-         <div class="header-left">
-           <h2>나의 감정 분석 리포트</h2>
-           <p class="subtitle">나의 마음 흐름을 다양한 관점에서 살펴보세요.</p>
-         </div>
-         <button @click="$router.push('/calendar')" class="close-btn">
-            <span class="icon">✖</span> 닫기
-         </button>
+      <!-- iOS Style Header -->
+      <header class="stats-header ios-header">
+        <div class="header-left">
+          <h2>마음 분석</h2>
+          <p class="subtitle">데이터로 보는 나의 하루</p>
+        </div>
+        <button @click="$router.push('/calendar')" class="close-btn">
+          <span class="icon">✖</span>
+        </button>
       </header>
 
-      <!-- Navigation Tabs -->
-      <nav class="stats-nav">
-          <button 
-            v-for="tab in tabs" 
+      <!-- iOS Style Scrollable Tabs -->
+      <nav class="stats-nav ios-tabs">
+        <div class="scroll-wrapper">
+          <button
+            v-for="tab in tabs"
             :key="tab.id"
             :class="['nav-item', { active: currentTab === tab.id }]"
             @click="currentTab = tab.id"
           >
-            <span class="nav-icon">{{ tab.icon }}</span>
             {{ tab.label }}
           </button>
+        </div>
       </nav>
 
-      <div class="stats-content">
-        <!-- Loading State -->
-        <div v-if="loading" class="loading-state">
-           <div class="spinner"></div>
-           <p>데이터를 분석하고 있습니다...</p>
-        </div>
+      <div class="stats-content-area">
+        <!-- Authenticated Content -->
+        <div class="content-body-wrapper">
+          <!-- Loading State -->
+          <div v-if="loading" class="loading-state">
+            <div class="spinner"></div>
+          </div>
 
-        <div v-else class="content-body">
-            <!-- 0. 감정 흐름 (Flow) -->
+          <div v-else class="content-body">
             <transition name="fade" mode="out-in">
-                <div v-if="currentTab === 'flow'" key="flow" class="chart-section">
-                     <div class="section-info">
-                         <h3>📈 감정 흐름</h3>
-                         <p>나의 기분이 시간의 흐름에 따라 어떻게 변해왔는지 확인해보세요.</p>
-                     </div>
-                     <div class="chart-wrapper main-chart" style="overflow-x: auto; padding-bottom: 10px;">
-                         <div :style="{ width: flowChartWidth, minWidth: '100%', height: '350px' }">
-                             <Line :data="flowChartData" :options="flowChartOptions" />
-                         </div>
-                     </div>
+              <!-- 1. Flow Chart (Card Style) -->
+              <div v-if="currentTab === 'flow'" key="flow" class="chart-card">
+                <div class="card-header">
+                  <span class="card-icon">📈</span>
+                  <h3>감정 흐름</h3>
+                </div>
+                <div class="chart-wrapper main-chart">
+                  <div :style="{ width: flowChartWidth, minWidth: '100%', height: '300px' }">
+                    <Line :data="flowChartData" :options="flowChartOptions" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Monthly Chart -->
+              <div v-else-if="currentTab === 'monthly'" key="monthly" class="chart-list">
+                <div v-for="chart in monthlyCharts" :key="chart.month" class="chart-card">
+                  <div class="card-header">
+                    <span class="card-icon">📅</span>
+                    <h3>{{ chart.month }}</h3>
+                  </div>
+                  <div class="chart-wrapper sub-chart">
+                    <Bar :data="chart.data" :options="chart.options" />
+                  </div>
+                </div>
+                <div v-if="monthlyCharts.length === 0" class="no-data-card">
+                  <p>데이터가 없습니다.</p>
+                </div>
+              </div>
+
+              <!-- 3. Mood Distribution -->
+              <div v-else-if="currentTab === 'mood'" key="mood" class="chart-card">
+                <div class="card-header">
+                  <span class="card-icon">🎨</span>
+                  <h3>감정 비중</h3>
+                </div>
+                <div class="mood-layout-ios">
+                  <div class="donut-wrapper">
+                    <Doughnut :data="moodChartData" :options="doughnutOptions" />
+                    <div class="donut-center-text">
+                      <span class="total-num">{{ totalMoodCount }}</span>
+                      <span class="total-label">TOTAL</span>
+                    </div>
+                  </div>
+                  <div class="mood-legend-ios">
+                    <div v-for="item in moodLegendData" :key="item.label" class="legend-row">
+                      <div class="row-left">
+                        <span class="dot" :style="{ background: item.color }"></span>
+                        <span class="l-label">{{ item.label }}</span>
+                      </div>
+                      <span class="l-val">{{ item.count }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4. Weather -->
+              <div v-else-if="currentTab === 'weather'" key="weather" class="chart-card">
+                <div class="card-header">
+                  <span class="card-icon">🌤️</span>
+                  <h3>날씨와 기분</h3>
+                </div>
+                <div class="chart-wrapper main-chart">
+                  <Bar :data="weatherChartData" :options="weatherBarOptions" />
+                </div>
+              </div>
+
+              <!-- 5. AI Report -->
+              <div v-else-if="currentTab === 'report'" key="report" class="chart-card report-card">
+                <div class="card-header">
+                  <span class="card-icon" style="color: purple">✨</span>
+                  <h3>AI 심층 리포트</h3>
                 </div>
 
-                <div v-else-if="currentTab === 'meds'" key="meds" class="chart-section">
-                     <div class="section-info">
-                         <h3>💊 건강 리포트</h3>
-                         <p>나의 신체 증상과 약물 복용이 기분에 미치는 영향입니다.</p>
-                     </div>
+                <div class="report-content-ios">
+                  <div v-if="!formattedReportContent && !isGeneratingReport" class="start-box">
+                    <button @click="handleGenerateReport" class="ios-btn-gradient">
+                      ✨ 지금 바로 분석 시작하기
+                    </button>
+                  </div>
+                  <div v-else-if="isGeneratingReport" class="loading-box">
+                    <div class="spinner"></div>
+                    <transition name="fade" mode="out-in">
+                      <p
+                        :key="loadingStepText"
+                        style="margin-top: 15px; font-weight: 500; min-height: 24px; color: #666"
+                      >
+                        {{ loadingStepText }}
+                      </p>
+                    </transition>
+                  </div>
+                  <div v-else class="result-box-wrapper">
+                    <div class="result-box">
+                      <h4>💬 3줄 요약</h4>
+                      <div class="r-text" v-html="formattedReportContent"></div>
+                      <button @click="handleGenerateReport" class="ios-btn-outline-blue">
+                        🔄 다시 분석
+                      </button>
+                    </div>
 
-                     <!-- Summary Cards -->
-                     <div class="health-summary-grid">
-                         <div class="summary-card">
-                             <div class="card-icon">🤕</div>
-                             <div class="card-content">
-                                 <span class="card-label">가장 잦은 증상</span>
-                                 <span class="card-value">{{ topSymptom }}</span>
-                             </div>
-                         </div>
-                         <div class="summary-card">
-                             <div class="card-icon">💊</div>
-                             <div class="card-content">
-                                 <span class="card-label">일기 기준 복용률</span>
-                                 <span class="card-value">{{ medicationRate }}%</span>
-                             </div>
-                         </div>
-                     </div>
+                    <div class="long-term-section">
+                      <div v-if="!formattedLongTermContent && !isGeneratingLongTerm">
+                        <button @click="handleGenerateLongTermReport" class="ios-btn-green">
+                          🧠 장기 기억 패턴 분석하기
+                        </button>
+                      </div>
+                      <div v-else-if="isGeneratingLongTerm" class="loading-box-small">
+                        <div class="spinner-small"></div>
+                        <transition name="fade" mode="out-in">
+                          <span
+                            :key="longTermStepText"
+                            style="display: inline-block; min-width: 150px"
+                          >
+                            {{ longTermStepText }}
+                          </span>
+                        </transition>
+                      </div>
+                      <div v-else class="result-box green-box">
+                        <h4>🧠 메타 분석</h4>
+                        <div class="r-text" v-html="formattedLongTermContent"></div>
+                        <button @click="handleRetryLongTermReport" class="ios-btn-outline-green">
+                          🔄 메타 분석 다시하기
+                        </button>
+                      </div>
+                    </div>
 
-                     <div class="chart-wrapper main-chart" style="margin-top: 24px;">
-                         <h4>증상 발생 빈도</h4>
-                         <div style="height: 300px; position: relative;">
-                            <Bar :data="symptomChartData" :options="symptomChartOptions" />
-                         </div>
-                     </div>
-
-                     <div class="chart-wrapper main-chart" style="margin-top: 24px;">
-                         <h4>약물 복용과 기분 상관관계</h4>
-                         <div style="height: 350px; position: relative;">
-                            <Line :data="medChartData" :options="medChartOptions" />
-                         </div>
-                     </div>
+                  </div>
                 </div>
-
-                <div v-else-if="currentTab === 'monthly'" key="monthly" class="chart-section">
-                    <div class="section-info">
-                        <h3>📅 월별 상세 기록</h3>
-                        <p>각 날짜별로 기록된 나의 기분 변화를 확인해보세요.</p>
-                    </div>
-                    
-                    <div class="charts-grid">
-                        <div v-for="chart in monthlyCharts" :key="chart.month" class="month-chart-card">
-                            <h4 class="month-title">{{ chart.month }}</h4>
-                            <div class="chart-wrapper sub-chart">
-                                <Bar :data="chart.data" :options="chart.options" />
-                            </div>
-                        </div>
-                        
-                        <div v-if="monthlyCharts.length === 0" class="no-data">
-                            데이터가 충분하지 않습니다.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. 감정 분포 (Mood Distribution) -->
-                <div v-else-if="currentTab === 'mood'" key="mood" class="chart-section mood-layout">
-                    <div class="section-info">
-                        <h3>😊 감정 분포</h3>
-                        <p>나의 주된 감정 상태는 무엇일까요?</p>
-                    </div>
-                    <div class="mood-content">
-                        <div class="chart-wrapper donut-chart">
-                            <Doughnut :data="moodChartData" :options="doughnutOptions" />
-                        </div>
-                        <div class="mood-legend">
-                            <div v-for="(item, index) in moodLegendData" :key="index" class="legend-item">
-                                <span class="dot" :style="{ background: item.color }"></span>
-                                <span class="label">{{ item.label }}</span>
-                                <span class="value">{{ item.count }}회 ({{ item.percent }}%)</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 3. 날씨별 기록 (Weather Stats) -->
-                <div v-else-if="currentTab === 'weather'" key="weather" class="chart-section">
-                     <div class="section-info">
-                        <h3>🌤️ 날씨와 감정</h3>
-                        <p>어떤 날씨에 일기를 자주 썼을까요?</p>
-                    </div>
-                    <div class="chart-wrapper main-chart">
-                        <Bar :data="weatherChartData" :options="weatherBarOptions" />
-                    </div>
-                </div>
-
-                <!-- 4. AI 심층 리포트 (New) -->
-                <div v-else-if="currentTab === 'report'" key="report" class="chart-section report-section">
-                    <div class="section-info">
-                        <h3>🔮 AI 심층 심리 분석</h3>
-                        <p>전문 AI 상담사가 나의 기록을 바탕으로 마음의 지도를 그려드립니다.</p>
-                        <p>분석하고 완료까지 약 10분정도 소요됩니다.</p>
-                    </div>
-
-                    <div class="report-container">
-                        <!-- 1. 생성 전 (버튼) -->
-                        <div v-if="!isGeneratingReport && !formattedReportContent" class="report-initial">
-                             <div class="report-icon-large">🧘</div>
-                             <p>최근 50개의 일기 기록을 종합적으로 분석하여<br>현재 심리 상태 진단과 맞춤형 조언을 제공합니다.</p>
-                             <button @click="handleGenerateReport" class="generate-btn">
-                                심층 리포트 생성하기
-                             </button>
-                             <p class="notice">* 생성에는 약 10분이 소요됩니다.</p>
-                        </div>
-
-                        <!-- 2. 생성 중 (로딩) -->
-                        <div v-else-if="isGeneratingReport" class="report-loading">
-                            <div class="spinner-large"></div>
-                            <p class="loading-text">AI가 내면의 목소리를 듣고 있어요...</p>
-                            <p class="loading-sub">잠시만 기다려주세요 (최대 10분)</p>
-                        </div>
-
-                        <!-- 3. 결과 (리포트) -->
-                        <div v-else class="report-result">
-                            <div class="report-meta">
-                                <span class="report-date">{{ new Date().toLocaleDateString() }} 기준 분석</span>
-                                <div class="report-actions">
-                                    <button @click="handleGenerateLongTermReport" class="meta-btn" :disabled="isGeneratingLongTerm">
-                                        <span v-if="isGeneratingLongTerm">분석 중...</span>
-                                        <span v-else>🧠 과거 기록 통합 분석 (Meta-Analysis)</span>
-                                    </button>
-                                    <button @click="handleGenerateReport" class="regenerate-btn">다시 분석하기</button>
-                                </div>
-                            </div>
-                            
-                            <div class="report-scroll-container">
-                                <!-- 기본 리포트 -->
-                                <div class="report-content-box basic-report">
-                                    <h4>📅 날짜 기준 분석</h4>
-                                    <div class="report-text" v-html="formattedReportContent"></div>
-                                </div>
-
-                                <!-- 메타 분석 결과 (Long Term) -->
-                                <div v-if="longTermReportContent" class="long-term-box">
-                                    <h4>🧠 과거 기록 통합 분석 (Meta-Analysis)</h4>
-                                    <div class="report-text" v-html="formattedLongTermContent"></div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+              </div>
             </transition>
+          </div>
         </div>
       </div>
     </div>
@@ -199,9 +173,9 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, reactive, onUnmounted } from 'vue'
-import { diaryAPI } from '../services/api'
-import { medicationAPI } from '../services/medication' // Import Medication API
+import { ref, onMounted, onActivated, computed, reactive, onUnmounted, onErrorCaptured } from "vue";
+import api, { diaryAPI } from "../services/api";
+import { medicationAPI } from "../services/medication";
 import {
   Chart as ChartJS,
   Title,
@@ -213,1099 +187,851 @@ import {
   ArcElement,
   PointElement,
   LineElement,
-  Filler
-} from 'chart.js'
-import { Bar, Doughnut, Line } from 'vue-chartjs'
+  Filler,
+} from "chart.js";
+import { Bar, Doughnut, Line } from "vue-chartjs";
+import { useRouter } from "vue-router";
 
-// Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler,
+);
 
 export default {
-  name: 'StatsPage',
+  name: "StatsPage",
   components: { Bar, Doughnut, Line },
   setup() {
-    const loading = ref(true)
-    const currentTab = ref('flow') // Default to 'flow'
-    const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [], timeline: [] })
-    const medLogs = ref([]) // Store medication logs
+    const router = useRouter();
+    const loading = ref(false);
+    const isLinked = ref(true); // Always open for Web
+    const currentTab = ref("flow");
+
+    const rawStats = ref({ monthly: [], moods: [], weather: [], daily: [], timeline: [] });
+    const medLogs = ref([]);
+    const errorMsg = ref(null);
+
+    onErrorCaptured((err) => {
+      console.error("StatsPage Capture:", err);
+      return false;
+    });
+
+    function generateMockData() {
+      // Mock data logic from copy file
+      const days = [];
+      const today = new Date();
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        days.push({
+          date: d.toISOString().split("T")[0],
+          mood_level: Math.floor(Math.random() * 3) + 3,
+          medication: i % 2 === 0,
+        });
+      }
+      return {
+        timeline: days,
+        moods: [
+          { _id: 5, count: 12 },
+          { _id: 4, count: 5 },
+          { _id: 3, count: 2 },
+          { _id: 2, count: 4 },
+          { _id: 1, count: 1 },
+        ],
+        weather: [],
+        daily: [],
+        medication_rate: 80,
+      };
+    }
+
+    async function loadData() {
+      loading.value = true;
+      try {
+        const [statsRes, medsRes] = await Promise.all([
+          diaryAPI.getStatistics().catch(() => null),
+          medicationAPI.getMedicationLogs().catch(() => []),
+        ]);
+
+        if (statsRes && statsRes.timeline && statsRes.timeline.length > 0) {
+          rawStats.value = {
+            ...statsRes,
+            daily: statsRes.daily || [],
+            timeline: statsRes.timeline || [],
+          };
+        } else {
+          console.warn("Using Mock Data");
+          rawStats.value = generateMockData();
+        }
+
+        medLogs.value = medsRes || [];
+      } catch (e) {
+        console.warn("Using Mock Data (Fallback)");
+        rawStats.value = generateMockData();
+      } finally {
+        loading.value = false;
+        // Check for existing reports immediately after loading data
+        checkStatus();
+        checkLongTermStatus();
+      }
+    }
+
+    onMounted(() => {
+      loadData();
+    });
 
     // Report State
-    const isGeneratingReport = ref(false)
-    const reportContent = ref('')
-    
-    // Long-term Report State
-    const isGeneratingLongTerm = ref(false)
-    const longTermReportContent = ref('')
+    const isGeneratingReport = ref(false);
+    const reportContent = ref("");
+    const isGeneratingLongTerm = ref(false);
+    const longTermReportContent = ref("");
 
-    const tabs = [
-        { id: 'flow', label: '감정 흐름', icon: '📈' },
-        { id: 'meds', label: '약물 & 기분', icon: '💊' }, // New Tab
-        { id: 'monthly', label: '월별 기록', icon: '📅' },
-        { id: 'mood', label: '감정 분포', icon: '🎨' },
-        { id: 'weather', label: '날씨 통계', icon: '☁️' },
-        { id: 'report', label: 'AI 심층 진단', icon: '🔮' }
+    // Loading Animation
+    const loadingStepText = ref("AI가 일기장을 읽고 있어요...");
+    const longTermStepText = ref("기억을 더듬는 중..."); // [NEW]
+    const stepInterval = ref(null);
+    const pollingInterval = ref(null);
+    const longTermPollingInterval = ref(null);
+    const longTermStepInterval = ref(null); // [NEW]
+
+    const loadingSteps = [
+        "📖 일기장을 꼼꼼히 읽고 있어요...",
+        "💡 감정을 글로 적는 것만으로도 뇌가 편안해집니다.",
+        "🔍 숨겨진 감정 패턴을 찾고 있어요...",
+        "🧠 뇌과학적으로 '멍 때리기'는 창의력의 원천이에요.",
+        "✨ 깊이 있는 통찰을 위해 시간이 조금 걸립니다...",
+        "🍵 따뜻한 차 한 잔의 여유를 가져보세요.",
+        "💭 오늘의 기분을 깊이 이해하고 있습니다...",
+        "💡 스트레스는 깊은 호흡만으로도 감소해요.",
+        "✨ 멋진 리포트를 작성하고 있습니다..."
     ]
 
-    // === Chart Options ===
-    const commonOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                backgroundColor: 'rgba(0,0,0,0.8)',
-                padding: 12,
-                cornerRadius: 8,
-                displayColors: false
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                grid: { color: '#f0f0f0' },
-                ticks: { display: false } 
-            },
-            x: {
-                grid: { display: false },
-                ticks: { font: { size: 10 }, maxRotation: 0, autoSkip: true }
-            }
-        },
-        animation: { duration: 1000 }
-    }
+    const tabs = [
+        { id: "flow", label: "흐름" },
+        { id: "monthly", label: "월별" },
+        { id: "mood", label: "분포" },
+        { id: "weather", label: "날씨" },
+        { id: "report", label: "AI분석" },
+    ];
 
-    // Flow Chart Options (Line)
-    const flowChartOptions = {
-        ...commonOptions,
-        scales: {
-            y: {
-                min: 0,
-                max: 6,
-                grid: { color: '#f0f0f0' },
-                ticks: {
-                    stepSize: 1,
-                    callback: function(value) {
-                         const map = { 1: '😠', 2: '😢', 3: '😐', 4: '😌', 5: '😊' }
-                         return map[value] || ''
-                    },
-                    font: { size: 20 }
-                }
-            },
-            x: {
-                grid: { display: false },
-                ticks: { display: false } // Hide Date Labels
-            }
+    const totalMoodCount = computed(() => {
+      if (!rawStats.value.moods) return 0;
+      return rawStats.value.moods.reduce((acc, cur) => acc + cur.count, 0);
+    });
+
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(255,255,255, 0.9)",
+          titleColor: "#000",
+          bodyColor: "#666",
+          borderColor: "rgba(0,0,0,0.1)",
+          borderWidth: 1,
+          padding: 10,
+          cornerRadius: 12,
+          displayColors: false,
         },
-        plugins: {
-            legend: { display: false },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        const index = context.dataIndex
-                        const timelineItem = rawStats.value.timeline[index]
-                        const map = { 1: '화남/부정', 2: '우울/슬픔', 3: '보통', 4: '편안/안정', 5: '행복/기쁨' }
-                        
-                        let label = `기분: ${map[context.raw] || context.raw}`
-                        if (timelineItem && timelineItem.ai_label) {
-                            // "슬픔 (비통함) (85.2%)" -> "슬픔 (비통함)" for cleaner tooltip
-                            const cleanLabel = timelineItem.ai_label.split('(')[0] + (timelineItem.ai_label.includes('(') ? '(' + timelineItem.ai_label.split('(')[1].split(')')[0] + ')' : '')
-                            label += ` | AI 분석: ${cleanLabel}`
-                        }
-                        return label
-                    }
-                }
-            }
-        }
-    }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: "#f5f5f7", borderDash: [5, 5] },
+          ticks: { display: false },
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 10 }, color: "#86868b" } },
+      },
+      animation: { duration: 800, easing: "easeOutQuart" },
+    };
+
+    const flowChartOptions = {
+      ...commonOptions,
+      interaction: { intersect: false, mode: "index" },
+      scales: {
+        y: {
+          min: 0,
+          max: 6,
+          grid: { color: "#f2f2f7" },
+          ticks: {
+            stepSize: 1,
+            callback: (v) => (v === 0 ? "" : { 1: "🤬", 2: "😢", 3: "😐", 4: "😌", 5: "🥰" }[v]),
+            font: { size: 16 },
+          },
+        },
+        x: { grid: { display: false }, ticks: { display: true, maxTicksLimit: 6 } },
+      },
+    };
 
     const weatherBarOptions = {
-        ...commonOptions,
-        scales: {
-            y: { beginAtZero: true, grid: { color: '#f0f0f0' }, stacked: true },
-            x: { grid: { display: false }, stacked: true }
-        },
-        plugins: {
-            legend: { 
-                display: true, 
-                position: 'bottom',
-                labels: { font: { size: 11 }, padding: 15, usePointStyle: true }
-            },
-            tooltip: { ...commonOptions.plugins.tooltip }
-        }
-    }
-    
-    // Doughnut specific options
+      ...commonOptions,
+      scales: {
+        y: { beginAtZero: true, display: false, stacked: true },
+        x: { grid: { display: false }, stacked: true },
+      },
+      plugins: {
+        legend: { display: true, position: "bottom", labels: { usePointStyle: true, boxWidth: 8 } },
+      },
+    };
+
     const doughnutOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '65%',
-        plugins: {
-            legend: { display: false },
-            tooltip: { 
-                callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.raw}회` }
-            }
-        }
-    }
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "75%",
+      plugins: { legend: { display: false } },
+    };
 
-    // === Computed Data for Charts ===
-    
-    // 0. Flow Data (Timeline)
     const flowChartData = computed(() => {
-        const timeline = rawStats.value.timeline || []
-        
-        // 데이터가 너무 많으면 적당히 샘플링하거나 최근 30~50개만 보여주기? 일단 전체 보여줌.
-        // UI가 깨지지 않게 Chart.js가 알아서 처리해주길 기대.
-        
-        return {
-            labels: timeline.map(t => t.date.slice(5)), // MM-DD만 표시
-            datasets: [{
-                label: '기분 흐름',
-                data: timeline.map(t => t.mood_level),
-                borderColor: '#1d1d1f',
-                backgroundColor: 'rgba(29, 29, 31, 0.1)',
-                tension: 0.4, // 곡선
-                pointBackgroundColor: '#1d1d1f',
-                pointRadius: 0,
-                pointHoverRadius: 4,
-                fill: true
-            }]
-        }
-    })
+      const timeline = rawStats.value.timeline || [];
+      return {
+        labels: timeline.map((t) => t.date.slice(5)),
+        datasets: [
+          {
+            label: "기분",
+            data: timeline.map((t) => t.mood_level),
+            borderColor: "#0071E3",
+            backgroundColor: "rgba(0, 113, 227, 0.1)",
+            tension: 0.4,
+            pointBackgroundColor: "#0071E3",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 0,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+            fill: true,
+          },
+        ],
+      };
+    });
 
-    const flowChartWidth = computed(() => {
-        const count = rawStats.value.timeline ? rawStats.value.timeline.length : 0
-        return count > 7 ? `${count * 60}px` : '100%'
-    })
+    const flowChartWidth = computed(() => "1200px");
 
-
-    // 1. Monthly Daily Charts (NEW) (unchanged)
     const monthlyCharts = computed(() => {
-        if (!rawStats.value.daily) return []
+      if (!rawStats.value.daily) return [];
+      // Simple Monthly Grouping Logic
+      const grouped = {};
+      rawStats.value.daily.forEach((item) => {
+        const m = item._id.substring(0, 7);
+        if (!grouped[m]) grouped[m] = {};
+        grouped[m][item._id] = item.count;
+      });
+      return Object.keys(grouped)
+        .sort()
+        .reverse()
+        .map((mStr) => {
+          const [y, m] = mStr.split("-");
+          const labels = Object.keys(grouped[mStr])
+            .sort()
+            .map((d) => d.slice(8));
+          const data = Object.values(grouped[mStr]);
+          return {
+            month: `${y}년 ${m}월`,
+            data: {
+              labels,
+              datasets: [{ label: "기분", data, backgroundColor: "#0071E3", borderRadius: 4 }],
+            },
+            options: {
+              ...commonOptions,
+              scales: {
+                y: { display: false, min: 0, max: 6 },
+                x: { display: true, grid: { display: false } },
+              },
+            },
+          };
+        });
+    });
 
-        const grouped = {}
-        rawStats.value.daily.forEach(item => {
-            const month = item._id.substring(0, 7)
-            if (!grouped[month]) grouped[month] = {}
-            grouped[month][item._id] = item.count // Now stores mood level
-        })
-
-        const sortedMonths = Object.keys(grouped).sort().reverse()
-
-        return sortedMonths.map(monthStr => {
-            const [year, month] = monthStr.split('-').map(Number)
-            const daysInMonth = new Date(year, month, 0).getDate()
-            
-            const labels = []
-            const data = []
-            const bgColors = []
-            
-            for (let i = 1; i <= daysInMonth; i++) {
-                labels.push(i)
-                const dateKey = `${monthStr}-${String(i).padStart(2, '0')}`
-                const moodVal = grouped[monthStr][dateKey] || 0
-                data.push(moodVal)
-                bgColors.push(moodVal ? (moodMap[moodVal] ? moodMap[moodVal].color : '#1d1d1f') : 'rgba(0,0,0,0.03)')
-            }
-
-            return {
-                month: `${year}년 ${month}월`,
-                data: {
-                    labels,
-                    datasets: [{
-                        label: '기분',
-                        data,
-                        backgroundColor: bgColors,
-                        borderRadius: 4,
-                        barPercentage: 0.7
-                    }]
-                },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        ...commonOptions.scales,
-                        y: {
-                            min: 0,
-                            max: 5,
-                            grid: { display: false },
-                            ticks: {
-                                stepSize: 1,
-                                callback: (v) => v === 0 ? '' : {1:'😠', 2:'😢', 3:'😐', 4:'😌', 5:'😊'}[v],
-                                font: { size: 14 }
-                            }
-                        },
-                        x: {
-                            ...commonOptions.scales.x,
-                            ticks: { font: { size: 9 }, autoSkip: false }
-                        }
-                    },
-                    plugins: {
-                        ...commonOptions.plugins,
-                        tooltip: {
-                            callbacks: {
-                                label: (ctx) => {
-                                    const val = ctx.raw
-                                    const labelMap = { 1: '화남', 2: '슬픔', 3: '평범', 4: '편안', 5: '행복' }
-                                    return val > 0 ? ` 기분: ${labelMap[val]} (${val})` : ' 기록 없음'
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
-    })
-
-    // 2. Mood Data
     const moodMap = {
-        1: { label: '화남 😠', color: '#EF9A9A' },
-        2: { label: '우울 😢', color: '#90CAF9' },
-        3: { label: '그저그럼 😐', color: '#E0E0E0' },
-        4: { label: '편안 😌', color: '#A5D6A7' },
-        5: { label: '행복 😊', color: '#FFE082' }
-    }
+      1: { label: "화남", color: "#8e8e93" },
+      2: { label: "우울", color: "#5e5ce6" },
+      3: { label: "보통", color: "#30b0c7" },
+      4: { label: "편안", color: "#32ade6" },
+      5: { label: "행복", color: "#ffcc00" },
+    };
 
     const moodChartData = computed(() => {
-        const dataMap = {}
-        rawStats.value.moods.forEach(m => dataMap[m._id] = m.count)
-        
-        const labels = []
-        const data = []
-        const backgroundColor = []
-        const order = [5, 4, 3, 2, 1]
-        
-        order.forEach(id => {
-            if (dataMap[id]) {
-                const info = moodMap[id]
-                labels.push(info.label)
-                data.push(dataMap[id])
-                backgroundColor.push(info.color)
-            }
-        })
-        
-        if (data.length === 0) return { labels: ['Empty'], datasets: [{ data: [1], backgroundColor: ['#eee'] }] }
-
-        return {
-            labels,
-            datasets: [{ backgroundColor, borderWidth: 0, data }]
+      const d = {};
+      (rawStats.value.moods || []).forEach((m) => (d[m._id] = m.count));
+      const labels = [],
+        data = [],
+        bg = [];
+      [5, 4, 3, 2, 1].forEach((id) => {
+        if (d[id]) {
+          labels.push(moodMap[id].label);
+          data.push(d[id]);
+          bg.push(moodMap[id].color);
         }
-    })
+      });
+      if (data.length === 0)
+        return { labels: ["Empty"], datasets: [{ data: [1], backgroundColor: ["#f2f2f7"] }] };
+      return { labels, datasets: [{ backgroundColor: bg, borderWidth: 0, data }] };
+    });
 
     const moodLegendData = computed(() => {
-        const total = rawStats.value.moods.reduce((acc, cur) => acc + cur.count, 0) || 1
-        const list = []
-        const order = [5, 4, 3, 2, 1]
-        const dataMap = {}
-        rawStats.value.moods.forEach(m => dataMap[m._id] = m.count)
-
-        order.forEach(id => {
-            if (dataMap[id]) {
-                const info = moodMap[id]
-                const count = dataMap[id]
-                list.push({
-                    label: info.label,
-                    color: info.color,
-                    count,
-                    percent: Math.round((count / total) * 100)
-                })
-            }
+      const total = (rawStats.value.moods || []).reduce((a, b) => a + b.count, 0) || 1;
+      return [5, 4, 3, 2, 1]
+        .map((id) => {
+          const count = ((rawStats.value.moods || []).find((m) => m._id === id) || { count: 0 })
+            .count;
+          return { label: moodMap[id].label, color: moodMap[id].color, count };
         })
-        return list
-    })
+        .filter((i) => i.count > 0);
+    });
 
-    // 3. Weather Data (New Stacked Logic)
     const weatherChartData = computed(() => {
-        if (!rawStats.value.weather || rawStats.value.weather.length === 0) {
-             return { labels: [], datasets: [] }
-        }
+      const wData = rawStats.value.weather || [];
+      return {
+        labels: wData.map((w) => w._id),
+        datasets: [5, 4, 3, 2, 1].map((id) => ({
+          label: moodMap[id].label,
+          data: wData.map((w) => {
+            const f = w.moods ? w.moods.find((m) => m.mood === id) : null;
+            return f ? f.count : 0;
+          }),
+          backgroundColor: moodMap[id].color,
+          borderRadius: 4,
+        })),
+      };
+    });
 
-        const labels = rawStats.value.weather.map(w => w._id)
-        
-        // Define order: Happy -> Calm -> Neutral -> Sad -> Angry
-        const order = [5, 4, 3, 2, 1]
-        
-        const datasets = order.map(moodId => {
-            const info = moodMap[moodId]
-            const data = rawStats.value.weather.map(w => {
-                 // w.moods is an array of { mood: <id>, count: <val> }
-                 const found = w.moods ? w.moods.find(m => m.mood === moodId) : null
-                 return found ? found.count : 0
-            })
-            
-            return {
-                label: info.label,
-                backgroundColor: info.color,
-                data: data,
-                borderRadius: 4,
-                // barPercentage: 0.6
-            }
-        })
-
-        return {
-            labels,
-            datasets: datasets
-        }
-    })
-
-    // === Report Logic ===
-    const formattedReportContent = computed(() => {
-       if (!reportContent.value) return ''
-       return reportContent.value
-         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-         .replace(/\n\n/g, '<br><br>')
-         .replace(/\n/g, '<br>')
-    })
-    
-    const formattedLongTermContent = computed(() => {
-       if (!longTermReportContent.value) return ''
-       return longTermReportContent.value
-         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') 
-         .replace(/\n\n/g, '<br><br>')
-         .replace(/\n/g, '<br>')
-    })
-
-    let pollingInterval = null
-    let longTermPollingInterval = null
-
+    // Report Polling Logic (Refactored for Stability)
     const checkStatus = async () => {
-        try {
-            const res = await diaryAPI.getReportStatus()
-            if (res.status === 'processing') {
-                isGeneratingReport.value = true
-                if (!pollingInterval) pollingInterval = setInterval(checkStatus, 3000)
-            } else if (res.status === 'completed') {
-                isGeneratingReport.value = false
-                reportContent.value = res.report
-                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-            } else if (res.status === 'failed') {
-                isGeneratingReport.value = false
-                reportContent.value = "리포트 생성에 실패했습니다. (AI 오류)"
-                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-            } else {
-                isGeneratingReport.value = false
-                if (pollingInterval) { clearInterval(pollingInterval); pollingInterval = null; }
-            }
-        } catch (e) {
-            console.error("Polling error:", e)
+      try {
+        const res = await diaryAPI.getReportStatus();
+        if (res.status === "completed") {
+          isGeneratingReport.value = false;
+          reportContent.value = res.report;
+          // Clear intervals
+          if (pollingInterval.value) clearInterval(pollingInterval.value);
+          if (stepInterval.value) clearInterval(stepInterval.value);
+        } else if (res.status === "failed") {
+          isGeneratingReport.value = false;
+          reportContent.value = "분석에 실패했습니다. 다시 시도해주세요.";
+          if (pollingInterval.value) clearInterval(pollingInterval.value);
+          if (stepInterval.value) clearInterval(stepInterval.value);
         }
-    }
-
-    const checkLongTermStatus = async () => {
-        try {
-            const res = await diaryAPI.getLongTermReportStatus()
-            if (res.status === 'processing') {
-                isGeneratingLongTerm.value = true
-                if (!longTermPollingInterval) longTermPollingInterval = setInterval(checkLongTermStatus, 3000)
-            } else if (res.status === 'completed') {
-                isGeneratingLongTerm.value = false
-                longTermReportContent.value = res.insight
-                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
-            } else if (res.status === 'failed') {
-                isGeneratingLongTerm.value = false
-                longTermReportContent.value = "분석에 실패했습니다."
-                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
-            } else {
-                // none or unexpected
-                isGeneratingLongTerm.value = false
-                if (longTermPollingInterval) { clearInterval(longTermPollingInterval); longTermPollingInterval = null; }
-            }
-        } catch (e) {
-            console.error("LongTerm Polling error:", e)
-        }
-    }
+      } catch (e) {
+        console.error(e);
+      }
+    };
 
     const handleGenerateReport = async () => {
-       isGeneratingReport.value = true
-       reportContent.value = ''
-       longTermReportContent.value = '' // Clear previous meta analysis
-       
-       try {
-          await diaryAPI.startReportGeneration()
-          if (pollingInterval) clearInterval(pollingInterval)
-          pollingInterval = setInterval(checkStatus, 3000)
-       } catch (e) {
-          isGeneratingReport.value = false
-          if (e.response && e.response.status === 400) {
-              // 400 Bad Request: Not enough diaries
-              const msg = e.response.data.message || "분석을 위해서는 최소 3일 이상의 기록이 필요해요."
-              alert(msg)
-              reportContent.value = "" // Clear loading text
-          } else {
-              reportContent.value = "요청 실패: " + (e.message || "알 수 없는 오류")
-          }
-       }
-    }
-    
+      if (isGeneratingReport.value) return; // Prevent double click
+
+      isGeneratingReport.value = true;
+      reportContent.value = "";
+
+      // Start Step Animation
+      let stepIdx = 0;
+      loadingStepText.value = loadingSteps[0];
+
+      if (stepInterval.value) clearInterval(stepInterval.value);
+      stepInterval.value = setInterval(() => {
+        stepIdx = (stepIdx + 1) % loadingSteps.length;
+        loadingStepText.value = loadingSteps[stepIdx];
+      }, 4000);
+
+      try {
+        await diaryAPI.startReportGeneration();
+
+        if (pollingInterval.value) clearInterval(pollingInterval.value);
+        pollingInterval.value = setInterval(checkStatus, 3000);
+      } catch (e) {
+        isGeneratingReport.value = false;
+        alert("오류: " + e.message);
+        if (stepInterval.value) clearInterval(stepInterval.value);
+      }
+    };
+
+    const checkLongTermStatus = async () => {
+      try {
+        const res = await diaryAPI.getLongTermReportStatus();
+        if (res.status === "completed") {
+          isGeneratingLongTerm.value = false;
+          longTermReportContent.value = res.insight;
+          if (longTermPollingInterval.value) clearInterval(longTermPollingInterval.value);
+          if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+        }
+      } catch (e) {}
+    };
     const handleGenerateLongTermReport = async () => {
-        if (isGeneratingLongTerm.value) return
+      if (isGeneratingLongTerm.value) return;
+
+      isGeneratingLongTerm.value = true;
+      longTermReportContent.value = "";
+
+      // Start Step Animation
+      let stepIdx = 0;
+      longTermStepText.value = loadingSteps[0];
+      if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+
+      longTermStepInterval.value = setInterval(() => {
+        stepIdx = (stepIdx + 1) % loadingSteps.length;
+        longTermStepText.value = loadingSteps[stepIdx];
+      }, 4000);
+
+      try {
+        await diaryAPI.startLongTermReportGeneration();
+
+        if (longTermPollingInterval.value) clearInterval(longTermPollingInterval.value);
+        longTermPollingInterval.value = setInterval(checkLongTermStatus, 3000);
+      } catch (e) {
+        isGeneratingLongTerm.value = false;
+        if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+      }
+    };
+
+    const handleRetryLongTermReport = async () => {
+        isGeneratingLongTerm.value = true;
+        longTermReportContent.value = "";
         
-        isGeneratingLongTerm.value = true
-        longTermReportContent.value = ''
-        
+        // Start Step Animation
+        let stepIdx = 0;
+        longTermStepText.value = loadingSteps[0];
+        if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+
+        longTermStepInterval.value = setInterval(() => {
+            stepIdx = (stepIdx + 1) % loadingSteps.length;
+            longTermStepText.value = loadingSteps[stepIdx];
+        }, 4000);
+
         try {
-            await diaryAPI.startLongTermReportGeneration()
-            
-            if (longTermPollingInterval) clearInterval(longTermPollingInterval)
-            longTermPollingInterval = setInterval(checkLongTermStatus, 3000)
-            
+            await diaryAPI.startLongTermReportGeneration();
+            if (longTermPollingInterval.value) clearInterval(longTermPollingInterval.value);
+            longTermPollingInterval.value = setInterval(checkLongTermStatus, 3000);
         } catch (e) {
-            isGeneratingLongTerm.value = false
-            alert(e.response?.data?.message || "분석 요청 실패: " + e.message)
+            isGeneratingLongTerm.value = false;
+            if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+            alert("오류: " + e.message);
         }
-    }
+    };
 
-    // === Meds & Mood Correlation Chart ===
-    const medChartData = computed(() => {
-        const timeline = rawStats.value.timeline || []
-        // timeline has medication boolean and mood_level
-        
-        return {
-            labels: timeline.map(t => t.date.slice(5)), // MM-DD
-            datasets: [
-                {
-                    label: '기분 점수',
-                    data: timeline.map(t => t.mood_level),
-                    borderColor: '#FFC107',
-                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
-                    yAxisID: 'y',
-                    tension: 0.3,
-                    fill: true
-                },
-                {
-                    label: '약물 복용 여부 (1=O, 0=X)',
-                    data: timeline.map(t => t.medication ? 1 : 0), // Assuming 'medication' boolean in timeline
-                    // Check backend: timeline items have 'medication' only if we add it in python.
-                    // Wait, we didn't add it to timeline object in python!
-                    // Quick fix: Python edit needed OR use existing data if available.
-                    // Let's assume frontend logic needs timeline fix or we rely on 'medication' property if I added it?
-                    // I added 'mood_level', 'ai_label', 'user_mood'. Medication is missing in timeline object in app.py logic!
-                    // However, we can use the 'daily_sum' approach locally or just plot mood for now strictly.
-                    // Wait, I can try to use medLogs if available.
-                    
-                    // Better approach: Let's assume medication is not yet in timeline.
-                    // I will filter medLogs by date.
-                    borderColor: '#42A5F5',
-                    pointStyle: 'rectRot',
-                    pointRadius: 6,
-                    showLine: false, // Only points for boolean
-                    yAxisID: 'y1'
-                }
-            ]
-        }
-    })
+    const formattedReportContent = computed(() => reportContent.value.replace(/\n/g, "<br>"));
+    const formattedLongTermContent = computed(() =>
+      longTermReportContent.value.replace(/\n/g, "<br>"),
+    );
 
-    // Symptom Data
-    const topSymptom = computed(() => {
-        if (!rawStats.value.symptoms || rawStats.value.symptoms.length === 0) return '없음'
-        return rawStats.value.symptoms[0].name
-    })
-
-    const medicationRate = computed(() => {
-        return rawStats.value.medication_rate || 0
-    })
-
-    const symptomChartData = computed(() => {
-        const symptoms = rawStats.value.symptoms || []
-        // Top 5 only
-        const top5 = symptoms.slice(0, 5)
-        
-        return {
-            labels: top5.map(s => {
-                const map = {
-                    'headache': '두통/어지러움',
-                    'digestion': '소화불량',
-                    'palpitation': '두근거림',
-                    'insomnia': '불면',
-                    'fatigue': '만성피로',
-                    'none': '증상없음'
-                }
-                return map[s.name] || s.name
-            }),
-            datasets: [{
-                label: '발생 횟수',
-                data: top5.map(s => s.count),
-                backgroundColor: ['#ef5350', '#ab47bc', '#5c6bc0', '#26a69a', '#ffa726'],
-                borderRadius: 6
-            }]
-        }
-    })
-
-    const symptomChartOptions = {
-        ...commonOptions,
-        indexAxis: 'y', // Horizontal Bar
-        scales: {
-            x: { beginAtZero: true, grid: { display: false } },
-            y: { grid: { display: false } }
-        }
-    }
-    
-    const medChartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: {
-            mode: 'index',
-            intersect: false,
-        },
-        scales: {
-            y: {
-                type: 'linear',
-                display: true,
-                position: 'left',
-                min: 0,
-                max: 6,
-                title: { display: true, text: '기분' },
-                ticks: { stepSize: 1 }
-            },
-            y1: {
-                type: 'linear',
-                display: true,
-                position: 'right',
-                min: 0,
-                max: 10, // Assuming max 10 meds/day
-                grid: {
-                    drawOnChartArea: false, // only want the grid lines for one axis to show up
-                },
-                title: { display: true, text: '복용 횟수' }
-            },
-            x: {
-                grid: { display: false }
-            }
-        },
-        plugins: {
-            tooltip: {
-                callbacks: {
-                    label: (ctx) => {
-                        if (ctx.datasetIndex === 0) { // Mood
-                            const map = { 1: '화남', 2: '우울', 3: '보통', 4: '편안', 5: '행복' }
-                            return `기분: ${map[ctx.raw] || ctx.raw}`
-                        } else { // Meds
-                            return `복용: ${ctx.raw}회`
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    onMounted(async () => {
-        try {
-            // Load Charts
-            const [statsRes, medsRes] = await Promise.all([
-                diaryAPI.getStatistics(),
-                medicationAPI.getMedicationLogs() // Fetch all logs (endpoint supports query, empty means all?)
-                // Wait, getMedicationLogs(date) filters by date.
-                // We need ALL logs or ranged logs. 
-                // Let's modify getMedicationLogs service or just fetch without date if backend supports it.
-                // Looking at backend: if date_str: query['date'] = date_str. If not, returns all user logs.
-                // So calling with no args is fine.
-            ])
-            
-            rawStats.value = { ...statsRes, daily: statsRes.daily || [], timeline: statsRes.timeline || [] }
-            medLogs.value = medsRes
-            
-            // Resume Polling if needed
-            checkStatus() 
-            checkLongTermStatus()
-            
-        } catch (e) {
-            console.error(e)
-            // Fallback load if meds fail
-            try {
-                 const res = await diaryAPI.getStatistics()
-                 rawStats.value = { ...res, daily: res.daily || [], timeline: res.timeline || [] }
-            } catch(e2) { console.error(e2) }
-        } finally {
-            loading.value = false
-        }
-    })
-
-    // Cleanup on unmount
     onUnmounted(() => {
-        if (pollingInterval) clearInterval(pollingInterval)
-        if (longTermPollingInterval) clearInterval(longTermPollingInterval)
-    })
+      if (pollingInterval.value) clearInterval(pollingInterval.value);
+      if (longTermPollingInterval.value) clearInterval(longTermPollingInterval.value);
+      if (stepInterval.value) clearInterval(stepInterval.value);
+      if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+    });
 
     return {
-        loading,
-        currentTab,
-        tabs,
-        monthlyCharts, flowChartData, flowChartOptions, flowChartWidth,
-        medChartData, medChartOptions, symptomChartData, symptomChartOptions, topSymptom, medicationRate,
-        moodChartData, doughnutOptions, moodLegendData,
-        weatherChartData, weatherBarOptions,
-        
-        // Report Exports
-        isGeneratingReport,
-        reportContent,
-        formattedReportContent,
-        handleGenerateReport,
-        
-        // Long Term
-        isGeneratingLongTerm,
-        longTermReportContent,
-        formattedLongTermContent,
-        handleGenerateLongTermReport
-    }
-  }
-}
+      loading,
+      isLinked,
+      currentTab,
+      tabs,
+      monthlyCharts,
+      flowChartData,
+      flowChartOptions,
+      flowChartWidth,
+      moodChartData,
+      doughnutOptions,
+      moodLegendData,
+      weatherChartData,
+      weatherBarOptions,
+      isGeneratingReport,
+      formattedReportContent,
+      handleGenerateReport,
+      isGeneratingLongTerm,
+      formattedLongTermContent,
+      handleGenerateLongTermReport,
+      handleRetryLongTermReport,
+      totalMoodCount,
+      loadingStepText,
+      longTermStepText,
+    };
+  },
+};
 </script>
 
 <style scoped>
-/* Previous Styles (omitted) */
-.long-term-box {
-    background: #f0fdf4; /* Light Green Tint */
-    border: 1px solid #bbf7d0;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 24px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-}
-.long-term-box h4 {
-    margin: 0 0 16px 0;
-    color: #166534;
-    font-size: 18px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.report-actions {
-    display: flex;
-    gap: 10px;
-}
-.meta-btn {
-    background: #10b981;
-    color: white;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.meta-btn:hover:not(:disabled) {
-    background: #059669;
-    transform: scale(1.02);
-}
-.meta-btn:disabled {
-    opacity: 0.7;
-    cursor: wait;
-}
-/* ... Rest of styles */
+/* Native Scroll Layout for reliability */
 .stats-page {
-  height: 100%;
-  overflow: hidden;
-  background: #f5f5f7;
-  padding: 20px;
-  box-sizing: border-box;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  background-color: #fbfbfd;
+  display: flex;
+  flex-direction: column;
+  /* overflow:hidden removed to allow native window scrolling */
+  font-family: -apple-system, sans-serif;
 }
 
 .stats-container {
-  max-width: 900px;
-  height: 100%;
-  margin: 0 auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+  position: relative;
 }
 
-.stats-header {
-  flex-shrink: 0;
+.ios-header {
+  padding: 20px 24px 10px;
+  background: rgba(251, 251, 253, 0.92); /* Translucent */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
+
 .header-left h2 {
   font-size: 28px;
   font-weight: 800;
   color: #1d1d1f;
-  margin: 0 0 8px 0;
+  margin: 0;
+  letter-spacing: -0.5px;
 }
 .subtitle {
   font-size: 15px;
   color: #86868b;
-  margin: 0;
+  margin-top: 4px;
+  font-weight: 500;
 }
-
 .close-btn {
   background: white;
-  border: 1px solid #d2d2d7;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1d1d1f;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.close-btn:hover {
-  background: #f5f5f7;
-  transform: scale(1.02);
-}
-.close-btn .icon { font-size: 12px; }
-
-/* Navigation Tabs */
-.stats-nav {
-  flex-shrink: 0;
-  display: flex;
-  background: white;
-  padding: 6px;
-  border-radius: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.03);
-  gap: 8px;
-}
-.nav-item {
-  flex: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   border: none;
-  background: transparent;
-  padding: 12px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #86868b;
-  cursor: pointer;
-  transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  color: #86868b;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
 }
-.nav-item:hover {
-  background: rgba(0,0,0,0.02);
-  color: #1d1d1f;
+
+.ios-tabs {
+  padding: 10px 24px 20px;
+  background: rgba(251, 251, 253, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky;
+  top: 94px; /* Adjusted based on header height */
+  z-index: 90;
+  transition: top 0.2s;
+}
+
+.scroll-wrapper {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 5px;
+  scrollbar-width: none;
+}
+.nav-item {
+  background: white;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #86868b;
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  transition: all 0.3s;
 }
 .nav-item.active {
-  background: #1d1d1f;
+  background: #0071e3;
   color: white;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.3);
+  transform: scale(1.02);
 }
-.nav-icon { font-size: 18px; }
 
-/* Content Area */
-.stats-content {
+.stats-content-area {
   flex: 1;
-  min-height: 0;
+  /* Removed overflow-y: auto to create single document scroll */
+  padding: 0 24px 120px;
+}
+
+.chart-card {
   background: white;
   border-radius: 24px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.04);
-  position: relative;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.card-header h3 {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1d1d1f;
+  margin: 0;
+}
+.card-icon {
+  font-size: 20px;
+}
+.main-chart {
+  height: 350px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.sub-chart {
+  height: 200px;
+}
+.chart-list {
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Clips scrollbar at corners */
+  gap: 24px;
 }
-
-.content-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 30px;
+.mood-layout-ios {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 20px;
 }
-
-/* Scrollbar Styling */
-.content-body::-webkit-scrollbar {
-  width: 8px;
+.donut-wrapper {
+  position: relative;
+  width: 160px;
+  height: 160px;
 }
-.content-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-.content-body::-webkit-scrollbar-thumb {
-  background-color: #d1d1d6;
-  border-radius: 4px;
-  border: 2px solid white;
-}
-
-.loading-state {
+.donut-center-text {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
+  pointer-events: none;
+}
+.total-num {
+  display: block;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1d1d1f;
+  line-height: 1;
+}
+.total-label {
+  font-size: 11px;
   color: #86868b;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
-.spinner {
-  width: 30px;
-  height: 30px;
-  border: 3px solid #f2f2f7;
-  border-top-color: #1d1d1f;
-  border-radius: 50%;
-  animation: spin 1s infinite linear;
-  margin: 0 auto 16px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-/* Chart Sections */
-.chart-section {
-  padding-bottom: 20px;
-}
-.section-info { margin-bottom: 30px; text-align: center; }
-.section-info h3 { font-size: 22px; margin: 0 0 8px; color: #1d1d1f; }
-.section-info p { color: #86868b; margin: 0; font-size: 15px; }
-
-.charts-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-}
-.month-chart-card {
-    background: #fbfbfd;
-    padding: 24px;
-    border-radius: 20px;
-    border: 1px solid #f2f2f7;
-}
-.month-title {
-    font-size: 18px;
-    font-weight: 700;
-    margin: 0 0 16px 0;
-    color: #1d1d1f;
-}
-
-.chart-wrapper {
-  flex: 1;
-  position: relative;
-  width: 100%;
-}
-.main-chart { min-height: 350px; }
-.sub-chart { min-height: 200px; } 
-.donut-chart { min-height: 300px; max-width: 400px; margin: 0 auto; }
-
-/* Mood Layout Specifics */
-.mood-layout .mood-content {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 40px;
-  flex-wrap: wrap;
-}
-.mood-legend {
+.mood-legend-ios {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-width: 200px;
+  min-width: 140px;
 }
-.legend-item {
+.legend-row {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   font-size: 14px;
-  color: #444;
-  background: #fbfbfd;
-  padding: 10px 16px;
-  border-radius: 12px;
-  border: 1px solid #f2f2f7;
+}
+.row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .dot {
-  width: 12px;
-  height: 12px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  margin-right: 12px;
 }
-.label { flex: 1; font-weight: 600; }
-.value { font-weight: 400; color: #86868b; font-size: 13px; }
-
-/* Transitions */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-@media (max-width: 768px) {
-  .stats-page {
-      padding: 16px; 
-      padding-bottom: 90px; /* Space for bottom nav */
-      height: 100%;
-      overflow-y: auto; /* Scroll page, not just content */
-  }
-  
-  .stats-container { height: auto; display: block; }
-  
-  .stats-header { 
-      flex-direction: column; 
-      gap: 12px; 
-      align-items: flex-start;
-  }
-  
-  .close-btn { 
-      position: absolute;
-      top: 16px;
-      right: 16px;
-  }
-  
-  /* Horizontal Scrollable Tabs */
-  .stats-nav {
-      overflow-x: auto;
-      white-space: nowrap;
-      padding: 10px 4px; /* More clickable area */
-      margin-bottom: 16px;
-      -webkit-overflow-scrolling: touch;
-  }
-  
-  .stats-nav::-webkit-scrollbar { display: none; }
-  
-  .nav-item {
-      flex: 0 0 auto; /* Don't shrink */
-      padding: 10px 16px;
-  }
-
-  .mood-layout .mood-content { flex-direction: column; }
-  
-  .stats-content { 
-      padding: 20px; 
-      height: auto; 
-      border-radius: 20px;
-      box-shadow: none; /* Simplier look on mobile */
-      border: 1px solid #f0f0f0;
-  }
-  
-  .content-body { padding: 0; overflow: visible; }
-  
-  .report-meta {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
-  }
-  
-  .report-actions {
-      width: 100%;
-      flex-direction: column;
-  }
-  
-  .meta-btn, .regenerate-btn {
-      width: 100%;
-      justify-content: center;
-  }
+.l-label {
+  font-weight: 500;
+  color: #1d1d1f;
+}
+.l-val {
+  font-weight: 700;
+  color: #86868b;
 }
 
-/* === Report Section Styles === */
-.report-section {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+.report-card {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+}
+.report-content-ios {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.start-box {
+  text-align: center;
+  padding: 20px 0;
+}
+.ios-btn-gradient {
+  background: linear-gradient(135deg, #5e5ce6 0%, #0071e3 100%);
+  padding: 16px 32px;
+  color: white;
+  font-weight: 700;
+  border-radius: 20px;
+  border: none;
+  font-size: 16px;
+  box-shadow: 0 8px 20px rgba(94, 92, 230, 0.3);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+.ios-btn-gradient:active {
+  transform: scale(0.96);
 }
 
-.report-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: #fbfbfd;
-    border-radius: 20px;
-    padding: 30px;
-    border: 1px solid #f2f2f7;
-    min-height: 400px;
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #86868b;
+  min-height: 200px;
 }
 
-/* Initial State */
-.report-initial {
-    text-align: center;
-    max-width: 400px;
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e5ea;
+  border-top-color: #0071e3;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
 }
-.report-icon-large {
-    font-size: 60px;
-    margin-bottom: 20px;
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
 }
-.report-initial p {
-    color: #666;
-    line-height: 1.6;
-    margin-bottom: 30px;
+.result-box {
+  background: #fbfbfd;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid #f2f2f7;
 }
-.generate-btn {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 14px 32px;
-    border-radius: 30px;
-    font-size: 16px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+.result-box h4 {
+  margin: 0 0 12px;
+  color: #1d1d1f;
+  font-size: 16px;
 }
-.generate-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(118, 75, 162, 0.4);
+.r-text {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
 }
-.notice {
-    margin-top: 16px !important;
-    font-size: 13px !important;
-    color: #999 !important;
+.long-term-section {
+  margin-top: 10px;
+}
+.ios-btn-green {
+  width: 100%;
+  padding: 14px;
+  background: #34c759;
+  color: white;
+  font-weight: 600;
+  border-radius: 16px;
+  border: none;
+  font-size: 15px;
+  cursor: pointer;
+}
+.green-box {
+  background: #f2fcf5;
+  border-color: #dbfbe6;
+}
+.loading-box-small {
+  text-align: center;
+  padding: 20px;
+  color: #34c759;
+  font-weight: 600;
+  background: #f2fcf5;
+  border-radius: 16px;
+  border: 1px dashed #34c759;
+}
+.spinner-small {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #dbfbe6;
+  border-top-color: #34c759;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 10px;
+}
+.retry-text-btn {
+  background: none;
+  border: none;
+  color: #86868b;
+  font-size: 13px;
+  margin-top: 10px;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
-/* Loading State */
-.report-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
 }
-.spinner-large {
-    width: 50px;
-    height: 50px;
-    border: 5px solid #e0e0e0;
-    border-top: 5px solid #764ba2;
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin-bottom: 24px;
-}
-.loading-text {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 8px;
-}
-.loading-sub {
-    color: #888;
-    font-size: 14px;
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 
-/* Result State */
-.report-result {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
+.result-box-wrapper {
+  width: 100%;
 }
-.report-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #eee;
+
+@media (max-width: 480px) {
+  .ios-tabs,
+  .stats-content-area,
+  .stats-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
 }
-.report-date {
-    font-size: 14px;
-    color: #888;
-    background: #eee;
-    padding: 4px 12px;
-    border-radius: 12px;
+
+.ios-btn-outline-blue {
+  width: 100%;
+  padding: 14px;
+  margin-top: 16px;
+  background: white;
+  border: 1px solid #0071e3;
+  color: #0071e3;
+  font-weight: 600;
+  border-radius: 16px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.regenerate-btn {
-    background: none;
-    border: 1px solid #ddd;
-    padding: 6px 12px;
-    border-radius: 15px;
-    font-size: 13px;
-    cursor: pointer;
-    color: #666;
-    transition: all 0.2s;
+.ios-btn-outline-blue:active {
+  background: #f0f8ff;
+  transform: scale(0.98);
 }
-.regenerate-btn:hover {
-    background: #f5f5f5;
-    color: #333;
+
+.ios-btn-outline-green {
+  width: 100%;
+  padding: 14px;
+  margin-top: 16px;
+  background: white;
+  border: 1px solid #34c759;
+  color: #34c759;
+  font-weight: 600;
+  border-radius: 16px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.report-content-box {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 10px;
-    font-size: 16px;
-    line-height: 1.8;
-    color: #333;
-    white-space: pre-wrap; /* Preserve formatting */
-}
-.report-content-box::-webkit-scrollbar {
-  width: 6px;
-}
-.report-content-box::-webkit-scrollbar-thumb {
-  background-color: #ddd;
-  border-radius: 3px;
+.ios-btn-outline-green:active {
+  background: #f2fcf5;
+  transform: scale(0.98);
 }
 </style>

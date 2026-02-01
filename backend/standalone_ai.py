@@ -31,6 +31,16 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
         "상담사 답변:"
     )
     
+    input_len = len(user_text)
+    dynamic_tokens = 800 # Default Base (Increased)
+    
+    if input_len < 50:
+        dynamic_tokens = 500  # 짧은 질문도 충분히
+    elif input_len > 200:
+        dynamic_tokens = 1200 # 긴 고민은 아주 길게 (약 3~4문단 가능)
+        
+    print(f"📏 [Auto-Scale] Input: {input_len} chars -> Allocating {dynamic_tokens} tokens")
+
     try:
         payload = {
             "model": "maum-on-gemma",
@@ -38,10 +48,10 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
             "stream": False,
             "options": {
                 "temperature": 0.7, 
-                "num_predict": 180
+                "num_predict": dynamic_tokens
             }
         }
-        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=60)
+        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=120)
         
         if res.status_code == 200:
             result = res.json().get('response', '').strip()

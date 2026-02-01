@@ -75,31 +75,10 @@
         @record="toggleRecording('question1')"
       />
 
-      <!-- Red Mode Specific: Physical Symptoms -->
-      <div v-if="uiMode === 'red'" class="symptom-check-section fade-in">
-          <label class="section-label">⚠️ 신체화 증상 체크 (오늘 느낀 불편함)</label>
-          <div class="symptom-grid">
-              <label 
-                v-for="opt in symptomOptions" 
-                :key="opt" 
-                class="symptom-chip"
-                :class="{ active: formData.symptoms.includes(opt) }"
-              >
-                  <input type="checkbox" :value="opt" v-model="formData.symptoms" hidden>
-                  {{ opt }}
-              </label>
-          </div>
-      </div>
+      <!-- Red Mode Specific: Physical Symptoms (REMOVED) -->
       
-      <!-- Red Mode Specific: Mood Intensity Slider -->
-      <div v-if="uiMode === 'red'" class="slider-section fade-in">
-          <label class="section-label">📉 우울감의 깊이 (1~10)</label>
-          <div class="slider-container">
-            <input type="range" min="1" max="10" v-model.number="formData.mood_intensity" class="range-slider">
-            <span class="slider-value">{{ formData.mood_intensity }}</span>
-          </div>
-          <p class="slider-hint">수치가 높을수록 힘듦을 의미합니다.</p>
-      </div>
+      <!-- Red Mode Specific: Mood Intensity Slider (REMOVED) -->
+
 
       <!-- Green Mode Specific: Gratitude -->
       <QuestionAccordion
@@ -136,14 +115,8 @@
         @record="toggleRecording('question4')"
       />
       
-      <!-- Red Mode: Safety Check -->
-      <div v-if="uiMode === 'red'" class="safety-check-box">
-          <label class="checkbox-container">
-              <input type="checkbox" v-model="formData.safety_flag">
-              <span class="checkmark"></span>
-              <span class="warning-text">혹시 충동적인 생각이 들었나요? (의료진에게 알림)</span>
-          </label>
-      </div>
+      <!-- Red Mode: Safety Check (REMOVED) -->
+
 
       <!-- Medication Check: Only for Severe/Paid Users (Red Mode) -->
       <!-- 경증 사용자(Green)는 약물 체크 불가 -->

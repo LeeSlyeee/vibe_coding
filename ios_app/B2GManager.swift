@@ -5,33 +5,57 @@ import Combine
 class B2GManager: ObservableObject {
     static let shared = B2GManager()
     
-    // 연동 상태 관리 (AppStorage 대신 UserDefaults 직접 관리로 변경 - 안정성 확보)
-    @Published var centerCode: String = "" {
+    // 연동 상태 관리 (Fort Knox Pattern)
+    // 1. Access Control: private(set) prevents external modification
+    @Published private(set) var centerCode: String = "" {
         didSet {
-            UserDefaults.standard.set(centerCode, forKey: "healthCenterCode")
+            if centerCode.isEmpty && !oldValue.isEmpty {
+                print("⚠️ [B2G] CenterCode Cleared! (Old: \(oldValue))")
+            }
         }
     }
-    
-    @Published var isLinked: Bool = false {
-        didSet {
-            UserDefaults.standard.set(isLinked, forKey: "isB2GLinked")
-        }
-    }
-    
-    @Published var lastSyncDate: Double = 0 {
-        didSet {
-            UserDefaults.standard.set(lastSyncDate, forKey: "lastSyncDate")
-        }
-    }
-    
+    @Published private(set) var isLinked: Bool = false
+    @Published private(set) var lastSyncDate: Double = 0
     @Published var isSyncing = false
     
+    // Explicit Save Helper (Dual Layer)
+    private func saveState() {
+        print("💾 [B2G] Saving State: \(centerCode) (Linked: \(isLinked))")
+        UserDefaults.standard.set(centerCode, forKey: "healthCenterCode")
+        UserDefaults.standard.set(centerCode, forKey: "healthCenterCode_BACKUP") // Save Backup
+        UserDefaults.standard.set(isLinked, forKey: "isB2GLinked")
+        UserDefaults.standard.set(lastSyncDate, forKey: "lastSyncDate")
+    }
+    
     private init() {
-        // Load Saved State
-        self.centerCode = UserDefaults.standard.string(forKey: "healthCenterCode") ?? ""
-        self.isLinked = UserDefaults.standard.bool(forKey: "isB2GLinked")
+        // 2. Auto-Recovery (Self-Healing)
+        let mainCode = UserDefaults.standard.string(forKey: "healthCenterCode") ?? ""
+        let backupCode = UserDefaults.standard.string(forKey: "healthCenterCode_BACKUP") ?? ""
+        
+        if !mainCode.isEmpty {
+            self.centerCode = mainCode
+            // [Fix] Trust the Code: If code exists, ALWAYS treat as linked.
+            self.isLinked = true
+            
+            // If stored boolean was false, correct it now.
+            if !UserDefaults.standard.bool(forKey: "isB2GLinked") {
+                UserDefaults.standard.set(true, forKey: "isB2GLinked")
+            }
+        } else if !backupCode.isEmpty {
+            print("🚑 [B2G] Main storage empty. Recovering from BACKUP...")
+            self.centerCode = backupCode
+            self.isLinked = true
+            // Repair Main
+            UserDefaults.standard.set(backupCode, forKey: "healthCenterCode")
+            UserDefaults.standard.set(true, forKey: "isB2GLinked")
+        }
+        
         self.lastSyncDate = UserDefaults.standard.double(forKey: "lastSyncDate")
     }
+    
+
+    
+
     
     // 보건소 코드 연결 시도 (실제 서버 연동)
     func connect(code: String, completion: @escaping (Bool, String) -> Void) {
@@ -41,7 +65,7 @@ class B2GManager: ObservableObject {
             return
         }
         
-        isSyncing = true
+        DispatchQueue.main.async { self.isSyncing = true }
         
         // Use APIService for centralized URL and Header management
         // This also ensures 'user_nickname' is sent (fixed in APIService)
@@ -58,16 +82,42 @@ class B2GManager: ObservableObject {
                         self.centerCode = trimmedCode.uppercased()
                         self.isLinked = true
                         
+                        // [Identity Unification] 
+                        // 서버가 계정 통합을 알리면, 앱의 정체성을 갈아끼웁니다.
+                        var successMessage = "연동에 성공했습니다!"
+                        
+                        if let ownerNick = json["owner_nickname"] as? String, !ownerNick.isEmpty {
+                            print("♻️ [B2G] Identity Merge: Switching to '\(ownerNick)'")
+                            
+                            // 1. Update Identity
+                            UserDefaults.standard.set(ownerNick, forKey: "userNickname")
+                            if let fullUsername = json["owner_username"] as? String {
+                                UserDefaults.standard.set(fullUsername, forKey: "app_username") // if needed
+                            }
+                            
+                            // 2. Set Message
+                            if let msg = json["message"] as? String {
+                                successMessage = msg
+                            } else {
+                                successMessage = "기존 계정(\(ownerNick))과 통합되었습니다."
+                            }
+                        }
+                        
+                        // [Fix] Explicit Save
+                        self.saveState()
+                        
                         // 센터 이름 저장 (옵션)
                         if let center = json["center"] as? [String: Any],
                            let centerName = center["name"] as? String {
                             UserDefaults.standard.set(centerName, forKey: "linkedCenterName")
-                            completion(true, "\(centerName)와 성공적으로 연결되었습니다!")
-                        } else {
-                            completion(true, "연동에 성공했습니다!")
                         }
                         
-                        self.syncData() // 연결 즉시 데이터 전송
+                        completion(true, successMessage)
+                        
+                        // [Critical] Identity Changed -> Must Force Pull All Data
+                        print("🚀 [B2G] Triggering Post-Merge Full Sync...")
+                        self.syncData(force: true) 
+                        
                     } else {
                         // 실패 메시지 파싱
                         let msg = json["error"] as? String ?? json["message"] as? String ?? "유효하지 않은 기관 코드입니다."
@@ -80,19 +130,54 @@ class B2GManager: ObservableObject {
         }
     }
     
-    // 연동 해제
-    func disconnect() {
+    // 연동 해제 (User Action Only)
+    func disconnect(force: Bool = false) {
+        print("🛡️ [B2G] Disconnect Blocked by Safety Lock!")
+        /*
+        guard force else {
+            print("🚫 [B2G] Automatic disconnect prevented. User must explicitly disconnect.")
+            return
+        }
+        
+        print("🚫 [B2G] Disconnecting from Center (User Action)...")
         self.centerCode = ""
         self.isLinked = false
         self.lastSyncDate = 0
+        
+
+        
+        UserDefaults.standard.removeObject(forKey: "healthCenterCode")
+        UserDefaults.standard.removeObject(forKey: "healthCenterCode_BACKUP") // Clear Backup
+        UserDefaults.standard.removeObject(forKey: "isB2GLinked")
+        UserDefaults.standard.removeObject(forKey: "linkedCenterName")
+        UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+        */
     }
     
+
+    
     // 백그라운드 데이터 동기화 (양방향: Fetch -> Merge -> Push)
-    func syncData() {
+    // [Differential Sync] force: true -> Full Sync
+    func syncData(force: Bool = false) {
+        // [Create Barrier] 이미 동기화 중이면 중복 실행 방지
+        if isSyncing {
+            print("⏳ [B2G] Sync already in progress. Skipping trigger.")
+            return
+        }
+        
+        // [Self-Healing] Before sync, check if we have code but bad state
+        if !centerCode.isEmpty && !isLinked {
+            DispatchQueue.main.async {
+                print("🚑 [B2G] Auto-repairing 'isLinked' state before sync...")
+                self.isLinked = true
+                self.saveState()
+            }
+        }
+        
         guard isLinked, !centerCode.isEmpty else { return }
         
-        isSyncing = true
-        print("🔄 [B2G] Start Full Sync (Pull + Push)...")
+        DispatchQueue.main.async { self.isSyncing = true }
+        print("🔄 [B2G] Start Full Sync (Pull + Push, Force: \(force))...")
         
         // 1. Pull (Server -> App)
         APIService.shared.fetchDiaries { [weak self] serverData in
@@ -100,29 +185,44 @@ class B2GManager: ObservableObject {
             
             if let data = serverData {
                 // Merge Data (Main Thread) -> Then Push
-                LocalDataManager.shared.mergeServerDiaries(data) {
-                    self.pushData()
+                DispatchQueue.main.async {
+                    LocalDataManager.shared.mergeServerDiaries(data) {
+                        self.pushData(force: force)
+                    }
                 }
             } else {
                 print("⚠️ [Sync] Fetch failed or no data, skipping merge.")
                 // Failure case runs on background thread, so dispatch to main
                 DispatchQueue.main.async {
-                    self.pushData()
+                    self.pushData(force: force)
                 }
             }
         }
     }
     
-    // 기존의 단방향 Push 로직 분리
-    func pushData() {
-        print("🔄 [B2G] Push Local Data to Server...")
+    // [Differential Sync] force: true -> Full Upload, force: false -> Delta Upload
+    func pushData(force: Bool = false) {
+        print("🔄 [B2G] Push Local Data to Server (Force: \(force))...")
         
         // 1. 로컬 데이터 수집
         // CRITICAL FIX: Must match APIService default ("Guest") to ensure consistent User Identity
         let nickname = UserDefaults.standard.string(forKey: "userNickname") ?? "Guest"
         print("👤 [B2G] Syncing Identity: \(nickname)")
         
-        let diaries = LocalDataManager.shared.diaries
+        var diaries = LocalDataManager.shared.diaries
+        
+        // [Optimized] Filter only Dirty Items unless Force Sync
+        if !force {
+            diaries = diaries.filter { $0.isSynced != true }
+        }
+        
+        if diaries.isEmpty {
+            print("✅ [B2G] Nothing to push. (All synced)")
+            DispatchQueue.main.async { self.isSyncing = false }
+            return
+        }
+        
+        print("📤 [B2G] Uploading \(diaries.count) items...")
         
         // 2. 일기 데이터를 심플한 포맷으로 변환 -> 상세 내용 포함으로 강화
         let metrics = diaries.map { diary -> [String: Any] in
@@ -139,7 +239,13 @@ class B2GManager: ObservableObject {
                 "ai_comment": diary.ai_comment ?? "",
                 "ai_advice": diary.ai_advice ?? "",
                 "ai_analysis": diary.ai_analysis ?? "",
-                "ai_prediction": diary.ai_prediction ?? ""
+                "ai_prediction": diary.ai_prediction ?? "",
+                
+                // [New] Rich Data Fields
+                "weather": diary.weather ?? "",
+                "medication_taken": diary.medication_taken,
+                "symptoms": diary.symptoms ?? [], // Array of strings
+                "gratitude": diary.gratitude_note ?? ""
             ]
         }
         
@@ -151,13 +257,47 @@ class B2GManager: ObservableObject {
         ]
         
         // 3. 백엔드 전송 (APIService 사용)
-        APIService.shared.syncCenterData(payload: body) { success in
+        APIService.shared.syncCenterData(payload: body) { success, errorMsg in
+            // [Sync Chain] Trigger 217 Web Sync immediately after B2G Sync
+            if success {
+                print("🔄 [B2G] Center Sync Success. Triggering Web (217) Sync...")
+                
+                // [Optimization] Mark these specific diaries as Synced locally
+                let sentIds = diaries.compactMap { $0.id }
+                LocalDataManager.shared.markAsSynced(ids: sentIds)
+                
+                // [Fix] Save Sync Date Explicitly
+                DispatchQueue.main.async { 
+                    self.lastSyncDate = Date().timeIntervalSince1970 
+                    self.saveState() 
+                }
+                
+                // Trigger Legacy Web Sync (if needed)
+                APIService.shared.triggerBulkSync { _ in 
+                    print("🏁 [B2G] Full Sync Chain Completed.")
+                }
+            }
+            
             DispatchQueue.main.async {
                 self.isSyncing = false
                 if success {
                     self.lastSyncDate = Date().timeIntervalSince1970
+                } else if let msg = errorMsg, msg.contains("유효하지 않은 센터 코드") {
+                     // 센터 코드가 만료되었거나 삭제된 경우 -> 연결 해제
+                     print("🚫 [B2G] Invalid Code Detected. Server said: \(msg)")
+                     // [Safety Fix] Do NOT auto-disconnect. 
+                     // self.disconnect(force: false) 
                 }
             }
         }
+    }
+
+    
+    // [Dev] Force Link Helper
+    func forceLink(code: String) {
+        print("🛠️ [B2G] Force Linking to \(code)")
+        self.centerCode = code
+        self.isLinked = true
+        self.saveState()
     }
 }

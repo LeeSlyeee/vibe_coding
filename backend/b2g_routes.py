@@ -18,11 +18,14 @@ def get_db():
 import requests
 
 # ----------------- 1. Verify Center Code (Proxy Pattern) -----------------
+@b2g_bp.route('/centers/verify-code/', methods=['POST'])
+@b2g_bp.route('/api/centers/verify-code/', methods=['POST'])
 @b2g_bp.route('/api/v1/centers/verify-code/', methods=['POST'])
 def verify_code():
     db = get_db()
     data = request.json
-    code = data.get('code', '').strip().upper()
+    # Frontend sends 'center_code', old logic might send 'code'
+    code = (data.get('center_code') or data.get('code', '')).strip().upper()
     
     # Strategy: Local First -> Then Proxy to InsightMind (Port 8000)
     
@@ -45,8 +48,8 @@ def verify_code():
         # Assuming InsightMind Django is on 8000 and has the same endpoint structure?
         # Or maybe it has a different endpoint? Usually it's /api/v1/centers/verify-code/
         # Let's try to pass the request.
-        print(f"🔄 Proxying verification for {code} to InsightMind(8000)...")
-        res = requests.post("http://192.168.0.22:8000/api/v1/centers/verify-code/", json={"code": code}, timeout=3)
+        print(f"🔄 Proxying verification for {code} to InsightMind(150.230.7.76.nip.io)...")
+        res = requests.post("https://150.230.7.76.nip.io/api/v1/centers/verify-code/", json={"code": code}, timeout=3, verify=False)
         
         if res.status_code == 200:
             ext_data = res.json()
@@ -89,6 +92,7 @@ def verify_code():
 
 # ----------------- 2. Connect User to Center -----------------
 @b2g_bp.route('/api/v1/b2g_sync/connect/', methods=['POST'])
+@b2g_bp.route('/api/b2g_sync/connect/', methods=['POST'])
 @jwt_required()
 def connect_center():
     user_id = get_jwt_identity()
@@ -146,15 +150,292 @@ def sync_data():
     center_code = data.get('center_code')
     nickname = data.get('user_nickname')
     
-    # 1. Local Log
+    # 1. Local Log & Persistence
     print(f"📥 [B2G Sync] Data received from {nickname} for {center_code}")
     
-    # 2. Forward to InsightMind (8000)
-    # This ensures the 'Real' B2G dashboard at 8000 gets the data too.
     try:
-        print(f"📤 Forwarding data to InsightMind(8000)...")
-        requests.post("http://192.168.0.22:8000/api/v1/centers/sync-data/", json=data, timeout=2)
+        # Save to 'b2g_metrics' collection for Dashboard
+        # Upsert based on (user, center) or just Append?
+        # Dashboard likely queries time-series.
+        
+        # We'll save the raw payload with a timestamp
+        payload = {
+            "center_code": center_code,
+            "user_nickname": nickname,
+            "metrics": data.get('mood_metrics', []),
+            "risk_level": data.get('risk_level', 0),
+            "synced_at": datetime.utcnow()
+        }
+        
+        # Insert (History Log)
+        db.b2g_metrics.insert_one(payload)
+        
+        # Update Latest Status for User/Center Connection
+        db.b2g_connections.update_one(
+            {"user_nickname": nickname, "center_code": center_code}, # Need to ensure nickname matching or use Code?
+            # Actually, usually user_id is better, but this is 'Guest' compatible sync.
+            {"$set": {
+                "last_sync": datetime.utcnow(), 
+                "last_risk_level": data.get('risk_level', 0),
+                "latest_metrics": data.get('mood_metrics', [])[:1] # Keep latest one for quick view
+            }},
+            upsert=True
+        )
+        
+        print(f"✅ [B2G Sync] Data saved to DB for {nickname}")
+        return jsonify({"message": "Data synced", "success": True}), 200
+        
     except Exception as e:
-        print(f"⚠️ Forwarding Failed: {e}") 
+        print(f"❌ [B2G Sync] Save Error: {e}")
+        return jsonify({"message": "Save Failed", "error": str(e)}), 500
+
+# ----------------- 4. Check Connection Status (New) -----------------
+@b2g_bp.route('/api/b2g_sync/status/', methods=['GET'])
+@jwt_required()
+def check_status():
+    user_id = get_jwt_identity()
+    db = get_db()
     
-    return jsonify({"message": "Data synced"}), 200
+    # Check users collection
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return jsonify({"linked": False, "message": "User not found"}), 404
+
+    code = user.get("linked_center_code")
+    
+    if code:
+        return jsonify({"linked": True, "code": code}), 200
+        
+    return jsonify({"linked": False}), 200
+
+# ----------------- 5. Server-to-Server Sync (Web -> 150) -----------------
+def sync_to_insight_mind(diary_data, user_id):
+    """
+    Web(217)에서 작성된 일기를 Admin(150) 서버로 전송
+    - Fire and Forget 방식 (메인 스레드 차단 방지)
+    - 앱(iOS)과 동일한 포맷 유지
+    """
+    try:
+        from app import mongo
+        import requests
+        import threading
+        
+        def _bg_task():
+            from app import app
+            with app.app_context():
+                try:
+                    # 1. Get User Info
+                    user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+                    if not user: return
+                    
+                    center_code = user.get("linked_center_code")
+                    if not center_code: 
+                        print(f"⏩ [B2G Web] Skipping sync. No center linked for {user.get('username')}")
+                        return
+                        
+                    nickname = user.get('nickname', user.get('username'))
+                    
+                    # 2. Format Payload (Same as iOS)
+                    # diary_data is 'raw_diary' dict
+                    
+                    # Safe Decrypt (If needed, but usually passed raw before encryption in create_diary)
+                    # If passed AFTER encryption, we need to decrypt.
+                    
+                    # Assuming we pass RAW data here.
+                    
+                    metrics = [{
+                        "created_at": diary_data.get('created_at').strftime('%Y-%m-%d %H:%M:%S') if diary_data.get('created_at') else "",
+                        "date": diary_data.get('created_at').strftime('%Y-%m-%d') if diary_data.get('created_at') else "",
+                        "mood_level": diary_data.get('mood_level', 3),
+                        "score": diary_data.get('mood_level', 3), # Dashboard uses 'score' often
+                        
+                        # Content
+                        "event": diary_data.get('event', ''),
+                        "emotion": diary_data.get('emotion_desc', ''),
+                        "meaning": diary_data.get('emotion_meaning', ''),
+                        "selftalk": diary_data.get('self_talk', ''),
+                        "sleep": diary_data.get('sleep_condition', '') or diary_data.get('sleep_desc', ''),
+                        
+                        # AI Data
+                        "ai_comment": diary_data.get('ai_comment', ''),
+                        "ai_advice": diary_data.get('ai_advice', ''), # If any
+                        "ai_analysis": diary_data.get('ai_analysis', ''), # If any
+                        "ai_prediction": diary_data.get('ai_prediction', ''),
+                        
+                        # Rich Data (New)
+                        "weather": diary_data.get('weather', ''),
+                        "medication_taken": diary_data.get('medication_taken', False),
+                        "symptoms": diary_data.get('symptoms', []),
+                        "gratitude": diary_data.get('gratitude_note', '')
+                    }]
+                    
+                    payload = {
+                        "center_code": center_code,
+                        "user_nickname": nickname,
+                        "risk_level": user.get('risk_level', 0),
+                        "mood_metrics": metrics
+                    }
+                    
+                    print(f"🚀 [B2G Web] Pushing to InsightMind(150)... User: {nickname}, Code: {center_code}")
+                    
+                    # 3. Send
+                    url = "https://150.230.7.76.nip.io/api/v1/centers/sync-data/"
+                    res = requests.post(url, json=payload, timeout=5, verify=False) # Skip SSL verify for nip.io self-signed if needed
+                    
+                    if res.status_code == 200:
+                        print(f"✅ [B2G Web] Sync Success: {res.json()}")
+                    else:
+                        print(f"⚠️ [B2G Web] Sync Failed ({res.status_code}): {res.text}")
+                        
+                except Exception as ex:
+                    print(f"❌ [B2G Web] Sync Error: {ex}")
+
+        # Run in Thread
+        threading.Thread(target=_bg_task).start()
+        
+    except Exception as e:
+        print(f"❌ [B2G Web] Launcher Error: {e}")
+
+def pull_from_insight_mind(user_id, run_async=True):
+    """
+    Admin(150) -> Web(217) 데이터 동기화
+    run_async=False : 로그인 시 확실한 동기화를 위해 동기 실행 권장
+    """
+    try:
+        from app import mongo
+        import requests
+        import threading
+        from app import encrypt_data # Encrypt before save
+        
+        def _bg_pull_task():
+            # [Fix] Import explicit app object for thread context
+            # If running sync, we might already have context, but safe to nest
+            from app import app
+            # Check if we are already in app context
+            try:
+                # If we are in Sync mode (Main Thread), `app` is available? 
+                # Just use app.app_context() always.
+                with app.app_context():
+                    _core_pull_logic(mongo, user_id, encrypt_data)
+            except RuntimeError:
+                # Already inside context?
+                _core_pull_logic(mongo, user_id, encrypt_data)
+        
+        def _core_pull_logic(mongo, user_id, encrypt_data):
+            try:
+                # 1. Get User Info
+                user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+                if not user: return
+                
+                # [Fix] Check both field names
+                center_code = user.get("linked_center_code") or user.get("center_code")
+                if not center_code: 
+                    print(f"⏩ [B2G Web] Pull skipped. No center code linked for {user.get('username')}")
+                    return
+                
+                nickname = user.get('nickname', user.get('username'))
+                
+                print(f"🚀 [B2G Web] Pulling from InsightMind(150)... User: {nickname}")
+                
+                # 2. Fetch from 150
+                url = "https://150.230.7.76.nip.io/api/v1/centers/sync-data/"
+                params = {"center_code": center_code, "user_nickname": nickname}
+                
+                res = requests.get(url, params=params, timeout=5, verify=False)
+                
+                if res.status_code == 200:
+                    server_items = res.json() # List of dicts
+                    print(f"📥 [B2G Web] Fetched {len(server_items)} items from Server.")
+                    
+                    count = 0
+                    for item in server_items:
+                        # 3. Check Duplicate (by date & user)
+                        date_str = item.get('created_at', '')[:10] # YYYY-MM-DD
+                        if not date_str: continue
+                        
+                        # MongoDB Date Range Check for that day
+                        start = datetime.strptime(date_str, "%Y-%m-%d")
+                        end = start + timedelta(days=1)
+                        
+                        exists = mongo.db.diaries.find_one({
+                            "user_id": str(user_id),
+                            "created_at": {"$gte": start, "$lt": end}
+                        })
+                        
+                        if not exists:
+                            # 4. Convert & Save
+                            raw_diary = {
+                                'user_id': str(user_id),
+                                'event': item.get('event', ''),
+                                'mood_level': item.get('mood_level', 3),
+                                'mood_intensity': 0,
+                                'mode': 'green', # Default
+                                
+                                # Rich Data
+                                'weather': item.get('weather'),
+                                'sleep_condition': item.get('sleep_condition'),
+                                'emotion_desc': item.get('emotion_desc'),
+                                'emotion_meaning': item.get('emotion_meaning'),
+                                'self_talk': item.get('self_talk'),
+                                'medication_taken': item.get('medication_taken', False),
+                                'symptoms': item.get('symptoms', []),
+                                'gratitude_note': item.get('gratitude_note', ''),
+                                
+                                # AI
+                                'ai_prediction': item.get('ai_prediction', ''),
+                                'ai_comment': item.get('ai_comment', ''),
+                                'ai_analysis': item.get('ai_analysis', ''),
+                                'created_at': datetime.strptime(item.get('created_at'), '%Y-%m-%d %H:%M:%S')
+                            }
+                            
+                            # Encrypt!
+                            encrypted = encrypt_data(raw_diary)
+                            mongo.db.diaries.insert_one(encrypted)
+                            count += 1
+                    
+                    if count > 0:
+                        print(f"✅ [B2G Web] Pulled & Restored {count} missing diaries.")
+                    else:
+                        print("✨ [B2G Web] All synced. No missing items.")
+                        
+                else:
+                    print(f"⚠️ [B2G Web] Pull Failed ({res.status_code})")
+                    
+            except Exception as ex:
+                print(f"❌ [B2G Web] Pull Logic Error: {ex}")
+
+        if run_async:
+            threading.Thread(target=_bg_pull_task).start()
+        else:
+            print("⚓️ [B2G Sync] Running Synchronously...")
+            _bg_pull_task()
+        
+    except Exception as e:
+        print(f"❌ [B2G Web] Launcher Error: {e}")
+
+def recover_center_code(nickname):
+    """
+    [Self-Healing] 150 서버에 물어봐서 연동된 코드가 있는지 확인
+    Return: code string or None
+    """
+    try:
+        import requests
+        print(f"🕵️ [B2G Web] Checking link recovery for '{nickname}'...")
+        
+        url = "https://150.230.7.76.nip.io/api/v1/centers/sync-data/"
+        params = {
+            "action": "check_link", 
+            "user_nickname": nickname
+        }
+        
+        res = requests.get(url, params=params, timeout=3, verify=False)
+        if res.status_code == 200:
+            data = res.json()
+            if data.get('linked') and data.get('center_code'):
+                print(f"🚑 [B2G Web] Link Recovered! -> {data.get('center_code')}")
+                return data.get('center_code')
+                
+        return None
+    except Exception as e:
+        print(f"❌ [B2G Web] Recovery Failed: {e}")
+        return None

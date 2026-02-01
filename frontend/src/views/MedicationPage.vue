@@ -4,9 +4,8 @@
       <h1>약물 관리</h1>
       <div class="header-buttons">
         <button class="checkup-btn" @click="$router.push('/assessment')">📋 자가진단</button>
-        <!-- 중증(Red) 사용자만 약물 추가 가능 -->
-        <button v-if="isSevere" class="add-btn" @click="showAddModal = true">+ 약 추가</button>
-        <button v-else class="add-btn locked" @click="showUpgradeAlert">🔒 약 추가</button>
+        <!-- 모든 사용자 약물 추가 가능 -->
+        <button class="add-btn" @click="showAddModal = true">+ 약 추가</button>
       </div>
     </header>
 
@@ -75,6 +74,8 @@ import { authAPI } from '../services/api' // Import authAPI
 
 const userRiskLevel = ref(1);
 const isSevere = computed(() => userRiskLevel.value >= 3);
+const isLinked = ref(localStorage.getItem('b2g_is_linked') === 'true');
+const isPremium = ref(false);
 
 const currentDate = ref(new Date())
 const medications = ref([])
@@ -114,8 +115,9 @@ const fetchData = async () => {
     ])
     medications.value = medsRes
     logs.value = logsRes
-    if (userRes && userRes.risk_level) {
-        userRiskLevel.value = userRes.risk_level;
+    if (userRes) {
+        if (userRes.risk_level) userRiskLevel.value = userRes.risk_level;
+        if (userRes.linked_center_code) isLinked.value = true;
     }
   } catch (e) {
     console.error("데이터 로딩 실패", e)

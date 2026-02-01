@@ -33,7 +33,7 @@ except ImportError as e:
 
 
 class EmotionAnalysis:
-    def __init__(self, light_mode=False):
+    def __init__(self):
         self.tokenizer = None
         self.model = None
         self.max_len = 50
@@ -66,10 +66,7 @@ class EmotionAnalysis:
 
                
         # === Tensorflow / LSTM Model Logic ===
-        # [User Request] Switch to Full LLM (Gemma) Mode. Disabling LSTM loading.
-        self.use_lstm = False 
-        
-        if self.use_lstm and TENSORFLOW_AVAILABLE and not light_mode:
+        if TENSORFLOW_AVAILABLE:
             self.tokenizer = Tokenizer()
             # Check for saved model
             base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -98,8 +95,8 @@ class EmotionAnalysis:
             
             print("AI Model initialization finished.")
 
-        else: 
-             print("Initializing Gemma-based Emotion Analysis (LSTM Disabled)...")
+        else: # TENSORFLOW NOT AVAILABLE
+             print("Initializing Fallback Emotion Analysis (Keyword based - 5 classes)...")
 
         # Load Comment Bank (Safety Net) - Always load this
         self.load_comment_bank()
@@ -296,13 +293,12 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "maum-on-gemma", # Reverted to user requested model
+                "model": "maum-on-gemma", # Use Custom Model Name
                 "prompt": prompt_text,
                 "stream": False,
-                # No 'format': 'json' here because we want free text
                 "options": {
                     "temperature": 0.5,
-                    "num_predict": 100 
+                    "num_predict": 60 
                 }
             }
             
@@ -328,398 +324,7 @@ class EmotionAnalysis:
 
         except Exception as e:
             print(f"❌ [Insight] Inference Failed: {str(e)}")
-            # Fallback Messages (Safety Net)
-            fallbacks = [
-                "오늘 하루도 수고 많으셨어요. 편안한 마음으로 기록해보세요.",
-                "날씨가 당신의 마음에 어떤 영향을 주었나요? 솔직하게 적어보세요.",
-                "가끔은 쉬어가는 날도 필요해요. 오늘의 감정을 들여다볼까요?",
-                "당신의 이야기가 궁금해요. 오늘 어떤 일이 있었나요?"
-            ]
-            return random.choice(fallbacks)
-
-    def generate_chat_reaction(self, user_text):
-        """
-        Generates a rich, empathetic reaction to the user's chat input.
-        """
-        if not user_text: return None
-        
-        sanitized = self._sanitize_context(user_text)
-        
-        prompt_text = (
-            f"내담자의 말: \"{sanitized}\"\n\n"
-            "너는 다정하고 통찰력 있는 심리 상담사야. 내담자의 말을 듣고 **풍부한 공감과 긍정적인 피드백**을 해줘.\n"
-            "지시사항:\n"
-            "1. 내담자의 감정이나 행동을 구체적으로 언급하며 '그렇군요', '정말 ~하셨겠어요'라고 공감해.\n"
-            "2. 그 행동이나 감정이 얼마나 소중한지, 또는 잘 대처했는지 칭찬해줘. (피드백)\n"
-            "3. 말투는 따뜻하고 부드러운 '해요체'를 써.\n"
-            "4. 질문은 하지 마. (다음 질문은 정해져 있어)\n"
-            "5. 2~3문장으로 100자 이내로 작성해.\n\n"
-            "리액션:"
-        )
-        
-        try:
-            payload = {
-                "model": "maum-on-gemma",
-                "prompt": prompt_text,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "num_predict": 150
-                }
-            }
-            
-            url = "http://localhost:11434/api/generate"
-            response = requests.post(url, json=payload, timeout=20)
-            
-            if response.status_code == 200:
-                result = response.json()
-                reaction = result.get('response', '').strip()
-                if reaction.startswith('"') and reaction.endswith('"'):
-                    reaction = reaction[1:-1]
-                return reaction
             return None
-        except Exception as e:
-            print(f"❌ Reaction Gen Error: {e}")
-            # Fallback Reactions (Safety Net)
-            fallbacks = [
-                "그렇군요. 이야기해주셔서 정말 고마워요. 😌",
-                "저런, 그런 일이 있으셨군요. 마음이 쓰이네요. 🥺",
-                "정말 공감이 가요. 💭",
-                "네, 계속 이야기해주세요. 제가 듣고 있어요. 👂",
-                "어떤 기분인지 조금은 알 것 같아요. 💫"
-            ]
-            return random.choice(fallbacks)
-
-    def _rebuild_inference_models(self):
-        # Seq2Seq Removed
-        pass
-
-    # Function moved to end of file to fix indentation 
-
-    def train_comment_model(self):
-        # Seq2Seq Removed
-        pass
-
-    def predict(self, text):
-        import time
-        start_time = time.time()
-        
-        if not text: 
-            return {"emotion": "분석 불가", "comment": "내용이 없습니다."}
-
-        emotion_result = "분석 불가"
-        
-        # [User Request] Gemma-First Analysis
-        try:
-            llm_emotion, llm_comment = self.analyze_diary_with_local_llm(text)
-            if llm_emotion:
-                 emotion_result = llm_emotion
-            else:
-                 emotion_result = self._fallback_predict(text)
-            
-            # Store comment for next step
-            self.temp_llm_comment = llm_comment
-        except:
-            emotion_result = self._fallback_predict(text)
-            self.temp_llm_comment = None
-            
-        # 2. Comment Generation
-        comment_result = getattr(self, 'temp_llm_comment', None)
-        
-
-
-
-        
-        # Final Fallback
-        if not comment_result:
-            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 정말 수고하셨어요."
-            
-        print(f"✨ [Timer] Total AI Analysis took: {time.time() - start_time:.3f}s")
-        return {
-            "emotion": emotion_result,
-            "comment": comment_result
-        }
-
-    def _fallback_predict(self, text):
-        # Load keywords from MongoDB
-        if self.db is None:
-             return "분석 불가"
-
-        try:
-            # Fetch all keywords from Mongo
-            # This is inefficient for large datasets but ok for small keywords bank
-            keywords = list(self.db.emotion_keywords.find())
-            
-            scores = [0] * 5
-            found_any = False
-            
-            for kw in keywords:
-                if kw['keyword'] in text:
-                    scores[kw['emotion_label']] += kw['frequency']
-                    found_any = True
-            
-            if found_any:
-                max_score = max(scores)
-                total_score = sum(scores)
-                confidence = (max_score / total_score * 100) if total_score > 0 else 85.0
-                best_idx = scores.index(max_score)
-                return f"{self.classes[best_idx]} ({confidence:.1f}%)"
-            else:
-                return "그저그래 (40.0%)" 
-        except Exception as e:
-            print(f"Fallback error: {e}")
-            return "분석 불가"
-
-    def load_sentiment_corpus(self):
-        """
-        Load 'Sentiment Dialogue Corpus' (Training & Validation).
-        Use Full 60-Class Granularity (E10 ~ E69).
-        """
-        import json
-        
-        files = [
-            '감성대화말뭉치(최종데이터)_Training.json',
-            '감성대화말뭉치(최종데이터)_Validation.json'
-        ]
-        
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        import glob
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # Use glob to avoid Unicode normalization issues (NFC vs NFD) on macOS
-        files = glob.glob(os.path.join(base_dir, "*Training.json")) + glob.glob(os.path.join(base_dir, "*Validation.json"))
-        
-        if not files:
-             print("No corpus files found via glob!")
-        
-        for fpath in files:
-            fname = os.path.basename(fpath)
-            # fpath is already absolute from glob
-             
-            print(f"Loading corpus: {fname}...")
-            try:
-                with open(fpath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    
-                new_texts = []
-                new_labels = []
-                
-                for entry in data:
-                    try:
-                        etype = entry.get('profile', {}).get('emotion', {}).get('type', '')
-                        
-                        # Only use codes defined in our map (E10-E69)
-                        if etype in self.code_to_idx:
-                            # Extract user text
-                            content = entry.get('talk', {}).get('content', {})
-                            text = content.get('HS01', '')
-                            system_text = content.get('SS01', '')
-                            
-                            if text:
-                                label_idx = self.code_to_idx[etype]
-                                new_texts.append(text)
-                                new_labels.append(label_idx)
-                                
-                                # Store for comment training if pair exists
-                                if system_text:
-                                    self.conversation_pairs.append((text, system_text))
-                                    
-                    except Exception as e:
-                        continue
-                        
-                # Add to training set
-                self.train_texts.extend(new_texts)
-                self.train_labels = np.concatenate((self.train_labels, np.array(new_labels)))
-                
-                print(f"Added {len(new_texts)} samples from {fname}")
-                
-            except Exception as e:
-                print(f"Error loading corpus {fname}: {e}")
-
-
-    def load_db_data(self):
-        """
-        Load data from the Diary table to fine-tune the model.
-        Returns:
-            X (list): Combined text (event + emotion_desc + self_talk)
-            y (list): Emotion labels (0-4)
-        """
-        print("Loading data from Database...")
-        session = self.Session()
-        X = []
-        y = []
-        try:
-            from models import Diary
-            diaries = session.query(Diary).all()
-            
-            # Mood Level to Label Mapping
-            # 5(Happy)->0, 4(Calm)->1, 3(Neutral)->2, 2(Depressed)->3, 1(Angry)->4
-            mapping = {5: 0, 4: 1, 3: 2, 2: 3, 1: 4}
-            
-            for d in diaries:
-                if not d.mood_level: continue
-                
-                label = mapping.get(d.mood_level)
-                if label is None: continue
-                
-                # Combine text fields for rich context
-                text = f"{d.event} {d.emotion_desc} {d.self_talk}"
-                X.append(text)
-                y.append(label)
-                
-            print(f"Loaded {len(X)} samples from Database.")
-            return X, y
-            
-        except Exception as e:
-            print(f"Error loading DB data: {e}")
-            return [], []
-        finally:
-            session.close()
-
-
-
-
-
-    def train_comment_model(self):
-        """
-        Train a Seq2Seq model using ChatbotData.csv AND Sentiment Dialogue Corpus
-        """
-        if not TENSORFLOW_AVAILABLE: return
-
-        print("Training Comment Generation Model (Seq2Seq)...")
-        try:
-            import os
-            import pickle
-            
-            # 1. Load ChatbotData.csv
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            data_path = os.path.join(base_dir, 'ChatbotData.csv')
-            questions = []
-            answers = []
-            
-            if os.path.exists(data_path):
-                df = pd.read_csv(data_path)
-                # Take a sample to keep training time reasonable, or all? 
-                # Let's take mixed sample.
-                df = df.sample(frac=1).reset_index(drop=True)
-                questions = df['Q'].astype(str).tolist()[:5000] # Cap at 5000 for speed
-                # Char-level: Use \t for Start, \n for End
-                answers = df['A'].apply(lambda x: '\t' + str(x) + '\n').tolist()[:5000]
-            
-            # 2. Add Sentiment Dialogue Corpus
-            if hasattr(self, 'conversation_pairs'):
-                print(f"Integrating {len(self.conversation_pairs)} pairs from Sentiment Corpus...")
-                # Sample 5000 from here too to balance
-                import random
-                pairs = self.conversation_pairs
-                if len(pairs) > 5000:
-                    pairs = random.sample(pairs, 5000)
-                
-                for q, a in pairs:
-                    questions.append(str(q))
-                    answers.append('\t' + str(a) + '\n')
-            
-            print(f"Total Comment Training Samples: {len(questions)}")
-
-            # Shared Tokenizer (Character Level for better Korean convergence without Mecab)
-            # Filters: Don't filter \t and \n as they are our tokens!
-            self.comment_tokenizer = Tokenizer(char_level=True, filters='!"#$%&()*+,-./:;<=>?@[\\]^`{|}~') 
-            self.comment_tokenizer.fit_on_texts(questions + answers)
-            
-            vocab_size = len(self.comment_tokenizer.word_index) + 1
-            print(f"Comment Vocab Size (Char-level): {vocab_size}")
-
-            # Encoder Data
-            tokenized_Q = self.comment_tokenizer.texts_to_sequences(questions)
-            encoder_input_data = pad_sequences(tokenized_Q, maxlen=self.comment_max_len, padding='post')
-            
-            # Decoder Data
-            tokenized_A = self.comment_tokenizer.texts_to_sequences(answers)
-            decoder_input_data = pad_sequences(tokenized_A, maxlen=self.comment_max_len, padding='post')
-            
-            # Decoder Target (Shifted-by-one)
-            decoder_target_data = np.zeros_like(decoder_input_data, dtype="float32")
-            decoder_target_data[:, :-1] = decoder_input_data[:, 1:]
-            decoder_target_data = np.expand_dims(decoder_target_data, -1)
-
-            # Model Architecture
-            latent_dim = 256
-            
-            # Encoder
-            encoder_inputs = Input(shape=(None,), name='enc_input')
-            enc_emb_layer = Embedding(vocab_size, latent_dim, name='enc_embedding')
-            enc_emb = enc_emb_layer(encoder_inputs)
-            encoder_lstm = LSTM(latent_dim, return_state=True, name='enc_lstm')
-            encoder_outputs, state_h, state_c = encoder_lstm(enc_emb)
-            encoder_states = [state_h, state_c]
-            
-            # Decoder
-            decoder_inputs = Input(shape=(None,), name='dec_input')
-            dec_emb_layer = Embedding(vocab_size, latent_dim, name='dec_embedding')
-            dec_emb = dec_emb_layer(decoder_inputs)
-            decoder_lstm = LSTM(latent_dim, return_sequences=True, return_state=True, name='dec_lstm')
-            decoder_outputs, _, _ = decoder_lstm(dec_emb, initial_state=encoder_states)
-            decoder_dense = Dense(vocab_size, activation='softmax', name='dec_dense')
-            decoder_outputs = decoder_dense(decoder_outputs)
-            
-            self.comment_model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
-            self.comment_model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-            
-            print("Fitting Seq2Seq Model (Char-level)...")
-            self.comment_model.fit([encoder_input_data, decoder_input_data], decoder_target_data,
-                                   batch_size=64, epochs=15, validation_split=0.2, verbose=1)
-                                   
-            print("Comment Model Trained. Saving...")
-            
-            # Save Main Model
-            self.comment_model.save(self.comment_model_path)
-            
-            # Save Tokenizer
-            with open(self.comment_tokenizer_path, 'wb') as handle:
-                pickle.dump(self.comment_tokenizer, handle)
-
-            # Construct & Save Inference Models
-            self.enc_model = Model(encoder_inputs, encoder_states)
-            self.enc_model.save(os.path.join(base_dir, 'comment_enc_model.h5'))
-            
-            dec_state_input_h = Input(shape=(latent_dim,), name='dec_input_h')
-            dec_state_input_c = Input(shape=(latent_dim,), name='dec_input_c')
-            dec_states_inputs = [dec_state_input_h, dec_state_input_c]
-            
-            dec_emb2 = dec_emb_layer(decoder_inputs)
-            dec_outputs2, state_h2, state_c2 = decoder_lstm(dec_emb2, initial_state=dec_states_inputs)
-            dec_states2 = [state_h2, state_c2]
-            dec_outputs2 = decoder_dense(dec_outputs2)
-            
-            self.dec_model = Model([decoder_inputs] + dec_states_inputs, [dec_outputs2] + dec_states2)
-            self.dec_model.save(os.path.join(base_dir, 'comment_dec_model.h5'))
-            
-            print("Inference models saved.")
-            
-        except Exception as e:
-            print(f"Error training comment model: {e}")
-
-    def _rebuild_inference_models(self):
-        """Rebuild inference models from loaded main model or load separate files"""
-        try:
-            from tensorflow.keras.models import load_model
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            enc_path = os.path.join(base_dir, 'comment_enc_model.h5')
-            dec_path = os.path.join(base_dir, 'comment_dec_model.h5')
-            
-            if os.path.exists(enc_path) and os.path.exists(dec_path):
-                self.enc_model = load_model(enc_path)
-                self.dec_model = load_model(dec_path)
-                print("Inference models loaded successfully.")
-            else:
-                print("Inference model files missing. Comment generation may fail.")
-        except Exception as e:
-            print(f"Error loading inference models: {e}")
-
-    # Seq2Seq Generation helpers removed
-
-
 
     def analyze_diary_with_local_llm(self, text, history_context=None, user_risk_level=1):
         # [Local AI Mode] Uses Local Ollama (Gemma 2) for Analysis.
@@ -767,7 +372,7 @@ class EmotionAnalysis:
                 f"2. 만약 내담자가 '죽고 싶다' 등 위험한 표현을 했거나({found_keywords}), 감정이 오랫동안 가라앉아 있다면 '추가 질문'을 생성해줘.\n"
                 f"3. 단순히 내용을 요약하지 말고, 전문적인 심리 분석 코멘트를 해줘.\n\n"
                 f"### [필수 답변 형식]:\n"
-                f"Emotion: (happy, sad, angry, neutral, panic 중 하나)\n"
+                f"Emotion: ('행복', '우울', '분노', '평온', '불안', '당황' 중 하나, 반드시 한국어로)\n"
                 f"Confidence: (0~100 숫자만)\n"
                 f"NeedFollowup: (YES 또는 NO)\n"
                 f"Question: (NeedFollowup이 YES일 때만, 내담자에게 물어볼 추가 질문 1문장. 아니면 'None')\n"
@@ -780,8 +385,8 @@ class EmotionAnalysis:
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {
-                    "temperature": 0.3, # Keep low for stability, let prompt drive urgency
-                    "num_predict": 250 
+                    "temperature": 0.3, 
+                    "num_predict": 160 # Optimized for Speed (OCI CPU)
                 }
             }
             
@@ -790,66 +395,105 @@ class EmotionAnalysis:
             
             if response.status_code != 200:
                 print(f"❌ Ollama Error {response.status_code}: {response.text}")
-                return None, None, False, None
+                return None, None
                 
             result = response.json()
             response_text = result.get('response', '').strip()
             print(f"🔍 Raw Output: {response_text}")
             
+            # Use Regex to parse Korean output
             import re
             
-            # 1. Emotion (Flexible Regex)
-            emotion_match = re.search(r"Emotion:\s*([a-zA-Z]+)", response_text, re.IGNORECASE)
-            emotion_str = emotion_match.group(1).lower() if emotion_match else "neutral"
+            # 1. Emotion (Korean)
+            emotion_match = re.search(r"Emotion:\s*([^\n]+)", response_text)
+            emotion_str = emotion_match.group(1).strip().replace("'", "").replace('"', "") if emotion_match else "평온"
             
             # 2. Confidence
             conf_match = re.search(r"Confidence:\s*(\d+)", response_text)
             confidence = int(conf_match.group(1)) if conf_match else 80
 
-            # 3. Followup Parsing
-            followup_match = re.search(r"NeedFollowup:\s*(YES|NO)", response_text, re.IGNORECASE)
-            need_followup = False
-            if followup_match and followup_match.group(1).upper() == "YES":
-                need_followup = True
-            
-            # [Hybrid Override] If Danger Keyword Found, FORCE True
-            if is_urgent_risk:
-                need_followup = True
-                print("⚡️ [Hybrid] Forcing Follow-up due to keywords.")
-                
-            question_match = re.search(r"Question:\s*(.*)", response_text)
-            followup_question = question_match.group(1).strip() if question_match else ""
-            if followup_question.lower() == "none" or not followup_question: 
-                # Fallback Question if model failed but we forced true
-                if is_urgent_risk:
-                    followup_question = "많이 힘드신 것 같아요. 혹시 위험한 생각이 드시나요? 저에게 솔직하게 털어놓아 주시겠어요?"
-                else:
-                    followup_question = ""
+            # 3. Followup
+            need_followup_match = re.search(r"NeedFollowup:\s*([^\n]+)", response_text, re.IGNORECASE)
             
             # 4. Comment
             comment_match = re.search(r"Comment:\s*(.*)", response_text, re.DOTALL)
-            comment = comment_match.group(1).strip() if comment_match else "오늘 하루도 수고 많으셨어요."
+            comment = comment_match.group(1).strip() if comment_match else response_text[:100]
             
-            if comment.startswith('"') and comment.endswith('"'):
-                comment = comment[1:-1]
-
-            # Map to Korean
-            emotion_map = {
-                "happy": "행복해", "joy": "행복해", 
-                "sad": "우울해", "depressed": "우울해", 
-                "neutral": "평온해", "calm": "평온해", "soso": "그저그래",
-                "angry": "화가나", "annoyed": "화가나", 
-                "panic": "우울해", "anxious": "우울해"
-            }
+            if comment.startswith('"') and comment.endswith('"'): comment = comment[1:-1]
             
-            korean_emotion = emotion_map.get(emotion_str, "평온해")
-            formatted_prediction = f"'{korean_emotion} ({confidence}%)'"
+            # Final Formatting
+            formatted_prediction = f"'{emotion_str} ({confidence}%)'"
             
-            return formatted_prediction, comment, need_followup, followup_question
+            return formatted_prediction, comment
                 
         except Exception as e:
             print(f"❌ Local AI Error: {e}")
-            return None, None, False, None
+            return None, None
+
+    def predict(self, text):
+        import time
+        start_time = time.time()
+        
+        if not text: 
+            return {"emotion": "분석 불가", "comment": "내용이 없습니다."}
+
+        emotion_result = "분석 불가"
+        
+        # [User Request] Gemma-First Analysis
+        try:
+            llm_emotion, llm_comment = self.analyze_diary_with_local_llm(text)
+            if llm_emotion:
+                 emotion_result = llm_emotion
+            else:
+                 emotion_result = self._fallback_predict(text)
+            
+            # Store comment for next step
+            self.temp_llm_comment = llm_comment
+        except:
+            emotion_result = self._fallback_predict(text)
+            self.temp_llm_comment = None
+            
+        # 2. Comment Generation
+        comment_result = getattr(self, 'temp_llm_comment', None)
+        
+        # Final Fallback
+        if not comment_result:
+            comment_result = self.generate_keyword_comment(text) or "오늘 하루도 정말 수고하셨어요."
+            
+        print(f"✨ [Timer] Total AI Analysis took: {time.time() - start_time:.3f}s")
+        return {
+            "emotion": emotion_result,
+            "comment": comment_result
+        }
+
+    def _fallback_predict(self, text):
+        # Load keywords from MongoDB
+        if self.db is None:
+             return "분석 불가"
+
+        try:
+            # Fetch all keywords from Mongo
+            keywords = list(self.db.emotion_keywords.find())
+            
+            scores = [0] * 5
+            found_any = False
+            
+            for kw in keywords:
+                if kw['keyword'] in text:
+                    scores[kw['emotion_label']] += kw['frequency']
+                    found_any = True
+            
+            if found_any:
+                max_score = max(scores)
+                total_score = sum(scores)
+                confidence = (max_score / total_score * 100) if total_score > 0 else 85.0
+                best_idx = scores.index(max_score)
+                return f"{self.classes[best_idx]} ({confidence:.1f}%)"
+            else:
+                return "그저그래 (40.0%)" 
+        except Exception as e:
+            print(f"Fallback error: {e}")
+            return "분석 불가"
 
     def generate_comment(self, prediction_text, user_text=None):
         # Generate a supportive comment.
@@ -1068,82 +712,4 @@ class EmotionAnalysis:
             session.rollback()
         finally:
             session.close()
-
-# Standalone Function: Bypasses EmotionAnalysis class init for stability
-def generate_analysis_reaction_standalone(user_text, mode='reaction'):
-    print(f"DEBUG: generate_analysis_reaction_standalone called. Mode={mode}, Text={user_text[:20]}...")
-    if not user_text: return None
-    import re
-    import requests
-    import random
-    
-    # 1. Sanitize
-    text = re.sub(r'[\w\.-]+@[\w\.-]+', '[EMAIL]', user_text)
-    sanitized = text[:300]
-    
-    # 2. Prompt Switching
-    if mode == 'question':
-        # Follow-up Question Prompt
-        prompt_text = (
-            f"내담자의 말: \"{sanitized}\"\n\n"
-            "내담자가 너무 짧고 단답형으로 대답했어. 대화를 더 깊게 이끌어내기 위해 **자연스러운 꼬리 질문**을 하나 던져줘.\n"
-            "지시사항:\n"
-            "1. 내담자의 말을 반복하기보다, 그 이면의 이유나 구체적인 내용을 물어봐.\n"
-            "2. '그렇군요' 같은 짧은 공감 후 바로 질문해.\n"
-            "3. 말투는 다정하고 궁금해하는 '해요체'를 써.\n"
-            "4. 100자 이내로.\n\n"
-            "꼬리 질문:"
-        )
-    else:
-        # Standard Reaction Prompt
-        prompt_text = (
-            f"내담자의 말: \"{sanitized}\"\n\n"
-            "너는 깊은 통찰력을 지닌 따뜻한 심리 상담사야. 내담자의 말을 듣고 **상황을 분석**하고 **지지하는 코멘트**를 해줘.\n"
-            "지시사항:\n"
-            "1. 먼저 내담자의 말 속에 숨겨진 감정이나 욕구를 분석해서 언급해줘. (예: '기대감과 동시에 걱정도 있으신 것 같군요.')\n"
-            "2. 그 다음, 그 감정이 타당함을 지지해주고 따뜻하게 격려해줘.\n"
-            "3. 말투는 전문적이고 부드러운 '해요체'를 써.\n"
-            "4. 질문은 하지 마.\n"
-            "5. 150자 이내로.\n\n"
-            "분석 및 리액션:"
-        )
-    
-    try:
-        payload = {
-            "model": "maum-on-gemma",
-            "prompt": prompt_text,
-            "stream": False,
-            "options": {
-                "temperature": 0.7, 
-                "num_predict": 180
-            }
-        }
-        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=60)
-        
-        if res.status_code == 200:
-            result = res.json().get('response', '').strip()
-            if result.startswith('"') and result.endswith('"'):
-                result = result[1:-1]
-            if result: return result
-            
-    except Exception as e:
-        print(f"❌ Standalone AI Error: {e}")
-        
-    # 3. Fallback (Mode Specific)
-    if mode == 'question':
-        fallbacks = [
-            "그렇군요. 혹시 조금 더 자세히 이야기해주실 수 있나요? 궁금해요.",
-            "저런, 특별한 이유가 있었는지 듣고 싶어요.",
-            "짧게 말씀하시니 더 깊은 속마음이 궁금해지네요. 편하게 털어놓아주세요.",
-            "그 일이 내담자님께 어떤 의미였는지 조금만 더 들려주세요."
-        ]
-    else:
-        fallbacks = [
-            "말씀하신 내용에서 깊은 고민과 진심이 느껴지네요. 잘하고 계십니다.",
-            "상황을 차분히 들여다보면, 그 안에서 스스로의 성장을 발견하실 수 있을 거예요.",
-            "지금 느끼시는 감정은 매우 자연스러운 반응이에요. 스스로를 믿어보세요.",
-            "이야기를 들어보니, 그동안 마음속에 담아두셨던 생각들이 많으셨던 것 같아 마음이 쓰이네요."
-        ]
-        
-    return random.choice(fallbacks)
 
