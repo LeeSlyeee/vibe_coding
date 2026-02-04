@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="ko-KR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <title>Mood Diary - 감정일기</title>
+    <!-- Google Fonts & Icons -->
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Inter", "Noto Sans KR", sans-serif;
+      }
+    </style>
+    <!-- REVERTED BUILD ASSETS (Blue Chart) -->
+    <script type="module" crossorigin src="/assets/index-BcGCcOje.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Dso1sYDN.css">
+
+    <!-- [MAINTAINED PATCH V36] Admin Button Fixes -->
+    <style>
+      /* FINAL CSS V36: ADMIN PANEL FIXES ONLY */
+      button, .el-button, [role="button"] { pointer-events: auto !important; cursor: pointer !important; }
+
+      #app .el-table { font-size: 22px !important; color: #222 !important; line-height: 1.5 !important; }
+      #app .el-table td, #app .el-table th, #app .el-table .cell, #app .el-table span { font-size: 22px !important; letter-spacing: -0.3px !important; }
+      #app .el-table .el-button, #app .el-table .el-tag { white-space: nowrap !important; font-size: 20px !important; font-weight: 600 !important; padding: 8px 16px !important; border-radius: 6px !important; }
+      #app .el-table th { font-weight: 700 !important; background-color: #f7f9fb !important; padding: 14px 0 !important; border-bottom: 2px solid #e0e4e8 !important; text-align: center !important; }
+      #app .el-table td:nth-child(1) { white-space: normal !important; min-width: 200px !important; width: 200px !important; text-align: center !important; padding: 12px !important; }
+      #app .el-table th:nth-child(1) { width: 200px !important; }
+      #app .el-table td:nth-child(2) { width: 160px !important; min-width: 160px !important; text-align: center !important; font-size: 23px !important; font-weight: 700 !important; }
+      #app .el-table th:nth-child(2) { width: 160px !important; }
+      #app .el-table td:nth-child(3) { white-space: normal !important; word-break: break-all !important; text-align: left !important; padding: 15px !important; }
+      #app .el-table th:nth-child(3) { text-align: left !important; padding-left: 15px !important; }
+      #app .el-table td:nth-child(4) { font-size: 26px !important; font-weight: 800 !important; text-align: center !important; color: #d32f2f !important; white-space: nowrap !important; width: 140px !important; min-width: 140px !important; }
+      #app .el-table th:nth-child(4) { width: 140px !important; min-width: 140px !important; }
+      #app .el-table td:nth-child(5) { text-align: center !important; width: 180px !important; min-width: 180px !important; }
+      #app .el-table th:nth-child(5) { width: 180px !important; min-width: 180px !important; }
+      #app .el-table td:last-child { min-width: 140px !important; width: 140px !important; text-align: center !important; padding: 0 !important; vertical-align: middle !important; }
+      #app .el-table th:last-child { text-align: center !important; padding: 14px 0 !important; width: 140px !important; }
+      #app .el-table td:last-child .el-button { margin: 0 auto !important; display: inline-flex !important; }
+      #app .el-table td { border-bottom: 1px solid #eee !important; }
+    </style>
+
+    <script>
+      (function() {
+        console.log("System V36 - Reverted Charts + Admin Fixes");
+
+        function getToken() {
+            return localStorage.getItem('access_token') || localStorage.getItem('token') || localStorage.getItem('jwt') || sessionStorage.getItem('access_token');
+        }
+
+        async function fetchGenerateCode(btnElement) {
+            const token = getToken();
+            if (!token) {
+                alert("인증 정보가 없습니다. 다시 로그인 해주세요.");
+                return;
+            }
+
+            const originalText = "🔑 코드 생성하기"; 
+            btnElement.innerText = "🔄 생성 중...";
+            
+            try {
+                // 백엔드 경로: 상대경로 (Nginx -> 8001)
+                const response = await fetch('/api/v1/centers/generate/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({}) 
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const code = data.code;
+                    
+                    btnElement.innerText = `🔑 ${code} (클릭 시 재발급)`;
+                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+                    while(walker.nextNode()) {
+                        if (walker.currentNode.nodeValue.trim().includes('발급')) {
+                             walker.currentNode.nodeValue = `최근 발급: ${code}`;
+                        }
+                    }
+
+                    try {
+                        await navigator.clipboard.writeText(code);
+                        alert(`📋 새 코드 [${code}] 복사 완료!\n(버튼을 누르면 또 발급됩니다)`);
+                    } catch (err) {
+                        prompt("코드를 복사하세요:", code);
+                    }
+
+                } else {
+                    const err = await response.json();
+                    if (response.status === 401) {
+                         alert("세션이 만료되었습니다. 다시 로그인해주세요.");
+                    } else {
+                         alert("오류: " + (err.message || response.status));
+                    }
+                    btnElement.innerText = originalText;
+                }
+            } catch (e) {
+                console.error(e);
+                alert("네트워크 요청 실패");
+                btnElement.innerText = originalText;
+            }
+        }
+
+        window.addEventListener('click', function(e) {
+            const target = e.target;
+            const txt = target.innerText || "";
+            if (txt.includes('코드') || txt.includes('생성') || txt.includes('발급') || txt.includes('🔑')) {
+                const btn = target.closest('button') || (target.tagName === 'BUTTON' ? target : null);
+                if (btn) {
+                    e.preventDefault(); 
+                    e.stopPropagation(); 
+                    e.stopImmediatePropagation();
+                    fetchGenerateCode(btn);
+                }
+            }
+        }, true);
+
+        // 디자인 유지보수
+        setInterval(() => {
+            document.querySelectorAll('.el-table td:nth-child(1) .cell, .el-table td:nth-child(1)').forEach(cell => {
+               if (cell.querySelector('.date-part')) return;
+               const d = cell.innerText.match(/(\d{4}\.\s*\d{1,2}\.\s*\d{1,2}\.?)/);
+               const t = cell.innerText.match(/(오후|오전)\s*(\d{1,2}:\d{2}(?::\d{2})?)/);
+               if (d && t) cell.innerHTML = `<div class="date-part" style="font-weight:700;font-size:22px;color:#111;margin-bottom:4px;white-space:nowrap;">${d[0]}</div><div class="time-part" style="font-size:18px;color:#666;white-space:nowrap;font-weight:500;">${t[0]}</div>`;
+            });
+            const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null, false);
+            while(walker.nextNode()) {
+                const node = walker.currentNode;
+                const txt = node.nodeValue.trim();
+                // 텍스트 흰색 처리
+                if (txt.includes('연동 코드') || txt.includes('생성') || txt.includes('발급') || txt.includes('재발급') || txt.includes('🔑')) {
+                    if (node.parentElement) node.parentElement.style.color = '#ffffff';
+                }
+            }
+        }, 500);
+
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

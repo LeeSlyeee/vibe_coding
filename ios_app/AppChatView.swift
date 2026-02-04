@@ -12,12 +12,21 @@ struct AppChatView: View {
     // Phase 2: Report Modal State
     @State private var showReport = false
     
+    // [UX] Cold Start Hint
+    @State private var loadingHint: String? = nil
+    
     // [New] SOS Crisis State
     @State private var isCrisis: Bool = false
     @State private var showSOSModal: Bool = false
     
     // [Gatekeeper] Mode Selection State
     @State private var showModeSelection: Bool = true
+    
+    // [New] Settings Modal State
+    @State private var showSettings = false
+    
+    // [New] Focus State based Keyboard Handling
+    @FocusState private var isInputFocused: Bool
     
     // Server Configuration
     let baseURL = "http://150.230.7.76"
@@ -65,8 +74,16 @@ struct AppChatView: View {
                                 }
                                 
                                 if isTyping {
-                                    HStack {
+                                    HStack(spacing: 12) {
                                         TypingIndicator()
+                                        
+                                        if let hint = loadingHint {
+                                            Text(hint)
+                                                .font(.caption)
+                                                .foregroundColor(.gray)
+                                                .transition(.opacity)
+                                                .multilineTextAlignment(.leading)
+                                        }
                                         Spacer()
                                     }
                                     .padding(.leading, 16)
@@ -117,6 +134,10 @@ struct AppChatView: View {
                         .onChangeCompat(of: isTyping) { _ in
                             scrollToBottom(proxy: proxy)
                         }
+                        // [UX] Dismiss Keyboard on Drag/Tap
+                        .onTapGesture {
+                            isInputFocused = false
+                        }
                     }
                     
                     // [New] Crisis Banner (위기 감지 시 노출)
@@ -143,11 +164,32 @@ struct AppChatView: View {
                     
                     // Input Area
                     HStack(spacing: 10) {
+                        // [New] Mode Selection Button (Previous Top-Right Feature)
+                        Button(action: {
+                            withAnimation { showModeSelection = true }
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.gray)
+                                .padding(8)
+                                .background(Color.gray.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                        .disabled(isTyping || showModeSelection)
+                        
                         TextField("메시지 보내기...", text: $inputText)
+                            .focused($isInputFocused) // [New] Focus Binding
                             .padding(12)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(20)
                             .disabled(isTyping || showModeSelection)
+                            .onChange(of: isInputFocused) { focused in
+                                // Notify MainTabView to hide/show TabBar
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name(focused ? "HideTabBar" : "ShowTabBar"),
+                                    object: nil
+                                )
+                            }
                         
                         Button(action: sendMessage) {
                             Image(systemName: "paperplane.fill")
@@ -160,6 +202,9 @@ struct AppChatView: View {
                         .disabled(inputText.isEmpty || isTyping || showModeSelection)
                     }
                     .padding()
+                    // [UI Fix] Dynamic Padding: Keyboard Up (0) vs Keyboard Down (60 for TabBar)
+                    // 평소엔 탭바 공간(60) 확보, 키보드 올라오면 0으로 붙임
+                    .padding(.bottom, isInputFocused ? 0 : 60)
                     .background(Color.white)
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
                 }
@@ -170,11 +215,8 @@ struct AppChatView: View {
                         Image(systemName: "chart.pie.fill")
                             .foregroundColor(.black)
                     },
-                    trailing: Button(action: { 
-                        // Re-open Selector
-                        withAnimation { showModeSelection = true }
-                    }) {
-                        Image(systemName: "slider.horizontal.3")
+                    trailing: Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape.fill")
                             .foregroundColor(.black)
                     }
                 )
@@ -185,6 +227,14 @@ struct AppChatView: View {
                 }
                 .sheet(isPresented: $showSOSModal) {
                     SOSView()
+                }
+                .sheet(isPresented: $showSettings) {
+                    NavigationView {
+                        AppSettingsView()
+                            .navigationBarItems(trailing: Button("닫기") {
+                                showSettings = false
+                            })
+                    }
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background
@@ -296,6 +346,21 @@ struct AppChatView: View {
         let userText = inputText
         inputText = ""
         isTyping = true 
+        self.loadingHint = "답변을 생각하는 중..."
+        
+        // [UX] Cold Start Timer (서버 깨어날 때 지루하지 않게 멘트 변경)
+        Task {
+            try? await Task.sleep(nanoseconds: 4 * 1_000_000_000)
+            // 아직도 타이핑 중이고, AI 메시지가 없거나 비어있다면 (대기 중)
+            if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
+                withAnimation { self.loadingHint = "AI가 마음의 준비를 하고 있어요... 🌿\n(서버가 깨어나는 중입니다)" }
+            }
+            
+            try? await Task.sleep(nanoseconds: 6 * 1_000_000_000) // +6초 (총 10초)
+            if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
+                withAnimation { self.loadingHint = "거의 다 되었습니다! 잠시만요... 🏃🏻" }
+            }
+        } 
         
         // 3. 사용자 메시지 추가
         let userMsg = ChatMessage(text: userText, isUser: true)
@@ -360,6 +425,10 @@ struct AppChatView: View {
                 userText: userText,        // Server Mode용
                 historyString: historyContext // Server Mode용
             ) {
+                // 첫 토큰 도착 시 힌트 삭제 (타이핑 시작)
+                if loadingHint != nil { 
+                    withAnimation { loadingHint = nil } 
+                }
                 // [RESET] 명령 감지 시 텍스트 초기화 (안전 장치 발동 시 기존 영어 텍스트 날리기)
                 if token.contains("[RESET]") {
                     fullResponse = ""
@@ -406,13 +475,13 @@ struct ChatBubble: View {
         HStack(alignment: .bottom, spacing: 8) {
             if !message.isUser {
                 Image(systemName: "face.smiling.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 30, height: 30)
-                    .foregroundColor(.purple)
-                    .background(Color.white)
-                    .clipShape(Circle())
-                    .shadow(radius: 1)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 30, height: 30)
+                .foregroundColor(.purple)
+                .background(Color.white)
+                .clipShape(Circle())
+                .shadow(radius: 1)
             } else {
                 Spacer()
             }
@@ -612,14 +681,14 @@ struct SOSView: View {
                     // Header
                     VStack(spacing: 10) {
                         Image(systemName: "heart.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.red)
+                        .font(.system(size: 60))
+                        .foregroundColor(.red)
                         Text("당신은 혼자가 아닙니다")
-                            .font(.title2)
-                            .fontWeight(.bold)
+                        .font(.title2)
+                        .fontWeight(.bold)
                         Text("언제든 도움을 요청할 수 있어요.\n전문가와 이야기해보세요.")
-                            .multilineTextAlignment(.center)
-                            .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.gray)
                     }
                     .padding(.top, 20)
                     
@@ -635,15 +704,15 @@ struct SOSView: View {
                     // Near Center Info
                     VStack(alignment: .leading, spacing: 10) {
                         Text("🏥 가까운 정신건강복지센터 찾기")
-                            .font(.headline)
+                        .font(.headline)
                         
                         Text("거주하시는 지역의 보건소나 정신건강복지센터에서 무료로 상담을 받으실 수 있습니다.")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        
                         Link("센터 찾기 (보건복지부)", destination: URL(string: "https://www.ncmh.go.kr")!)
-                            .font(.body)
-                            .foregroundColor(.blue)
+                        .font(.body)
+                        .foregroundColor(.blue)
                     }
                     .padding()
                     .background(Color.gray.opacity(0.1))
@@ -683,7 +752,7 @@ struct ContactButton: View {
                 }
                 Spacer()
                 Image(systemName: "phone.fill")
-                    .font(.title2)
+                .font(.title2)
             }
             .padding()
             .foregroundColor(.white)

@@ -22,3 +22,8 @@ MindDiaryApp.xcodeproj/
 .swiftpm/
 .build/
 
+
+# Ignored large directories
+runpod_serverless/model_data/
+_trash/
+temp_key_*

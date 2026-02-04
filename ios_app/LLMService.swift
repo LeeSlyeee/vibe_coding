@@ -368,7 +368,7 @@ class LLMService: ObservableObject {
                      print("☁️ [LLM] Using Server AI Mode for Chat (Target: 217)...")
                      
                      if let uText = userText, let hString = historyString {
-                         // [Smart Fallback] Try Server First, but fall back to Local if it fails
+                         // [Strict Server Mode] Only use Server, No Local Fallback
                          let serverResponse: String? = await withCheckedContinuation { continuation in
                              APIService.shared.sendChatMessage(text: uText, history: hString) { result in
                                  switch result {
@@ -376,6 +376,7 @@ class LLMService: ObservableObject {
                                      continuation.resume(returning: response)
                                  case .failure(let error):
                                      print("❌ [LLM] Server(217) Connection Failed: \(error)")
+                                     // 실패 시 nil 반환 -> 아래에서 처리
                                      continuation.resume(returning: nil)
                                  }
                              }
@@ -386,11 +387,20 @@ class LLMService: ObservableObject {
                              continuation.yield(response)
                              continuation.finish()
                              return
+                         } else {
+                             // 서버 실패 시 로컬로 넘어가지 않고 에러 메시지 출력
+                             print("⛔️ [LLM] Server Failed. Strict Mode ON (No Local Fallback).")
+                             continuation.yield("서버와의 연결이 원활하지 않습니다. 잠시 후 다시 시도해주세요.")
+                             continuation.finish()
+                             return
                          }
-                         
-                         // 실패 시 Local로 전환
-                         print("⚠️ [LLM] Server failed. Falling back to On-Device LLM...")
                      }
+                }
+                
+                // [Gatekeeper] 서버 모드인데 여기까지 왔다면(userText가 nil인 경우 등), 로컬 로직 실행 방지
+                if await LLMService.shared.useServerAI && userText != nil {
+                    continuation.finish()
+                    return
                 }
                 
                 // === BELOW IS LOCAL MODEL LOGIC (Used for Diary Analysis OR Local Chat) ===

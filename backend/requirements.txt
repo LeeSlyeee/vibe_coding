@@ -10,4 +10,5 @@ tensorflow
 celery
 redis
 faster-whisper
+requests
 

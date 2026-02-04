@@ -30,6 +30,9 @@ struct AppStatsView: View {
     @State private var connectMessage = ""
     @State private var showingResultAlert = false
     
+    // [New] Settings Modal State
+    @State private var showSettings = false
+    
     let baseURL = "http://150.230.7.76"
     
     let tabs = [
@@ -41,163 +44,176 @@ struct AppStatsView: View {
     ]
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.bgMain.edgesIgnoringSafeArea(.all)
-                
-                // [B2G] 무조건 연동해야만 통계 해금
-                if !b2gManager.isLinked {
-                    VStack(spacing: 24) {
-                        Spacer()
-                        Image(systemName: "lock.shield.fill")
-                            .font(.system(size: 80))
-                            .foregroundColor(authManager.riskLevel >= 2 ? .red.opacity(0.6) : .gray.opacity(0.5))
+        ZStack {
+            Color.bgMain.edgesIgnoringSafeArea(.all) // 배경만 전체 채움
+            
+            // [B2G] 무조건 연동해야만 통계 해금
+            if !b2gManager.isLinked {
+                VStack(spacing: 24) {
+                    Spacer()
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 80))
+                        .foregroundColor(authManager.riskLevel >= 2 ? .red.opacity(0.6) : .gray.opacity(0.5))
+                    
+                    VStack(spacing: 8) {
+                        Text("전문 분석 기능 잠김")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
                         
-                        VStack(spacing: 8) {
-                            Text("전문 분석 기능 잠김")
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                            
-                            if authManager.riskLevel >= 2 {
-                                // 중증(위험) 사용자용 메시지
-                                Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/상담센터와 연동해주세요.")
-                                    .multilineTextAlignment(.center)
-                                    .foregroundColor(.red)
-                                    .fontWeight(.semibold)
-                            } else {
-                                // 경증(일반) 사용자용 메시지
-                                Text("보건소/상담센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
-                                    .multilineTextAlignment(.center)
-                                    .foregroundColor(.secondary)
-                            }
+                        if authManager.riskLevel >= 2 {
+                            // 중증(위험) 사용자용 메시지
+                            Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/상담센터와 연동해주세요.")
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.red)
+                                .fontWeight(.semibold)
+                        } else {
+                            // 경증(일반) 사용자용 메시지
+                            Text("보건소/상담센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
+                                .multilineTextAlignment(.center)
+                                .foregroundColor(.secondary)
                         }
-                        
-                        Text("설정 > 기관 연동(B2G) 메뉴에서도\n언제든 연동할 수 있습니다.")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 10)
-                        
-                        // [New] Direct Connect Button
-                        Button(action: { showingConnectAlert = true }) {
-                            Text("지금 연동하기")
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .padding(.vertical, 12)
-                                .padding(.horizontal, 24)
-                                .background(Color.blue)
-                                .cornerRadius(12)
-                                .shadow(radius: 3)
-                        }
-                        .padding(.top, 20)
-                        .alert("기관 코드 입력", isPresented: $showingConnectAlert) {
-                            TextField("코드 (예: CENTER001)", text: $inputCode)
-                            Button("취소", role: .cancel) { }
-                            Button("연동") {
-                                connectToCenter()
-                            }
-                        } message: {
-                            Text("보건소나 상담센터에서 발급받은\n코드를 입력해주세요.")
-                        }
-                            
-                        Spacer()
                     }
-                    .padding()
-                } else {
-                    // Full Feature for Severe (Level 2+) Users
-                    VStack(spacing: 0) {
-                        // Header
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("마음 분석")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.primaryText)
-                            Text("데이터로 보는 나의 하루")
-                                .font(.subheadline)
-                                .foregroundColor(.secondaryText)
+                    
+                    Text("설정 > 기관 연동(B2G) 메뉴에서도\n언제든 연동할 수 있습니다.")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 10)
+                    
+                    // [New] Direct Connect Button
+                    Button(action: { showingConnectAlert = true }) {
+                        Text("지금 연동하기")
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 24)
+                            .background(Color.blue)
+                            .cornerRadius(12)
+                            .shadow(radius: 3)
+                    }
+                    .padding(.top, 20)
+                    .alert("기관 코드 입력", isPresented: $showingConnectAlert) {
+                        TextField("코드 (예: CENTER001)", text: $inputCode)
+                        Button("취소", role: .cancel) { }
+                        Button("연동") {
+                            connectToCenter()
                         }
-                        Spacer()
+                    } message: {
+                        Text("보건소나 상담센터에서 발급받은\n코드를 입력해주세요.")
+                    }
+                        
+                    Spacer()
+                }
+                .padding()
+            } else {
+                // Full Feature for Severe (Level 2+) Users
+                VStack(spacing: 0) {
+                    // Header
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("마음 분석")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(.primaryText)
+                        Text("데이터로 보는 나의 하루")
+                            .font(.subheadline)
+                            .foregroundColor(.secondaryText)
+                    }
+                    Spacer()
+                    
+                    // [New] Settings Button
+                    Button(action: { showSettings = true }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title2)
+                            .foregroundColor(.primaryText)
+                            .padding(8)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.1), radius: 2)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 20)
+                .background(Color.white.opacity(0.8))
+                
+                // Modern Tab Bar
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(tabs, id: \.0) { tab in
+                            Button(action: { 
+                                withAnimation(.spring()) { currentTab = tab.0 }
+                            }) {
+                                Text(tab.1)
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .padding(.vertical, 10)
+                                    .padding(.horizontal, 18)
+                                    .background(currentTab == tab.0 ? Color.accent : Color.white)
+                                    .foregroundColor(currentTab == tab.0 ? .white : .secondaryText)
+                                    .cornerRadius(20)
+                                    .shadow(color: currentTab == tab.0 ? Color.accent.opacity(0.3) : Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                            }
+                        }
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 20)
-                    .padding(.bottom, 20)
-                    .background(Color.white.opacity(0.8))
-                    
-                    // Modern Tab Bar
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(tabs, id: \.0) { tab in
-                                Button(action: { 
-                                    withAnimation(.spring()) { currentTab = tab.0 }
-                                }) {
-                                    Text(tab.1)
-                                        .font(.system(size: 15, weight: .semibold))
-                                        .padding(.vertical, 10)
-                                        .padding(.horizontal, 18)
-                                        .background(currentTab == tab.0 ? Color.accent : Color.white)
-                                        .foregroundColor(currentTab == tab.0 ? .white : .secondaryText)
-                                        .cornerRadius(20)
-                                        .shadow(color: currentTab == tab.0 ? Color.accent.opacity(0.3) : Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-                                }
+                    .padding(.bottom, 15)
+                }
+                
+                // Content
+                if isLoading {
+                    Spacer()
+                    ProgressView().scaleEffect(1.2)
+                    Spacer()
+                } else if let stats = stats {
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 24) {
+                            switch currentTab {
+                            case "flow": FlowChartView(data: stats.timeline ?? [])
+                            case "monthly": MonthlyChartView(data: stats.daily ?? [])
+                            case "mood": MoodDistributionView(data: stats.moods ?? [])
+                            case "weather": WeatherStatsView(data: stats.weather ?? [])
+                            case "report": ReportView(
+                                isGenerating: $isGeneratingReport,
+                                content: $reportContent,
+                                isGeneratingLong: $isGeneratingLongTerm,
+                                longContent: $longTermContent,
+                                startReport: startReport,
+                                startLongTerm: startLongTermReport
+                            )
+                            default: EmptyView()
                             }
                         }
                         .padding(.horizontal, 24)
-                        .padding(.bottom, 15)
-                    }
-                    
-                    // Content
-                    if isLoading {
-                        Spacer()
-                        ProgressView().scaleEffect(1.2)
-                        Spacer()
-                    } else if let stats = stats {
-                        ScrollView(showsIndicators: false) {
-                            VStack(spacing: 24) {
-                                switch currentTab {
-                                case "flow": FlowChartView(data: stats.timeline ?? [])
-                                case "monthly": MonthlyChartView(data: stats.daily ?? [])
-                                case "mood": MoodDistributionView(data: stats.moods ?? [])
-                                case "weather": WeatherStatsView(data: stats.weather ?? [])
-                                case "report": ReportView(
-                                    isGenerating: $isGeneratingReport,
-                                    content: $reportContent,
-                                    isGeneratingLong: $isGeneratingLongTerm,
-                                    longContent: $longTermContent,
-                                    startReport: startReport,
-                                    startLongTerm: startLongTermReport
-                                )
-                                default: EmptyView()
-                                }
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.top, 10)
-                            .padding(.bottom, 100)
-                        }
+                        .padding(.top, 10)
+                        .padding(.bottom, 100)
                     }
                 }
-                } // End of Else (Full Features)
             }
-            #if os(iOS)
-            .navigationBarHidden(true)
-            #endif
-            .onAppear {
-                // 연동 상태라면 데이터 로딩 (위험도 상관없음)
-                if b2gManager.isLinked {
-                    fetchStats()
-                    fetchExistingReports()
-                }
+        } // End of Else (Full Features)
+    }
+    .onAppear {
+            // 연동 상태라면 데이터 로딩 (위험도 상관없음)
+            if b2gManager.isLinked {
+                fetchStats()
+                fetchExistingReports()
             }
-            // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
-            .onChangeCompat(of: b2gManager.isLinked) { linked in
-                if linked {
-                    fetchStats()
-                    fetchExistingReports()
-                }
+        }
+        // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
+        .onChangeCompat(of: b2gManager.isLinked) { linked in
+            if linked {
+                fetchStats()
+                fetchExistingReports()
             }
-            // [New] 결과 알림
-            .alert(isPresented: $showingResultAlert) {
-                Alert(title: Text("알림"), message: Text(connectMessage), dismissButton: .default(Text("확인")))
+        }
+        .alert(isPresented: $showingResultAlert) {
+            Alert(title: Text("알림"), message: Text(connectMessage), dismissButton: .default(Text("확인")))
+        }
+        .sheet(isPresented: $showSettings) {
+            NavigationView {
+                AppSettingsView()
+                    .navigationBarItems(trailing: Button("닫기") {
+                        showSettings = false
+                    })
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
@@ -330,9 +346,11 @@ struct FlowChartView: View {
     let data: [StatsTimelineItem]
     
     var contentWidth: CGFloat {
-        let minWidth: CGFloat = 350
-        let itemWidth: CGFloat = 50
-        return max(minWidth, CGFloat(data.count) * itemWidth)
+        let screenWidth = UIScreen.main.bounds.width - 48 // 좌우 패딩 고려
+        let minWidth: CGFloat = screenWidth
+        let itemWidth: CGFloat = 100 // 아이템 폭 대폭 증가 (스크롤 확실시)
+        let computedWidth = CGFloat(data.count) * itemWidth
+        return max(minWidth, computedWidth)
     }
     
     var body: some View {
@@ -358,6 +376,7 @@ struct FlowChartView: View {
                     .chartYScale(domain: 0...6)
                     .chartYAxis { AxisMarks(values: [1,3,5]) { v in AxisValueLabel(moodEmoji(v.as(Int.self) ?? 0)) } }
                     .frame(width: contentWidth, height: 280)
+                    .contentShape(Rectangle()) // ✅ 터치 영역 확보
                 }
             } else { Text("iOS 16+ 필요") }
         }

@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.git
+.DS_Store
+# model_data/base/*.safetensors (제외하면 안됨)
+# 제외할 것들만 명시

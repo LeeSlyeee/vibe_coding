@@ -4,78 +4,179 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from flask_pymongo import PyMongo
 from datetime import datetime, timedelta
 from bson.objectid import ObjectId
+import requests # [RunPod] Added for forwarding
 import os
+import threading
 from config import Config
-from config import Config
-# from standalone_ai import generate_analysis_reaction_standalone
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Imports moved to bottom to prevent circular dependency hanging the route registration
-# from tasks import process_diary_ai, analyze_diary_logic
-# from ai_brain import EmotionAnalysis
-# ...
-
-# Global AI for immediate insights (Lazy loaded) - Kept for other routes
-insight_ai = None
-
-@app.route('/api/test/hello', methods=['GET'])
-def test_hello():
-    return jsonify({"message": "Hello from backend!"}), 200
-
-@app.route('/api/chat/reaction', methods=['POST'])
-@jwt_required()
+@app.route('/api/v1/chat/reaction', methods=['POST'])
+@app.route('/api/chat/reaction', methods=['POST']) # [Legacy Support] Match iOS Client
+# @jwt_required(optional=True) -> Removed to prevent 422 on invalid token
 def chat_reaction():
-    # Use Standalone Function for robustness & Analysis capability
+    # [RunPod vLLM Forwarding Logic]
+    # 앱(iOS) -> 217 서버 -> RunPod (GPU) -> 217 서버 -> 앱
+    
+    # [Manual Auth Attempt]
+    # 토큰이 유효하지 않아도(150 서버 등) 채팅 요청은 수행해야 함.
+    # 따라서 데코레이터 대신 수동으로 시도하고 실패 시 무시.
+    current_user_id = "anonymous_user"
+    try:
+        from flask_jwt_extended import verify_jwt_in_request
+        verify_jwt_in_request(optional=True)
+        id_found = get_jwt_identity()
+        if id_found: current_user_id = id_found
+    except Exception:
+        pass # Ignore auth errors (Signature mismatch, etc.)
+    
     data = request.json
-    text = data.get('text', '')
-    mode = data.get('mode', 'reaction') # Accept 'mode'
-    history = data.get('history') # Accept conversation history
-
-    if not text:
+    user_text = data.get('text', '')
+    history = data.get('history', '') # Previous conversation context
+    
+    if not user_text:
         return jsonify({'reaction': ""}), 200
-        
-    # Directly call function, bypassing class instantiation issues
-    # reaction = generate_analysis_reaction_standalone(text, mode=mode, history=history)
-    reaction = "AI 서버 점검 중입니다."
-    
-    # [Async Analysis & Logging]
-    # Fire and forget thread to analyze sentiment and save to DB
-    current_user_id = get_jwt_identity()
-    
-    def background_chat_log(user_id, u_text, a_react):
-        # Allow running outside request context manually or establish context if needed
-        # Since we use mongo.db directly, we might need app context
-        with app.app_context():
-            try:
-                # 1. Analyze
-                # from standalone_ai import analyze_chat_sentiment_background
-                # analysis_data = analyze_chat_sentiment_background(u_text, a_react)
-                analysis_data = {}
-                
-                # 2. Save
-                log_entry = {
-                    'user_id': user_id,
-                    'user_message': u_text,
-                    'ai_response': a_react,
-                    'analysis': analysis_data,
-                    'created_at': datetime.utcnow()
-                }
-                
-                # Encrypt sensitive text if needed? 
-                # For now let's keep chat logs plain or minimal encryption for analysis stats
-                # If we want full privacy, we should encrypt 'user_message'.
-                
-                mongo.db.chat_logs.insert_one(log_entry)
-                print(f"✅ Chat Log Saved for {user_id}")
-                
-            except Exception as e:
-                print(f"❌ Background Log Error: {e}")
 
-    threading.Thread(target=background_chat_log, args=(current_user_id, text, reaction)).start()
+    # [Target Change] Detected Serverless Endpoint (ID: mp2w6kb0npg0tp)
+    # Serverless Base: https://api.runpod.ai/v2/{ID}/openai/v1
+    # [RunPod Serverless Native Mode]
+    # vLLM OpenAI Proxy가 아닌 RunPod Worker 모드로 직접 실행
+    # Endpoint: /runsync (동기 실행)
+    target_url = "https://api.runpod.ai/v2/mp2w6kb0npg0tp/runsync"
+    
+    # [Auth Fix] Force valid API Key
+    runpod_api_key = os.getenv('RUNPOD_API_KEY')
+    
+    # 2. Prompt Construction (RunPod Schema)
+    # [Persona Injection]
+    # AI가 단순 대화가 아닌 '일기 쓰기'를 유도하도록 강력한 페르소나 주입
+    system_prompt = (
+        "당신은 사용자의 하루를 기록해주는 다정한 AI 비서 '마음 온'입니다. "
+        "사용자가 편안하게 하루 있었던 일과 감정을 털어놓도록 따뜻하게 질문해주세요. "
+        "한 번에 너무 많은 질문을 하지 말고, 친구처럼 하나씩 물어봐주세요. "
+        "사용자의 말에 공감해주고, 구체적으로 어떤 일이 있었는지 꼬리를 무는 질문을 해주세요. "
+        "절대 기계적인 말투를 쓰지 마세요. 이모지를 적절히 사용하여 생동감 있게 대화하세요."
+    )
+    
+    payload = {
+        "input": {
+            "prompt": f"System: {system_prompt}\n\n{history}\nUser: {user_text}\nAssistant:",
+            "max_tokens": 300, # 답변 길이 여유 있게
+            "temperature": 0.8 # 창의성 약간 증가 (딱딱함 방지)
+        }
+    }
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {runpod_api_key}"
+    }
+
+    try:
+        reaction = ""
+        print(f"🚀 [Chat] Invoking RunPod Serverless: {target_url}")
+        
+        # 3. Call RunPod (Timeout Extended to 300s for Queue)
+        # Serverless Cold Start can take 2-3 minutes if queue is full
+        try:
+            resp = requests.post(target_url, json=payload, headers=headers, timeout=300)
+        except requests.exceptions.Timeout:
+            print("❌ [Chat] RunPod Request Timed Out (Initial POST)")
+            return jsonify({'reaction': "죄송해요, 생각이 조금 길어지고 있어요. 잠시 후 다시 말 걸어주시겠어요? 🌿"}), 200
+            
+        if resp.status_code == 200:
+            result = resp.json()
+            
+            # [Async Handling] runsync might return 'IN_QUEUE' if it takes too long
+            if result.get("status") in ["IN_QUEUE", "IN_PROGRESS"] and "id" in result:
+                job_id = result["id"]
+                print(f"⏳ [Chat] Job {job_id} queued. Polling status...")
+                
+                # Poll for result (Max 300s)
+                import time
+                start_time = time.time()
+                while time.time() - start_time < 300:
+                    time.sleep(2)
+                    status_url = f"https://api.runpod.ai/v2/mp2w6kb0npg0tp/status/{job_id}"
+                    try:
+                        status_resp = requests.get(status_url, headers=headers, timeout=30)
+                        if status_resp.status_code == 200:
+                            status_data = status_resp.json()
+                            if status_data.get("status") == "COMPLETED":
+                                result = status_data
+                                break
+                            elif status_data.get("status") == "FAILED":
+                                print(f"❌ [Chat] Job Failed: {status_data}")
+                                result = status_data 
+                                break
+                    except:
+                        pass # Ignore transient polling errors
+                
+                # Check if still not completed
+                if result.get("status") != "COMPLETED":
+                     print(f"⚠️ [Chat] Job Timeout or Not Completed: {result.get('status')}")
+                     # Return friendly message instead of 500 error
+                     return jsonify({'reaction': "죄송해요, 지금 많은 분들의 이야기를 듣고 있어서 답변이 늦어지고 있어요. 1분 뒤에 다시 시도해주시겠어요? 🙇🏻‍♂️"}), 200
+            
+            # RunPod Response Format: { "status": "COMPLETED", "output": "..." }
+            if "output" in result:
+                # vLLM Worker Output handling
+                output_data = result["output"]
+                if isinstance(output_data, dict) and "text" in output_data: # vLLM standard
+                     reaction = output_data["text"][0] if isinstance(output_data["text"], list) else output_data["text"]
+                elif isinstance(output_data, list) and len(output_data) > 0: # Some workers return list
+                     reaction = output_data[0]
+                elif isinstance(output_data, str):
+                     reaction = output_data
+                else:
+                     reaction = str(output_data) # Fallback
+                
+                # [Data Cleaning]
+                # If output is weird JSON string like "{'reaction': '...'}", clean it.
+                if "{'reaction':" in reaction or '{"reaction":' in reaction:
+                    try:
+                        # Simple cleanup
+                        import ast
+                        parsed = ast.literal_eval(reaction)
+                        if isinstance(parsed, dict) and 'reaction' in parsed:
+                            reaction = parsed['reaction']
+                    except Exception:
+                        pass # Keep original if parsing fails
+                        
+                # Remove quotes if wrapped
+                reaction = reaction.strip().strip("'").strip('"')
+            else:
+                 print(f"⚠️ [Chat] Unexpected RunPod Response: {result}")
+                 reaction = "(AI 응답 형식이 올바르지 않습니다)"
+                 
+            print(f"✅ [Chat] RunPod Success: {len(reaction)} chars")
+        else:
+             print(f"❌ [Chat] RunPod Fail: {resp.status_code} {resp.text}")
+             reaction = "(서버 연결 실패) AI 서버가 응답하지 않습니다. (RunPod Error)"
+
+    except Exception as e:
+        print(f"❌ [Chat] Forwarding Error: {e}")
+        reaction = "AI 서버와 연결할 수 없습니다. (네트워크 오류)"
+
+    # [Async Logging] - 기존 로직 유지
+    # Auth logic moved to top of function
+    threading.Thread(target=background_chat_log_task, args=(app, current_user_id, user_text, reaction)).start() # [Fix] Use 'app' directly
 
     return jsonify({'reaction': reaction}), 200
+
+# Helper for Threading context
+def background_chat_log_task(app_instance, user_id, u_text, a_react):
+    with app_instance.app_context():
+        try:
+            log_entry = {
+                'user_id': user_id,
+                'user_message': u_text,
+                'ai_response': a_react,
+                'created_at': datetime.utcnow()
+            }
+            mongo.db.chat_logs.insert_one(log_entry)
+        except Exception as e:
+            print(f"Log Error: {e}")
 
 # ... (Previous code)
 
@@ -1152,15 +1253,19 @@ def start_long_term_report():
     # Check Permission
     user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
     if not user: return jsonify({"message": "User not found"}), 404
-    if user.get('risk_level', 1) < 3:
+    # Allow if Risk Level >= 3 OR User is Premium OR Linked to Center
+    is_linked = user.get('linked_center_code') and str(user.get('linked_center_code')).strip() != ""
+
+    if user.get('risk_level', 1) < 3 and not user.get('is_premium', False) and not is_linked:
         return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
     
     # 1. Fetch Past Reports (Limit 5 most recent)
     cursor = mongo.db.reports.find({'user_id': user_id, 'type': 'comprehensive'}).sort('created_at', -1).limit(5)
     reports = list(cursor)
     
+    # [Rollback] Require at least 2 reports for meaningful long-term analysis
     if len(reports) < 2:
-        return jsonify({"message": "장기 분석을 하려면 최소 2개 이상의 심층 리포트가 필요해요."}), 400
+        return jsonify({"message": "장기 기억 패턴을 분석하려면 최소 2개 이상의 심층 리포트가 필요해요.", "code": "NOT_ENOUGH_REPORTS"}), 400
         
     # Prepare Data
     reports.reverse() 
@@ -1207,7 +1312,10 @@ def start_report_generation():
     # Check Permission
     user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
     if not user: return jsonify({"message": "User not found"}), 404
-    if user.get('risk_level', 1) < 3:
+    # Allow if Risk Level >= 3 OR User is Premium OR Linked to Center
+    is_linked = user.get('linked_center_code') and str(user.get('linked_center_code')).strip() != ""
+    
+    if user.get('risk_level', 1) < 3 and not user.get('is_premium', False) and not is_linked:
         return jsonify({"message": "보건소 및 병원 사용자 또는 유료사용자 기능입니다."}), 403
 
     # 1. Check Diaries

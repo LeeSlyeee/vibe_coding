@@ -364,7 +364,8 @@ class APIService: NSObject {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.timeoutInterval = 70.0 // [Fallback] Wait up to 70s for Server LLM (Safety)
+            request.timeoutInterval = 300.0 // [Extended] Wait up to 300s (5min) for RunPod Queue
+
             
             // Auth Token (Pass it just in case 217 needs it, or for logging)
             if let token = self.token {

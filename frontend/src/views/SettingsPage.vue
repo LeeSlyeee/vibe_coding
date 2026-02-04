@@ -145,10 +145,29 @@ export default {
     const showAlert = ref(false);
     const alertMessage = ref('');
 
-    const refreshStatus = () => {
-      // [Direct Check] B2GService 캐시 우회
-      isLinked.value = localStorage.getItem("b2g_is_linked") === "true";
-      centerCode.value = localStorage.getItem("b2g_center_code") || "";
+    const refreshStatus = async () => {
+      try {
+          // [Fix] 서버에서 최신 정보(User Me)를 가져와서 동기화
+          const userRes = await api.get('/user/me'); // authAPI.getUserInfo()와 동일한 엔드포인트
+          if (userRes && userRes.data) {
+              const info = userRes.data;
+              // DB 정보로 로컬 스토리지 갱신
+              const code = info.linked_center_code || info.center_code || "";
+              const isLinkedVal = !!code;
+              
+              localStorage.setItem("b2g_center_code", code);
+              localStorage.setItem("b2g_is_linked", isLinkedVal.toString());
+              
+              isLinked.value = isLinkedVal;
+              centerCode.value = code;
+          }
+      } catch (e) {
+          console.error("Failed to refresh status from server", e);
+          // 실패 시 캐시된 데이터라도 보여줌
+          isLinked.value = localStorage.getItem("b2g_is_linked") === "true";
+          centerCode.value = localStorage.getItem("b2g_center_code") || "";
+      }
+      
       lastSyncDate.value = localStorage.getItem("b2g_last_sync");
     };
 
@@ -166,9 +185,7 @@ export default {
         // [Direct API Call]
         console.log(`🚀 [Settings] Connecting to OCI server: ${inputCode.value}`);
         
-        // [Standard API Call] api.js가 OCI를 가리키므로 상대 경로 사용
-        // [Standard API Call] Fix: Remove /v1 prefix to avoid Nginx proxying to OCI.
-        // This ensures the request hits the local Flask server (via /api location block).
+        // [Standard API Call] Check verification
         const response = await api.post('/centers/verify-code/', { 
             center_code: inputCode.value,
             user_nickname: localStorage.getItem('user_nickname') || 'WebUser'
@@ -183,14 +200,13 @@ export default {
                  console.error("Connect failed in Settings", connErr)
             }
 
-            // 성공 처리
-            localStorage.setItem("b2g_center_code", inputCode.value.toUpperCase());
-            localStorage.setItem("b2g_is_linked", "true");
-            
+            // 성공 처리 - 로컬 스토리지 업데이트 대신 리프레시 수행
             alertMessage.value = response.data.message || "연동되었습니다!";
             showAlert.value = true;
             inputCode.value = ''; 
-            refreshStatus();
+            
+            // [Fix] 서버에서 최신 정보 받아오기 (확실한 동기화)
+            await refreshStatus(); 
         }
       } catch (err) {
         console.error("❌ [Settings] Connection Error:", err);

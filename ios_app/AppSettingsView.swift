@@ -324,6 +324,18 @@ struct AppSettingsView: View {
                     }
                 }
                 
+                // Section 3.5: 지원 (Support)
+                Section(header: Text("지원")) {
+                    NavigationLink(destination: AppGuideView()) {
+                        HStack {
+                            Image(systemName: "book.fill")
+                                .foregroundColor(.blue)
+                            Text("사용 가이드")
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+                
                 // Section 4: 앱 정보
                 Section(header: Text("앱 정보")) {
                     HStack {

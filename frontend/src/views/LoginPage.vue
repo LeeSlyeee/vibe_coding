@@ -125,6 +125,12 @@ export default {
                 if (userRes) {
                     if (userRes.risk_level) localStorage.setItem('risk_level', userRes.risk_level);
                     
+                    // [Fix] 프리미엄(is_premium) 유저도 진단 패스
+                    if (userRes.is_premium) {
+                        localStorage.setItem('assessment_completed', 'true');
+                        console.log("💎 [Login] Premium User Detected. Bypassing Assessment.");
+                    }
+
                     if (userRes.linked_center_code) {
                         finalCenterCode = userRes.linked_center_code;
                         localStorage.setItem('b2g_center_code', finalCenterCode);

@@ -30,6 +30,9 @@ struct MoodCalendarView: View {
     @State private var errorMessage: String?
     @State private var showErrorAlert = false
     
+    // [New] Settings Modal State
+    @State private var showSettings = false
+    
     // Write Modal State (Identifiable Item for Safe Presentation)
     @State private var writeTarget: WriteTargetDate?
     
@@ -43,20 +46,37 @@ struct MoodCalendarView: View {
             NavigationView {
                 VStack(spacing: 20) {
                     // 상단 헤더
-                    HStack {
-                        Button(action: { changeMonth(by: -1) }) {
-                            Image(systemName: "chevron.left").font(.title2).foregroundColor(.black)
+                    // 상단 헤더
+                    ZStack {
+                        // 1. Center Group: [ < ] [ YYYY년 M월 ] [ > ]
+                        HStack(spacing: 20) {
+                            Button(action: { changeMonth(by: -1) }) {
+                                Image(systemName: "chevron.left")
+                                    .font(.title2)
+                                    .foregroundColor(.black)
+                            }
+                            
+                            Text(monthYearString(currentDate))
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Button(action: { changeMonth(by: 1) }) {
+                                Image(systemName: "chevron.right")
+                                    .font(.title2)
+                                    .foregroundColor(.black)
+                            }
                         }
-                        Spacer()
-                        Text(monthYearString(currentDate)).font(.title2).fontWeight(.bold)
-                        Spacer()
                         
-
-                        // Button Removed
-
-                        
-                        Button(action: { changeMonth(by: 1) }) {
-                            Image(systemName: "chevron.right").font(.title2).foregroundColor(.black)
+                        // 2. Trailing Group: [ Hamburger ]
+                        HStack {
+                            Spacer()
+                            Button(action: { showSettings = true }) {
+                                Image(systemName: "line.3.horizontal") // 햄버거 메뉴
+                                    .font(.title2)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.black)
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -179,25 +199,33 @@ struct MoodCalendarView: View {
                         onSave: fetchDiaries
                      )
                 }
-                // ✅ 제스처 추가: 좌우 스와이프로 월 이동
-                .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            if value.translation.width < -50 {
-                                // 왼쪽으로 스와이프 -> 다음 달
-                                changeMonth(by: 1)
-                            } else if value.translation.width > 50 {
-                                // 오른쪽으로 스와이프 -> 이전 달
-                                changeMonth(by: -1)
-                            }
-                        }
-                )
+                .sheet(isPresented: $showSettings) {
+                    NavigationView {
+                        AppSettingsView()
+                            .navigationBarItems(trailing: Button("닫기") {
+                                showSettings = false
+                            })
+                    }
+                }
             }
             
             
             // Modal Removed
 
         }
+        .contentShape(Rectangle()) // ✅ 전체 영역 터치 가능하게 설정
+        .highPriorityGesture( // ✅ 버튼보다 스와이프 우선 인식하되,
+            DragGesture(minimumDistance: 30, coordinateSpace: .local) // ⭐️ 30pt 이상 움직여야만 드래그로 인식 (단순 터치는 통과)
+                .onEnded { value in
+                    if value.translation.width < 0 {
+                        // 왼쪽으로 스와이프 -> 다음 달
+                        changeMonth(by: 1)
+                    } else if value.translation.width > 0 {
+                        // 오른쪽으로 스와이프 -> 이전 달
+                        changeMonth(by: -1)
+                    }
+                }
+        )
     }
     
     // MARK: - Logic

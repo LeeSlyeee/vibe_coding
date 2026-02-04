@@ -169,6 +169,19 @@
         </div>
       </div>
     </div>
+
+    
+    <!-- Custom Modal for Alerts -->
+    <transition name="fade">
+      <div v-if="showModal" class="modal-overlay" @click="showModal = false">
+        <div class="modal-content" @click.stop>
+          <div class="modal-icon">ℹ️</div>
+          <h3>안내</h3>
+          <p>{{ modalMessage }}</p>
+          <button @click="showModal = false" class="modal-btn">확인</button>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -412,6 +425,14 @@ export default {
 
     const flowChartWidth = computed(() => "1200px");
 
+    const moodMap = {
+      1: { label: "화남", color: "#FF3B30" }, // Red (Anger)
+      2: { label: "우울", color: "#5E5CE6" }, // Purple (Melancholy)
+      3: { label: "보통", color: "#64D2FF" }, // Mint Blue (Neutral/Calm) - [CHANGED]
+      4: { label: "편안", color: "#34C759" }, // Green (Relaxed/Nature) - [CHANGED]
+      5: { label: "행복", color: "#FFCC00" }, // Yellow (Happy/Sun)
+    };
+
     const monthlyCharts = computed(() => {
       if (!rawStats.value.daily) return [];
       // Simple Monthly Grouping Logic
@@ -430,11 +451,23 @@ export default {
             .sort()
             .map((d) => d.slice(8));
           const data = Object.values(grouped[mStr]);
+          
+          // [FIX] Apply color based on mood level
+          const backgroundColors = data.map(val => {
+              const level = Math.round(val);
+              return moodMap[level] ? moodMap[level].color : "#0071E3";
+          });
+
           return {
             month: `${y}년 ${m}월`,
             data: {
               labels,
-              datasets: [{ label: "기분", data, backgroundColor: "#0071E3", borderRadius: 4 }],
+              datasets: [{ 
+                  label: "기분", 
+                  data, 
+                  backgroundColor: backgroundColors, // Dynamic Colors
+                  borderRadius: 4 
+              }],
             },
             options: {
               ...commonOptions,
@@ -442,18 +475,24 @@ export default {
                 y: { display: false, min: 0, max: 6 },
                 x: { display: true, grid: { display: false } },
               },
+              plugins: {
+                ...commonOptions.plugins, // Inherit base plugins
+                tooltip: {
+                    ...commonOptions.plugins.tooltip, // Inherit base tooltip styles
+                    callbacks: {
+                        label: function(context) {
+                            const val = Math.round(context.raw);
+                            const moodLabel = moodMap[val] ? moodMap[val].label : val;
+                            return `기분: ${moodLabel}`;
+                            // 원한다면 `기분: ${moodLabel} (${val})` 형식도 가능하지만 깔끔하게 한글만.
+                        }
+                    }
+                }
+              }
             },
           };
         });
     });
-
-    const moodMap = {
-      1: { label: "화남", color: "#8e8e93" },
-      2: { label: "우울", color: "#5e5ce6" },
-      3: { label: "보통", color: "#30b0c7" },
-      4: { label: "편안", color: "#32ade6" },
-      5: { label: "행복", color: "#ffcc00" },
-    };
 
     const moodChartData = computed(() => {
       const d = {};
@@ -502,6 +541,9 @@ export default {
 
     // Report Polling Logic (Refactored for Stability)
     const checkStatus = async () => {
+      // [Fix] 프리미엄 권한 체크 로직 추가
+      // 만약 권한이 없다면 초기에 차단하지만, 이미 들어와서 폴링 중이라면 서버 응답을 신뢰
+      // 여기서는 결과만 확인
       try {
         const res = await diaryAPI.getReportStatus();
         if (res.status === "completed") {
@@ -522,6 +564,17 @@ export default {
     };
 
     const handleGenerateReport = async () => {
+      // [Fix] 권한 체크: 연동 사용자(isLinked) OR 프리미엄 여부
+      // 로컬 스토리지에서 b2g_is_linked 확인
+      const b2gLinked = localStorage.getItem('b2g_is_linked') === 'true';
+      // 진단 패스된 유저는 사실상 프리미엄/연동 유저임 (간접 확인)
+      const isAssessed = localStorage.getItem('assessment_completed') === 'true';
+
+      if (!b2gLinked && !isAssessed) {
+           alert("유료 사용자 또는 기관 연동 사용자 전용 기능입니다.");
+           return;
+      }
+
       if (isGeneratingReport.value) return; // Prevent double click
 
       isGeneratingReport.value = true;
@@ -544,7 +597,12 @@ export default {
         pollingInterval.value = setInterval(checkStatus, 3000);
       } catch (e) {
         isGeneratingReport.value = false;
-        alert("오류: " + e.message);
+        // 403 Forbidden 등 백엔드 에러 처리
+        if (e.response && e.response.status === 403) {
+            alert("🔒 접근 제한\n\n보건소 및 병원 사용자\n또는 유료사용자 전용 기능입니다.");
+        } else {
+            alert("오류: " + e.message);
+        }
         if (stepInterval.value) clearInterval(stepInterval.value);
       }
     };
@@ -560,6 +618,10 @@ export default {
         }
       } catch (e) {}
     };
+    // [Modal State]
+    const showModal = ref(false);
+    const modalMessage = ref("");
+
     const handleGenerateLongTermReport = async () => {
       if (isGeneratingLongTerm.value) return;
 
@@ -584,6 +646,15 @@ export default {
       } catch (e) {
         isGeneratingLongTerm.value = false;
         if (longTermStepInterval.value) clearInterval(longTermStepInterval.value);
+        
+        // [UX] Show Modal for Error (e.g. Not Enough Reports)
+        if (e.response && e.response.status === 400 && e.response.data && e.response.data.message) {
+             modalMessage.value = e.response.data.message;
+             showModal.value = true;
+        } else {
+             modalMessage.value = "분석을 시작할 수 없습니다. 잠시 후 다시 시도해주세요.";
+             showModal.value = true;
+        }
       }
     };
 
@@ -648,6 +719,8 @@ export default {
       totalMoodCount,
       loadingStepText,
       longTermStepText,
+      showModal,
+      modalMessage
     };
   },
 };
@@ -1033,5 +1106,66 @@ export default {
 .ios-btn-outline-green:active {
   background: #f2fcf5;
   transform: scale(0.98);
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-content {
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: 80%;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.modal-icon {
+  font-size: 40px;
+  margin-bottom: 15px;
+}
+.modal-content h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1d1d1f;
+}
+.modal-content p {
+  margin: 0 0 24px 0;
+  font-size: 15px;
+  color: #666;
+  line-height: 1.5;
+}
+.modal-btn {
+  background: #0071e3;
+  color: white;
+  border: none;
+  padding: 12px 0;
+  width: 100%;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.modal-btn:active {
+  background: #0077ed;
+  transform: scale(0.98);
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 </style>

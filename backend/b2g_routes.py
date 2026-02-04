@@ -172,8 +172,7 @@ def sync_data():
         
         # Update Latest Status for User/Center Connection
         db.b2g_connections.update_one(
-            {"user_nickname": nickname, "center_code": center_code}, # Need to ensure nickname matching or use Code?
-            # Actually, usually user_id is better, but this is 'Guest' compatible sync.
+            {"user_nickname": nickname, "center_code": center_code},
             {"$set": {
                 "last_sync": datetime.utcnow(), 
                 "last_risk_level": data.get('risk_level', 0),
@@ -181,8 +180,82 @@ def sync_data():
             }},
             upsert=True
         )
+
+        # [CRITICAL UPGRADE] 
+        # 150 서버에서 온 데이터를 '통계'뿐만 아니라 실제 '일기(diaries)' 컬렉션에도 저장해야 함.
+        # 그래야 사용자가 앱에서 볼 수 있고 AI 분석이 돌아감.
         
-        print(f"✅ [B2G Sync] Data saved to DB for {nickname}")
+        incoming_metrics = data.get('mood_metrics', [])
+        if incoming_metrics:
+            # 반환값에 처리 결과 포함
+            processed_count = 0
+            
+            # 유저 ID 조회 (Nickname 기반)
+            user = db.users.find_one({"username": nickname}) or db.users.find_one({"nickname": nickname})
+            
+            if user:
+                user_id = str(user['_id'])
+                from app import encrypt_data # Encryption Helper
+                
+                for item in incoming_metrics:
+                    # Date Logic
+                    date_str = item.get('date', '') 
+                    if not date_str and item.get('created_at'):
+                        date_str = item.get('created_at')[:10]
+                        
+                    if not date_str: continue
+                    
+                    # Check duplication (Date Scope)
+                    try:
+                        start = datetime.strptime(date_str, "%Y-%m-%d")
+                        end = start + timedelta(days=1)
+                        
+                        exists = db.diaries.find_one({
+                            "user_id": user_id,
+                            "created_at": {"$gte": start, "$lt": end}
+                        })
+                        
+                        if not exists:
+                            # Parse Content
+                            raw_diary = {
+                                'user_id': user_id,
+                                'event': item.get('event', ''),
+                                'mood_level': item.get('mood_level', 3),
+                                'mood_intensity': item.get('mood_intensity', 0),
+                                'mode': item.get('mode', 'green'),
+                                
+                                # Rich Data
+                                'weather': item.get('weather'),
+                                'sleep_condition': item.get('sleep') or item.get('sleep_condition'),
+                                'emotion_desc': item.get('emotion') or item.get('emotion_desc'),
+                                'emotion_meaning': item.get('meaning') or item.get('emotion_meaning'),
+                                'self_talk': item.get('selftalk') or item.get('self_talk'),
+                                'gratitude_note': item.get('gratitude') or item.get('gratitude_note', ''),
+                                'medication_taken': item.get('medication_taken', False),
+                                'symptoms': item.get('symptoms', []),
+                                
+                                # AI Data (Preserve from 150 if exists)
+                                'ai_prediction': item.get('ai_prediction', '분석 중...'),
+                                'ai_comment': item.get('ai_comment', '잠시만 기다려주세요... 🤖'),
+                                'ai_analysis': item.get('ai_analysis', ''),
+                                
+                                'created_at': datetime.strptime(item.get('created_at'), '%Y-%m-%d %H:%M:%S') if item.get('created_at') else datetime.utcnow(),
+                                'sync_source': 'InsightMind_150'
+                            }
+                            
+                            # Encrypt & Insert
+                            encrypted = encrypt_data(raw_diary)
+                            db.diaries.insert_one(encrypted)
+                            processed_count += 1
+                            print(f"✅ [B2G Sync] Inserted diary for {nickname} on {date_str}")
+                    except Exception as parse_err:
+                        print(f"⚠️ [B2G Sync] Parse Error for item: {parse_err}")
+                        continue
+
+            else:
+                print(f"⚠️ [B2G Sync] User not found for nickname: {nickname}")
+
+        print(f"✅ [B2G Sync] Data saved to DB for {nickname} details.")
         return jsonify({"message": "Data synced", "success": True}), 200
         
     except Exception as e:

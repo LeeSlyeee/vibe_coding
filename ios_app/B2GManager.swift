@@ -53,10 +53,6 @@ class B2GManager: ObservableObject {
         self.lastSyncDate = UserDefaults.standard.double(forKey: "lastSyncDate")
     }
     
-
-    
-
-    
     // 보건소 코드 연결 시도 (실제 서버 연동)
     func connect(code: String, completion: @escaping (Bool, String) -> Void) {
         let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -131,30 +127,30 @@ class B2GManager: ObservableObject {
     }
     
     // 연동 해제 (User Action Only)
+    // [UNLOCKED] Removed safety guard for immediate disconnect
     func disconnect(force: Bool = false) {
-        print("🛡️ [B2G] Disconnect Blocked by Safety Lock!")
+        print("🔓 [B2G] Disconnect Safety Lock REMOVED by Request")
         /*
         guard force else {
             print("🚫 [B2G] Automatic disconnect prevented. User must explicitly disconnect.")
             return
         }
+        */
         
         print("🚫 [B2G] Disconnecting from Center (User Action)...")
         self.centerCode = ""
         self.isLinked = false
         self.lastSyncDate = 0
         
-
-        
         UserDefaults.standard.removeObject(forKey: "healthCenterCode")
         UserDefaults.standard.removeObject(forKey: "healthCenterCode_BACKUP") // Clear Backup
         UserDefaults.standard.removeObject(forKey: "isB2GLinked")
         UserDefaults.standard.removeObject(forKey: "linkedCenterName")
         UserDefaults.standard.removeObject(forKey: "lastSyncDate")
-        */
+        
+        // Notify UI
+        objectWillChange.send()
     }
-    
-
     
     // 백그라운드 데이터 동기화 (양방향: Fetch -> Merge -> Push)
     // [Differential Sync] force: true -> Full Sync

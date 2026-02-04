@@ -6,88 +6,51 @@ struct AppMainTabView: View {
     @StateObject private var networkMonitor = NetworkMonitor()
     @State private var showAssessment = false
     @State private var selection = 0
-    @State private var showEmergencySheet = false
+    @State private var isTabBarHidden = false // [New] TabBar Visibility Control
     
     var body: some View {
         if !authManager.isAuthenticated {
             AppLoginView()
         } else {
-            ZStack(alignment: .bottomTrailing) {
-                // Main Content
-                ZStack(alignment: .top) {
-                    TabView(selection: $selection) {
-                        MoodCalendarView()
-                            .tabItem { Label("캘린더", systemImage: "calendar") }
-                            .tag(0)
-                        
-                        // RBAC Check: If Level 1 (Mild), Show Lock or Limited View
-                        // But for better UX, let AppStatsView handle the internal lock UI.
-                        AppStatsView()
-                            .tabItem { Label("통계", systemImage: "chart.bar.fill") }
-                            .tag(1)
-                        
-                        AppGuideView()
-                            .tabItem { Label("가이드", systemImage: "book.fill") }
-                            .tag(2)
-                        
-                        AppChatView()
-                            .tabItem { Label("상담", systemImage: "message.fill") }
-                            .tag(3)
-                        
-                        AppSettingsView()
-                            .tabItem { Label("설정", systemImage: "gearshape.fill") }
-                            .tag(4)
-                    }
-                    .accentColor(.black)
-                    .disabled(!networkMonitor.isConnected) // Disable interaction if offline? Or just show banner. Let's just show banner.
+            ZStack(alignment: .bottom) {
+                // Main Content Area
+                MoodCalendarView()
+                    .opacity(selection == 0 ? 1 : 0)
+                    .allowsHitTesting(selection == 0)
                     
-                    // Network Status Banner
-                    if !networkMonitor.isConnected {
-                        VStack {
-                            HStack {
-                                Image(systemName: "wifi.slash")
-                                Text("네트워크 연결이 불안정합니다.")
-                                    .font(.system(size: 14, weight: .bold))
-                                Spacer()
-                            }
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.red)
-                            .shadow(radius: 2)
-                            
-                            Spacer()
+                AppStatsView()
+                    .opacity(selection == 1 ? 1 : 0)
+                    .allowsHitTesting(selection == 1)
+                    
+                AppChatView()
+                    .opacity(selection == 2 ? 1 : 0)
+                    .allowsHitTesting(selection == 2)
+                    
+                AppEmergencyView()
+                    .opacity(selection == 3 ? 1 : 0)
+                    .allowsHitTesting(selection == 3)
+                
+                // Custom Tab Bar
+                if !isTabBarHidden {
+                    VStack(spacing: 0) {
+                        Divider()
+                            .background(Color.gray.opacity(0.1))
+                        
+                        HStack(spacing: 0) {
+                            TabButton(index: 0, title: "캘린더", image: "tab_calendar", systemIcon: "calendar", selection: $selection)
+                            TabButton(index: 1, title: "통계", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
+                            TabButton(index: 2, title: "상담", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
+                            TabButton(index: 3, title: "긴급", image: "tab_emergency", systemIcon: "exclamationmark.triangle.fill", selection: $selection)
                         }
-                        .transition(.move(edge: .top))
-                        .animation(.easeInOut, value: networkMonitor.isConnected)
-                        .zIndex(100) // Ensure it's on top of everything
+                        .padding(.top, 10)
+                        .padding(.bottom, 20)
+                        .background(Color.white)
+                        .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
                     }
-                }
-                
-                // SOS Button (Icon Only, Left Side)
-                Button(action: { 
-                    withAnimation {
-                        showEmergencySheet = true 
-                    }
-                }) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 20)) // [Resize] 24 -> 20
-                        .foregroundColor(.white)
-                        .padding(12) // [Resize] 16 -> 12
-                        .background(Color.red)
-                        .clipShape(Circle())
-                        .shadow(color: Color.red.opacity(0.4), radius: 5, x: 0, y: 5)
-                }
-                .padding(.trailing, 20)
-                .padding(.top, 0) // 최상단 밀착 (Navigator Bar 영역)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                
-                // Custom Emergency Overlay
-                if showEmergencySheet {
-                    AppEmergencyView(isPresented: $showEmergencySheet)
-                        .transition(.opacity)
-                        .zIndex(200) // Ensure it's on top of TabBar and Content
+                    .transition(.move(edge: .bottom)) // Smooth transition
                 }
             }
+            .edgesIgnoringSafeArea(.bottom)
             #if os(iOS)
             .fullScreenCover(isPresented: $showAssessment) {
                 AppAssessmentView()
@@ -103,19 +66,82 @@ struct AppMainTabView: View {
                     }
             }
             #endif
-                .onAppear {
-                    checkAssessmentStatus()
-                    
-                    // [New] App Launch Sync
-                    if authManager.isAuthenticated {
-                        LocalDataManager.shared.syncWithServer()
-                    }
-                    
-                    // Listen for Chat Redirection
-                    NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { notif in
-                        self.selection = 3 // Switch to Chat Tab
-                    }
+            .onAppear {
+                checkAssessmentStatus()
+                
+                if authManager.isAuthenticated {
+                    LocalDataManager.shared.syncWithServer()
                 }
+                
+                // Tab Switching Observer
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("SwitchToChatTab"), object: nil, queue: .main) { _ in
+                    self.selection = 2
+                }
+                
+                // [New] Keyboard/TabBar Observers
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("HideTabBar"), object: nil, queue: .main) { _ in
+                    withAnimation { self.isTabBarHidden = true }
+                }
+                
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("ShowTabBar"), object: nil, queue: .main) { _ in
+                    withAnimation { self.isTabBarHidden = false }
+                }
+            }
+        }
+    }
+
+    // MARK: - Tab Button Component
+    struct TabButton: View {
+        let index: Int
+        let title: String
+        let image: String // Not used anymore
+        let systemIcon: String
+        @Binding var selection: Int
+        
+        var isSelected: Bool { selection == index }
+        var isEmergency: Bool { index == 3 }
+        
+        var body: some View {
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    selection = index
+                }
+            }) {
+                VStack(spacing: 4) {
+                    // 시스템 아이콘 사용
+                    Image(systemName: systemIcon)
+                        .resizable()
+                        .renderingMode(.template)
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(iconColor)
+                    
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(isSelected ? .bold : .regular)
+                        .foregroundColor(textColor)
+                }
+                // .frame(maxWidth: .infinity) // Moved to outside of Label
+            }
+            .frame(maxWidth: .infinity) // Button 자체가 1/N 너비를 차지하도록 설정
+            .contentShape(Rectangle()) // 빈 공간도 터치 가능하도록 설정
+        }
+        
+        // 긴급 버튼은 붉은색, 나머지는 흑백/회색
+        var iconColor: Color {
+            if isEmergency {
+                return isSelected ? .red : .red.opacity(0.6)
+            } else {
+                return isSelected ? .black : Color.gray.opacity(0.5)
+            }
+        }
+        
+        var textColor: Color {
+            if isEmergency {
+                return isSelected ? .red : .gray
+            } else {
+                return isSelected ? .black : .gray
+            }
         }
     }
     
@@ -148,66 +174,62 @@ struct AppGuideView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(hexString: "F5F5F7").edgesIgnoringSafeArea(.all)
-                
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 30) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("📖 사용 설명서")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(Color(hexString: "1D1D1F"))
-                            Text("마음 온(Maum-on)을 100% 활용하는 방법을 알려드려요.")
-                                .font(.system(size: 15))
-                                .foregroundColor(Color(hexString: "86868B"))
-                        }
-                        .padding(.top, 20)
-                        
-                        // Section 1: 일기 작성하기
-                        VStack(alignment: .leading, spacing: 20) {
-                            GuideSectionHeader(title: "📝 일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
-                            
-                            VStack(spacing: 16) {
-                                GuideStepCard(num: "1", title: "사실 (Event)", desc: "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
-                                GuideStepCard(num: "2", title: "감정 (Emotion)", desc: "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
-                                GuideStepCard(num: "3", title: "의미 (Meaning)", desc: "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
-                                GuideStepCard(num: "4", title: "위로 (Self-Talk)", desc: "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
-                            }
-                        }
-                        
-                        // Section 2: AI 분석
-                        VStack(alignment: .leading, spacing: 20) {
-                            GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "전문 상담사급 AI가 당신의 마음을 읽어드립니다.")
-                            
-                            GuideFeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
-                            GuideFeatureCard(icon: "💬", title: "전문 상담사급 AI 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
-                        }
-                        
-                        // Section 3: 프라이버시 & 심층 분석
-                        VStack(alignment: .leading, spacing: 20) {
-                            GuideSectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
-                            
-                            GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 상담사", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
-                            GuideFeatureCard(icon: "📑", title: "🧠 심층 심리 리포트", desc: "일기가 3개 이상 모이면, **나만의 심리 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)")
-                            GuideFeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
-                            
-                            HStack(spacing: 14) {
-                                GuideSmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
-                                GuideSmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
-                            }
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-                        
-                        Spacer(minLength: 50)
+        // Removed NavigationView wrapper to avoid nested navigation when pushed from Settings
+        ZStack {
+            Color(hexString: "F5F5F7").edgesIgnoringSafeArea(.all)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 30) {
+                    // Header
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("📖 사용 설명서")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(Color(hexString: "1D1D1F"))
+                        Text("마음 온(Maum-on)을 100% 활용하는 방법을 알려드려요.")
+                            .font(.system(size: 15))
+                            .foregroundColor(Color(hexString: "86868B"))
                     }
-                    .padding(24)
+                    .padding(.top, 20)
+                    
+                    // Section 1: 일기 작성하기
+                    VStack(alignment: .leading, spacing: 20) {
+                        GuideSectionHeader(title: "📝 일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
+                        
+                        VStack(spacing: 16) {
+                            GuideStepCard(num: "1", title: "사실 (Event)", desc: "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
+                            GuideStepCard(num: "2", title: "감정 (Emotion)", desc: "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
+                            GuideStepCard(num: "3", title: "의미 (Meaning)", desc: "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
+                            GuideStepCard(num: "4", title: "위로 (Self-Talk)", desc: "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
+                        }
+                    }
+                    
+                    // Section 2: AI 분석
+                    VStack(alignment: .leading, spacing: 20) {
+                        GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "전문 상담사급 AI가 당신의 마음을 읽어드립니다.")
+                        
+                        GuideFeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
+                        GuideFeatureCard(icon: "💬", title: "전문 상담사급 AI 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
+                    }
+                    
+                    // Section 3: 프라이버시 & 심층 분석
+                    VStack(alignment: .leading, spacing: 20) {
+                        GuideSectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
+                        
+                        GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 상담사", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
+                        GuideFeatureCard(icon: "📑", title: "🧠 심층 심리 리포트", desc: "일기가 3개 이상 모이면, **나만의 심리 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)")
+                        GuideFeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
+                        
+                        HStack(spacing: 14) {
+                            GuideSmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
+                            GuideSmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                    
+                    Spacer(minLength: 50)
                 }
+                .padding(24)
             }
-            #if os(iOS)
-            .navigationBarHidden(true)
-            #endif
         }
     }
 }
