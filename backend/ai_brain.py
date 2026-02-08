@@ -18,7 +18,9 @@ except ImportError:
 
 # TensorFlow/Keras Import (Optional)
 try:
-    from tensorflow.keras.preprocessing.text import Tokenizer
+    raise ImportError("Disabled to prevent mutex crash on macOS")
+    if False and os.getenv("ENABLE_TF"): # Disabled by default to fix Mac M1/M2 mutex crash
+        from tensorflow.keras.preprocessing.text import Tokenizer
     from tensorflow.keras.preprocessing.sequence import pad_sequences
     from tensorflow.keras.models import Sequential, Model
     from tensorflow.keras.layers import Embedding, LSTM, Dense, Dropout, Input
@@ -293,7 +295,7 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "haru-on-gemma", # Use Custom Model Name
+                "model": "haruON-gemma", # Use Custom Model Name
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {
@@ -381,7 +383,7 @@ class EmotionAnalysis:
             )
             
             payload = {
-                "model": "haru-on-gemma",
+                "model": "haruON-gemma",
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {

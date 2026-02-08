@@ -32,4 +32,4 @@ echo "✅ Fine-tuning Completed!"
 # python -m mlx_lm.fuse \
 #   --model google/gemma-2-2b-it \
 #   --adapter-path adapters_maumon \
-#   --save-path models/maum-on-gemma-2b-v1
+#   --save-path models/haruON-gemma-2b-v1

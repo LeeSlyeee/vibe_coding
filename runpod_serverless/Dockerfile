@@ -12,7 +12,7 @@ RUN pip install runpod huggingface_hub peft accelerate
 COPY src/handler.py /app/handler.py
 
 # 2. [Offline Mode] Copy Pre-downloaded Model Data
-# Contains: /app/model_data/base (Llama-3) & /app/model_data/adapter (Maum-On)
+# Contains: /app/model_data/base (Llama-3) & /app/model_data/adapter (haruON)
 COPY model_data /app/model_data
 
 # 3. Copy Start Script

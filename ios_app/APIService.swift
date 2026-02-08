@@ -346,7 +346,7 @@ class APIService: NSObject {
         }
     }
     
-    // MARK: - Chat (OCI Server Mode: Maum-On 217 Node)
+    // MARK: - Chat (OCI Server Mode: haruON 217 Node)
     func sendChatMessage(text: String, history: String, completion: @escaping (Result<String, Error>) -> Void) {
         ensureAuth { success in
             guard success else {

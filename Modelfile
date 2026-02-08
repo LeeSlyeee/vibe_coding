@@ -1,4 +1,4 @@
-FROM /Users/slyeee/Desktop/DATA/DATA2/vibe_coding/models/maum-on-gemma-2b-v2-full-4bit
+FROM /Users/slyeee/Desktop/DATA/DATA2/vibe_coding/models/haruON-gemma-2b-v2-full-4bit
 TEMPLATE """<start_of_turn>user
 {{ .Prompt }}<end_of_turn>
 <start_of_turn>model

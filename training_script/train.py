@@ -19,7 +19,7 @@ LOAD_IN_4BIT = True  # Quanitzation for memory efficiency
 # Base Model (You can change this to 'meta-llama/Meta-Llama-3-8B-Instruct')
 # Using a Korean-finetuned base can yield better results
 MODEL_ID = "unsloth/llama-3-8b-Instruct-bnb-4bit" 
-NEW_MODEL_NAME = "maum-on-llama3-v1"
+NEW_MODEL_NAME = "haruON-llama3-v1"
 HF_USERNAME = "slyeee"  # Change this to your HF username
 HF_TOKEN = os.getenv("HF_TOKEN") # Load from environment variable
 

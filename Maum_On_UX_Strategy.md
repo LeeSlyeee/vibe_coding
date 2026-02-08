@@ -1,4 +1,4 @@
-# Maum-On: On-Device AI 안심 UX 전략 (Security Strategy)
+# haruON: On-Device AI 안심 UX 전략 (Security Strategy)
 
 ## 📌 핵심 가치 (Core Value)
 

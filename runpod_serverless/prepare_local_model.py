@@ -4,7 +4,7 @@ from huggingface_hub import snapshot_download
 
 HF_TOKEN = os.getenv("HF_TOKEN")
 BASE_MODEL_ID = "meta-llama/Meta-Llama-3-8B-Instruct"
-ADAPTER_ID = "slyeee/maum-on-llama3-v1"
+ADAPTER_ID = "slyeee/haruON-llama3-v1"
 MODEL_DIR = "./model_data"
 
 print(f"🚀 [Local Build] Starting Download...")

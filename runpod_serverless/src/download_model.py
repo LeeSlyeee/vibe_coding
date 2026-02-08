@@ -8,7 +8,7 @@ sys.stdout.reconfigure(line_buffering=True)
 
 # Get token from environment
 hf_token = os.environ.get("HF_TOKEN")
-model_id = "slyeee/maum-on-llama3-v1"
+model_id = "slyeee/haruON-llama3-v1"
 
 print(f"🚀 [Downloader] Starting download script...", flush=True)
 

@@ -1535,7 +1535,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
     
     try:
         payload = {
-            "model": "maum-on-gemma",
+            "model": "haruON-gemma",
             "prompt": prompt_text,
             "stream": False,
             "options": {
