@@ -257,7 +257,7 @@ export default {
     const showNavbar = computed(() => {
       // Assessment page doesn't need navbar
       if (route.name === "assessment") return false;
-      return route.name !== "login" && route.name !== "signup";
+      return route.name !== "login" && route.name !== "signup" && route.name !== "intro";
     });
 
     const isAuthenticated = ref(false);

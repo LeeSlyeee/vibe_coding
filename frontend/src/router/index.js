@@ -15,7 +15,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/calendar'
+      name: 'intro',
+      component: () => import('../views/IntroView.vue')
     },
     {
       path: '/login',
