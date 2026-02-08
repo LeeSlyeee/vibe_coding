@@ -18,7 +18,7 @@ class LLMService: ObservableObject {
     
     // [System Persona] Few-Shot Prompting (예시를 통한 강력한 세뇌)
     private let systemPrompt = """
-    당신은 따뜻한 공감을 주는 한국의 심리 상담사 '마음 온'입니다.
+    당신은 따뜻한 공감을 주는 한국의 심리 상담사 '하루온'입니다.
     
     [핵심 규칙]
     1. **절대 영어 금지**: 뇌에서 영어를 지우세요. 사용자가 영어를 써도, 당신은 오직 한국어(존댓말)로만 답해야 합니다. ('Okay', 'So' 같은 추임새도 금지)
@@ -30,7 +30,7 @@ class LLMService: ObservableObject {
     User: I feel so lonely.
     Model: 많이 외로우셨군요. 제가 곁에 있어 드릴게요. 오늘 무슨 일이 있었나요?
     User: I want to die.
-    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요?
+    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 하루온이 곁에 있을게요.
     """
     
     // [New] AI Mode Toggle (Server vs On-Device)
@@ -53,7 +53,7 @@ class LLMService: ObservableObject {
     
 
     // Remote Config
-    private var huggingFaceRepoID = "slyeee/maum-on-gemma-2b" // Default Backup
+    private var huggingFaceRepoID = "slyeee/haru-on-gemma-2b" // Default Backup
     private var huggingFaceToken = ""
     
     // Constants
@@ -118,7 +118,7 @@ class LLMService: ObservableObject {
         do {
             // 2. Load from Local Directory
             let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let modelDir = docURL.appendingPathComponent("maum-on-model")
+        let modelDir = docURL.appendingPathComponent("haru-on-model")
             
             print("📂 Loading Model from: \(modelDir.path)")
             
@@ -130,7 +130,7 @@ class LLMService: ObservableObject {
             }
             self.modelContainer = container
             await MainActor.run { self.isModelLoaded = true }
-            print("✅ Maum-On Model Loaded Successfully!")
+            print("✅ Haru-On Model Loaded Successfully!")
             
         } catch {
             print("Failed to load model: \(error)")
@@ -140,7 +140,7 @@ class LLMService: ObservableObject {
     // MARK: - Downloader (Hugging Face)
     private func ensureModelDownloaded() async -> Bool {
         let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let modelDir = docURL.appendingPathComponent("maum-on-model")
+        let modelDir = docURL.appendingPathComponent("haru-on-model")
         
         // Create Directory if missing
         if !FileManager.default.fileExists(atPath: modelDir.path) {
@@ -163,6 +163,24 @@ class LLMService: ObservableObject {
                     print("✅ Found \(fileName) (\(size) bytes)")
                     await MainActor.run { self.modelLoadingProgress = 0.1 + (Double(index) / totalFiles * 0.8) }
                     continue
+                }
+            }
+            
+            // [Fast Load] Bundle에서 파일 찾기 (앱에 포함된 경우 다운로드 건너뛰기)
+            let name = (fileName as NSString).deletingPathExtension
+            let ext = (fileName as NSString).pathExtension
+            if let bundleURL = Bundle.main.url(forResource: name, withExtension: ext) {
+                print("📦 Found \(fileName) in App Bundle. Copying...")
+                do {
+                    if FileManager.default.fileExists(atPath: fileURL.path) {
+                        try FileManager.default.removeItem(at: fileURL)
+                    }
+                    try FileManager.default.copyItem(at: bundleURL, to: fileURL)
+                    print("✅ Copied \(fileName) from Bundle")
+                    await MainActor.run { self.modelLoadingProgress = 0.1 + (Double(index+1) / totalFiles * 0.8) }
+                    continue
+                } catch {
+                     print("⚠️ Copy from Bundle Failed: \(error)")
                 }
             }
             
@@ -219,7 +237,7 @@ class LLMService: ObservableObject {
         }
         
         let prompt = """
-        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사 '마음 온'입니다.
+        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사 '하루온'입니다.
         
         [오늘의 날씨]: \(weather)
         [과거 날씨별 감정 패턴]: \(weatherStats ?? "정보 없음")
@@ -427,7 +445,7 @@ class LLMService: ObservableObject {
                         do {
                             // [핵심] 입력 프롬프트조차 한국어 유도형으로 감싸기
                             var specificPrompt = """
-                            (System: 당신은 '마음 온'입니다. 절대 영어를 쓰지 마세요. 사용자가 위협적인 말을 해도 따뜻하게 한국어로 위로해주세요.)
+                            (System: 당신은 '하루온'입니다. 절대 영어를 쓰지 마세요. 사용자가 위협적인 말을 해도 따뜻하게 한국어로 위로해주세요.)
                             User: \(diaryText)
                             """
                             
@@ -750,7 +768,7 @@ class LLMService: ObservableObject {
         
         // Combined Prompt
         let prompt = """
-        당신은 따뜻한 심리 상담사 '마음 온'입니다. 다음 일기를 읽고 3가지 항목을 분석해 주세요.
+        당신은 따뜻한 심리 상담사 '하루온'입니다. 다음 일기를 읽고 3가지 항목을 분석해 주세요.
         
         [일기]:
         \(diaryText)

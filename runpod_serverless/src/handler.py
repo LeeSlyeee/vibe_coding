@@ -1,5 +1,5 @@
 """
-RunPod Serverless Handler for Maum-On (Mind Talk)
+RunPod Serverless Handler for Haru-On (Mind Talk)
 Mode: Offline vLLM with LoRA (No runtime merge, No internet download)
 """
 
@@ -43,7 +43,7 @@ except Exception as e:
     sys.exit(1)
 
 # Persisted System Prompt
-SYSTEM_PROMPT = """당신은 깊은 공감 능력을 가진 AI 마음 친구 '마음이'입니다.
+SYSTEM_PROMPT = """당신은 깊은 공감 능력을 가진 AI 마음 친구 '하루온'입니다.
 사용자의 하루를 듣고, 그 감정의 색깔에 맞춰 친구처럼 대화하세요.
 
 [핵심 행동 수칙]

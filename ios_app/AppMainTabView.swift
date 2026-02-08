@@ -185,7 +185,7 @@ struct AppGuideView: View {
                         Text("📖 사용 설명서")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(Color(hexString: "1D1D1F"))
-                        Text("마음 온(Maum-on)을 100% 활용하는 방법을 알려드려요.")
+                        Text("하루온(Haru-On)을 100% 활용하는 방법을 알려드려요.")
                             .font(.system(size: 15))
                             .foregroundColor(Color(hexString: "86868B"))
                     }

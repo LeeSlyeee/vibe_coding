@@ -347,7 +347,7 @@ struct AppSettingsView: View {
                     HStack {
                         Text("개발자")
                         Spacer()
-                        Text("Maum-on Team")
+                        Text("Haru-on Team")
                             .foregroundColor(.gray)
                     }
                     

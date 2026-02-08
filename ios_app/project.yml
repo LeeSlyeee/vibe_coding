@@ -24,8 +24,8 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: "Maum-on"
-        CFBundleName: "Maum-on"
+        CFBundleDisplayName: "Haru-on"
+        CFBundleName: "Haru-on"
         UILaunchStoryboardName: "LaunchScreen"
     dependencies:
       - package: mlx-swift

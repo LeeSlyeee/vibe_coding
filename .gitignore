@@ -27,3 +27,4 @@ MindDiaryApp.xcodeproj/
 runpod_serverless/model_data/
 _trash/
 temp_key_*
+ios_app/PreloadedModel/
