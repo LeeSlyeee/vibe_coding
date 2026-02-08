@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.mooddiary.app',
-  appName: 'MoodDiary',
+  appName: 'haruON',
   webDir: 'dist',
   plugins: {
     CapacitorHttp: {

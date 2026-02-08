@@ -3,7 +3,7 @@
     <!-- 데스크탑용 상단 네비게이션 -->
     <header class="navbar desktop-nav" v-if="showNavbar">
       <div class="navbar-content">
-        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+        <h1 class="logo" @click="goHome">haruON</h1>
         <div class="nav-actions">
           <button
             v-if="isAuthenticated"
@@ -39,7 +39,7 @@
     <!-- 모바일용 상단 헤더 (앱 타이틀만) -->
     <header class="navbar mobile-header" v-if="showNavbar">
       <div class="mobile-navbar-content">
-        <h1 class="logo" @click="goHome">MOOD DIARY</h1>
+        <h1 class="logo" @click="goHome">haruON</h1>
         <div class="mobile-nav-actions" v-if="isAuthenticated">
           <button @click="$router.push('/guide')" class="mobile-icon-btn" title="가이드">📘</button>
           <button @click="goToStats" class="mobile-icon-btn" title="분석">📊</button>

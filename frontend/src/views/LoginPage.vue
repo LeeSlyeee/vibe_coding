@@ -2,7 +2,7 @@
   <div class="auth-page">
     <div class="auth-container">
       <div class="auth-card card">
-        <h1 class="auth-title">MOOD DIARY</h1>
+        <h1 class="auth-title">haruON</h1>
         
         <form @submit.prevent="handleLogin" class="auth-form">
           <div class="test-account-info">

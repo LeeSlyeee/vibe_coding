@@ -4,7 +4,7 @@
       <header class="guide-header">
         <div class="header-left">
           <h2>📖 사용 설명서</h2>
-          <p class="subtitle">MOOD DIARY를 100% 활용하는 방법을 알려드려요.</p>
+          <p class="subtitle">haruON를 100% 활용하는 방법을 알려드려요.</p>
         </div>
         <button @click="$router.push('/calendar')" class="close-btn" aria-label="닫기">
           <svg
