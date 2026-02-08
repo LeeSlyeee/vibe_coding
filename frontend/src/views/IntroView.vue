@@ -3,8 +3,7 @@
     <div class="content">
       <div class="logo-area">
         <div class="moon-icon">🌙</div>
-        <h1 class="title">하루온</h1>
-        <h2 class="subtitle">Haru-On</h2>
+        <h1 class="title">haruON</h1>
         <p class="tagline">당신의 하루를, 온전히</p>
       </div>
 

@@ -16,11 +16,7 @@ struct AppSplashView: View {
                         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
                     
                     VStack(spacing: 8) {
-                        Text("하루온")
-                            .font(.system(size: 40, weight: .bold)) // Korean Title
-                            .foregroundColor(.white)
-                        
-                        Text("Haru-On")
+                        Text("haruON")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.white.opacity(0.9))
