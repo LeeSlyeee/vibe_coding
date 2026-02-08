@@ -64,7 +64,7 @@
         </form>
 
         <div class="auth-footer">
-          <p>© 2026 Slyeee. All rights reserved.</p>
+          <p>© 2026 haruON. All rights reserved.</p>
         </div>
       </div>
     </div>

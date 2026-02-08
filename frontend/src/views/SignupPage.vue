@@ -51,7 +51,7 @@
         </form>
 
         <div class="auth-footer">
-          <p>© 2026 Mood. All rights reserved.</p>
+          <p>© 2026 haruON. All rights reserved.</p>
           <p class="footer-credit">Design by Youngjae</p>
         </div>
       </div>
