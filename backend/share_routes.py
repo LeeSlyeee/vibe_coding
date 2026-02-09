@@ -143,8 +143,12 @@ def get_shared_list():
             
             # If name is missing in relation, try fetch from users collection (optional but better)
             if viewer_name == '보호자':
-                u = mongo.db.users.find_one({'_id': ObjectId(rel['viewer_id'])})
-                if u: viewer_name = u.get('nickname', u.get('username'))
+                try:
+                    u = mongo.db.users.find_one({'_id': ObjectId(rel['viewer_id'])})
+                    if u: viewer_name = u.get('nickname', u.get('username'))
+                except:
+                    # Invalid ObjectId (e.g. test string ID), ignore
+                    pass
             
             results.append({
                 'id': rel['viewer_id'],
