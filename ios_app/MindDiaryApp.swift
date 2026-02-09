@@ -20,6 +20,7 @@ struct MindDiaryApp: App {
                         .zIndex(0)
                 }
             }
+            .screenshotProtected(isProtected: true) // 스크린샷 방지 적용 (검은 화면 처리)
             .preferredColorScheme(.light) // Force Light Mode
             .onAppear {
                 // 1. 모델 로딩 시작 (Background)

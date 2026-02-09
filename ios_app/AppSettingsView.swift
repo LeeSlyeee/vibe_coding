@@ -569,6 +569,7 @@ struct AppSettingsView: View {
                         showPremiumModal = false
                     }
                 })
+                .screenshotProtected(isProtected: true) // 스크린샷 방지
             }
         } // End NavigationView
     }

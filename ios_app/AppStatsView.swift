@@ -214,6 +214,7 @@ struct AppStatsView: View {
                     .navigationBarItems(trailing: Button("닫기") {
                         showSettings = false
                     })
+                    .screenshotProtected(isProtected: true) // 스크린샷 방지
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
@@ -231,7 +232,15 @@ struct AppStatsView: View {
     func fetchStats() {
         // 로컬 데이터 로딩 시뮬레이션 (빠름)
         DispatchQueue.main.async {
-            let diaries = LocalDataManager.shared.diaries
+            let originalDiaries = LocalDataManager.shared.diaries
+            
+            // [Filter] 미래 날짜 데이터 제외 (통계 오류 방지, 2026-08 등등)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let todayStr = formatter.string(from: Date())
+            
+            // 오늘 날짜보다 미래인 데이터는 통계에서 제외
+            let diaries = originalDiaries.filter { ($0.date ?? "") <= todayStr }
             
             // 1. Timeline Data
             let timeline = diaries.map { diary in
@@ -255,18 +264,24 @@ struct AppStatsView: View {
             // 3. Mood Distribution
             var moodCounts = [Int: Int]()
             for diary in diaries {
-                moodCounts[diary.mood_level, default: 0] += 1
+                // [Fix] 1~5 범위로 정규화 (Clamp)
+                let normalizedMood = min(max(diary.mood_level, 1), 5)
+                moodCounts[normalizedMood, default: 0] += 1
             }
             let moods = moodCounts.map { StatsMoodItem(_id: $0.key, count: $0.value) }
             
             // 4. Weather (날씨별 감정 통계 구현)
-            // Group by weatherDesc -> moodLevel -> count
             var weatherMap = [String: [Int: Int]]()
             
             for diary in diaries {
                 let w = diary.weather ?? "알 수 없음"
+                // [Fix] 날씨 데이터가 없으면 통계 제외
+                if w == "알 수 없음" || w.isEmpty { continue }
+                
                 if weatherMap[w] == nil { weatherMap[w] = [:] }
-                weatherMap[w]![diary.mood_level, default: 0] += 1
+                
+                let normalizedMood = min(max(diary.mood_level, 1), 5)
+                weatherMap[w]![normalizedMood, default: 0] += 1
             }
             
             let weather = weatherMap.map { (weatherDesc, moodCounts) in

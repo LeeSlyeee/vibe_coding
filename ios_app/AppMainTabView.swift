@@ -57,6 +57,7 @@ struct AppMainTabView: View {
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
+                    .screenshotProtected(isProtected: true) // 스크린샷 방지
             }
             #else
             .sheet(isPresented: $showAssessment) {
@@ -64,6 +65,7 @@ struct AppMainTabView: View {
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
+                    .screenshotProtected(isProtected: true) // 스크린샷 방지
             }
             #endif
             .onAppear {

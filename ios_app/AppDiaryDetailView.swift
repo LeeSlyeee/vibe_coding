@@ -179,6 +179,7 @@ struct AppDiaryDetailView: View {
                 },
                 diaryToEdit: diary
             )
+            .screenshotProtected(isProtected: true) // 스크린샷 방지
         }
         .alert(isPresented: $showErrorAlert) {
             Alert(title: Text("삭제 실패"), message: Text(errorMessage), dismissButton: .default(Text("확인")))

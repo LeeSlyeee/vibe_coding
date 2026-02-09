@@ -352,6 +352,7 @@ struct AppDiaryWriteView: View {
         // [New] 약물 설정 시트
         .sheet(isPresented: $showingMedSetting, onDismiss: loadMedications) {
             MedicationSettingView()
+                .screenshotProtected(isProtected: true) // 스크린샷 방지
         }
         // 음성 인식 텍스트 반영
         .onChangeCompat(of: voiceRecorder.transcribedText) { newText in

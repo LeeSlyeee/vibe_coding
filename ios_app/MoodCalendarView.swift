@@ -210,6 +210,7 @@ struct MoodCalendarView: View {
                         date: target.date,
                         onSave: fetchDiaries
                      )
+                     .screenshotProtected(isProtected: true) // 스크린샷 방지
                 }
                 .sheet(isPresented: $showSettings) {
                     NavigationView {
@@ -218,6 +219,7 @@ struct MoodCalendarView: View {
                                 showSettings = false
                             })
                     }
+                    .screenshotProtected(isProtected: true) // 스크린샷 방지
                 }
             }
             
