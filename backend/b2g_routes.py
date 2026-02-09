@@ -8,6 +8,7 @@ b2g_bp = Blueprint('b2g_bp', __name__)
 # 우리는 app.py의 mongo 인스턴스를 사용해야 합니다.
 # 순환 참조를 피하기 위해 함수 내부에서 import하거나, current_app을 사용합니다.
 from flask import current_app
+from config import get_korea_time
 
 def get_db():
     # flask_pymongo의 래퍼가 아닌, 직접 db 객체에 접근
@@ -67,7 +68,7 @@ def verify_code():
                         "region": ext_center.get("region", "External"),
                         "external_id": ext_center.get("id"), # Original ID
                         "source": "InsightMind_Proxy",
-                        "created_at": datetime.utcnow()
+                        "created_at": get_korea_time()
                     }).inserted_id
                     
                     print(f"✅ Cached External Center: {ext_center.get('name')} -> {new_center_id}")
@@ -120,7 +121,7 @@ def connect_center():
     if existing:
         db.b2g_connections.update_one(
             {"_id": existing["_id"]},
-            {"$set": {"status": "ACTIVE", "updated_at": datetime.utcnow()}}
+            {"$set": {"status": "ACTIVE", "updated_at": get_korea_time()}}
         )
     else:
         db.b2g_connections.insert_one({
@@ -128,7 +129,7 @@ def connect_center():
             "center_id": center_obj_id,
             "center_code": center.get("code"),
             "status": "ACTIVE",
-            "created_at": datetime.utcnow()
+            "created_at": get_korea_time()
         })
         
     db.users.update_one(
@@ -164,7 +165,7 @@ def sync_data():
             "user_nickname": nickname,
             "metrics": data.get('mood_metrics', []),
             "risk_level": data.get('risk_level', 0),
-            "synced_at": datetime.utcnow()
+            "synced_at": get_korea_time()
         }
         
         # Insert (History Log)
@@ -174,7 +175,7 @@ def sync_data():
         db.b2g_connections.update_one(
             {"user_nickname": nickname, "center_code": center_code},
             {"$set": {
-                "last_sync": datetime.utcnow(), 
+                "last_sync": get_korea_time(), 
                 "last_risk_level": data.get('risk_level', 0),
                 "latest_metrics": data.get('mood_metrics', [])[:1] # Keep latest one for quick view
             }},
@@ -203,7 +204,7 @@ def sync_data():
                         "email": f"{nickname}@b2g.auto", # 가상 이메일
                         "password": "auto_generated", # 접속 불가 (비번 모름)
                         "risk_level": data.get('risk_level', 0),
-                        "created_at": datetime.utcnow(),
+                        "created_at": get_korea_time(),
                         "source": "B2G_Auto_Sync",
                         "linked_center_code": center_code
                     }
@@ -239,7 +240,7 @@ def sync_data():
                     
                     if not exists:
                         # [Fix] Date Parsing Logic (ISO 8601 & Legacy Support)
-                        created_at_val = datetime.utcnow()
+                        created_at_val = get_korea_time()
                         if item.get('created_at'):
                             c_str = item.get('created_at')
                             try:

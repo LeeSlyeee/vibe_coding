@@ -81,6 +81,19 @@ const router = createRouter({
       name: 'medication',
       component: () => import('../views/MedicationPage.vue'),
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/share',
+      name: 'share',
+      component: () => import('../views/SharePage.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/share/stats/:id',
+      name: 'shared-stats',
+      props: true,
+      component: () => import('../views/SharedStatsPage.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

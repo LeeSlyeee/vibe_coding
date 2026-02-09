@@ -189,6 +189,32 @@ struct AppSettingsView: View {
                     }
                 }
                 
+                // [Section 1.5] 보호자/친구 연결 (독립 섹션)
+                Section {
+                    NavigationLink(destination: AppShareView()) {
+                        HStack(spacing: 15) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.purple.opacity(0.1))
+                                    .frame(width: 40, height: 40)
+                                Image(systemName: "person.2.fill")
+                                    .foregroundColor(.purple)
+                                    .font(.system(size: 20))
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("보호자/친구 연결")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                Text("가족과 감정 통계 공유하기")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+                
                 // Section 2: B2G 연동 (핵심 기능)
                 Section(header: Text("기관 연동 (B2G)")) {
                     if b2gManager.isLinked {
@@ -244,7 +270,7 @@ struct AppSettingsView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "arrow.up.circle.fill")
-                                            .font(.system(size: 18))
+                                        .font(.system(size: 18))
                                         Text("데이터 강제 전송 (App → Server)")
                                             .fontWeight(.bold)
                                             .font(.system(size: 16))
@@ -265,7 +291,7 @@ struct AppSettingsView: View {
                                 }) {
                                     HStack {
                                         Image(systemName: "arrow.down.circle.fill")
-                                            .font(.system(size: 18))
+                                        .font(.system(size: 18))
                                         Text("서버 데이터 가져오기 (Server → App)")
                                             .fontWeight(.bold)
                                             .font(.system(size: 16))
@@ -322,10 +348,6 @@ struct AppSettingsView: View {
                         .padding(.vertical, 8)
                     }
                 }
-                
-                
-                
-                
                 
                 // Section 3: 멤버십 (Membership)
                 Section(header: Text("멤버십")) {
@@ -522,7 +544,7 @@ struct AppSettingsView: View {
                     }
                     .padding(.top, 4)
                 }
-                }
+            } // End List
             .navigationTitle("설정")
             .alert(item: $activeAlert) { item in
                 switch item {
@@ -539,17 +561,16 @@ struct AppSettingsView: View {
                     )
                 }
             }
-            
             .sheet(isPresented: $showPremiumModal) {
                 PremiumModalView(isPresented: $showPremiumModal, onUpgrade: {
-                     // Simple Mock Upgrade
-                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                         authManager.setPremium(true)
-                         showPremiumModal = false
-                     }
+                    // Simple Mock Upgrade
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        authManager.setPremium(true)
+                        showPremiumModal = false
+                    }
                 })
             }
-        }
+        } // End NavigationView
     }
     
     // 이스터에그 함수

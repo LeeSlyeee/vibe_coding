@@ -15,6 +15,16 @@
             <p class="profile-desc">Web Mode</p>
           </div>
         </div>
+        
+        <!-- Share Link Button -->
+        <div class="link-card" style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer;"
+             @click="$router.push('/share')">
+           <div>
+              <h4 style="margin: 0; font-size: 16px;">🤝 보호자/친구 연결</h4>
+              <p style="margin: 4px 0 0 0; font-size: 12px; color: #86868b;">가족이나 친구에게 내 감정 통계를 공유하세요.</p>
+           </div>
+           <span style="font-size: 20px; color: #d1d1d6;">›</span>
+        </div>
       </section>
 
       <!-- Section 2: B2G 연동 (핵심) -->

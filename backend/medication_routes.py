@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from bson import ObjectId
 from datetime import datetime
+from config import get_korea_time
 import threading
 
 med_bp = Blueprint('medication', __name__)
@@ -63,7 +64,7 @@ def add_medication():
         'alarm_time': data.get('alarm_time', {}), # {'morning': '08:00', ...}
         'memo': data.get('memo', ''),
         'color': data.get('color', '#FF5733'), # For UI visualization
-        'created_at': datetime.utcnow(),
+        'created_at': get_korea_time(),
         'is_active': True
     }
     
@@ -149,7 +150,7 @@ def log_medication():
         # Update existing
         mongo.db.medication_logs.update_one(
             {'_id': existing['_id']},
-            {'$set': {'status': status, 'updated_at': datetime.utcnow()}}
+            {'$set': {'status': status, 'updated_at': get_korea_time()}}
         )
     else:
         # Create new log
@@ -159,8 +160,8 @@ def log_medication():
             'date': date_str,
             'slot': slot,
             'status': status,
-            'taken_at': datetime.utcnow(),
-            'created_at': datetime.utcnow()
+            'taken_at': get_korea_time(),
+            'created_at': get_korea_time()
         }
         mongo.db.medication_logs.insert_one(log_entry)
         
@@ -219,7 +220,7 @@ def submit_assessment():
         'score': score,
         'risk_level': risk_level,
         'answers': data.get('answers', []),
-        'created_at': datetime.utcnow()
+        'created_at': get_korea_time()
     }
     mongo.db.assessments.insert_one(assessment)
     
@@ -228,7 +229,7 @@ def submit_assessment():
         {'_id': ObjectId(user_id)},
         {'$set': {
             'risk_level': risk_level,
-            'last_assessment_date': datetime.utcnow(),
+            'last_assessment_date': get_korea_time(),
             'care_plan': _generate_care_plan(risk_level)
         }}
     )

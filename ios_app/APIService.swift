@@ -132,6 +132,10 @@ class APIService: NSObject {
             }
             
             // Success Logic
+            if let id = json["id"] as? String {
+                UserDefaults.standard.set(id, forKey: "userId") // [CRITICAL] Store User ID
+                print("✅ [API-217] User ID Synced: \(id)")
+            }
             if let name = json["name"] as? String, !name.isEmpty {
                 UserDefaults.standard.set(name, forKey: "realName")
                 print("✅ [API-217] Real Name Synced: \(name)")
@@ -432,7 +436,7 @@ class APIService: NSObject {
         return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
 
-    private func performRequest(endpoint: String, method: String, body: [String: Any]? = nil, requiresAuth: Bool = true, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    func performRequest(endpoint: String, method: String, body: [String: Any]? = nil, requiresAuth: Bool = true, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         guard let url = URL(string: baseURL + endpoint) else {
             completion(.failure(NSError(domain: "Invalid URL", code: -1, userInfo: nil)))
             return
@@ -502,7 +506,7 @@ class APIService: NSObject {
     }
     
     // Array Response helper
-    private func performRequestList(endpoint: String, method: String, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
+    func performRequestList(endpoint: String, method: String, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
         guard let url = URL(string: baseURL + endpoint) else { return }
         
         var request = URLRequest(url: url)

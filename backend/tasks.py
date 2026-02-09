@@ -2,7 +2,7 @@ import sys
 import os
 from celery_app import celery_app
 from ai_brain import EmotionAnalysis
-from config import Config
+from config import Config, get_korea_time
 from pymongo import MongoClient
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
@@ -75,7 +75,7 @@ def analyze_diary_logic(diary_id_str, update_progress_callback=None):
         # 2.5 Fetch 7-Day History Context
         history_context = ""
         try:
-            current_date = diary.get('created_at', datetime.utcnow())
+            current_date = diary.get('created_at', get_korea_time())
             start_date = current_date - timedelta(days=7)
             
             # Fetch previous diaries (exclude current)
