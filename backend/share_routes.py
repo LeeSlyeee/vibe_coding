@@ -122,19 +122,31 @@ def get_shared_list():
     
     results = []
     
+    # [CRITICAL FIX] Search by both String and ObjectId to handle mixed types in DB
+    from bson.objectid import ObjectId
+    
+    def match_id(field_name, val):
+        q = {field_name: val}
+        try:
+            oid = ObjectId(val)
+            q = {'$or': [{field_name: val}, {field_name: oid}]}
+        except:
+            pass
+        return q
+
     if role == 'viewer':
         # I am the Viewer, show me my Sharers (Patients)
-        cursor = mongo.db.share_relationships.find({'viewer_id': user_id})
+        cursor = mongo.db.share_relationships.find(match_id('viewer_id', user_id))
         for rel in cursor:
             results.append({
-                'id': rel['sharer_id'], # Keep uniform key 'id'
+                'id': str(rel['sharer_id']), # Ensure string output
                 'name': rel['sharer_name'],
                 'role': 'sharer',
                 'connected_at': rel['created_at']
             })
     else:
         # I am the Sharer, show me my Viewers (Guardians)
-        cursor = mongo.db.share_relationships.find({'sharer_id': user_id})
+        cursor = mongo.db.share_relationships.find(match_id('sharer_id', user_id))
         for rel in cursor:
             # For viewers, we might not have stored their name in relationship
             # So we might need to fetch it or store it.
