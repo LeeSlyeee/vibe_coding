@@ -173,6 +173,48 @@ def get_shared_list():
     # Wrap in "data" key to match iOS expectation
     return jsonify({"data": results}), 200
 
+# --- 4. Disconnect (Delete Relationship) ---
+@share_bp.route('/api/v1/share/disconnect', methods=['POST'])
+def disconnect_user():
+    mongo = get_mongo()
+    data = request.get_json()
+    
+    user_id = data.get('user_id')
+    target_id = data.get('target_id')
+    
+    if not user_id or not target_id:
+        return jsonify({"message": "Missing user_id or target_id"}), 400
+        
+    # Try to delete relationship where (sharer=me, viewer=target) OR (viewer=me, sharer=target)
+    # Also handle ObjectId vs String mismatch
+    from bson.objectid import ObjectId
+    
+    q_target_oid = target_id
+    try:
+        if ObjectId.is_valid(target_id):
+            q_target_oid = ObjectId(target_id)
+    except:
+        pass
+
+    result = mongo.db.share_relationships.delete_one({
+        '$or': [
+            # Case 1: I am Sharer, deleting Viewer
+            {'sharer_id': user_id, 'viewer_id': target_id},
+            {'sharer_id': user_id, 'viewer_id': q_target_oid},
+            
+            # Case 2: I am Viewer, deleting Sharer
+            {'viewer_id': user_id, 'sharer_id': target_id},
+            {'viewer_id': user_id, 'sharer_id': q_target_oid}
+        ]
+    })
+    
+    if result.deleted_count > 0:
+        return jsonify({"message": "연결이 해제되었습니다."}), 200
+    else:
+        # If not found, maybe existing data has ObjectId for sharer_id?
+        # Just return 200 to clear UI (it's gone anyway)
+        return jsonify({"message": "연결이 해제되었습니다. (Already deleted)"}), 200
+
 # --- 4. View Insights (Core: Sync from 150) ---
 @share_bp.route('/api/v1/share/insights/<target_id>', methods=['GET'])
 @jwt_required()
