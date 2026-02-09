@@ -22,7 +22,7 @@ struct AppLoginView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    SizedBox(height: 60) // Top spacing
+                    Spacer().frame(height: 60) // Top spacing
                     
                     VStack(spacing: 8) {
                         Text("🌙")
@@ -124,7 +124,6 @@ struct AppLoginView: View {
                     .padding(.horizontal, 24)
                     .disabled(isLoading || username.isEmpty || password.isEmpty || name.isEmpty) // 이름도 필수
                     
-                    SizedBox(height: 50) // Bottom spacing
                 }
                 .padding(.vertical)
             }
@@ -132,11 +131,6 @@ struct AppLoginView: View {
                 hideKeyboard()
             }
         }
-    }
-    
-    // Helper for spacing
-    func SizedBox(height: CGFloat) -> some View {
-        Spacer().frame(height: height)
     }
     
     #if os(iOS)

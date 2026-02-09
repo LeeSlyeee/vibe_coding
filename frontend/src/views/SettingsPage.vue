@@ -61,6 +61,13 @@
           </div>
           
           <button class="disconnect-btn" @click="handleDisconnect">연동 해제</button>
+          
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e5e5ea;">
+            <button class="force-sync-btn" @click="handleForceSync" :disabled="isLoading">
+                🔄 데이터 강제 동기화 (서버 확인)
+            </button>
+            <p class="sync-desc">연동 상태가 이상하거나 데이터가 보이지 않을 때 눌러주세요.</p>
+          </div>
         </div>
       </section>
 
@@ -263,6 +270,22 @@ export default {
         return date.toLocaleString();
     }
 
+    const handleForceSync = async () => {
+        if (confirm("서버와 통신하여 연동 상태를 강제로 동기화하시겠습니까?")) {
+            isLoading.value = true;
+            try {
+                await refreshStatus();
+                // [Self-Healing] 만약 로컬엔 코드가 없는데 서버엔 있다면 복구됨
+                // 만약 로컬엔 있는데 서버엔 없다면? -> 끊김 (정상)
+                alert("동기화가 완료되었습니다.\n현재 연동 상태: " + (isLinked.value ? "연동됨" : "미연동"));
+            } catch (e) {
+                alert("동기화 실패: " + e.message);
+            } finally {
+                isLoading.value = false;
+            }
+        }
+    };
+
     return {
       isLinked,
       centerCode,
@@ -275,6 +298,7 @@ export default {
       handleConnect,
       handleDisconnect,
       handleLogout,
+      handleForceSync,
       formatDate
     };
   }
@@ -537,5 +561,27 @@ export default {
     border: none;
     border-radius: 8px;
     cursor: pointer;
+}
+
+.force-sync-btn {
+    width: 100%;
+    padding: 10px;
+    background: #f0f9ff;
+    border: 1px solid #0ea5e9;
+    color: #0284c7;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.force-sync-btn:hover {
+    background: #e0f2fe;
+}
+.sync-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    text-align: center;
+    margin-top: 4px;
 }
 </style>

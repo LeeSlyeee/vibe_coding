@@ -28,6 +28,13 @@ struct MindDiaryApp: App {
                     await LLMService.shared.loadModel()
                 }
                 
+                // [Self-Healing] 앱 시작 시 자동으로 서버 데이터 동기화 (Data Recovery)
+                if B2GManager.shared.isLinked {
+                    print("🔄 [App Start] Auto-Syncing with Server (Self-Healing)...")
+                    // force: false -> Smart Sync (Fetch & Merge)
+                    B2GManager.shared.syncData(force: false)
+                }
+                
                 // 2. 스플래시 화면 제어 (최소 2초 + 로딩 완료 대기)
                 Task {
                     // (A) 로고 감상을 위한 최소 대기 시간 (2초)

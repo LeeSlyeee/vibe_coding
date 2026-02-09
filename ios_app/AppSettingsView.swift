@@ -17,8 +17,23 @@ struct AppSettingsView: View {
     @State private var tempInputCode = ""
     @State private var showPremiumModal = false // New Modal State
     @State private var showExitAlert = false // Exit Confirmation
+    @State private var showDisconnectAlert = false // Disconnect Confirmation [New]
     @State private var isPwVisible = false // Password Reveal Only
     @State private var useCustomLogin = false // Toggle between Auto-Account and Custom Login
+    
+    // Unified Alert System [Fix]
+    enum ActiveAlert: Identifiable {
+        case info(String)
+        case disconnect
+        
+        var id: String {
+            switch self {
+            case .info(let msg): return "info-\(msg)"
+            case .disconnect: return "disconnect"
+            }
+        }
+    }
+    @State private var activeAlert: ActiveAlert?
     
     var body: some View {
         NavigationView {
@@ -139,13 +154,12 @@ struct AppSettingsView: View {
                                     APIService.shared.ensureAuth { success in
                                         isLoggingIn = false
                                         if success {
-                                            alertMessage = "로그인 성공! 이제 이 계정으로 동기화됩니다."
                                             authManager.username = loginId // Update UI state if needed
+                                            activeAlert = .info("로그인 성공! 이제 이 계정으로 동기화됩니다.")
                                         } else {
-                                            alertMessage = "로그인 실패. 아이디/비밀번호를 확인하세요."
+                                            activeAlert = .info("로그인 실패. 아이디/비밀번호를 확인하세요.")
                                             // Revert if failed? Maybe let them try again.
                                         }
-                                        showAlert = true
                                         // loginPw = "" // Keep it for retry convenience
                                     }
                                 }) {
@@ -197,6 +211,22 @@ struct AppSettingsView: View {
                                 Text(b2gManager.centerCode)
                                     .font(.system(.body, design: .monospaced))
                                     .fontWeight(.bold)
+                                
+                                Spacer()
+                                
+                                // [UX Change] Disconnect button moved next to code
+                                Button(action: {
+                                    activeAlert = .disconnect
+                                }) {
+                                    Text("연동 해제")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.red)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.red.opacity(0.1))
+                                        .cornerRadius(6)
+                                }
                             }
                             
                             if b2gManager.lastSyncDate > 0 {
@@ -205,35 +235,55 @@ struct AppSettingsView: View {
                                     .foregroundColor(.gray)
                             }
                             
-                            HStack(spacing: 20) {
+                            // [Buttons] Sync Actions
+                            VStack(spacing: 12) {
+                                // 1. Force Sync (Push)
                                 Button(action: {
                                     b2gManager.syncData(force: true)
-                                    alertMessage = "모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)"
-                                    showAlert = true
+                                    activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)")
                                 }) {
                                     HStack {
-                                        Image(systemName: "arrow.triangle.2.circlepath")
-                                        Text("데이터 강제 전송 (Force Sync)")
+                                        Image(systemName: "arrow.up.circle.fill")
+                                            .font(.system(size: 18))
+                                        Text("데이터 강제 전송 (App → Server)")
                                             .fontWeight(.bold)
+                                            .font(.system(size: 16))
                                     }
+                                    .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(Color.blue.opacity(0.1))
-                                    .cornerRadius(8)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                                    .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
                                 
+                                // 2. Pull Data (Server -> App)
                                 Button(action: {
-                                    b2gManager.disconnect(force: true)
+                                    b2gManager.pullDataFromServer { success, msg in
+                                        activeAlert = .info(msg)
+                                    }
                                 }) {
-                                    Text("연동 해제")
-                                        .foregroundColor(.red)
-                                        .font(.caption)
+                                    HStack {
+                                        Image(systemName: "arrow.down.circle.fill")
+                                            .font(.system(size: 18))
+                                        Text("서버 데이터 가져오기 (Server → App)")
+                                            .fontWeight(.bold)
+                                            .font(.system(size: 16))
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.green) // Distinct Color
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                                    .shadow(color: Color.green.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
                             }
-                            .padding(.top, 4)
+                            .padding(.vertical, 8)
                             
-                            Text("* 대시보드에 데이터가 뜨지 않으면 위 버튼을 누르세요.")
+                            Text("* 데이터가 보이지 않거나 꼬였을 때 위 버튼들을 눌러 동기화하세요.")
                                 .font(.caption2)
-                                .foregroundColor(.orange)
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
                         }
                         .padding(.vertical, 8)
                         
@@ -256,8 +306,7 @@ struct AppSettingsView: View {
                                 
                                 Button(action: {
                                     b2gManager.connect(code: inputCode) { success, message in
-                                        alertMessage = message
-                                        showAlert = true
+                                        activeAlert = .info(message)
                                     }
                                 }) {
                                     if b2gManager.isSyncing {
@@ -430,24 +479,21 @@ struct AppSettingsView: View {
                                                     if success {
                                                         // B2GManager 상태 강제 동기화 (Updated for encapsulation)
                                                         b2gManager.forceLink(code: tempInputCode.uppercased())
-                                                        alertMessage = "✅ 강제 연동 성공!\n코드: \(tempInputCode.uppercased())"
+                                                        activeAlert = .info("✅ 강제 연동 성공!\n코드: \(tempInputCode.uppercased())")
                                                         tempInputCode = ""
                                                     } else {
-                                                        alertMessage = "❌ 기관 연결(Connect) API 실패"
+                                                        activeAlert = .info("❌ 기관 연결(Connect) API 실패")
                                                     }
-                                                    showAlert = true
                                                 }
                                             }
                                         } else {
                                             DispatchQueue.main.async {
-                                                alertMessage = "⚠️ 센터 ID를 찾을 수 없습니다 (응답 데이터 오류)."
-                                                showAlert = true
+                                                activeAlert = .info("⚠️ 센터 ID를 찾을 수 없습니다 (응답 데이터 오류).")
                                             }
                                         }
                                     case .failure(let err):
                                         DispatchQueue.main.async {
-                                            alertMessage = "❌ 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)"
-                                            showAlert = true
+                                            activeAlert = .info("❌ 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)")
                                         }
                                     }
                                 }
@@ -463,11 +509,35 @@ struct AppSettingsView: View {
                         }
                     }
                     .padding(.vertical, 8)
+                    
+                    // [Recovery Tool] Tombstone Clear
+                    Button(action: {
+                        UserDefaults.standard.removeObject(forKey: "deleted_diary_ids")
+                        UserDefaults.standard.removeObject(forKey: "deleted_diary_dates")
+                        activeAlert = .info("🗑️ 차단 목록(Tombstone)이 초기화되었습니다.\n이제 서버에서 삭제된 일기도 다시 가져올 수 있습니다.")
+                    }) {
+                        Text("삭제/차단 기록 초기화 (Recover Deleted)")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                    .padding(.top, 4)
                 }
-            }
+                }
             .navigationTitle("설정")
-            .alert(isPresented: $showAlert) {
-                Alert(title: Text("알림"), message: Text(alertMessage), dismissButton: .default(Text("확인")))
+            .alert(item: $activeAlert) { item in
+                switch item {
+                case .info(let message):
+                    return Alert(title: Text("알림"), message: Text(message), dismissButton: .default(Text("확인")))
+                case .disconnect:
+                    return Alert(
+                        title: Text("연동 해제"),
+                        message: Text("정말 연결을 끊으시겠습니까?\n서버의 데이터는 삭제되지 않지만, 앱에서는 더 이상 전송되지 않습니다."),
+                        primaryButton: .destructive(Text("해제")) {
+                            b2gManager.disconnect(force: true)
+                        },
+                        secondaryButton: .cancel(Text("취소"))
+                    )
+                }
             }
             
             .sheet(isPresented: $showPremiumModal) {
@@ -485,8 +555,7 @@ struct AppSettingsView: View {
     // 이스터에그 함수
     func seedData() {
         DataSeeder.shared.seedDummyData { count in
-            alertMessage = "테스트용 일기 \(count)개가 생성되었습니다.\n캘린더와 통계 탭을 확인해보세요."
-            showAlert = true
+            activeAlert = .info("테스트용 일기 \(count)개가 생성되었습니다.\n캘린더와 통계 탭을 확인해보세요.")
         }
     }
 }

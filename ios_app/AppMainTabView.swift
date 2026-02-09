@@ -149,11 +149,21 @@ struct AppMainTabView: View {
         // 로그인된 상태에서만 진단 여부를 체크해야 함.
         guard authManager.isAuthenticated else { return }
         
+        // [Fix] B2G 연동 유저는 PHQ-9 진단 건너뛰기 (이미 기관 관리 대상임)
+        if B2GManager.shared.isLinked {
+            print("🏥 [App] B2G Linked. Skipping Initial Assessment.")
+            UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+            return
+        }
+        
         let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
         if !hasDone {
             // Give a small delay for smooth transition
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                showAssessment = true
+                // Double check before showing (in case changed rapidly)
+                if !B2GManager.shared.isLinked {
+                    showAssessment = true
+                }
             }
         }
     }

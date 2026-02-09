@@ -130,12 +130,10 @@ class B2GManager: ObservableObject {
     // [UNLOCKED] Removed safety guard for immediate disconnect
     func disconnect(force: Bool = false) {
         print("🔓 [B2G] Disconnect Safety Lock REMOVED by Request")
-        /*
         guard force else {
             print("🚫 [B2G] Automatic disconnect prevented. User must explicitly disconnect.")
             return
         }
-        */
         
         print("🚫 [B2G] Disconnecting from Center (User Action)...")
         self.centerCode = ""
@@ -278,11 +276,51 @@ class B2GManager: ObservableObject {
                 self.isSyncing = false
                 if success {
                     self.lastSyncDate = Date().timeIntervalSince1970
-                } else if let msg = errorMsg, msg.contains("유효하지 않은 센터 코드") {
+                } else if let msg = errorMsg {
                      // 센터 코드가 만료되었거나 삭제된 경우 -> 연결 해제
-                     print("🚫 [B2G] Invalid Code Detected. Server said: \(msg)")
-                     // [Safety Fix] Do NOT auto-disconnect. 
-                     // self.disconnect(force: false) 
+                     print("🚫 [B2G] Sync Failed. Server said: \(msg)")
+                     
+                     // [CRITICAL SAFETY]
+                     // 절대 자동으로 연결을 해제하지 않음.
+                     // 사용자가 직접 끊기 전까지는 코드를 유지함.
+                     if msg.contains("유효하지 않은 센터 코드") {
+                         print("⚠️ [B2G] Ignoring 'Invalid Code' error to prevent data loss.")
+                     }
+                }
+            }
+        }
+    }
+    
+    // [New] Pull Only Mode (User Request)
+    // 서버 데이터만 강제로 내려받아 덮어쓰기/병합
+    func pullDataFromServer(completion: @escaping (Bool, String) -> Void) {
+        if isSyncing {
+            completion(false, "이미 동기화 작업이 진행 중입니다.")
+            return
+        }
+        
+        DispatchQueue.main.async { self.isSyncing = true }
+        print("📥 [B2G] Starting Pull-Only Sync...")
+        
+        APIService.shared.fetchDiaries { [weak self] serverData in
+            guard let self = self else { return }
+            
+            if let data = serverData {
+                DispatchQueue.main.async {
+                    // 병합 로직 수행
+                    LocalDataManager.shared.mergeServerDiaries(data) {
+                        self.isSyncing = false
+                        self.lastSyncDate = Date().timeIntervalSince1970
+                        self.saveState()
+                        print("✅ [B2G] Pull Completed. (\(data.count) items)")
+                        completion(true, "서버에서 \(data.count)개의 데이터를 가져왔습니다.")
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isSyncing = false
+                    print("⚠️ [B2G] Pull Failed or No Data.")
+                    completion(false, "데이터를 가져오지 못했습니다. (서버 응답 없음)")
                 }
             }
         }

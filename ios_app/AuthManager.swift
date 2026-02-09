@@ -70,7 +70,7 @@ class AuthManager: ObservableObject {
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 // Login Success
-                self.handleLoginResponse(data: data, username: username, completion: completion)
+                self.handleLoginResponse(data: data, username: username, centerCode: centerCode, completion: completion)
             } else {
                 // Login Failed -> Try Registration
                 print("⚠️ [Auth] Login Failed. Attempting Registration for \(username)...")
@@ -88,7 +88,9 @@ class AuthManager: ObservableObject {
         var body: [String: Any] = [
             "username": username,
             "password": password,
-            "email": "" // Optional but often required struct
+            "email": "",
+            "name": name ?? "", // [Fix] Send Real Name
+            "center_code": centerCode ?? "" // [Fix] Send Center Code
         ]
         // Profile or extra fields handling depends on backend implementation
         
@@ -105,7 +107,7 @@ class AuthManager: ObservableObject {
                 // DJ-Rest-Auth often returns token on register usually.
                 
                 if let data = data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any], json["key"] != nil || json["access"] != nil {
-                     self.handleLoginResponse(data: data, username: username, completion: completion)
+                     self.handleLoginResponse(data: data, username: username, centerCode: centerCode, completion: completion)
                 } else {
                     // Call Login Explicitly
                     // Recurse? We need to be careful of infinite loop if logic logic is flawed.
@@ -121,7 +123,7 @@ class AuthManager: ObservableObject {
         }.resume()
     }
     
-    private func handleLoginResponse(data: Data?, username: String, completion: @escaping (Bool, String) -> Void) {
+    private func handleLoginResponse(data: Data?, username: String, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
         guard let data = data,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             DispatchQueue.main.async { completion(false, "응답 오류") }
@@ -131,12 +133,46 @@ class AuthManager: ObservableObject {
         let token = (json["key"] as? String) ?? (json["access"] as? String) ?? (json["access_token"] as? String)
         
         if let token = token {
-            DispatchQueue.main.async {
-                self.token = token
-                self.username = username
-                self.isAuthenticated = true
-                LocalDataManager.shared.syncWithServer()
-                completion(true, "로그인 성공")
+            // [Critical Logic]
+            // UI 전환(isAuthenticated=true) 전에 B2G 연동 상태를 먼저 확정지어야 함.
+            // 1. 토큰을 조용히 저장 (APIService가 사용할 수 있도록)
+            UserDefaults.standard.set(token, forKey: "serverAuthToken")
+            
+            // 2. 연동 코드 확인 (User Input > Server Response)
+            let inputCode = centerCode
+            let serverCode = json["center_code"] as? String ?? json["linked_center_code"] as? String
+            
+            let codeToLink = (inputCode?.isEmpty == false) ? inputCode! : (serverCode ?? "")
+            
+            if !codeToLink.isEmpty {
+                print("🔗 [Auth] Verifying Center Code before UI transition: \(codeToLink)")
+                B2GManager.shared.connect(code: codeToLink) { success, msg in
+                    DispatchQueue.main.async {
+                        // 결과와 상관없이 로그인은 성공 처리 (연동 실패했다고 로그인 막으면 안됨)
+                        // 단, 성공 시 isLinked가 true가 되어 PHQ-9 스킵됨.
+                        if success { 
+                             print("✅ [Auth] B2G Link Restored/Verified!")
+                             // [New] 연동 성공 시, 서버 데이터를 즉시 가져옴 (Auto-Restore)
+                             B2GManager.shared.syncData(force: true)
+                        } else {
+                             print("⚠️ [Auth] B2G Link Failed: \(msg)")
+                        }
+                        
+                        // 3. Finalize Login (Trigger UI)
+                        self.token = token // This triggers isAuthenticated = true
+                        self.username = username
+                        LocalDataManager.shared.syncWithServer()
+                        completion(true, "로그인 성공")
+                    }
+                }
+            } else {
+                // 연동 코드 없음 -> 바로 진입
+                DispatchQueue.main.async {
+                    self.token = token
+                    self.username = username
+                    LocalDataManager.shared.syncWithServer()
+                    completion(true, "로그인 성공")
+                }
             }
         } else {
             DispatchQueue.main.async { completion(false, "토큰 없음") }

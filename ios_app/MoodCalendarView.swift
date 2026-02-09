@@ -1,5 +1,6 @@
 
 import SwiftUI
+import Combine
 
 // MARK: - Safe Data Wrapper
 struct WriteTargetDate: Identifiable {
@@ -182,9 +183,20 @@ struct MoodCalendarView: View {
                 #if os(iOS)
                 .navigationBarHidden(true)
                 #endif
-                .onAppear(perform: fetchDiaries)
+                .onAppear {
+                    fetchDiaries()
+                    // [Safety Net] Force re-fetch after short delay to catch fast syncs
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        fetchDiaries()
+                    }
+                }
                 .onChangeCompat(of: currentDate) { _ in fetchDiaries() }
                 .onChangeCompat(of: dataManager.diaries) { _ in fetchDiaries() } // ✅ Auto Refresh on Sync
+                // [Fix] Listen for Explicit Sync Notification
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshDiaries"))) { _ in
+                    print("🔔 [Calendar] Received Refresh Signal. Updating UI...")
+                    fetchDiaries()
+                }
                 .alert(isPresented: $showErrorAlert) {
                     Alert(title: Text("알림"), message: Text(errorMessage ?? "알 수 없는 오류가 발생했습니다."), dismissButton: .default(Text("확인")))
                 }

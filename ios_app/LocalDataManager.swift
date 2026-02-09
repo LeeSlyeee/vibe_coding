@@ -287,22 +287,20 @@ class LocalDataManager: ObservableObject {
             for item in serverData {
                 let id = "\(item["id"] ?? "")"
                 
-                // [Tombstone] 사용자가 삭제한 ID라면 병합 제외 (좀비 방지)
-                if self.deletedDiaryIds.contains(id) {
-                    print("👻 [Sync] Ignoring Zombie Diary ID: \(id)")
-                    continue
-                }
+                // [Tombstone] 사용자가 삭제한 ID라면 병합 제외
+                if self.deletedDiaryIds.contains(id) { continue }
                 
                 guard let createdAt = item["created_at"] as? String else { continue }
                 
-                let dateStr = String(createdAt.prefix(10))
+                // [Critical Fix] Prefer explicitly mapped 'date' field if available, else derive from created_at
+                // 서버가 'date' 필드를 보내주지 않는 경우, created_at(UTC)이 한국 시간과 달라 날짜가 밀리는 현상 방지
+                let serverDateRaw = (item["date"] as? String) ?? createdAt
+                let dateStr = String(serverDateRaw.prefix(10))
                 
-                // [Tombstone] 사용자가 삭제한 날짜라면 병합 제외 (좀비 방지 2차)
-                if self.deletedDiaryDates.contains(dateStr) {
-                    print("👻 [Sync] Ignoring Zombie Diary Date: \(dateStr)")
-                    continue
-                }
+                // [Tombstone] 날짜 차단 확인
+                if self.deletedDiaryDates.contains(dateStr) { continue }
                 
+                // ... (Parsing logic omitted for brevity, stick to current impl) ...
                 // [Robust Parsing] Field Name Fallbacks
                 var moodScore = 3
                 if let ms = item["mood_score"] as? Int { moodScore = ms }
@@ -313,47 +311,21 @@ class LocalDataManager: ObservableObject {
                 else if let e = item["event"] as? String { content = e }
                 
                 // AI Fields Parsing
-                // AI Fields Parsing
                 let analysisMap = item["analysis_result"] as? [String: Any]
-                let aiComment = (item["ai_comment"] as? String) 
-                    ?? (analysisMap?["ai_comment"] as? String)
-                    ?? (analysisMap?["comment"] as? String)
+                let aiComment = (item["ai_comment"] as? String) ?? (analysisMap?["ai_comment"] as? String) ?? (analysisMap?["comment"] as? String)
+                let aiAnalysis = (item["ai_analysis"] as? String) ?? (analysisMap?["ai_analysis"] as? String) ?? (analysisMap?["analysis"] as? String)
+                let aiAdvice = (item["ai_advice"] as? String) ?? (analysisMap?["ai_advice"] as? String) ?? (analysisMap?["advice"] as? String)
+                let aiPrediction = (item["ai_prediction"] as? String) ?? (analysisMap?["ai_prediction"] as? String) ?? (analysisMap?["prediction"] as? String)
                 
-                let aiAnalysis = (item["ai_analysis"] as? String) 
-                    ?? (analysisMap?["ai_analysis"] as? String)
-                    ?? (analysisMap?["analysis"] as? String)
+                let sleepDesc = (item["sleep_condition"] as? String) ?? (item["sleep_desc"] as? String) ?? (analysisMap?["sleep_condition"] as? String) ?? (analysisMap?["sleep_desc"] as? String)
+                let weather = (item["weather"] as? String) ?? (analysisMap?["weather"] as? String)
+                let emotionDesc = (item["emotion_desc"] as? String) ?? (analysisMap?["emotion_desc"] as? String)
+                let emotionMeaning = (item["emotion_meaning"] as? String) ?? (analysisMap?["emotion_meaning"] as? String)
+                let selfTalk = (item["self_talk"] as? String) ?? (analysisMap?["self_talk"] as? String)
                 
-                let aiAdvice = (item["ai_advice"] as? String) 
-                    ?? (analysisMap?["ai_advice"] as? String)
-                    ?? (analysisMap?["advice"] as? String)
-                
-                let aiPrediction = (item["ai_prediction"] as? String) 
-                    ?? (analysisMap?["ai_prediction"] as? String)
-                    ?? (analysisMap?["prediction"] as? String)
-                
-                // [Fix] Data Corruption Bug
-                // 서버에서 'analysis_result' 안에 넣어둔 데이터(감정, 날씨 등)를 꺼내지 않아 nil로 덮어씌워지는 문제 해결
-                let sleepDesc = (item["sleep_condition"] as? String) 
-                    ?? (item["sleep_desc"] as? String)
-                    ?? (analysisMap?["sleep_condition"] as? String)
-                    ?? (analysisMap?["sleep_desc"] as? String)
-                
-                let weather = (item["weather"] as? String)
-                    ?? (analysisMap?["weather"] as? String)
-                
-                let emotionDesc = (item["emotion_desc"] as? String)
-                    ?? (analysisMap?["emotion_desc"] as? String)
-                
-                let emotionMeaning = (item["emotion_meaning"] as? String)
-                    ?? (analysisMap?["emotion_meaning"] as? String)
-                
-                let selfTalk = (item["self_talk"] as? String)
-                    ?? (analysisMap?["self_talk"] as? String)
-                
-                // Create Diary Object from Server Data
                 var serverDiary = Diary(
-                    id: UUID().uuidString, // Temporary UUID
-                    _id: id,               // Server ID
+                    id: UUID().uuidString,
+                    _id: id,
                     date: dateStr,
                     mood_level: moodScore,
                     event: content,
@@ -372,28 +344,35 @@ class LocalDataManager: ObservableObject {
                     medication: nil,
                     medication_desc: nil
                 )
-                
-                // [Sync Optimization] Mark as Clean
                 serverDiary.isSynced = true
                 
-                // Merge Logic: Find existing by _id (preferred) or date (fallback)
+                // [Safety Merge] 날짜 매칭 시 ID 충돌 검사
                 if let index = self.diaries.firstIndex(where: { 
+                    // 1. ID가 일치하면 무조건 업데이트 (가장 안전)
                     if let existingId = $0._id, existingId == id { return true }
-                    return ($0.date ?? "").prefix(10) == dateStr.prefix(10)
+                    
+                    // 2. 날짜가 일치하는 경우
+                    if ($0.date ?? "").prefix(10) == dateStr.prefix(10) {
+                        // [Critical Guard]
+                        // 로컬 일기가 이미 "다른 Server ID"를 가지고 있다면? -> 충돌! 덮어쓰지 않음.
+                        if let existingId = $0._id, !existingId.isEmpty, existingId != id {
+                            print("🛡️ [Sync] Conflict Detected! Date matches (\(dateStr)) but IDs differ (Local: \(existingId) vs Server: \(id)). Keeping Local.")
+                            return false
+                        }
+                        return true
+                    }
+                    return false
                 }) {
-                    // [Conflict Check] If local is 'dirty' (unsynced), DO NOT overwrite
+                    // [Conflict Check] unsynced local data preservation
                     if self.diaries[index].isSynced == false {
                         print("🛡️ [Sync] Preserving Unsynced Local Data (Date: \(dateStr))")
                         continue
                     }
                     
-                    // Update: Overwrite local with server (Server Wins)
-                    // Preserve Local UUID to avoid UI list refresh glitch
                     serverDiary.id = self.diaries[index].id
                     self.diaries[index] = serverDiary
                     updatedCount += 1
                 } else {
-                    // New Insert
                     self.diaries.append(serverDiary)
                     newCount += 1
                 }
@@ -403,6 +382,10 @@ class LocalDataManager: ObservableObject {
             self.saveToDisk()
             
             print("📥 [Sync] Merge Complete. New: \(newCount), Updated: \(updatedCount)")
+            
+            // [Fix] Broadcast Update explicitly to force UI Refresh
+            NotificationCenter.default.post(name: NSNotification.Name("RefreshDiaries"), object: nil)
+            
             completion()
         } // End Dispatch
     }

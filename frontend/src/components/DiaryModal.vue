@@ -192,27 +192,27 @@
           </div>
         </div>
 
-        <!-- 질문 답변 리스트 -->
+        <!-- 질문 답변 리스트 (Parsed Content) -->
         <div class="view-answers">
-          <div class="answer-item-premium">
+          <div v-if="parsedContent.sleep" class="answer-item-premium">
             <h4 class="answer-question">잠은 잘 주무셨나요?</h4>
-            <p class="answer-text">{{ currentDiary.sleep_condition || currentDiary.sleep_desc || '(기록 없음)' }}</p>
+            <p class="answer-text">{{ parsedContent.sleep }}</p>
           </div>
-          <div v-if="currentDiary.event" class="answer-item-premium">
+          <div v-if="parsedContent.event" class="answer-item-premium">
             <h4 class="answer-question">오늘 무슨일이 있었나요?</h4>
-            <p class="answer-text">{{ currentDiary.event }}</p>
+            <p class="answer-text">{{ parsedContent.event }}</p>
           </div>
-          <div v-if="currentDiary.emotion_desc" class="answer-item-premium">
+          <div v-if="parsedContent.emotion" class="answer-item-premium">
             <h4 class="answer-question">어떤 감정이 들었나요?</h4>
-            <p class="answer-text">{{ currentDiary.emotion_desc }}</p>
+            <p class="answer-text">{{ parsedContent.emotion }}</p>
           </div>
-          <div v-if="currentDiary.emotion_meaning" class="answer-item-premium">
+          <div v-if="parsedContent.meaning" class="answer-item-premium">
             <h4 class="answer-question">자신의 감정을 깊게 탐색해보면...</h4>
-            <p class="answer-text">{{ currentDiary.emotion_meaning }}</p>
+            <p class="answer-text">{{ parsedContent.meaning }}</p>
           </div>
-          <div v-if="currentDiary.self_talk" class="answer-item-premium">
+          <div v-if="parsedContent.selftalk" class="answer-item-premium">
             <h4 class="answer-question">나에게 보내는 따뜻한 위로</h4>
-            <p class="answer-text">{{ currentDiary.self_talk }}</p>
+            <p class="answer-text">{{ parsedContent.selftalk }}</p>
           </div>
         </div>
 
@@ -325,6 +325,43 @@ export default {
       if (!dStr) return "";
       const d = new Date(dStr);
       return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    });
+
+    // === Parsed Content for Restored Diaries ===
+    const parsedContent = computed(() => {
+      const d = currentDiary.value;
+      const raw = d.event || d.content || "";
+      
+      // If NOT restored format (checks for specific header), treat as legacy/simple
+      if (!raw.includes("[잠은 잘 주무셨나요?]")) {
+          return {
+              sleep: d.sleep_condition || d.sleep_desc,
+              event: d.event,
+              emotion: d.emotion_desc,
+              meaning: d.emotion_meaning,
+              selftalk: d.self_talk
+          };
+      }
+
+      // Restored Format Parsing
+      const result = { sleep: "", event: "", emotion: "", meaning: "", selftalk: "" };
+      let currentSection = "";
+      
+      const lines = raw.split("\n");
+      for (const line of lines) {
+          const t = line.trim();
+          if (!t) continue;
+          
+          if (t === "[잠은 잘 주무셨나요?]") currentSection = "sleep";
+          else if (t === "[오늘 무슨일이 있었나요?]") currentSection = "event";
+          else if (t === "[어떤 감정이 들었나요?]") currentSection = "emotion";
+          else if (t === "[자신의 감정을 깊게 탐색해보면...]") currentSection = "meaning";
+          else if (t === "[나에게 보내는 따뜻한 위로]") currentSection = "selftalk";
+          else if (currentSection) {
+              result[currentSection] += (result[currentSection] ? "\n" : "") + line;
+          }
+      }
+      return result;
     });
 
     const isValid = computed(() => formData.value.mood && formData.value.question1.trim() && formData.value.question_sleep.trim());
@@ -531,13 +568,15 @@ export default {
     const handleEdit = () => {
         isViewMode.value = false; showForm.value = true;
         const d = currentDiary.value;
+        const parsed = parsedContent.value;
+        
         formData.value = {
             mood: moodLevelToName[d.mood_level] || "neutral",
-            question_sleep: d.sleep_condition || "",
-            question1: d.event || "",
-            question2: d.emotion_desc || "",
-            question3: d.emotion_meaning || "",
-            question4: d.self_talk || "",
+            question_sleep: parsed.sleep || "",
+            question1: parsed.event || "",
+            question2: parsed.emotion || "",
+            question3: parsed.meaning || "",
+            question4: parsed.selftalk || "",
             mode: d.mode || 'green',
             mood_intensity: d.mood_intensity || 5,
             symptoms: d.symptoms || [],
@@ -582,7 +621,7 @@ export default {
 
     return {
       isViewMode, showForm, saving, formData, weatherInfo, weatherInsight,
-      panelRef, currentDiary, formattedDate, formattedDateTime, isValid,
+      panelRef, currentDiary, formattedDate, formattedDateTime, isValid, parsedContent,
       getMoodEmoji, getMoodName, getMoodColorClass, getWeatherIcon,
       handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
       isProcessing, progressPercent, loadingMessage, eta,
