@@ -1,8 +1,14 @@
 import os
-from datetime import timedelta
+from datetime import datetime, timedelta
+import pytz
 from dotenv import load_dotenv
 
 load_dotenv()
+
+def get_korea_time():
+    """Returns the current time in KST (UTC+9)"""
+    KST = pytz.timezone('Asia/Seoul')
+    return datetime.now(KST)
 
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-prod'
@@ -15,7 +21,9 @@ class Config:
     # Default to localhost:27017 if MONGO_URI not provided
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/mood_diary_db'
 
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-secret-key-change-in-prod'
+    # [CRITICAL FIX] Hardcode Secret Key to match Main Server (150)
+    # Environment variable loading via SystemD is failing, so we enforce it here.
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'django-insecure-dev-key-12345'
     # JWT 토큰 만료 시간 설정 (24시간)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 
