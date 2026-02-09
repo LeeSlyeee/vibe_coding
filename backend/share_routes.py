@@ -138,11 +138,10 @@ def get_shared_list():
         # I am the Viewer, show me my Sharers (Patients)
         cursor = mongo.db.share_relationships.find(match_id('viewer_id', user_id))
         for rel in cursor:
-            results.append({
                 'id': str(rel['sharer_id']), # Ensure string output
-                'name': rel['sharer_name'],
+                'name': rel.get('sharer_name', 'Unknown'),
                 'role': 'sharer',
-                'connected_at': rel['created_at']
+                'connected_at': rel['created_at'].isoformat() if hasattr(rel['created_at'], 'isoformat') else str(rel['created_at'])
             })
     else:
         # I am the Sharer, show me my Viewers (Guardians)
@@ -166,7 +165,8 @@ def get_shared_list():
                 'id': rel['viewer_id'],
                 'name': viewer_name,
                 'role': 'viewer',
-                'connected_at': rel['created_at']
+                # [CRITICAL FIX] Convert Datetime to String for iOS JSON Decoder (which expects String)
+                'connected_at': rel['created_at'].isoformat() if hasattr(rel['created_at'], 'isoformat') else str(rel['created_at'])
             })
             
     # Wrap in "data" key to match iOS expectation
