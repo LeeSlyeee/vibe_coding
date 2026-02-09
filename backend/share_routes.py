@@ -20,19 +20,15 @@ def generate_code(length=6):
 
 # --- 1. Generate Share Code (Sharer) ---
 @share_bp.route('/api/v1/share/code', methods=['POST'])
-# @jwt_required()
+@jwt_required()
 def create_share_code():
     mongo = get_mongo()
-    # user_id = get_jwt_identity()
+    user_id = get_jwt_identity()
     
-    # [TEMP] Bypass Auth for Testing (Secret Key Mismatch)
-    user_id = "temp_bypass_user_id_12345"
-    nickname = "테스트 유저"
-
     # Check User
-    # user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
-    # if not user:
-    #     return jsonify({"message": "User not found"}), 404
+    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+    if not user:
+        return jsonify({"message": "User not found"}), 404
     
     # Generate Unique Code
     code = generate_code()
@@ -41,7 +37,7 @@ def create_share_code():
     share_entry = {
         'code': code,
         'sharer_id': user_id,
-        'sharer_name': nickname, # user.get('nickname', user.get('username')),
+        'sharer_name': user.get('nickname', user.get('username')),
         'created_at': get_korea_time(),
         'used': False
     }
@@ -100,23 +96,47 @@ def connect_share():
         "sharer_name": share_entry['sharer_name']
     }), 200
 
-# --- 3. List My Connected Users (Viewer) ---
+# --- 3. List Connected Users (Both Directions) ---
 @share_bp.route('/api/v1/share/list', methods=['GET'])
 @jwt_required()
 def get_shared_list():
     mongo = get_mongo()
-    viewer_id = get_jwt_identity()
+    user_id = get_jwt_identity()
+    role = request.args.get('role', 'viewer') # 'viewer' (default) or 'sharer'
     
-    cursor = mongo.db.share_relationships.find({'viewer_id': viewer_id})
     results = []
     
-    for rel in cursor:
-        results.append({
-            'sharer_id': rel['sharer_id'],
-            'name': rel['sharer_name'],
-            'connected_at': rel['created_at']
-        })
-        
+    if role == 'viewer':
+        # I am the Viewer, show me my Sharers (Patients)
+        cursor = mongo.db.share_relationships.find({'viewer_id': user_id})
+        for rel in cursor:
+            results.append({
+                'id': rel['sharer_id'], # Keep uniform key 'id'
+                'name': rel['sharer_name'],
+                'role': 'sharer',
+                'connected_at': rel['created_at']
+            })
+    else:
+        # I am the Sharer, show me my Viewers (Guardians)
+        cursor = mongo.db.share_relationships.find({'sharer_id': user_id})
+        for rel in cursor:
+            # For viewers, we might not have stored their name in relationship
+            # So we might need to fetch it or store it.
+            # For now, let's assume we stored it or return ID as name fallback
+            viewer_name = rel.get('viewer_name', '보호자') 
+            
+            # If name is missing in relation, try fetch from users collection (optional but better)
+            if viewer_name == '보호자':
+                u = mongo.db.users.find_one({'_id': ObjectId(rel['viewer_id'])})
+                if u: viewer_name = u.get('nickname', u.get('username'))
+            
+            results.append({
+                'id': rel['viewer_id'],
+                'name': viewer_name,
+                'role': 'viewer',
+                'connected_at': rel['created_at']
+            })
+            
     return jsonify(results), 200
 
 # --- 4. View Insights (Core: Sync from 150) ---
