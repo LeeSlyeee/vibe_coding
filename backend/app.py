@@ -1612,13 +1612,6 @@ try:
 except Exception as e:
     print(f"❌ Failed to register Share Routes: {e}")
 
-try:
-    from b2g_routes import b2g_bp
-    app.register_blueprint(b2g_bp)
-    print("✅ B2G Routes Registered")
-except Exception as e:
-    print(f"❌ Failed to register B2G Routes: {e}")
-
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default
