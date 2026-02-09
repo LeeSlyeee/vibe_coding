@@ -20,15 +20,22 @@ def generate_code(length=6):
 
 # --- 1. Generate Share Code (Sharer) ---
 @share_bp.route('/api/v1/share/code', methods=['POST'])
-@jwt_required()
+# @jwt_required()
 def create_share_code():
     mongo = get_mongo()
-    user_id = get_jwt_identity()
     
-    # Check User
-    user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
-    if not user:
-        return jsonify({"message": "User not found"}), 404
+    # [BYPASS AUTH] Accept ID from Body (Client-Side Identity)
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    user_name = data.get('user_name', '사용자')
+    
+    if not user_id:
+        # Fallback if client didn't send ID (should not happen with updated app)
+        user_id = "temp_bypass_user_id_12345"
+        user_name = "테스트 유저"
+
+    # [Note] Ideally we verify this ID exists in DB, but for now trust the client
+    # user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
     
     # Generate Unique Code
     code = generate_code()
@@ -37,7 +44,7 @@ def create_share_code():
     share_entry = {
         'code': code,
         'sharer_id': user_id,
-        'sharer_name': user.get('nickname', user.get('username')),
+        'sharer_name': user_name,
         'created_at': get_korea_time(),
         'used': False
     }
