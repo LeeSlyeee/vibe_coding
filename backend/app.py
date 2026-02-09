@@ -1612,6 +1612,25 @@ try:
 except Exception as e:
     print(f"❌ Failed to register Share Routes: {e}")
 
+# --- User Info Sync (Added for Share ID Fix) ---
+@app.route('/api/v1/auth/me', methods=['GET'])
+@jwt_required()
+def get_user_info():
+    user_id = get_jwt_identity()
+    try:
+        user = mongo.db.users.find_one({'_id': ObjectId(user_id)})
+        if not user:
+            return jsonify({'message': 'User not found'}), 404
+            
+        return jsonify({
+            'id': str(user['_id']),
+            'name': user.get('realName', ''),
+            'nickname': user.get('nickname', ''),
+            'username': user.get('username', '')
+        }), 200
+    except Exception as e:
+        return jsonify({'message': str(e)}), 500
+
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default
