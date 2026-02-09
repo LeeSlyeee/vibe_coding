@@ -138,6 +138,7 @@ def get_shared_list():
         # I am the Viewer, show me my Sharers (Patients)
         cursor = mongo.db.share_relationships.find(match_id('viewer_id', user_id))
         for rel in cursor:
+            results.append({
                 'id': str(rel['sharer_id']), # Ensure string output
                 'name': rel.get('sharer_name', 'Unknown'),
                 'role': 'sharer',
