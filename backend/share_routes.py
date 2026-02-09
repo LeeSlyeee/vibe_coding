@@ -153,7 +153,8 @@ def get_shared_list():
                 'connected_at': rel['created_at']
             })
             
-    return jsonify(results), 200
+    # Wrap in "data" key to match iOS expectation
+    return jsonify({"data": results}), 200
 
 # --- 4. View Insights (Core: Sync from 150) ---
 @share_bp.route('/api/v1/share/insights/<target_id>', methods=['GET'])
