@@ -7,7 +7,7 @@ from bson.objectid import ObjectId
 import requests # [RunPod] Added for forwarding
 import os
 import threading
-from config import Config
+from config import Config, get_korea_time
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -172,7 +172,7 @@ def background_chat_log_task(app_instance, user_id, u_text, a_react):
                 'user_id': user_id,
                 'user_message': u_text,
                 'ai_response': a_react,
-                'created_at': datetime.utcnow()
+                'created_at': get_korea_time()
             }
             mongo.db.chat_logs.insert_one(log_entry)
         except Exception as e:
@@ -210,10 +210,10 @@ def get_insight():
             # End of target date (next day 00:00:00)
             end_date = target_date + timedelta(days=1)
         except ValueError:
-            target_date = datetime.utcnow()
+            target_date = get_korea_time()
             end_date = target_date + timedelta(days=1)
     else:
-        target_date = datetime.utcnow()
+        target_date = get_korea_time()
         end_date = target_date + timedelta(days=1)
 
     start_date = target_date - timedelta(weeks=1)
@@ -379,7 +379,7 @@ def register():
     user_id = mongo.db.users.insert_one({
         'username': username,
         'password_hash': hashed_password,
-        'created_at': datetime.utcnow()
+        'created_at': get_korea_time()
     }).inserted_id
 
     return jsonify({"message": "User registered successfully", "user_id": str(user_id)}), 201
@@ -408,7 +408,7 @@ def login():
             'username': username,
             'nickname': username, 
             'password_hash': hashed_password,
-            'created_at': datetime.utcnow()
+            'created_at': get_korea_time()
         }
         if name:
             user_doc['name'] = name 
@@ -417,7 +417,7 @@ def login():
         if center_code:
             user_doc['center_code'] = center_code
             user_doc['assessment_completed'] = True
-            user_doc['assessment_date'] = datetime.utcnow()
+            user_doc['assessment_date'] = get_korea_time()
             user_doc['phq9_score'] = 0 
             user_doc['risk_level'] = 1
             user_doc['is_premium'] = True # [B2G] Institutions get Premium
@@ -441,7 +441,7 @@ def login():
              update_fields = {}
              if not user.get('assessment_completed'):
                  update_fields['assessment_completed'] = True
-                 update_fields['assessment_date'] = datetime.utcnow()
+                 update_fields['assessment_date'] = get_korea_time()
              
              if not user.get('is_premium'):
                  update_fields['is_premium'] = True
@@ -495,7 +495,7 @@ def login():
     if db_center_code and not is_assessed:
         is_assessed = True
         # DB Update for consistency
-        mongo.db.users.update_one({'_id': user['_id']}, {'$set': {'assessment_completed': True, 'assessment_date': datetime.utcnow()}})
+        mongo.db.users.update_one({'_id': user['_id']}, {'$set': {'assessment_completed': True, 'assessment_date': get_korea_time()}})
         print(f"🏥 [B2G] User '{username}' has center code '{db_center_code}'. Auto-passing assessment.")
 
     return jsonify({
@@ -600,7 +600,7 @@ def submit_assessment():
             'phq9_score': score,
             'risk_level': risk_level,
             'assessment_completed': True,
-            'assessment_date': datetime.utcnow()
+            'assessment_date': get_korea_time()
         }}
     )
     
@@ -695,7 +695,7 @@ def create_diary():
     print(f"🔍 [DEBUG] sleep_desc value: '{data.get('sleep_desc', 'NOT_FOUND')}'")
     created_at_str = data.get('created_at') or data.get('date')
     if created_at_str and created_at_str.endswith('Z'): created_at_str = created_at_str[:-1]
-    created_at = datetime.fromisoformat(created_at_str) if created_at_str else datetime.utcnow()
+    created_at = datetime.fromisoformat(created_at_str) if created_at_str else get_korea_time()
 
     # Map Frontend Questions to Backend Fields
     event_val = data.get('event') or data.get('question1', '')
@@ -1086,7 +1086,7 @@ def get_statistics():
         # Assuming decrypt_doc returns datetime. If it's UTC, add KST.
         # If decrypt_doc handles timezone, adjust accordingly. 
         # Usually pymongo returns UTC datetime.
-        local_date = created_at + KST
+        local_date = created_at
         date_str = local_date.strftime('%Y-%m-%d')
         month_str = local_date.strftime('%Y-%m')
         
@@ -1195,7 +1195,7 @@ def background_generate_task(app_instance, user_id, final_input):
             new_report = {
                 'user_id': user_id,
                 'content': report_content,
-                'created_at': datetime.utcnow(),
+                'created_at': get_korea_time(),
                 'type': 'comprehensive'
             }
             mongo.db.reports.insert_one(new_report)
@@ -1207,7 +1207,7 @@ def background_generate_task(app_instance, user_id, final_input):
                 {'$set': {
                     'report_status': 'completed',
                     'latest_report': report_content,
-                    'report_updated_at': datetime.utcnow()
+                    'report_updated_at': get_korea_time()
                 }}
             )
             print(f"✅ [Thread] Report generation complete for {user_id}")
@@ -1233,7 +1233,7 @@ def background_long_term_task(app_instance, user_id, history_data):
                 {'$set': {
                     'longterm_status': 'completed',
                     'longterm_result': insight,
-                    'longterm_updated_at': datetime.utcnow()
+                    'longterm_updated_at': get_korea_time()
                 }}
             )
             print(f"✅ [Thread] Long-term analysis complete for {user_id}")
@@ -1429,7 +1429,7 @@ def get_chat_summary():
     user_id = get_jwt_identity()
     
     # Range: Last 7 Days
-    end_date = datetime.utcnow()
+    end_date = get_korea_time()
     start_date = end_date - timedelta(days=7)
     
     # Aggregation Pipeline
@@ -1603,6 +1603,29 @@ try:
     print("✅ B2G Routes Registered")
 except Exception as e:
     print(f"❌ Failed to register B2G Routes: {e}")
+
+# --- Share Routes (New) ---
+try:
+    from share_routes import share_bp
+    app.register_blueprint(share_bp)
+    print("✅ Share Routes Registered")
+except Exception as e:
+    print(f"❌ Failed to register Share Routes: {e}")
+
+try:
+    from b2g_routes import b2g_bp
+    app.register_blueprint(b2g_bp)
+    print("✅ B2G Routes Registered")
+except Exception as e:
+    print(f"❌ Failed to register B2G Routes: {e}")
+
+# --- Share Routes (New) ---
+try:
+    from share_routes import share_bp
+    app.register_blueprint(share_bp)
+    print("✅ Share Routes Registered")
+except Exception as e:
+    print(f"❌ Failed to register Share Routes: {e}")
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default
