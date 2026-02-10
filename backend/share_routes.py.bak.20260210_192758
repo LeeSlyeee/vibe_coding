@@ -85,9 +85,7 @@ def connect_share():
         'viewer_id': viewer_id,
         'sharer_id': sharer_id,
         'sharer_name': share_entry['sharer_name'],
-        'created_at': get_korea_time(),
-        'is_active': True,
-        'deleted_at': None
+        'created_at': get_korea_time()
     }
     
     # Upsert (Avoid duplicates)
@@ -138,9 +136,7 @@ def get_shared_list():
 
     if role == 'viewer':
         # I am the Viewer, show me my Sharers (Patients)
-        q = match_id('viewer_id', user_id)
-        q['is_active'] = {'$ne': False}
-        cursor = mongo.db.share_relationships.find(q)
+        cursor = mongo.db.share_relationships.find(match_id('viewer_id', user_id))
         for rel in cursor:
             results.append({
                 'id': str(rel['sharer_id']), # Ensure string output
@@ -150,9 +146,7 @@ def get_shared_list():
             })
     else:
         # I am the Sharer, show me my Viewers (Guardians)
-        q = match_id('sharer_id', user_id)
-        q['is_active'] = {'$ne': False}
-        cursor = mongo.db.share_relationships.find(q)
+        cursor = mongo.db.share_relationships.find(match_id('sharer_id', user_id))
         for rel in cursor:
             # For viewers, we might not have stored their name in relationship
             # So we might need to fetch it or store it.
@@ -202,8 +196,7 @@ def disconnect_user():
     except:
         pass
 
-    # [SAFETY] Soft Delete implementation
-    result = mongo.db.share_relationships.update_one({
+    result = mongo.db.share_relationships.delete_one({
         '$or': [
             # Case 1: I am Sharer, deleting Viewer
             {'sharer_id': user_id, 'viewer_id': target_id},
@@ -213,14 +206,9 @@ def disconnect_user():
             {'viewer_id': user_id, 'sharer_id': target_id},
             {'viewer_id': user_id, 'sharer_id': q_target_oid}
         ]
-    }, {
-        '$set': {
-            'is_active': False,
-            'deleted_at': get_korea_time()
-        }
     })
     
-    if result.matched_count > 0:
+    if result.deleted_count > 0:
         return jsonify({"message": "연결이 해제되었습니다."}), 200
     else:
         # If not found, maybe existing data has ObjectId for sharer_id?
@@ -237,8 +225,7 @@ def get_shared_insights(target_id):
     # 1. Verify Permission
     rel = mongo.db.share_relationships.find_one({
         'viewer_id': viewer_id,
-        'sharer_id': target_id,
-        'is_active': {'$ne': False}
+        'sharer_id': target_id
     })
     
     if not rel:
@@ -251,7 +238,7 @@ def get_shared_insights(target_id):
         print(f"🔄 [Share] Syncing data for {target_id} from 150 Server...")
         pull_from_insight_mind(target_id, run_async=False) # Wait for sync
     except Exception as e:
-        print(f"⚠️ [Share] Sync Warning (Non-fatal): {e}")
+        print(f"⚠️ [Share] Sync Warning: {e}")
         # Proceed with local data even if sync fails
         
     # 3. Fetch Report & Stats (Re-use existing logic logic)

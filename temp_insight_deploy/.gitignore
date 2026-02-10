@@ -1,0 +1,44 @@
+# System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor Configs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python / Django (Backend)
+__pycache__/
+*.py[cod]
+*$py.class
+backend/venv/
+backend/.env
+backend/db.sqlite3
+backend/db.sqlite3-journal
+backend/media/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.*
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Logs
+*.log
+backend/*.log
+frontend/*.log
+tunnel_*.log
+request_log.txt
+curl_output.txt
+
+# Security / Keys
+oracle_ssh/
+
+# Data Dumps
+remote_diaries_export.json
+remote_users_export.json
