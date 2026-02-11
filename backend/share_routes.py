@@ -142,10 +142,30 @@ def get_shared_list():
         q['is_active'] = {'$ne': False}
         cursor = mongo.db.share_relationships.find(q)
         for rel in cursor:
+            # Fetch Sharer Details for Birth Date
+            # Fetch Sharer Details for Birth Date
+            from bson.objectid import ObjectId
+            sharer_user = None
+            try:
+                # Try ObjectId conversion
+                sharer_user = mongo.db.users.find_one({'_id': ObjectId(rel['sharer_id'])})
+            except:
+                # Fallback to direct string match (just in case)
+                sharer_user = mongo.db.users.find_one({'_id': rel['sharer_id']})
+            
+            # [Fix] Handle Zombie Relationships (User Deleted)
+            if not sharer_user:
+                # User not found in DB -> Skip this relationship
+                continue
+                
+            sharer_name = sharer_user.get('nickname', sharer_user.get('username'))
+            birth_date = sharer_user.get('birth_date', "")
+                 
             results.append({
                 'id': str(rel['sharer_id']), # Ensure string output
-                'name': rel.get('sharer_name', 'Unknown'),
+                'name': sharer_name,
                 'role': 'sharer',
+                'birth_date': birth_date,
                 'connected_at': rel['created_at'].isoformat() if hasattr(rel['created_at'], 'isoformat') else str(rel['created_at'])
             })
     else:
@@ -157,22 +177,25 @@ def get_shared_list():
             # For viewers, we might not have stored their name in relationship
             # So we might need to fetch it or store it.
             # For now, let's assume we stored it or return ID as name fallback
-            viewer_name = rel.get('viewer_name', '보호자') 
-            
             # If name is missing in relation, try fetch from users collection (optional but better)
-            if viewer_name == '보호자':
-                try:
-                    u = mongo.db.users.find_one({'_id': ObjectId(rel['viewer_id'])})
-                    if u: viewer_name = u.get('nickname', u.get('username'))
-                except:
-                    # Invalid ObjectId (e.g. test string ID), ignore
-                    pass
+            
+            # [Fix] Robust Viewer Fetch
+            u = None
+            try:
+                u = mongo.db.users.find_one({'_id': ObjectId(rel['viewer_id'])})
+            except:
+                pass
+            
+            if not u: continue # Skip if viewer user is gone
+            
+            viewer_name = u.get('nickname', u.get('username'))
+            viewer_birth_date = u.get('birth_date', "")
             
             results.append({
                 'id': rel['viewer_id'],
                 'name': viewer_name,
                 'role': 'viewer',
-                # [CRITICAL FIX] Convert Datetime to String for iOS JSON Decoder (which expects String)
+                'birth_date': viewer_birth_date,
                 'connected_at': rel['created_at'].isoformat() if hasattr(rel['created_at'], 'isoformat') else str(rel['created_at'])
             })
             
@@ -288,6 +311,7 @@ def get_shared_insights(target_id):
         
     return jsonify({
         "user_name": rel['sharer_name'],
+        "birth_date": user.get('birth_date', ""), # [New]
         "risk_level": risk_level,
         "latest_report": report,
         "recent_moods": processed_moods,

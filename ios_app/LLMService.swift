@@ -4,6 +4,7 @@ import MLX
 import MLXLMCommon
 import MLXRandom
 import MLXLLM 
+import UserNotifications // [Fix] Missing Import
 
 // MARK: - LLM Service (On-Device AI Manager)
 class LLMService: ObservableObject {
@@ -57,7 +58,8 @@ class LLMService: ObservableObject {
     private var huggingFaceToken = ""
     
     // Constants
-    private let configServerURL = "https://150.230.7.76.nip.io/api/v1/diaries/config/"
+    // [Target Fix] Updated to 217 Server (app.py: /api/config)
+    private let configServerURL = "https://217.142.253.35.nip.io/api/config"
     private let modelFiles = [
         "config.json",
         "model.safetensors",
@@ -94,6 +96,11 @@ class LLMService: ObservableObject {
         return false
     }
 
+    init() {
+        // [UX] Request Notification Permission for AI Ready Alert
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
     // MARK: - Model Loading
     func loadModel() async {
         // [Hybrid] 서버 모드와 상관없이 로컬 모델 로드 (일기 분석용)
@@ -118,7 +125,7 @@ class LLMService: ObservableObject {
         do {
             // 2. Load from Local Directory
             let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let modelDir = docURL.appendingPathComponent("haru-on-model")
+            let modelDir = docURL.appendingPathComponent("haru-on-model") // Corrected path building
             
             print("📂 Loading Model from: \(modelDir.path)")
             
@@ -131,6 +138,19 @@ class LLMService: ObservableObject {
             self.modelContainer = container
             await MainActor.run { self.isModelLoaded = true }
             print("✅ Haru-On Model Loaded Successfully!")
+            
+            // [UX] Notify User (System)
+            let content = UNMutableNotificationContent()
+            content.title = "AI 준비 완료"
+            content.body = "이제 일기를 분석할 수 있어요! 🧠"
+            content.sound = .default
+            let request = UNNotificationRequest(identifier: "AI_READY", content: content, trigger: nil)
+            try? await UNUserNotificationCenter.current().add(request)
+            
+            // [UX] Notify App (Toast)
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(name: NSNotification.Name("AIModelLoaded"), object: nil)
+            }
             
         } catch {
             print("Failed to load model: \(error)")
@@ -800,11 +820,15 @@ class LLMService: ObservableObject {
             let content = result
             
             // Parsing
-            var emotion = "평온 (50%)"
-            var advice = "마음의 평화를 빕니다."
-            var analysis = "분석을 완료하지 못했습니다."
+            var emotion = ""
+            var advice = ""
+            var analysis = ""
             
-            if let eRange = content.range(of: "EMOTION:"), let aRange = content.range(of: "ADVICE:"), let anRange = content.range(of: "ANALYSIS:") {
+            // 1. Try Strict Parsing first
+            if let eRange = content.range(of: "EMOTION:"), 
+               let aRange = content.range(of: "ADVICE:"), 
+               let anRange = content.range(of: "ANALYSIS:") {
+                
                 let eEnd = content[eRange.upperBound...].components(separatedBy: "ADVICE:").first ?? ""
                 let aEnd = content[aRange.upperBound...].components(separatedBy: "ANALYSIS:").first ?? ""
                 let anEnd = content[anRange.upperBound...]
@@ -812,15 +836,46 @@ class LLMService: ObservableObject {
                 emotion = eEnd.trimmingCharacters(in: .whitespacesAndNewlines)
                 advice = aEnd.trimmingCharacters(in: .whitespacesAndNewlines)
                 analysis = String(anEnd).trimmingCharacters(in: .whitespacesAndNewlines)
-            } else {
-                // Fallback parsing (newline based)
+            } 
+            
+            // 2. Fallback / Cleanup Parsing
+            if emotion.isEmpty || advice.isEmpty || analysis.isEmpty {
                  let lines = content.components(separatedBy: "\n")
                  for line in lines {
-                     if line.starts(with: "EMOTION:") { emotion = line.replacingOccurrences(of: "EMOTION:", with: "").trimmingCharacters(in: .whitespaces) }
-                     else if line.starts(with: "ADVICE:") { advice = line.replacingOccurrences(of: "ADVICE:", with: "").trimmingCharacters(in: .whitespaces) }
-                     else if !line.isEmpty && !line.contains("--구분선--") { analysis += line + " " }
+                     let cleanLine = line.trimmingCharacters(in: .whitespaces)
+                     if cleanLine.isEmpty { continue }
+                     if cleanLine.contains("--구분선--") { continue }
+                     if cleanLine.contains("[일기]") || cleanLine.contains("[지시사항]") { continue } // 프롬프트 반복 방지
+                     
+                     if cleanLine.starts(with: "EMOTION:") { 
+                        emotion = cleanLine.replacingOccurrences(of: "EMOTION:", with: "").trimmingCharacters(in: .whitespaces) 
+                     }
+                     else if cleanLine.starts(with: "ADVICE:") { 
+                        advice = cleanLine.replacingOccurrences(of: "ADVICE:", with: "").trimmingCharacters(in: .whitespaces) 
+                     }
+                     else if cleanLine.starts(with: "ANALYSIS:") {
+                        let val = cleanLine.replacingOccurrences(of: "ANALYSIS:", with: "").trimmingCharacters(in: .whitespaces)
+                        if !val.isEmpty { analysis += val + " " }
+                     }
+                     else {
+                         // 헤더가 없는 줄은 '분석'으로 간주하되, 감정/조언이 이미 채워진 상태여야 함 (순서상 뒤에 오므로)
+                         // 혹은 분석 내용이 이어지는 경우
+                         if !analysis.isEmpty || (emotion.isEmpty && advice.isEmpty) {
+                            // 아직 아무것도 못 찾았는데 텍스트가 나온다? -> 잡음일 가능성 높음. 
+                            // 하지만 분석 내용일 수도 있으니 추가.
+                            analysis += cleanLine + " "
+                         } else {
+                            // 감정/조언은 찾았는데 헤더 없는 줄 -> 분석 내용 이어짐
+                            analysis += cleanLine + " "
+                         }
+                     }
                  }
             }
+            
+            // 3. Defaults if still empty
+            if emotion.isEmpty { emotion = "평온 (50%)" }
+            if advice.isEmpty { advice = "마음의 평화를 빕니다." }
+            if analysis.trimmingCharacters(in: .whitespaces).isEmpty { analysis = "AI가 분석을 완료하지 못했습니다. (내용이 너무 짧거나 분석하기 어렵습니다)" }
             
             return (emotion, advice, analysis)
             

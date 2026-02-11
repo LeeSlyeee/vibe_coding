@@ -142,7 +142,16 @@ export default {
   font-size: 18px;
   font-weight: 600;
   color: var(--color-text);
+  margin-bottom: 12px;
 }
+
+.signup-desc {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
 
 .auth-form {
   display: flex;

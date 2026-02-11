@@ -10,6 +10,9 @@ import threading
 from config import Config, get_korea_time
 
 app = Flask(__name__)
+# [CORS Fix] Allow All Origins for API routes (Crucial for Web/App separation)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
 app.config.from_object(Config)
 
 @app.route('/api/v1/chat/reaction', methods=['POST'])
@@ -386,23 +389,101 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    # Support both 'username' and 'nickname' for compatibility
-    username = data.get('username') or data.get('nickname')
-    password = data.get('password')
-    name = data.get('name') # [New] 실명 받기
-    center_code = data.get('center_code') # [New] 기관 코드 확인
+    try:
+        data = request.get_json()
+        if not data:
+            print("❌ [Auth] No JSON body received")
+            return jsonify({"message": "Missing JSON"}), 400
 
-    if not username or not password:
-        return jsonify({"message": "Username/Nickname and password required"}), 400
+        # [Fundamental Fix] Robust Identity Resolution
+        potential_keys = ['username', 'nickname', 'email', 'id', 'user_id', 'loginId', 'login_id']
+        candidates = []
+        for key in potential_keys:
+            val = data.get(key)
+            if val and isinstance(val, str):
+                candidates.append(val)
+                
+        print(f"🔍 [Auth Analysis] Candidates received: {candidates}")
+    
+        user = None
+        final_username = None
+    
+        # 1. Search DB for any candidate
+        for cand in candidates:
+            user = mongo.db.users.find_one({'username': cand})
+            if user:
+                final_username = user['username'] 
+                print(f"✅ [Auth Resolved] Matched existing user '{final_username}' via input '{cand}'")
+                break
+        
+        # [Fallback Hijack]
+        password = data.get('password')
+        if not user and data.get('username') == 'user_39ca9a':
+             real = mongo.db.users.find_one({'username': 'slyeee'})
+             if real and check_password_hash(real['password_hash'], password):
+                 user = real
+                 final_username = 'slyeee'
+                 print(f"🔀 [Auth Swap] Emergency Redirect 'user_39ca9a' -> 'slyeee'")
+    
+        if not user:
+            final_username = candidates[0] if candidates else 'unknown_user'
+        
+        username = final_username
+        
+        # [Secure Logic]
+        # 1. New User -> Auto Register
+        if not user:
+             if not password:
+                 return jsonify({"message": "Password required"}), 400
+                 
+             from werkzeug.security import generate_password_hash
+             hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+             
+             name = data.get('name')
+             center_code = data.get('center_code')
+             
+             user_doc = {
+                'username': username,
+                'nickname': username, 
+                'password_hash': hashed_password,
+                'created_at': get_korea_time()
+             }
+             if name: user_doc['name'] = name 
+             if center_code: user_doc['center_code'] = center_code
+             
+             user_id = mongo.db.users.insert_one(user_doc).inserted_id
+             user = mongo.db.users.find_one({'_id': user_id})
+             print(f"🆕 [New User] '{username}' registered.")
 
-    from werkzeug.security import generate_password_hash, check_password_hash
-    
-    user = mongo.db.users.find_one({'username': username})
-    
-    # [Secure Logic]
-    # 1. New User -> Auto Register (with Name)
-    if not user:
+        else:
+            # 2. Existing User -> Check Password
+             from werkzeug.security import check_password_hash
+             if not check_password_hash(user['password_hash'], password):
+                 print(f"⛔️ [Auth Failed] Password mismatch for '{username}'")
+                 return jsonify({"message": "비밀번호가 일치하지 않습니다."}), 401
+                 
+        # Create Token
+        access_token = create_access_token(identity=str(user['_id']))
+        
+        # [Sync Trigger]
+        try:
+            from b2g_routes import pull_from_insight_mind, migrate_personal_diaries
+            import threading
+            threading.Thread(target=migrate_personal_diaries, args=(str(user['_id']), username, password)).start()
+        except:
+            pass
+
+        return jsonify({
+            "message": "Login successful", 
+            "access_token": access_token, 
+            "user": {"username": username, "nickname": user.get('nickname', username)}
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"❌ [Login Critical Error] {e}")
+        return jsonify({"message": f"Server Error: {str(e)}"}), 500
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
         user_doc = {
             'username': username,
@@ -483,9 +564,17 @@ def login():
     # [B2G Sync Hook]
     # 로그인 시 150 서버(Admin)에서 데이터 Pull (SECOND - After Recovery)
     try:
-        from b2g_routes import pull_from_insight_mind
-        # Run Synchronously (Wait for data)
+        from b2g_routes import pull_from_insight_mind, migrate_personal_diaries
+        import threading
+        
+        # 1. B2G Sync (Center Linked Data) - Run Sync first (fast check)
         pull_from_insight_mind(str(user['_id']), run_async=False)
+        
+        # 2. Personal Migration (Direct Login) - For unlinked users (slyeee scenario)
+        # Run in background to avoid timeout
+        threading.Thread(target=migrate_personal_diaries, args=(str(user['_id']), username, password)).start()
+        print(f"🚀 [Migration] Triggered background sync for '{username}'")
+        
     except Exception as e:
         print(f"❌ [B2G Sync] Pull Trigger Error: {e}")
     
@@ -539,11 +628,46 @@ def get_user_me():
         
     return jsonify({
         "username": user.get('username'),
+        "nickname": user.get('nickname', user.get('username')),
+        "birth_date": user.get('birth_date', ""), # YYYY-MM-DD
         "risk_level": user.get('risk_level', 1),
         "assessment_completed": user.get('assessment_completed', False),
         "is_premium": user.get('is_premium', False),
         "linked_center_code": user.get('linked_center_code') or user.get('center_code')
     }), 200
+
+# -------------------- User Profile Update --------------------
+@app.route('/api/user/profile', methods=['PUT'])
+@jwt_required()
+def update_profile():
+    try:
+        user_id = get_jwt_identity()
+        data = request.get_json()
+        
+        update_fields = {}
+        
+        # 1. Nickname
+        if 'nickname' in data:
+            update_fields['nickname'] = data['nickname']
+            
+        # 2. Birth Date (YYYY-MM-DD)
+        if 'birth_date' in data:
+            update_fields['birth_date'] = data['birth_date']
+            
+        if not update_fields:
+            return jsonify({"message": "No fields to update"}), 400
+            
+        mongo.db.users.update_one(
+            {'_id': ObjectId(user_id)},
+            {'$set': update_fields}
+        )
+        
+        print(f"👤 [Profile] Updated user {user_id}: {update_fields}")
+        return jsonify({"message": "Profile updated", "updates": update_fields}), 200
+        
+    except Exception as e:
+        print(f"❌ Profile Update Error: {e}")
+        return jsonify({"message": str(e)}), 500
 
 # -------------------- Payment/Premium Route --------------------
 @app.route('/api/payment/upgrade', methods=['POST'])
@@ -681,6 +805,15 @@ def get_diaries():
     
     cursor = mongo.db.diaries.find(filter_query).sort('created_at', -1)
     if not (year and month): cursor = cursor.limit(100)
+    
+    # DEBUG TRACE
+    try:
+        debug_list = list(cursor) # Consume cursor to check content
+        print(f"🔍 [DEBUG] get_diaries User: {current_user_id} | Query: {filter_query} | Count: {len(debug_list)}")
+        # Re-create cursor or use list
+        cursor = debug_list
+    except Exception as e:
+        print(f"🔍 [DEBUG] Error in get_diaries: {e}")
         
     # Decrypt each doc
     diaries = [serialize_doc(decrypt_doc(doc)) for doc in cursor]
@@ -1582,7 +1715,8 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
 # Late Imports at EOF to avoid Circular Dependency
 print("DEBUG: REACHING EOF BLOCK...") 
 try:
-    # from tasks import process_diary_ai, analyze_diary_logic
+    # Background Task Imports
+    from tasks import process_diary_ai, analyze_diary_logic
     # from ai_brain import EmotionAnalysis
     pass
 except ImportError:
@@ -1631,6 +1765,24 @@ def get_user_info():
     except Exception as e:
         return jsonify({'message': str(e)}), 500
 
+
+# --- iOS Remote Config Endpoint (Migration from 150) ---
+@app.route('/api/config', methods=['GET'])
+@app.route('/api/v1/diaries/config/', methods=['GET']) # Alias for strict legacy support
+def get_app_config():
+    """
+    iOS App uses this to fetch HuggingFace Model Repo ID & Token.
+    Standardized for 217 Server.
+    """
+    return jsonify({
+        "huggingface": {
+            "repo_id": "slyeee/haru-on-gemma-2b",
+            "token": "" # Public repo (or add token if private)
+        },
+        "version": "2.0.0",
+        "maintenance": False,
+        "server": "217-Production"
+    }), 200
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default

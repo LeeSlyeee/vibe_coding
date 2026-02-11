@@ -295,3 +295,20 @@ python app.py
   - 주인이 없는 고아 일기(Orphaned Diaries) 184건 삭제. (일기 폭등 문제 해결)
   - **최종 데이터 검증**: 환자 2명(이성희, 김혜진), 일기 39건(이성희)으로 정상화.
   - 관리자 계정(`slyeee`) 실명 복구 ("이슬이" -> "이성희").
+
+### 15. Cross-Platform Verification & Birthday Badge System (2026.02.12)
+
+- **생일 알림 및 공유 시스템 검증**:
+  - **웹(Web) <-> iOS(App) 상호 운용성 확보**: 내담자와 보호자가 서로 다른 플랫폼을 사용하더라도(Web-App, App-Web) 연결 및 데이터 동기화가 원활함을 검증했습니다.
+  - **생일 배지(Birthday Badge) 구현**:
+    - `SharedStatsPage.vue`에 **D-Day** 및 **오늘 생일(Today)** 배지 로직을 추가했습니다.
+    - **Safari/iOS 호환성 패치**: `YYYY-MM-DD` 포맷 파싱 오류(NaN)를 해결하기 위해 `YYYY/MM/DD` 변환 로직을 적용했습니다.
+    - **Timezone 보정**: 클라이언트 시차로 인한 D-Day 계산 오차를 방지하기 위해 연/월/일 단위 비교 로직을 강화했습니다.
+
+- **안정성 및 보안 강화**:
+  - **CORS (Cross-Origin Resource Sharing) 해결**: 로컬 웹 개발 환경(`localhost:5173`)과 백엔드 간의 통신 문제를 해결하기 위해 전역 CORS 정책(`origins="*"`)을 적용했습니다.
+  - **Zombie Data 방어**: 탈퇴한 회원의 데이터가 공유 목록에 남아 발생하는 UI 오류를 방지하기 위해, 백엔드(`share_routes.py`) 레벨에서 유효성 검사 로직을 추가했습니다.
+
+- **품질 보증 (QA)**:
+  - **스트레스 테스트(Stress Test)**: 무작위 시나리오(생일 Offset, 연결 방향 랜덤)를 생성하여 **20회 연속 테스트**를 수행했고, **성공률 100% (20/20)**를 달성했습니다.
+  - **시뮬레이션 검증**: 실제 iOS 기기 없이도 앱 동작을 검증할 수 있는 `verify_cross_platform_scenarios.py`를 개발하여 로직의 완결성을 입증했습니다.

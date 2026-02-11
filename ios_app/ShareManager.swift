@@ -28,12 +28,14 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         let id: String
         let name: String
         let role: String? // 'sharer' or 'viewer'
+        let birthDate: String? // [New] Birth Date (YYYY-MM-DD)
         let connectedAt: String
         
         enum CodingKeys: String, CodingKey {
             case id
             case name
             case role
+            case birthDate = "birth_date"
             case connectedAt = "connected_at"
         }
     }
@@ -264,6 +266,67 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                 }
             }
         }
+    // 6. Check Friend Birthdays
+    // 6. Check Friend Birthdays (Today + Upcoming 7 Days)
+    func checkFriendBirthdays() -> [(name: String, dDay: Int)] {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        let today = Date()
+        let cal = Calendar.current
+        
+        // Remove time component for accurate comparison
+        let currentDay = cal.startOfDay(for: today)
+        let currentYear = cal.component(.year, from: currentDay)
+        
+        var upcomingBirthdays: [(name: String, dDay: Int)] = []
+        var processedIDs: Set<String> = [] // Avoid duplicates
+        
+        let allFriends = connectedUsers + myGuardians
+        
+        for user in allFriends {
+            if processedIDs.contains(user.id) { continue }
+            
+            if let bString = user.birthDate, let birthDate = f.date(from: bString) {
+                let month = cal.component(.month, from: birthDate)
+                let day = cal.component(.day, from: birthDate)
+                
+                // Create this year's birthday
+                var components = DateComponents()
+                components.year = currentYear
+                components.month = month
+                components.day = day
+                
+                guard let thisYearBirthday = cal.date(from: components) else { continue }
+                
+                // Calculate difference
+                let diffComponents = cal.dateComponents([.day], from: currentDay, to: thisYearBirthday)
+                
+                if let days = diffComponents.day {
+                    if days >= 0 && days <= 7 {
+                        upcomingBirthdays.append((name: user.name, dDay: days))
+                        processedIDs.insert(user.id)
+                    } else if days < 0 {
+                         // Check next year (e.g. Dec 31 vs Jan 1) if needed, 
+                         // but for "Birthday Week" usually means upcoming. 
+                         // If today is Jan 1 and birthday was Dec 31, it's passed.
+                         // Only edge case: Today is Dec 28, Birthday is Jan 2. 
+                         // Then thisYearBirthday (Jan 2 2026) is passed? No wait.
+                         // If today is Dec, and birthday is Jan, currentYear Jan has passed. 
+                         // Need to check next year.
+                         
+                         var nextComponents = components
+                         nextComponents.year = currentYear + 1
+                         if let nextYearBirthday = cal.date(from: nextComponents),
+                            let nextDays = cal.dateComponents([.day], from: currentDay, to: nextYearBirthday).day,
+                            nextDays >= 0 && nextDays <= 7 {
+                             upcomingBirthdays.append((name: user.name, dDay: nextDays))
+                             processedIDs.insert(user.id)
+                         }
+                    }
+                }
+            }
+        }
+        
+        return upcomingBirthdays.sorted { $0.dDay < $1.dDay }
     }
-
 }

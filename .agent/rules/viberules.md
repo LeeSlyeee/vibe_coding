@@ -1,0 +1,8 @@
+---
+trigger: always_on
+---
+
+## 권한
+
+- vibe_coding 프로젝트의 모든 파일을 엑세스 할 권한이 있습니다. (OCI서버 217.142.253.35.nip.io)
+- OCI키는 해당 폴더 내부 ssh-key폴더에 존재한다.

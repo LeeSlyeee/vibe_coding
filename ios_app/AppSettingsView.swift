@@ -20,6 +20,7 @@ struct AppSettingsView: View {
     @State private var showDisconnectAlert = false // Disconnect Confirmation [New]
     @State private var isPwVisible = false // Password Reveal Only
     @State private var useCustomLogin = false // Toggle between Auto-Account and Custom Login
+    @State private var showBirthDatePicker = false // [New] Birth Date Picker
     
     // Unified Alert System [Fix]
     enum ActiveAlert: Identifiable {
@@ -61,6 +62,26 @@ struct AppSettingsView: View {
                             .font(.caption)
                         }
                         .padding(.vertical, 8)
+                        
+                        // [New] Birth Date Setting
+                        HStack {
+                            Text("생년월일")
+                            Spacer()
+                            if let bDate = authManager.birthDate {
+                                Text(bDate)
+                                    .foregroundColor(.primary)
+                            } else {
+                                Text("설정되지 않음")
+                                    .foregroundColor(.gray)
+                            }
+                            
+                            // Edit Button (trigger sheet or inline picker)
+                            Button("변경") {
+                                showBirthDatePicker = true
+                            }
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                        }
                     } else {
                         // [Dual Mode] Auto Account vs Custom Login
                         if !useCustomLogin {
@@ -543,6 +564,16 @@ struct AppSettingsView: View {
                             .foregroundColor(.red)
                     }
                     .padding(.top, 4)
+                    
+                    // [New] Clean Today's Fake Data
+                    Button(action: {
+                        cleanTodayFakeData()
+                    }) {
+                        Text("🧹 오늘 가짜 데이터 청소 (Clean Today's Fake)")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.top, 4)
                 }
             } // End List
             .navigationTitle("설정")
@@ -571,6 +602,10 @@ struct AppSettingsView: View {
                 })
                 .screenshotProtected(isProtected: true) // 스크린샷 방지
             }
+            // [New] Birth Date Picker Sheet
+            .sheet(isPresented: $showBirthDatePicker) {
+                BirthDatePickerView(isPresented: $showBirthDatePicker)
+            }
         } // End NavigationView
     }
     
@@ -578,6 +613,107 @@ struct AppSettingsView: View {
     func seedData() {
         DataSeeder.shared.seedDummyData { count in
             activeAlert = .info("테스트용 일기 \(count)개가 생성되었습니다.\n캘린더와 통계 탭을 확인해보세요.")
+        }
+    }
+    
+    // [New] Clean Fake Data Logic
+    func cleanTodayFakeData() {
+        let today = Date()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        // [Safety] 명시적으로 2026-02-11 등 타겟팅 가능하지만 일단 오늘 날짜
+        let todayStr = formatter.string(from: today)
+        
+        // DataSeeder Patterns (Short Keywords)
+        let fakePatterns = ["직장", "실수", "친구", "말다툼", "평범", "산책", "프로젝트", "성공"]
+        
+        let allDiaries = LocalDataManager.shared.diaries
+        let todayDiaries = allDiaries.filter { $0.date == todayStr }
+        
+        // Filter & Delete
+        let toDeleteIds = todayDiaries.filter { diary in
+            let content = (diary.event ?? "") + (diary.emotion_desc ?? "")
+            for pattern in fakePatterns {
+                if content.contains(pattern) { return true }
+            }
+            return false
+        }.compactMap { $0.id }
+        
+        if toDeleteIds.isEmpty {
+            activeAlert = .info("🔍 검색 결과: 총 \(todayDiaries.count)개 발견됨.\n하지만 '가짜 패턴'과 일치하는 항목이 없습니다.\n(날짜: \(todayStr))")
+            return
+        }
+        
+        print("🧹 Cleaning \(toDeleteIds.count) fake diaries...")
+        
+        for id in toDeleteIds {
+            LocalDataManager.shared.deleteDiary(id: id) { _ in }
+        }
+        
+        let deleted = toDeleteIds.count
+        
+        activeAlert = .info("✨ 청소 완료!\n총 \(todayDiaries.count)개 중 가짜 \(deleted)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
+        
+        // Refresh Stats
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshStats"), object: nil)
+    }
+}
+
+// [New] Birth Date Picker View
+struct BirthDatePickerView: View {
+    @Binding var isPresented: Bool
+    @EnvironmentObject var authManager: AuthManager
+    
+    @State private var selectedDate = Date()
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("생일 선택")) {
+                    DatePicker("생년월일", selection: $selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                }
+                
+                Section {
+                    Button(action: {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        let dateStr = formatter.string(from: selectedDate)
+                        
+                        // Save & Close
+                        authManager.updateBirthDate(dateStr) { success in
+                            isPresented = false
+                        }
+                    }) {
+                        HStack {
+                            Spacer()
+                            Text("저장하기")
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+                    }
+                    .foregroundColor(.white)
+                    .listRowBackground(Color.blue)
+                }
+            }
+            .navigationTitle("생년월일 설정")
+            .navigationBarItems(trailing: Button("취소") { isPresented = false })
+            .onAppear {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                if let saved = authManager.birthDate, let date = formatter.date(from: saved) {
+                    selectedDate = date
+                } else {
+                    // Default to 1986-03-11 (User's Example) for convenience
+                    var components = DateComponents()
+                    components.year = 1986
+                    components.month = 3
+                    components.day = 11
+                    if let defaultDate = Calendar.current.date(from: components) {
+                        selectedDate = defaultDate
+                    }
+                }
+            }
         }
     }
 }

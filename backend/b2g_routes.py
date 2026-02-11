@@ -548,3 +548,147 @@ def recover_center_code(nickname):
     except Exception as e:
         print(f"❌ [B2G Web] Recovery Failed: {e}")
         return None
+
+def migrate_personal_diaries(user_id, username, password):
+    """
+    [Migration Hook]
+    """
+    try:
+        # [Debug Log Setup]
+        log_path = "/home/ubuntu/sync_debug.log"
+        import datetime
+        def debug_log(msg):
+            with open(log_path, "a") as f:
+                f.write(f"[{datetime.datetime.now()}] {msg}\n")
+        
+        debug_log(f"🚀 Start Sync for User: {username}")
+        
+        from app import mongo, encrypt_data
+        import requests
+        from datetime import datetime, timedelta
+        
+        print(f"🚀 [Migration] Attempting Login to 150 for '{username}'...")
+        debug_log(f"Login Attempt to 150...")
+        
+        # 1. Login to 150
+        login_url = "https://150.230.7.76.nip.io/api/v1/auth/login/"
+        payload = {"username": username, "password": password}
+        headers = {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true"
+        }
+        
+        res = requests.post(login_url, json=payload, headers=headers, verify=False, timeout=5)
+        
+        if res.status_code != 200:
+            print(f"⏩ [Migration] Login Failed (Status: {res.status_code}). Skipping Personal Migration.")
+            return
+
+        data = res.json()
+        token = data.get('key') or data.get('access') or data.get('token')
+        if not token:
+            print("⏩ [Migration] No Token. Skipping.")
+            return
+            
+        prefix = "Token"
+        if data.get('access'): prefix = "Bearer"
+        elif data.get('token'): prefix = "Bearer"
+        
+        print(f"✅ [Migration] 150 Login Success. Token: {token[:5]}... Prefix: {prefix}")
+        headers['Authorization'] = f"{prefix} {token}"
+        
+        # 2. Fetch Diaries (Limit 100)
+        diaries_url = "https://150.230.7.76.nip.io/api/v1/diaries/"
+        # DRF Default Pagination might be active.
+        
+        res_d = requests.get(diaries_url, headers=headers, verify=False, timeout=10)
+        
+        diaries = []
+        if res_d.status_code == 200:
+            json_d = res_d.json()
+            # print(f"DEBUG: 150 Raw Response: {json_d}", flush=True) # Too verbose?
+            if isinstance(json_d, list):
+                diaries = json_d
+            elif isinstance(json_d, dict) and 'results' in json_d:
+                diaries = json_d['results']
+            elif isinstance(json_d, dict):
+                 # Maybe 'data' or root dict?
+                 print(f"DEBUG: Unknown dict format. Keys: {json_d.keys()}", flush=True)
+                 # Try to find list inside
+                 for k, v in json_d.items():
+                     if isinstance(v, list):
+                         diaries = v
+                         print(f"DEBUG: Found list in key '{k}'", flush=True)
+                         break
+                
+        print(f"📥 [Migration] Fetched {len(diaries)} items from 150 Server.")
+        
+        restored_count = 0
+        for item in diaries:
+            print(f"DEBUG: Diary Keys from 150: {list(item.keys())}", flush=True)
+            # [Fix] Robust Date Parsing
+            date_str = item.get('date')
+            if not date_str and item.get('created_at'):
+                # Handle '2026-01-01...' format
+                date_str = str(item.get('created_at'))[:10]
+            
+            if not date_str: 
+                print("⚠️ Skipping item with no date")
+                continue
+            
+            # Check Duplicate
+            exists = mongo.db.diaries.find_one({
+                "user_id": str(user_id),
+                "date": date_str
+            })
+            
+            if not exists:
+                # Map Fields (150 -> 217)
+                # 150: content, mood_score, weather, sleep_condition, ai_analysis
+                # 217: event, mood_level, weather, sleep_desc, ai_analysis
+                
+                raw_diary = {
+                    'user_id': str(user_id),
+                    'date': date_str,
+                    # [Fix] Fallback keys for 150/217 schema compatibility
+                    'event': item.get('content') or item.get('event') or '',
+                    'mood_level': item.get('mood_score') or item.get('mood_level') or 3,
+                    'weather': item.get('weather') or '',
+                    'sleep_desc': item.get('sleep_condition') or item.get('sleep_desc') or '',
+                    'ai_analysis': item.get('ai_analysis') or item.get('ai_comment') or '',
+                    'ai_advice': item.get('ai_advice') or item.get('ai_comment') or '',
+                    
+                    # Defaults
+                    'created_at': datetime.now(),
+                    'is_migrated': True
+                }
+                
+                # Try to parse 'created_at' if exists
+                if item.get('created_at'):
+                    try:
+                        raw_diary['created_at'] = datetime.strptime(item.get('created_at'), '%Y-%m-%d %H:%M:%S')
+                    except:
+                        pass # Keep now()
+                else:
+                    # Construct from date
+                    try:
+                        dt = datetime.strptime(date_str, '%Y-%m-%d')
+                        raw_diary['created_at'] = dt.replace(hour=23, minute=59)
+                    except:
+                        pass
+                
+                # Encrypt
+                try:
+                    encrypted = encrypt_data(raw_diary)
+                    mongo.db.diaries.insert_one(encrypted)
+                    restored_count += 1
+                except Exception as e:
+                    print(f"⚠️ [Migration] Save Error: {e}")
+        
+        if restored_count > 0:
+            print(f"✅ [Migration] Restored {restored_count} diaries for {username}.")
+        else:
+            print(f"ℹ️ [Migration] No new diaries imported. (Total fetched: {len(diaries)})")
+            
+    except Exception as e:
+        print(f"❌ [Migration] Critical Error: {e}")

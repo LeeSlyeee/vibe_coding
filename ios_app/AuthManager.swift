@@ -25,19 +25,44 @@ class AuthManager: ObservableObject {
         }
     }
     
-    @Published var username: String? = nil {
-        didSet {
             UserDefaults.standard.set(username, forKey: "authUsername")
+        }
+    }
+    
+    @Published var birthDate: String? = nil {
+        didSet {
+            UserDefaults.standard.set(birthDate, forKey: "userBirthDate")
         }
     }
     
     init() {
         self.token = UserDefaults.standard.string(forKey: "authToken")
         self.username = UserDefaults.standard.string(forKey: "authUsername")
+        self.birthDate = UserDefaults.standard.string(forKey: "userBirthDate")
         self.isAuthenticated = self.token != nil
         self.riskLevel = UserDefaults.standard.integer(forKey: "userRiskLevel")
         self.isPremium = UserDefaults.standard.bool(forKey: "userIsPremium")
         if self.riskLevel == 0 { self.riskLevel = 1 } // Default to 1
+        
+        // [Fix] Purge Legacy Random Users on Launch
+        if let currentName = self.username, currentName.hasPrefix("user_") {
+            print("⚠️ [Auth] Legacy Random User Detected (\(currentName)). Forcing Logout.")
+            self.logout()
+            // Also notify APIService to clear its cache
+            UserDefaults.standard.removeObject(forKey: "app_username")
+        }
+    }
+    
+    // [New] Update Birth Date
+    func updateBirthDate(_ dateStr: String, completion: @escaping (Bool) -> Void) {
+        APIService.shared.updateProfile(nickname: nil, birthDate: dateStr) { success in
+            if success {
+                DispatchQueue.main.async {
+                    self.birthDate = dateStr
+                }
+            }
+            completion(success)
+        }
     }
     
     // 단순 토큰 설정 (기존)

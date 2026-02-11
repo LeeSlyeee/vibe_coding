@@ -24,32 +24,12 @@ struct MindDiaryApp: App {
             .ignoresSafeArea() // [Fix] 전체 화면 꽉 차게 (스플래시 상하 여백 제거)
             .preferredColorScheme(.light) // Force Light Mode
             .onAppear {
-                // 1. 모델 로딩 시작 (Background)
-                Task(priority: .userInitiated) {
-                    print("🚀 [App Start] Loading AI Model...")
-                    await LLMService.shared.loadModel()
-                }
-                
-                // [Self-Healing] 앱 시작 시 자동으로 서버 데이터 동기화 (Data Recovery)
-                if B2GManager.shared.isLinked {
-                    print("🔄 [App Start] Auto-Syncing with Server (Self-Healing)...")
-                    // force: false -> Smart Sync (Fetch & Merge)
-                    B2GManager.shared.syncData(force: false)
-                }
-                
-                // 2. 스플래시 화면 제어 (최소 2초 + 로딩 완료 대기)
+                // 2. 스플래시 화면 제어 (최소 2초)
                 Task {
                     // (A) 로고 감상을 위한 최소 대기 시간 (2초)
                     try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
                     
-                    // (B) 모델이 로드될 때까지 대기 (0.5초 간격 폴링)
-                    // LLMService의 isModelLoaded가 true가 될 때까지 기다림
-                    while !LLMService.shared.isModelLoaded {
-                        print("⏳ Waiting for AI Model to load...")
-                        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5s check
-                    }
-                    
-                    print("✅ AI Model Loaded! Dismissing Splash.")
+                    print("✅ Splash Time Completed. Dismising Splash.")
                     
                     // (C) 메인 화면 전환
                     await MainActor.run {

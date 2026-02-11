@@ -7,6 +7,20 @@ struct AppMainTabView: View {
     @State private var showAssessment = false
     @State private var selection = 0
     @State private var isTabBarHidden = false // [New] TabBar Visibility Control
+    @State private var showToast = false // [New] AI Loaded Toast
+    @State private var showBirthdayToast = false // [New] Birthday Toast State (Me)
+    @State private var showFriendBirthdayToast = false // [New] Friend Birthday Toast (Others)
+    
+    // [New] Friends List with D-Day
+    // struct because Tuple is not Equatable for @State strictly without wrappers, 
+    // but array of tuples is okay for simple assignment. 
+    // Or better, let's use a simple struct for state.
+    struct BirthdayInfo: Identifiable {
+        let id = UUID()
+        let name: String
+        let dDay: Int
+    }
+    @State private var upcomingBirthdays: [BirthdayInfo] = []
     
     var body: some View {
         if !authManager.isAuthenticated {
@@ -49,6 +63,150 @@ struct AppMainTabView: View {
                     }
                     .transition(.move(edge: .bottom)) // Smooth transition
                 }
+                
+                // [New] AI Loaded Toast (Floating above TabBar)
+                if showToast {
+                    VStack {
+                        Spacer()
+                        HStack(spacing: 8) {
+                            Image(systemName: "cpu.fill")
+                            Text("AI가 준비되었습니다!")
+                        }
+                        .font(.caption)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(Color.black.opacity(0.7))
+                        .foregroundColor(.white)
+                        .cornerRadius(20)
+                        .shadow(radius: 5)
+                        .padding(.bottom, isTabBarHidden ? 40 : 100) // Adjust position
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .zIndex(100) // Always on top
+                }
+                
+                // [New] Birthday Toast (More Fancy)
+                if showBirthdayToast {
+                     ZStack {
+                         Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
+                         
+                         VStack(spacing: 20) {
+                             Text("🎂")
+                                 .font(.system(size: 80))
+                                 .padding(.bottom, -10)
+                             
+                             Text("생일 축하해!!")
+                                 .font(.largeTitle)
+                                 .fontWeight(.heavy)
+                                 .foregroundColor(.pink)
+                             
+                             Text("오늘 하루 세상에서 가장 행복한 사람이 되길 바랄게! 🎉")
+                                 .font(.body)
+                                 .fontWeight(.bold)
+                                 .foregroundColor(.white)
+                                 .multilineTextAlignment(.center)
+                                 .padding(.horizontal)
+                             
+                             Button(action: {
+                                 withAnimation { showBirthdayToast = false }
+                             }) {
+                                 Text("고마워! 😍")
+                                     .fontWeight(.bold)
+                                     .padding(.horizontal, 30)
+                                     .padding(.vertical, 12)
+                                     .background(Color.white)
+                                     .foregroundColor(.pink)
+                                     .cornerRadius(20)
+                             }
+                         }
+                         .padding(40)
+                         .background(
+                            RoundedRectangle(cornerRadius: 25)
+                                .fill(LinearGradient(gradient: Gradient(colors: [Color.purple, Color.blue]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .shadow(radius: 20)
+                         )
+                         .padding(30)
+                     }
+                     .zIndex(200) // Top Priority
+                     .transition(.scale)
+                }
+                
+                // [New] Friend Birthday Toast (Different Style)
+                if showFriendBirthdayToast && !upcomingBirthdays.isEmpty {
+                     ZStack {
+                         Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
+                         
+                         VStack(spacing: 15) {
+                             Text("🎉")
+                                 .font(.system(size: 60))
+                                 .padding(.bottom, -5)
+                             
+                             Text("챙겨주실 생일이 있어요!")
+                                 .font(.title2)
+                                 .fontWeight(.bold)
+                                 .foregroundColor(.white)
+                             
+                             // List of Birthdays
+                             VStack(spacing: 8) {
+                                 ForEach(upcomingBirthdays) { info in
+                                     HStack {
+                                         Text(info.name)
+                                             .font(.title3)
+                                             .fontWeight(.bold)
+                                             .foregroundColor(.yellow)
+                                         
+                                         if info.dDay == 0 {
+                                             Text("오늘 생일! 🎂")
+                                                 .font(.headline)
+                                                 .fontWeight(.heavy)
+                                                 .foregroundColor(.white)
+                                                 .padding(.horizontal, 8)
+                                                 .padding(.vertical, 4)
+                                                 .background(Color.red)
+                                                 .cornerRadius(10)
+                                         } else {
+                                             Text("D-\(info.dDay)")
+                                                 .font(.headline)
+                                                 .fontWeight(.bold)
+                                                 .foregroundColor(.white)
+                                                 .padding(.horizontal, 8)
+                                                 .padding(.vertical, 4)
+                                                 .background(Color.blue.opacity(0.8))
+                                                 .cornerRadius(10)
+                                         }
+                                     }
+                                 }
+                             }
+                             .padding(.vertical, 5)
+                             
+                             Text("따뜻한 축하 메시지 준비해볼까요?")
+                                 .font(.body)
+                                 .foregroundColor(.white.opacity(0.9))
+                                 .multilineTextAlignment(.center)
+                             
+                             Button(action: {
+                                 withAnimation { showFriendBirthdayToast = false }
+                             }) {
+                                 Text("확인했어요! 💌")
+                                     .fontWeight(.bold)
+                                     .padding(.horizontal, 24)
+                                     .padding(.vertical, 10)
+                                     .background(Color.white)
+                                     .foregroundColor(.orange)
+                                     .cornerRadius(15)
+                             }
+                         }
+                         .padding(30)
+                         .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(LinearGradient(gradient: Gradient(colors: [Color.orange, Color.pink]), startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .shadow(radius: 15)
+                         )
+                         .padding(40)
+                     }
+                     .zIndex(190) // Slightly lower than My Birthday
+                     .transition(.scale)
+                }
             }
             .edgesIgnoringSafeArea(.bottom)
             #if os(iOS)
@@ -73,6 +231,37 @@ struct AppMainTabView: View {
                 
                 if authManager.isAuthenticated {
                     LocalDataManager.shared.syncWithServer()
+                    
+                    // [New] Sync Friends & Check Birthdays
+                    DispatchQueue.global().async {
+                        let sm = ShareManager.shared
+                        // Refresh both lists first
+                        let group = DispatchGroup()
+                        
+                        group.enter()
+                        sm.fetchList(role: "viewer") // My Patients (Sharers)
+                        // fetchList is async but logic inside updates @Published on main. 
+                        // Wait slightly or just assume next launch picks it up. 
+                        // Actually, let's wait a bit or use completion handler if modified. 
+                        // Since fetchList doesn't yield completion here easily without modification,
+                        // We will just do a delayed check on Main thread.
+                        group.leave()
+                        
+                        sm.fetchList(role: "sharer") // My Guardians (Viewers)
+                        group.leave()
+                        
+                        // Check after a delay to allow fetch to complete
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            let friends = sm.checkFriendBirthdays()
+                            // Map Tuple to Struct
+                            let infos = friends.map { BirthdayInfo(name: $0.name, dDay: $0.dDay) }
+                            
+                            if !infos.isEmpty {
+                                self.upcomingBirthdays = infos
+                                withAnimation { self.showFriendBirthdayToast = true }
+                            }
+                        }
+                    }
                 }
                 
                 // Tab Switching Observer
@@ -87,6 +276,43 @@ struct AppMainTabView: View {
                 
                 NotificationCenter.default.addObserver(forName: NSNotification.Name("ShowTabBar"), object: nil, queue: .main) { _ in
                     withAnimation { self.isTabBarHidden = false }
+                }
+                
+                // [New] Safe Loading (10s Delay)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                    print("🚀 [SmartLoad] App stabilized (10s). Pre-loading Local LLM...")
+                    Task {
+                        await LLMService.shared.loadModel()
+                    }
+                }
+                
+                // [New] Toast Trigger
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("AIModelLoaded"), object: nil, queue: .main) { _ in
+                    withAnimation { self.showToast = true }
+                    // Auto Hide after 3s
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation { self.showToast = false }
+                }
+                
+                // [New] Birthday Check
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    if let bString = authManager.birthDate {
+                        let f = DateFormatter()
+                        f.dateFormat = "yyyy-MM-dd"
+                        if let date = f.date(from: bString) {
+                            let cal = Calendar.current
+                            let today = Date()
+                            
+                            let tM = cal.component(.month, from: today)
+                            let tD = cal.component(.day, from: today)
+                            let bM = cal.component(.month, from: date)
+                            let bD = cal.component(.day, from: date)
+                            
+                            if tM == bM && tD == bD {
+                                withAnimation { self.showBirthdayToast = true }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -11,7 +11,8 @@ struct AppDiaryDetailView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     
-    let baseURL = "http://150.230.7.76"
+    // [Target Fix] Updated to 217 Server
+    let baseURL = "https://217.142.253.35.nip.io/api"
     
     var body: some View {
         ScrollView {

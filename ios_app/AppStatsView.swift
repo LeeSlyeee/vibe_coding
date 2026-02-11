@@ -33,7 +33,8 @@ struct AppStatsView: View {
     // [New] Settings Modal State
     @State private var showSettings = false
     
-    let baseURL = "http://150.230.7.76"
+    // [Target Fix] Updated to 217 Server
+    let baseURL = "https://217.142.253.35.nip.io/api"
     
     let tabs = [
         ("flow", "흐름"),
@@ -192,19 +193,24 @@ struct AppStatsView: View {
         } // End of Else (Full Features)
     }
     .onAppear {
-            // 연동 상태라면 데이터 로딩 (위험도 상관없음)
-            if b2gManager.isLinked {
-                fetchStats()
-                fetchExistingReports()
-            }
+        // [Fix] 연동 여부와 상관없이 일단 로컬 데이터 계산 (잠금 화면 뒤에서도 준비)
+        fetchStats()
+        if b2gManager.isLinked {
+            fetchExistingReports()
         }
-        // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
-        .onChangeCompat(of: b2gManager.isLinked) { linked in
-            if linked {
-                fetchStats()
-                fetchExistingReports()
-            }
+    }
+    .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
+        // [UX] 데이터 갱신 알림 수신 시 재계산
+        print("🔄 [Stats] Refreshing stats due to data change...")
+        fetchStats()
+    }
+    // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
+    .onChangeCompat(of: b2gManager.isLinked) { linked in
+        if linked {
+            fetchStats()
+            fetchExistingReports()
         }
+    }
         .alert(isPresented: $showingResultAlert) {
             Alert(title: Text("알림"), message: Text(connectMessage), dismissButton: .default(Text("확인")))
         }

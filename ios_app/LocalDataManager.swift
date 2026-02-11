@@ -64,19 +64,23 @@ class LocalDataManager: ObservableObject {
     }
     
     // [New] Auto-Recovery for Diaries stuck in "Re-analyzing..." state (Crash Recovery)
+    // [Auto-Recovery]
+    // [Fix] Smart Recovery: Reset status first to unblock UI, then Lazy Load Model.
     private func recoverStuckAnalysis() {
         let stuckDiaries = self.diaries.filter { $0.ai_prediction == "재분석 중..." }
         
         if !stuckDiaries.isEmpty {
-            print("🚑 [Recovery] Found \(stuckDiaries.count) diaries stuck in analysis. Restarting queue slowly...")
+            print("🚑 [Recovery] Found \(stuckDiaries.count) diaries stuck. Resetting status & Scheduling Safe Retry.")
             
-            // [Throttle] Enqueue one by one with 10s delay to prevent OOM loop
-            for (index, diary) in stuckDiaries.enumerated() {
-                let delay = Double(index) * 10.0 + 3.0 // Start after 3s, then every 10s
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                    print("🚑 [Recovery] Re-queueing stuck diary: \(diary.date ?? "")")
-                    _ = LLMService.shared.tryEnqueueDiaryAnalysis(diary)
+            // 1. UI Unblocking (Immediate)
+            DispatchQueue.main.async {
+                for (index, _) in self.diaries.enumerated() {
+                    if self.diaries[index].ai_prediction == "재분석 중..." {
+                        self.diaries[index].ai_prediction = nil 
+                        self.diaries[index].ai_analysis = nil 
+                    }
                 }
+                self.saveToDisk()
             }
         }
     }

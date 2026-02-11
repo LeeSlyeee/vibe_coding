@@ -3,7 +3,15 @@
     <header class="page-header">
       <button class="back-btn" @click="$router.go(-1)">‹</button>
       <div v-if="stats" class="header-info">
-        <h2>{{ stats.user_name }}님의 마음</h2>
+        <div class="name-row">
+            <h2>{{ stats.user_name }}님의 마음</h2>
+            <span 
+                v-if="getBirthdayBadge(stats.birth_date)" 
+                :class="['badge', getBirthdayBadge(stats.birth_date).class]"
+            >
+                {{ getBirthdayBadge(stats.birth_date).text }}
+            </span>
+        </div>
         <span class="sync-time" v-if="stats.last_sync">
             마지막 업데이트: {{ formatDate(stats.last_sync) }}
         </span>
@@ -171,13 +179,59 @@ export default {
         fetchData();
     });
 
+    const getBirthdayBadge = (birthDateStr) => {
+        if (!birthDateStr) return null;
+        
+        // [Safety Fix 1] Safari Compatibility: Replace '-' with '/'
+        // iOS Safari may return NaN for 'YYYY-MM-DD', prefers 'YYYY/MM/DD'
+        const safeDateStr = birthDateStr.replace(/-/g, '/');
+        const birthDate = new Date(safeDateStr);
+        
+        if (isNaN(birthDate.getTime())) return null;
+
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        
+        // [Safety Fix 3] Timezone Robustness: Compare Year/Month/Day manually
+        // Instead of relying on timestamps which vary by timezone, use local date components
+        const bMonth = birthDate.getMonth();
+        const bDay = birthDate.getDate();
+        
+        const thisYearBirthday = new Date(currentYear, bMonth, bDay);
+        
+        // Reset times for accurate day diff (00:00:00)
+        today.setHours(0, 0, 0, 0);
+        thisYearBirthday.setHours(0, 0, 0, 0);
+        
+        // Calculate difference in milliseconds
+        const diffTime = thisYearBirthday - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) {
+            return { text: '오늘 생일! 🎂', class: 'badge-today' };
+        } else if (diffDays > 0 && diffDays <= 7) {
+            return { text: `D-${diffDays}`, class: 'badge-upcoming' };
+        } else if (diffDays < 0) {
+            // Check next year for edge cases (e.g. late Dec vs early Jan)
+            const nextYearBirthday = new Date(currentYear + 1, bMonth, bDay);
+            const nextDiffTime = nextYearBirthday - today;
+            const nextDiffDays = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));
+             if (nextDiffDays > 0 && nextDiffDays <= 7) {
+                return { text: `D-${nextDiffDays}`, class: 'badge-upcoming' };
+            }
+        }
+        
+        return null; // Not upcoming
+    };
+
     return {
         stats,
         isLoading,
         chartData,
         chartOptions,
         formatDate,
-        formattedReport
+        formattedReport,
+        getBirthdayBadge
     };
   }
 };
@@ -216,6 +270,36 @@ export default {
 .header-info {
     display: flex;
     flex-direction: column;
+}
+
+.name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.badge {
+    font-size: 13px;
+    padding: 3px 8px;
+    border-radius: 8px;
+    font-weight: 700;
+    color: white;
+    vertical-align: middle;
+}
+
+.badge-today {
+    background-color: #ff3b30; /* Red */
+    animation: pulse 2s infinite;
+}
+
+.badge-upcoming {
+    background-color: #0071e3; /* Blue */
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 
 .header-info h2 {

@@ -29,7 +29,8 @@ struct AppChatView: View {
     @FocusState private var isInputFocused: Bool
     
     // Server Configuration
-    let baseURL = "http://150.230.7.76"
+    // [Target Fix] Updated to 217 Server
+    let baseURL = "https://217.142.253.35.nip.io/api"
     
     var body: some View {
         ZStack {
@@ -537,7 +538,8 @@ struct ChatReportView: View {
     @State private var reportData: ChatSummary?
     @State private var isLoading = true
     
-    let baseURL = "http://150.230.7.76"
+    // [Target Fix] Updated to 217 Server
+    let baseURL = "https://217.142.253.35.nip.io/api"
     
     var body: some View {
         NavigationView {

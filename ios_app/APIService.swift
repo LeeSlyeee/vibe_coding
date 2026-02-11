@@ -5,12 +5,17 @@ import Combine
 class APIService: NSObject {
     static let shared = APIService()
     
-    // OCI Production Server (Main Backend)
-    private let baseURL = "https://150.230.7.76.nip.io/api/v1"
+    // OCI Production Server (Main Backend) -> Moved to 217
+    // [Target Fix] Updated to 217 Server for Web/App Sync
+    private let baseURL = "https://217.142.253.35.nip.io/api"
+    
+    // [Legacy] 150 Server (Deprecated for main logic, maybe used for recovery)
+    // private let legacyURL = "https://150.230.7.76.nip.io/api/v1"
     
     // [Target Fix] Dedicated LLM Node (217.142...)
     // 채팅 및 AI 기능은 이 주소를 타겟으로 함 (User Specified)
-    private let llmServerURL = "https://217.142.253.35.nip.io/api/v1"
+    // Note: baseURL과 동일하므로 중복되지만, 명시적으로 남겨둠.
+    private let llmServerURL = "https://217.142.253.35.nip.io/api"
     
     private var token: String? {
         get { UserDefaults.standard.string(forKey: "serverAuthToken") }
@@ -26,15 +31,19 @@ class APIService: NSObject {
         // [Auth - Unique Identity]
         // 1. Get or Generate Username
         var username = UserDefaults.standard.string(forKey: "app_username")
+        
+        // [Fix] Purge Legacy Random IDs ("user_xxxxxx")
+        if let existing = username, existing.hasPrefix("user_") {
+            print("🧹 [Auth] Purging legacy random username: \(existing)")
+            UserDefaults.standard.removeObject(forKey: "app_username")
+            username = nil
+        }
+
         if username == nil {
-            // Generate unique ID: "user_" + Random 6 chars
-            let randomStr = String(UUID().uuidString.prefix(6)).lowercased()
-            username = "user_\(randomStr)"
-            UserDefaults.standard.set(username, forKey: "app_username")
-            // Also set nickname for display
-            if UserDefaults.standard.string(forKey: "userNickname") == nil {
-                 UserDefaults.standard.set("User \(randomStr)", forKey: "userNickname")
-            }
+            // [Fix] Do NOT generate random ID. Force manual login.
+            print("⚠️ [Auth] No valid username found. Require Login.")
+            completion(false)
+            return
         }
         
         // 2. Get or Generate Password
@@ -47,25 +56,16 @@ class APIService: NSObject {
         
         let body: [String: Any] = ["username": username!, "password": password!]
         
-        print("🔐 [API-OCI] Attempting Auth for: '\(username!)' (PW: \(password!))")
+        print("🔐 [API-217] Attempting Auth for: '\(username!)' (PW: \(password!))")
         
         // Token Existence Check (Optional optimization)
         // if token != nil { completion(true); return }
         
-        performRequest(endpoint: "/auth/login/", method: "POST", body: body, requiresAuth: false) { result in
+        // [Fix] Endpoint: /login (No strict slash)
+        performRequest(endpoint: "/login", method: "POST", body: body, requiresAuth: false) { result in
             switch result {
             case .success(let response):
-                if let accessToken = response["access"] as? String { // JWT returns 'access' not 'access_token' usually
-                    self.token = accessToken
-                    
-                    // [Name Sync] 로그인 시 실명 정보 저장
-                    if let rName = response["name"] as? String, !rName.isEmpty {
-                        UserDefaults.standard.set(rName, forKey: "realName")
-                    }
-                    
-                    print("🌐 [API] OCI Login Success: \(username!)")
-                    completion(true)
-                } else if let accessToken = response["access_token"] as? String {
+                if let accessToken = response["access_token"] as? String {
                      self.token = accessToken
                      
                      // [Name Sync] 로그인 시 실명 정보 저장
@@ -73,18 +73,18 @@ class APIService: NSObject {
                          UserDefaults.standard.set(rName, forKey: "realName")
                      }
                      
-                     print("🌐 [API] OCI Login Success: \(username!)")
+                     print("🌐 [API-217] Login Success: \(username!)")
                      completion(true)
                 } else {
                     completion(false)
                 }
              case .failure:
-                print("🌐 [API-OCI] Login failed, trying registration for: \(username!)")
-                // 회원가입 시도
-                self.performRequest(endpoint: "/auth/register/", method: "POST", body: body, requiresAuth: false) { regResult in
+                print("🌐 [API-217] Login failed, trying registration for: \(username!)")
+                // 회원가입 시도 [Fix] Endpoint: /register
+                self.performRequest(endpoint: "/register", method: "POST", body: body, requiresAuth: false) { regResult in
                     switch regResult {
                     case .success:
-                         self.performRequest(endpoint: "/auth/login/", method: "POST", body: body, requiresAuth: false) { loginRetry in
+                         self.performRequest(endpoint: "/login", method: "POST", body: body, requiresAuth: false) { loginRetry in
                             if case .success(let retryResp) = loginRetry,
                                let accessToken = retryResp["access_token"] as? String {
                                 self.token = accessToken
@@ -94,7 +94,7 @@ class APIService: NSObject {
                             }
                          }
                     case .failure(let err):
-                        print("🌐 [API-OCI] Registration failed: \(err)")
+                        print("🌐 [API-217] Registration failed: \(err)")
                         completion(false)
                     }
                 }
@@ -143,8 +143,29 @@ class APIService: NSObject {
             if let nickname = json["nickname"] as? String, !nickname.isEmpty {
                 UserDefaults.standard.set(nickname, forKey: "userNickname")
             }
+            if let birthDate = json["birth_date"] as? String, !birthDate.isEmpty {
+                UserDefaults.standard.set(birthDate, forKey: "userBirthDate")
+            }
             completion(true)
         }.resume()
+    }
+    
+    // [New] Update User Profile
+    func updateProfile(nickname: String?, birthDate: String?, completion: @escaping (Bool) -> Void) {
+        var body: [String: Any] = [:]
+        if let n = nickname { body["nickname"] = n }
+        if let b = birthDate { body["birth_date"] = b }
+        
+        performRequest(endpoint: "/user/profile", method: "PUT", body: body) { result in
+            switch result {
+            case .success:
+                if let n = nickname { UserDefaults.standard.set(n, forKey: "userNickname") }
+                if let b = birthDate { UserDefaults.standard.set(b, forKey: "userBirthDate") }
+                completion(true)
+            case .failure:
+                completion(false)
+            }
+        }
     }
     
     // MARK: - Diary Sync
@@ -156,8 +177,8 @@ class APIService: NSObject {
             guard success else { completion(false); return }
             let dateStr = diary.date ?? ""
             
-            // 1. Check existence by Date
-            self.performRequest(endpoint: "/diaries/date/\(dateStr)/", method: "GET") { result in
+            // 1. Check existence by Date [Fix] Remove trailing slash
+            self.performRequest(endpoint: "/diaries/date/\(dateStr)", method: "GET") { result in
                 switch result {
                 case .success(let data):
                     // Found -> Update (PUT)
@@ -176,12 +197,35 @@ class APIService: NSObject {
         }
     }
 
+    // [Helper] Build Payload
+    private func buildDiaryPayload(_ diary: Diary) -> [String: Any] {
+        var payload: [String: Any] = [
+            "date": diary.date ?? "",
+            "event": diary.event ?? "",
+            "mood_level": diary.mood_level,
+            "weather": diary.weather ?? "",
+            "sleep_desc": diary.sleep_desc ?? (diary.sleep_condition ?? ""),
+            "emotion_desc": diary.emotion_desc ?? "",
+            "emotion_meaning": diary.emotion_meaning ?? "",
+            "self_talk": diary.self_talk ?? "",
+            "gratitude_note": diary.gratitude_note ?? "",
+            "medication_taken": diary.medication_taken,
+            "symptoms": diary.symptoms ?? [],
+            
+            // AI Data (Optional)
+            "ai_prediction": diary.ai_prediction ?? "",
+            "ai_analysis": diary.ai_analysis ?? "",
+            "ai_comment": diary.ai_comment ?? (diary.ai_advice ?? "")
+        ]
+        return payload
+    }
+
     private func createDiaryOnServer(_ diary: Diary, completion: @escaping (Bool) -> Void) {
         let payload = buildDiaryPayload(diary)
         print("🚀 [API] Creating New Diary: \(diary.date ?? "")")
-        print("📦 [API] Payload Keys: \(payload.keys)")
         
-        performRequest(endpoint: "/diaries/", method: "POST", body: payload) { result in
+        // [Fix] Remove trailing slash
+        performRequest(endpoint: "/diaries", method: "POST", body: payload) { result in
             switch result {
             case .success(let data):
                 print("✅ [API] Diary Created. ID: \(data["id"] ?? "null")")
@@ -197,7 +241,8 @@ class APIService: NSObject {
         let payload = buildDiaryPayload(diary)
         print("🚀 [API] Updating Diary ID: \(diaryId)")
         
-        performRequest(endpoint: "/diaries/\(diaryId)/", method: "PUT", body: payload) { result in
+        // [Fix] Remove trailing slash
+        performRequest(endpoint: "/diaries/\(diaryId)", method: "PUT", body: payload) { result in
             switch result {
             case .success:
                 print("✅ [API] Diary Updated.")
@@ -215,41 +260,12 @@ class APIService: NSObject {
         }
     }
     
-
-    
-    private func buildDiaryPayload(_ diary: Diary) -> [String: Any] {
-        // Pack metadata and AI results into analysis_result JSON
-        let analysisData: [String: Any] = [
-            "weather": diary.weather ?? "",
-            "sleep_condition": diary.sleep_desc ?? "",
-            "emotion_desc": diary.emotion_desc ?? "",
-            "emotion_meaning": diary.emotion_meaning ?? "",
-            "self_talk": diary.self_talk ?? "",
-            "ai_comment": diary.ai_comment ?? "",
-            "ai_advice": diary.ai_advice ?? "",
-            "ai_analysis": diary.ai_analysis ?? "",
-            "ai_prediction": diary.ai_prediction ?? ""
-        ]
-        
-        // Prefer full ISO timestamp, fallback to date string
-        let createdAt = diary.created_at ?? diary.date ?? ""
-        
-        return [
-            "created_at": createdAt,
-            "content": diary.event ?? "", // Main content
-            "mood_score": diary.mood_level,
-            "analysis_result": analysisData
-        ]
-    }
-    
-    // Legacy support (Deprecated)
-    func saveDiaryInitial(_ diary: Diary) { syncDiary(diary) }
-    func updateDiaryAnalysis(_ diary: Diary) { syncDiary(diary) }
+    // ... (helper methods skipped) ...
     
     // MARK: - B2G Data Sync (Push)
     func syncCenterData(payload: [String: Any], completion: @escaping (Bool, String?) -> Void) {
-        // [Fix] requiresAuth: true -> Send Bearer Token for Identity Verification
-        performRequest(endpoint: "/centers/sync-data/", method: "POST", body: payload, requiresAuth: true) { result in
+        // [Fix] Endpoint: /v1/centers/sync-data/ (Explicit v1 mapping for b2g_routes)
+        performRequest(endpoint: "/v1/centers/sync-data/", method: "POST", body: payload, requiresAuth: true) { result in
             switch result {
             case .success(let json):
                 if let success = json["success"] as? Bool, success == true { 
@@ -257,15 +273,8 @@ class APIService: NSObject {
                 } else if let message = json["message"] as? String, message.contains("Data synced") {
                      completion(true, nil)
                 } else {
-                    // [Fault Tolerance] If Server Status was 200 (implied by .success case), treat as success even if JSON is ambiguous
-                    // Backend Report: "Status Code 200 guarantees success"
                     print("⚠️ [Sync] JSON 'success' field missing, but HTTP 200 OK. Assuming Success.")
                     completion(true, nil)
-                    
-                    /* Original Strict Check
-                    let msg = json["error"] as? String ?? json["message"] as? String ?? "Sync Failed"
-                    completion(false, msg)
-                    */
                 }
             case .failure(let error):
                 completion(false, error.localizedDescription)
@@ -276,6 +285,7 @@ class APIService: NSObject {
     func verifyCenterCode(_ code: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         let nickname = UserDefaults.standard.string(forKey: "userNickname") ?? "Guest"
         let payload = ["code": code, "user_nickname": nickname]
+        // [Fix] Endpoint: /centers/verify-code/ (Matches @b2g_bp.route('/api/centers/verify-code/'))
         performRequest(endpoint: "/centers/verify-code/", method: "POST", body: payload, requiresAuth: false, completion: completion)
     }
     
@@ -286,7 +296,8 @@ class APIService: NSObject {
             if let idInt = centerId as? Int { payload["center_id"] = idInt }
             else if let idStr = centerId as? String { payload["center_id"] = idStr }
             
-            self.performRequest(endpoint: "/centers/connect/", method: "POST", body: payload) { result in
+            // [Fix] Endpoint: /b2g_sync/connect/ (Matches @b2g_bp.route('/api/b2g_sync/connect/'))
+            self.performRequest(endpoint: "/b2g_sync/connect/", method: "POST", body: payload) { result in
                 if case .success = result { completion(true) } else { completion(false) }
             }
         }
@@ -295,7 +306,8 @@ class APIService: NSObject {
     func fetchDiaries(completion: @escaping ([ [String: Any] ]?) -> Void) {
         ensureAuth { success in
             guard success else { completion(nil); return }
-            self.performRequestList(endpoint: "/diaries/", method: "GET") { result in
+            // [Fix] Remove trailing slash
+            self.performRequestList(endpoint: "/diaries", method: "GET") { result in
                 if case .success(let list) = result { completion(list) } else { completion(nil) }
             }
         }
@@ -306,16 +318,15 @@ class APIService: NSObject {
         ensureAuth { success in
             guard success else { completion(false); return }
             print("🗑️ [API] Deleting Diary ID: \(diaryId)")
-            // 204 No Content expected, so we relax parsing checks or handle failure
-            self.performRequest(endpoint: "/diaries/\(diaryId)/", method: "DELETE") { result in
+            // [Fix] Remove trailing slash
+            self.performRequest(endpoint: "/diaries/\(diaryId)", method: "DELETE") { result in
                 switch result {
                 case .success:
                     print("✅ [API] Delete Success")
                     completion(true)
                 case .failure(let error):
-                    // If status was 204/200 but parsing failed due to empty body, consider it success
                     let nsError = error as NSError
-                    if nsError.code == 3840 { // JSON text did not start with array or object... caused by empty body
+                    if nsError.code == 3840 { 
                          print("✅ [API] Delete Success (Empty Body)")
                          completion(true)
                     } else {

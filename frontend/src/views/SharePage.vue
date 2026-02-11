@@ -50,7 +50,15 @@
           <ul v-else class="user-list">
             <li v-for="user in connectedList" :key="user.sharer_id" @click="goToStats(user.sharer_id)">
               <div class="user-info">
-                <span class="user-name">{{ user.name }}</span>
+                <div class="name-row">
+                    <span class="user-name">{{ user.name }}</span>
+                    <span 
+                        v-if="getBirthdayBadge(user.birth_date)" 
+                        :class="['badge', getBirthdayBadge(user.birth_date).class]"
+                    >
+                        {{ getBirthdayBadge(user.birth_date).text }}
+                    </span>
+                </div>
                 <span class="date">{{ formatDate(user.connected_at) }} 연결됨</span>
               </div>
               <span class="arrow">›</span>
@@ -183,6 +191,43 @@ export default {
         router.push(`/share/stats/${id}`);
     };
 
+    const getBirthdayBadge = (birthDateStr) => {
+        if (!birthDateStr) return null;
+        
+        const today = new Date();
+        const birthDate = new Date(birthDateStr);
+        if (isNaN(birthDate.getTime())) return null;
+
+        const currentYear = today.getFullYear();
+        
+        // Create this year's birthday date object
+        const thisYearBirthday = new Date(currentYear, birthDate.getMonth(), birthDate.getDate());
+        
+        // Reset times for accurate day diff
+        today.setHours(0, 0, 0, 0);
+        thisYearBirthday.setHours(0, 0, 0, 0);
+        
+        // Calculate difference in milliseconds
+        const diffTime = thisYearBirthday - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 0) {
+            return { text: '오늘 생일! 🎂', class: 'badge-today' };
+        } else if (diffDays > 0 && diffDays <= 7) {
+            return { text: `D-${diffDays}`, class: 'badge-upcoming' };
+        } else if (diffDays < 0) {
+            // Check next year for edge cases (e.g. late Dec vs early Jan)
+            const nextYearBirthday = new Date(currentYear + 1, birthDate.getMonth(), birthDate.getDate());
+            const nextDiffTime = nextYearBirthday - today;
+            const nextDiffDays = Math.ceil(nextDiffTime / (1000 * 60 * 60 * 24));
+             if (nextDiffDays > 0 && nextDiffDays <= 7) {
+                return { text: `D-${nextDiffDays}`, class: 'badge-upcoming' };
+            }
+        }
+        
+        return null; // Not upcoming
+    };
+
     onMounted(() => {
         fetchList();
     });
@@ -199,7 +244,8 @@ export default {
         formatTime,
         connectWithCode,
         generateCode,
-        goToStats
+        goToStats,
+        getBirthdayBadge
     };
   }
 };
@@ -402,11 +448,42 @@ h3 {
   margin: 0 0 8px 0;
   color: #f5a623;
   font-size: 15px;
+  font-weight: 600;
 }
 .info-box p {
   margin: 0;
   font-size: 13px;
   color: #5c4b2e;
   line-height: 1.5;
+}
+
+/* Badge Styles */
+.name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-weight: 700;
+    color: white;
+}
+
+.badge-today {
+    background-color: #ff3b30; /* Red */
+    animation: pulse 2s infinite;
+}
+
+.badge-upcoming {
+    background-color: #0071e3; /* Blue */
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
 }
 </style>
