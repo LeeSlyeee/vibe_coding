@@ -266,6 +266,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                 }
             }
         }
+    }
     // 6. Check Friend Birthdays
     // 6. Check Friend Birthdays (Today + Upcoming 7 Days)
     func checkFriendBirthdays() -> [(name: String, dDay: Int)] {

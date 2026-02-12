@@ -293,6 +293,7 @@ struct AppMainTabView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                         withAnimation { self.showToast = false }
                 }
+                }
                 
                 // [New] Birthday Check
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
@@ -567,6 +568,7 @@ struct GuideFeatureCard: View {
         try! AttributedString(markdown: text)
     }
 }
+
 
 struct GuideSmallFeatureCard: View {
     let title: String

@@ -25,6 +25,8 @@ class AuthManager: ObservableObject {
         }
     }
     
+    @Published var username: String? {
+        didSet {
             UserDefaults.standard.set(username, forKey: "authUsername")
         }
     }

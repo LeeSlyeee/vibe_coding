@@ -274,6 +274,7 @@ struct AppSettingsView: View {
                                         .background(Color.red.opacity(0.1))
                                         .cornerRadius(6)
                                 }
+                                .buttonStyle(BorderlessButtonStyle()) // [Fix] Touch Separation
                             }
                             
                             if b2gManager.lastSyncDate > 0 {
@@ -286,12 +287,16 @@ struct AppSettingsView: View {
                             VStack(spacing: 12) {
                                 // 1. Force Sync (Push)
                                 Button(action: {
+                                    // [Haptic & Action]
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                    
                                     b2gManager.syncData(force: true)
                                     activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)")
                                 }) {
                                     HStack {
                                         Image(systemName: "arrow.up.circle.fill")
-                                        .font(.system(size: 18))
+                                            .font(.system(size: 18))
                                         Text("데이터 강제 전송 (App → Server)")
                                             .fontWeight(.bold)
                                             .font(.system(size: 16))
@@ -303,16 +308,21 @@ struct AppSettingsView: View {
                                     .cornerRadius(12)
                                     .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
-                                
+                                .buttonStyle(BorderlessButtonStyle()) // [Fix] List 내부 버튼 간섭 방지
+
                                 // 2. Pull Data (Server -> App)
                                 Button(action: {
+                                    // [Haptic & Action]
+                                    let generator = UIImpactFeedbackGenerator(style: .medium)
+                                    generator.impactOccurred()
+                                    
                                     b2gManager.pullDataFromServer { success, msg in
                                         activeAlert = .info(msg)
                                     }
                                 }) {
                                     HStack {
                                         Image(systemName: "arrow.down.circle.fill")
-                                        .font(.system(size: 18))
+                                            .font(.system(size: 18))
                                         Text("서버 데이터 가져오기 (Server → App)")
                                             .fontWeight(.bold)
                                             .font(.system(size: 16))
@@ -324,6 +334,7 @@ struct AppSettingsView: View {
                                     .cornerRadius(12)
                                     .shadow(color: Color.green.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
+                                .buttonStyle(BorderlessButtonStyle()) // [Fix] List 내부 버튼 간섭 방지
                             }
                             .padding(.vertical, 8)
                             
@@ -549,6 +560,7 @@ struct AppSettingsView: View {
                                     .background(Color.orange)
                                     .cornerRadius(8)
                             }
+                            .buttonStyle(BorderlessButtonStyle()) // [Fix] Touch Separation
                         }
                     }
                     .padding(.vertical, 8)
