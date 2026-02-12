@@ -37,8 +37,8 @@ struct MoodCalendarView: View {
     // Write Modal State (Identifiable Item for Safe Presentation)
     @State private var writeTarget: WriteTargetDate?
     
-    // ✅ Base URL
-    let baseURL = "http://150.230.7.76"
+    // ✅ Base URL (Managed by APIService)
+    // let baseURL = "https://217.142.253.35.nip.io/api"
     
     let columns = Array(repeating: GridItem(.flexible()), count: 7)
     

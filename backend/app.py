@@ -387,7 +387,11 @@ def register():
 
     return jsonify({"message": "User registered successfully", "user_id": str(user_id)}), 201
 
+    return jsonify({"message": "User registered successfully", "user_id": str(user_id)}), 201
+
 @app.route('/api/login', methods=['POST'])
+@app.route('/api/v1/auth/login/', methods=['POST']) # [FIX] iOS Support
+@app.route('/api/auth/login/', methods=['POST'])
 def login():
     try:
         data = request.get_json()
@@ -561,22 +565,6 @@ def login():
         except Exception as rec_err:
              print(f"⚠️ [B2G Recovery] Error: {rec_err}")
 
-    # [B2G Sync Hook]
-    # 로그인 시 150 서버(Admin)에서 데이터 Pull (SECOND - After Recovery)
-    try:
-        from b2g_routes import pull_from_insight_mind, migrate_personal_diaries
-        import threading
-        
-        # 1. B2G Sync (Center Linked Data) - Run Sync first (fast check)
-        pull_from_insight_mind(str(user['_id']), run_async=False)
-        
-        # 2. Personal Migration (Direct Login) - For unlinked users (slyeee scenario)
-        # Run in background to avoid timeout
-        threading.Thread(target=migrate_personal_diaries, args=(str(user['_id']), username, password)).start()
-        print(f"🚀 [Migration] Triggered background sync for '{username}'")
-        
-    except Exception as e:
-        print(f"❌ [B2G Sync] Pull Trigger Error: {e}")
     
     # [Auto-Pass Assessment]
     # 연동된 유저는 심리검사 자동 패스
@@ -1748,6 +1736,7 @@ except Exception as e:
 
 # --- User Info Sync (Added for Share ID Fix) ---
 @app.route('/api/v1/auth/me', methods=['GET'])
+@app.route('/api/user/me', methods=['GET']) # [FIX] iOS Alias
 @jwt_required()
 def get_user_info():
     user_id = get_jwt_identity()

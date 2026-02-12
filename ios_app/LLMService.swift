@@ -74,7 +74,7 @@ class LLMService: ObservableObject {
         guard let url = URL(string: configServerURL) else { return false }
         
         do {
-            print("🌍 Fetching Config from 150 Server...")
+            print("🌍 Fetching Config from 217 Server...")
             let (data, response) = try await URLSession.shared.data(from: url)
             
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {

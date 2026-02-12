@@ -3,6 +3,7 @@ import SwiftUI
 
 struct AppMainTabView: View {
     @EnvironmentObject var authManager: AuthManager
+    @Environment(\.scenePhase) var scenePhase // [New] Detect App Background/Foreground
     @StateObject private var networkMonitor = NetworkMonitor()
     @State private var showAssessment = false
     @State private var selection = 0
@@ -236,19 +237,15 @@ struct AppMainTabView: View {
                     DispatchQueue.global().async {
                         let sm = ShareManager.shared
                         // Refresh both lists first
-                        let group = DispatchGroup()
                         
-                        group.enter()
                         sm.fetchList(role: "viewer") // My Patients (Sharers)
                         // fetchList is async but logic inside updates @Published on main. 
                         // Wait slightly or just assume next launch picks it up. 
                         // Actually, let's wait a bit or use completion handler if modified. 
                         // Since fetchList doesn't yield completion here easily without modification,
                         // We will just do a delayed check on Main thread.
-                        group.leave()
                         
                         sm.fetchList(role: "sharer") // My Guardians (Viewers)
-                        group.leave()
                         
                         // Check after a delay to allow fetch to complete
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
@@ -316,6 +313,38 @@ struct AppMainTabView: View {
                     }
                 }
             }
+            .onChange(of: scenePhase) { newPhase in
+                if newPhase == .active && authManager.isAuthenticated {
+                    print("📱 [App] Scene Active. Checking Auth Status...")
+                    
+                    // [Step 1] Verify Login Integrity First (Single Source of Truth)
+                    if let username = authManager.username, !username.isEmpty {
+                        
+                        // [Step 2] Valid Auth -> Proceed to Sync
+                        print("✅ [App] Auth Valid (User: \(username)). Triggering Sync.")
+                        LocalDataManager.shared.syncWithServer()
+                        
+                    } else {
+                        // [Step 1-Fail] Zombie State -> Recover First, Then Sync
+                        print("🚑 [App] Auth Incomplete (Zombie State). Recovering User Info...")
+                        
+                        APIService.shared.syncUserInfo { success in
+                            if success, let name = UserDefaults.standard.string(forKey: "userId") {
+                                DispatchQueue.main.async {
+                                    authManager.username = name
+                                    // No need to set "app_username" anymore
+                                    print("✅ [App] Recovery Success! User: \(name). Now Syncing...")
+                                    
+                                    // [Step 2-Delayed] Now it's safe to sync
+                                    LocalDataManager.shared.syncWithServer(force: true)
+                                }
+                            } else {
+                                print("❌ [App] Recovery Failed. Please Re-login.")
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -375,6 +404,12 @@ struct AppMainTabView: View {
     }
     
     func checkAssessmentStatus() {
+        // [Hotfix] Disable Automatic PHQ-9 Popup unconditionally based on user feedback.
+        // 사용자가 원할 때만 진단을 수행하도록 UX 변경 예정.
+        print("🛑 [App] Automatic Assessment disabled by User Request.")
+        return
+        
+        /*
         // 로그인된 상태에서만 진단 여부를 체크해야 함.
         guard authManager.isAuthenticated else { return }
         
@@ -385,16 +420,23 @@ struct AppMainTabView: View {
             return
         }
         
-        let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
-        if !hasDone {
-            // Give a small delay for smooth transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                // Double check before showing (in case changed rapidly)
-                if !B2GManager.shared.isLinked {
-                    showAssessment = true
-                }
+        // [Fix] PHQ-9 팝업 타이밍 조절 (앱 로딩 안정화 대기)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            // 1. Re-check B2G Link Status (Most Critical)
+            if B2GManager.shared.isLinked {
+                print("🏥 [App] B2G Check Passed (Late). Skipping Assessment.")
+                UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+                return
+            }
+            
+            // 2. Re-check Completion Status
+            let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
+            if !hasDone {
+                 print("📋 [App] Initial Assessment Required. Showing Sheet.")
+                 self.showAssessment = true
             }
         }
+        */
     }
     
     func callNumber(_ number: String) {

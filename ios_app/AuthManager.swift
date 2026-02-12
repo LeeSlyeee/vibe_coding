@@ -41,17 +41,29 @@ class AuthManager: ObservableObject {
         self.token = UserDefaults.standard.string(forKey: "authToken")
         self.username = UserDefaults.standard.string(forKey: "authUsername")
         self.birthDate = UserDefaults.standard.string(forKey: "userBirthDate")
+        
         self.isAuthenticated = self.token != nil
+        
         self.riskLevel = UserDefaults.standard.integer(forKey: "userRiskLevel")
         self.isPremium = UserDefaults.standard.bool(forKey: "userIsPremium")
         if self.riskLevel == 0 { self.riskLevel = 1 } // Default to 1
         
-        // [Fix] Purge Legacy Random Users on Launch
-        if let currentName = self.username, currentName.hasPrefix("user_") {
-            print("⚠️ [Auth] Legacy Random User Detected (\(currentName)). Forcing Logout.")
-            self.logout()
-            // Also notify APIService to clear its cache
-            UserDefaults.standard.removeObject(forKey: "app_username")
+        // [Standard Architecture] 
+        // Single Source of Truth: 'authUsername'. No more 'app_username'.
+        if isAuthenticated && (self.username == nil || self.username!.isEmpty) {
+            print("⚠️ [Auth] Login State Inconsistent: Authenticated but No Username. (Zombie State)")
+            // Trigger emergency fetch
+            Task {
+                print("🚑 [Auth] Attempting background user recovery...")
+                APIService.shared.syncUserInfo { success in
+                   if success, let recoveredName = UserDefaults.standard.string(forKey: "userId") {
+                       print("✅ [Auth] Recovered Username: \(recoveredName)")
+                       DispatchQueue.main.async {
+                           self.username = recoveredName // Updates 'authUsername' automatically
+                       }
+                   }
+                }
+            }
         }
     }
     
@@ -73,12 +85,10 @@ class AuthManager: ObservableObject {
     }
     
     // 실제 서버 로그인 API 호출
-    // 실제 서버 로그인 API 호출
-    // 실제 서버 로그인 API 호출
     // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
     func performLogin(username: String, password: String, name: String? = nil, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
-        // [Fix] Use HTTPS and Correct API V1 Endpoint
-        let baseUrl = "https://150.230.7.76.nip.io/api/v1" 
+        // [Fix] Use HTTPS and Correct API V1 Endpoint (217 Server)
+        let baseUrl = "https://217.142.253.35.nip.io/api/v1" 
         
         // 1. Attempt Login First
         let loginUrl = URL(string: "\(baseUrl)/auth/login/")!
@@ -197,6 +207,8 @@ class AuthManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.token = token
                     self.username = username
+                    // [Critical Fix] Ensure APIService can see this username
+                    UserDefaults.standard.set(username, forKey: "app_username")
                     LocalDataManager.shared.syncWithServer()
                     completion(true, "로그인 성공")
                 }

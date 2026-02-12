@@ -214,28 +214,46 @@ class LocalDataManager: ObservableObject {
     // MARK: - Server Sync
     
     // [Smart Sync] Pull First -> Diff -> Push Missing -> Merge
+    // [Smart Sync] Pull First -> Diff -> Push Missing -> Merge
     // 효율적이고 정확한 동기화: 서버에 없는 데이터만 골라서 전송
-    func syncWithServer() {
-        print("🧠 [SmartSync] Starting Integrity Check...")
+    func syncWithServer(force: Bool = false) {
+        // [Standard Architecture] Strict Auth Check
+        // CRITICAL FIX: Use "authUsername" (Single Source of Truth) instead of "app_username"
+        guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
+            print("🚫 [SmartSync] Aborted. Missing User Identity (authUsername). Please Login.")
+            return
+        }
+        
+        print("🧠 [SmartSync] Starting Standard Sync... (User: \(username), Force: \(force))")
+        
         
         // 1. Fetch Server State First
         APIService.shared.fetchDiaries { [weak self] serverData in
-            guard let self = self, let serverItems = serverData else {
-                print("⚠️ [SmartSync] Server unreachable. Fallback to offline mode.")
-                return
+            guard let self = self else { return }
+            
+            // [Strict Sync] Server State is REQUIRED.
+            // If fetch fails (Auth error or Network), we CANNOT proceed safely.
+            guard let finalServerItems = serverData else {
+                print("⚠️ [SmartSync] Server Sync Failed (Auth/Network). Aborting.")
+                return 
             }
             
-            // 2. Build Server Inventory (Dates & IDs)
-            let serverDates = Set(serverItems.compactMap { ($0["created_at"] as? String)?.prefix(10).description })
-            let serverIDs = Set(serverItems.compactMap { $0["id"] as? String })
+            let serverItems = finalServerItems
             
-            print("📋 [SmartSync] Server has \(serverItems.count) items.")
+            // 2. Build Server Inventory (Dates & IDs)
+            let serverDates = Set(finalServerItems.compactMap { ($0["created_at"] as? String)?.prefix(10).description })
+            // let serverIDs = Set(finalServerItems.compactMap { $0["id"] as? String })
+            
+            print("📋 [SmartSync] Server has \(finalServerItems.count) items.")
             
             let group = DispatchGroup()
             
             // 3. Identify Missing Items (Local has it, Server doesn't)
-            // Condition: (isSynced == false) OR (Date missing on Server)
+            // Condition: (isSynced == false) OR (Date missing on Server) OR (Force == true)
             let itemsToPush = self.diaries.filter { diary in
+                // [Force Sync] 무조건 전송
+                if force { return true }
+                
                 // 1. Explicitly dirty (User just wrote it)
                 if diary.isSynced == false { return true }
                 
@@ -274,7 +292,7 @@ class LocalDataManager: ObservableObject {
             group.notify(queue: .main) {
                 print("🔄 [SmartSync] Push done. Merging server updates...")
                 self.saveToDisk() // Save 'isSynced' status
-                self.mergeServerDiaries(serverItems) {
+                self.mergeServerDiaries(finalServerItems) {
                     print("✅ [SmartSync] Synchronization Complete.")
                 }
             }
@@ -290,9 +308,14 @@ class LocalDataManager: ObservableObject {
             
             for item in serverData {
                 let id = "\(item["id"] ?? "")"
+                let dateRaw = (item["date"] as? String) ?? (item["created_at"] as? String) ?? "Unknown"
+                print("👀 [SyncDebug] Processing Server Item: ID=\(id), Date=\(dateRaw)")
                 
                 // [Tombstone] 사용자가 삭제한 ID라면 병합 제외
-                if self.deletedDiaryIds.contains(id) { continue }
+                if self.deletedDiaryIds.contains(id) { 
+                    print("🚫 [SyncDebug] Skipped (Tombstone ID): \(id)")
+                    continue 
+                }
                 
                 guard let createdAt = item["created_at"] as? String else { continue }
                 
@@ -302,7 +325,10 @@ class LocalDataManager: ObservableObject {
                 let dateStr = String(serverDateRaw.prefix(10))
                 
                 // [Tombstone] 날짜 차단 확인
-                if self.deletedDiaryDates.contains(dateStr) { continue }
+                if self.deletedDiaryDates.contains(dateStr) { 
+                    print("🚫 [SyncDebug] Skipped (Tombstone Date): \(dateStr)")
+                    continue 
+                }
                 
                 // ... (Parsing logic omitted for brevity, stick to current impl) ...
                 // [Robust Parsing] Field Name Fallbacks
@@ -350,33 +376,45 @@ class LocalDataManager: ObservableObject {
                 )
                 serverDiary.isSynced = true
                 
-                // [Safety Merge] 날짜 매칭 시 ID 충돌 검사
-                if let index = self.diaries.firstIndex(where: { 
-                    // 1. ID가 일치하면 무조건 업데이트 (가장 안전)
+                if let index = self.diaries.firstIndex(where: {
+                    // 1. Server ID Exact Match (Best)
                     if let existingId = $0._id, existingId == id { return true }
-                    
-                    // 2. 날짜가 일치하는 경우
-                    if ($0.date ?? "").prefix(10) == dateStr.prefix(10) {
-                        // [Critical Guard]
-                        // 로컬 일기가 이미 "다른 Server ID"를 가지고 있다면? -> 충돌! 덮어쓰지 않음.
-                        if let existingId = $0._id, !existingId.isEmpty, existingId != id {
-                            print("🛡️ [Sync] Conflict Detected! Date matches (\(dateStr)) but IDs differ (Local: \(existingId) vs Server: \(id)). Keeping Local.")
-                            return false
-                        }
-                        return true
-                    }
+                    // 2. Local UUID Match (Fallback)
+                    // if $0.id == serverDiary.id { return true }
+                    // 3. Date Match (Logical)
+                    if ($0.date ?? "").prefix(10) == dateStr.prefix(10) { return true }
                     return false
                 }) {
-                    // [Conflict Check] unsynced local data preservation
+                    // [Conflict Resolution]
                     if self.diaries[index].isSynced == false {
-                        print("🛡️ [Sync] Preserving Unsynced Local Data (Date: \(dateStr))")
+                        print("🛡️ [Sync] Skipping overwrite of unsynced local diary (Date: \(dateStr))")
                         continue
                     }
                     
-                    serverDiary.id = self.diaries[index].id
+                    // [Critical Fix] If Server ID and Local Server ID differ
+                    if let oldServerId = self.diaries[index]._id, oldServerId != id {
+                        print("♻️ [Sync] Server ID changed for \(dateStr). (Old: \(oldServerId) -> New: \(id))")
+                    }
+                    
+                    print("🔄 [SyncDebug] Updating Local Diary for \(dateStr)...")
+                    
+                    // Update Logic
+                    // 1. Preserve Local UUID (for UI stability)
+                    let stableLocalUUID = self.diaries[index].id
+                    
+                    // 2. Overwrite EVERYTHING else with Server Data
                     self.diaries[index] = serverDiary
+                    
+                    // 3. Restore Local UUID
+                    self.diaries[index].id = stableLocalUUID
+                    
+                    // 4. Ensure Synced State
+                    self.diaries[index].isSynced = true
+                    
                     updatedCount += 1
                 } else {
+                    // New Entry
+                    print("🆕 [SyncDebug] Adding New Diary for \(dateStr)")
                     self.diaries.append(serverDiary)
                     newCount += 1
                 }

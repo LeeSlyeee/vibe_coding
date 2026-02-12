@@ -12,6 +12,8 @@ class B2GManager: ObservableObject {
             if centerCode.isEmpty && !oldValue.isEmpty {
                 print("⚠️ [B2G] CenterCode Cleared! (Old: \(oldValue))")
             }
+            // [Fix] Auto-Save on Change
+            self.saveState()
         }
     }
     @Published private(set) var isLinked: Bool = false
@@ -90,6 +92,10 @@ class B2GManager: ObservableObject {
                             if let fullUsername = json["owner_username"] as? String {
                                 UserDefaults.standard.set(fullUsername, forKey: "app_username") // if needed
                             }
+                            
+                            // [Fix] B2G 연동 유저는 PHQ-9 검사 건너뛰기 (기관 관리 대상)
+                            UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
+                            print("✅ [B2G] PHQ-9 Assessment marked as completed by Association.")
                             
                             // 2. Set Message
                             if let msg = json["message"] as? String {
@@ -199,8 +205,12 @@ class B2GManager: ObservableObject {
         print("🔄 [B2G] Push Local Data to Server (Force: \(force))...")
         
         // 1. 로컬 데이터 수집
-        // CRITICAL FIX: Must match APIService default ("Guest") to ensure consistent User Identity
-        let nickname = UserDefaults.standard.string(forKey: "userNickname") ?? "Guest"
+        // CRITICAL FIX: Eliminate "Guest" concept. Require explicit user identity.
+        guard let nickname = UserDefaults.standard.string(forKey: "app_username") ?? UserDefaults.standard.string(forKey: "userNickname") else {
+            print("❌ [B2G] Sync Aborted: No User Identity (Guest is banned).")
+            DispatchQueue.main.async { self.isSyncing = false }
+            return
+        }
         print("👤 [B2G] Syncing Identity: \(nickname)")
         
         var diaries = LocalDataManager.shared.diaries

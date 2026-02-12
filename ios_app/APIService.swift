@@ -28,20 +28,10 @@ class APIService: NSObject {
     
     // MARK: - Auth
     func ensureAuth(completion: @escaping (Bool) -> Void) {
-        // [Auth - Unique Identity]
-        // 1. Get or Generate Username
-        var username = UserDefaults.standard.string(forKey: "app_username")
-        
-        // [Fix] Purge Legacy Random IDs ("user_xxxxxx")
-        if let existing = username, existing.hasPrefix("user_") {
-            print("🧹 [Auth] Purging legacy random username: \(existing)")
-            UserDefaults.standard.removeObject(forKey: "app_username")
-            username = nil
-        }
-
-        if username == nil {
-            // [Fix] Do NOT generate random ID. Force manual login.
-            print("⚠️ [Auth] No valid username found. Require Login.")
+        // [Auth - Unified Identity]
+        // CRITICAL FIX: Use "authUsername" (Single Source of Truth)
+        guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
+            print("⚠️ [API-OCI] No Valid Identity (authUsername). Require Login.")
             completion(false)
             return
         }
@@ -54,12 +44,16 @@ class APIService: NSObject {
             UserDefaults.standard.set(password, forKey: "app_password")
         }
         
-        let body: [String: Any] = ["username": username!, "password": password!]
         
-        print("🔐 [API-217] Attempting Auth for: '\(username!)' (PW: \(password!))")
+        let body: [String: Any] = ["username": username, "password": password!]
         
-        // Token Existence Check (Optional optimization)
-        // if token != nil { completion(true); return }
+        print("🔐 [API-217] Attempting Auth for: '\(username)' (PW: \(password!))")
+        
+        // Token Existence Check (Optimistic Auth)
+        if token != nil {
+            completion(true)
+            return
+        }
         
         // [Fix] Endpoint: /login (No strict slash)
         performRequest(endpoint: "/login", method: "POST", body: body, requiresAuth: false) { result in
@@ -73,13 +67,13 @@ class APIService: NSObject {
                          UserDefaults.standard.set(rName, forKey: "realName")
                      }
                      
-                     print("🌐 [API-217] Login Success: \(username!)")
+                     print("🌐 [API-217] Login Success: \(username)")
                      completion(true)
                 } else {
                     completion(false)
                 }
              case .failure:
-                print("🌐 [API-217] Login failed, trying registration for: \(username!)")
+                print("🌐 [API-217] Login failed, trying registration for: \(username)")
                 // 회원가입 시도 [Fix] Endpoint: /register
                 self.performRequest(endpoint: "/register", method: "POST", body: body, requiresAuth: false) { regResult in
                     switch regResult {
@@ -173,8 +167,15 @@ class APIService: NSObject {
     // Unified Sync Method
     // Unified Sync Method
     func syncDiary(_ diary: Diary, completion: @escaping (Bool) -> Void = { _ in }) {
+        print("🔄 [API] Syncing Diary: \(diary.date ?? "Unknown")")
+        
         ensureAuth { success in
-            guard success else { completion(false); return }
+            guard success else {
+                print("❌ [API] Sync Aborted: Auth Failed.")
+                completion(false)
+                return
+            }
+            
             let dateStr = diary.date ?? ""
             
             // 1. Check existence by Date [Fix] Remove trailing slash
@@ -182,15 +183,20 @@ class APIService: NSObject {
                 switch result {
                 case .success(let data):
                     // Found -> Update (PUT)
+                    print("✅ [API] Found existing diary for \(dateStr). Updating...")
                     if let id = data["id"] as? Int {
                         self.updateDiaryOnServer(diaryId: String(id), diary: diary, completion: completion)
                     } else if let id = data["id"] as? String {
                         self.updateDiaryOnServer(diaryId: id, diary: diary, completion: completion)
                     } else {
-                         completion(false)
+                         // ID parsing failed, try create
+                         print("⚠️ [API] ID parsing failed. Falling back to Create.")
+                         self.createDiaryOnServer(diary, completion: completion)
                     }
-                case .failure:
-                    // Not Found -> Create (POST)
+                case .failure(let error):
+                    // Not Found or Error -> Create (POST)
+                    // [Important] 404면 생성이 맞지만, 500이면? 일단 생성을 시도해본다.
+                    print("⚠️ [API] Lookup failed for \(dateStr): \(error). Attempting Create...")
                     self.createDiaryOnServer(diary, completion: completion)
                 }
             }
@@ -284,9 +290,66 @@ class APIService: NSObject {
     
     func verifyCenterCode(_ code: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         let nickname = UserDefaults.standard.string(forKey: "userNickname") ?? "Guest"
+        // [Fix] Direct URL Request to bypass '/api' prefix issue
+        // [Fix] Revert to V1 Endpoint which is confirmed to work (or verify path)
+        // Previous error: 404 on .../verify-code-v2/
+        let urlStr = "https://217.142.253.35.nip.io/api/v1/centers/verify-code/"
+        guard let url = URL(string: urlStr) else { return }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // [Fix] Add headers just in case
+        request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        
         let payload = ["code": code, "user_nickname": nickname]
-        // [Fix] Endpoint: /centers/verify-code/ (Matches @b2g_bp.route('/api/centers/verify-code/'))
-        performRequest(endpoint: "/centers/verify-code/", method: "POST", body: payload, requiresAuth: false, completion: completion)
+        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+        
+        print("🚀 [API-Direct] POST \(urlStr)")
+        
+        // Use shared session (with SSL bypass delegate if needed, but here simple shared)
+        // Note: If self-signed cert issue arises, use self.session
+        self.session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("❌ [API-Direct] Error: \(error.localizedDescription)")
+                completion(.failure(error))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(NSError(domain: "No Response", code: 0, userInfo: nil)))
+                return
+            }
+            
+            print("📡 [API-Direct] Status: \(httpResponse.statusCode)")
+            
+            if (200...299).contains(httpResponse.statusCode), let data = data {
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        completion(.success(json))
+                    } else {
+                        // Sometimes array wrapper?
+                         if let jsonArr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]], let first = jsonArr.first {
+                              completion(.success(first))
+                         } else {
+                             completion(.failure(NSError(domain: "Invalid JSON", code: -1, userInfo: nil)))
+                         }
+                    }
+                } catch {
+                     // Try parsing as simple string message
+                     if let str = String(data: data, encoding: .utf8) {
+                         print("📝 [API-Direct] Response: \(str)")
+                     }
+                     completion(.failure(error))
+                }
+            } else {
+                // [Debug] Log Body on Failure
+                if let data = data, let str = String(data: data, encoding: .utf8) {
+                    print("📝 [API-Direct] Fail Body: \(str)")
+                }
+                completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
+            }
+        }.resume()
     }
     
     func connectToCenter(centerId: Any, completion: @escaping (Bool) -> Void) {
@@ -472,11 +535,16 @@ class APIService: NSObject {
         }
         
         print("🚀 [API-OCI] \(method) \(endpoint)")
+        if let token = request.value(forHTTPHeaderField: "Authorization") {
+            print("🔑 [API-OCI] Auth Token Present: \(token.prefix(10))...")
+        } else {
+            print("⚠️ [API-OCI] No Auth Token!")
+        }
         
         // Use Custom Session
         session.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("❌ [API-OCI] Error: \(error.localizedDescription)")
+                print("❌ [API-OCI] Network Error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
@@ -488,14 +556,18 @@ class APIService: NSObject {
             
             // Should be optional, but handle safely
             let responseData = data ?? Data()
+            let responseString = String(data: responseData, encoding: .utf8) ?? "(No Body)"
+            
+            print("📡 [API-OCI] Status: \(httpResponse.statusCode) | URL: \(endpoint)")
             
             if !(200...299).contains(httpResponse.statusCode) {
-                print("📡 [API-OCI] Failed: \(httpResponse.statusCode)")
-                if let str = String(data: responseData, encoding: .utf8) {
-                     print("📡 [API-OCI] Body: \(str)")
-                }
+                print("❌ [API-OCI] Request Failed!")
+                print("📝 [API-OCI] Response Body: \(responseString)")
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                 return
+            } else {
+                // Success case logging (Optional, noisy)
+                // print("✅ [API-OCI] Success Body: \(responseString.prefix(100))...")
             }
             
             do {
@@ -549,11 +621,22 @@ class APIService: NSObject {
             }
             
             do {
-                if let json = try JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] {
+                if let json = try? JSONSerialization.jsonObject(with: responseData) as? [[String: Any]] {
                     completion(.success(json))
-                } else if let jsonDict = try JSONSerialization.jsonObject(with: responseData) as? [String: Any],
-                          let results = jsonDict["results"] as? [[String: Any]] {
-                    completion(.success(results))
+                } else if let jsonDict = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any] {
+                    // Check if it's a wrapper like {"data": [...]} or {"results": [...]}
+                    if let results = jsonDict["results"] as? [[String: Any]] {
+                        completion(.success(results))
+                    } else if let dataList = jsonDict["data"] as? [[String: Any]] {
+                        completion(.success(dataList))
+                    } else if let msg = jsonDict["msg"] as? String {
+                        // Backend returned a message instead of list (likely auth error or empty)
+                        print("⚠️ [API-OCI-LIST] Server Message: \(msg)")
+                        completion(.failure(NSError(domain: "Server", code: -1, userInfo: ["msg": msg])))
+                    } else {
+                        print("⚠️ [API-OCI-LIST] Unexpected Dict Response: \(jsonDict)")
+                        completion(.failure(NSError(domain: "Invalid Format", code: -1, userInfo: nil)))
+                    }
                 } else {
                      if let str = String(data: responseData, encoding: .utf8) { print("Invalid List JSON: \(str)") }
                     completion(.failure(NSError(domain: "API", code: -1, userInfo: nil)))

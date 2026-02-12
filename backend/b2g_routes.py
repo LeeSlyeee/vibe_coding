@@ -34,6 +34,64 @@ def verify_code():
     center = db.centers.find_one({"code": code})
     
     if center:
+    if center:
+        # [Added] Try to find the user associated with this center (for App Recovery)
+        # 1. Direct Link
+        linked_user = db.users.find_one({"linked_center_code": code})
+        
+        # 2. Connection Table (More Reliable)
+        if not linked_user:
+            conn = db.b2g_connections.find_one({"center_code": code})
+            if conn and conn.get("user_id"):
+                from bson.objectid import ObjectId
+                try:
+                    linked_user = db.users.find_one({"_id": ObjectId(conn.get("user_id"))})
+                except:
+                    pass
+
+        # 3. Log Table (Last Resort - Who sent data recently?)
+        if not linked_user:
+            log = db.b2g_metrics.find_one({"center_code": code}, sort=[("synced_at", -1)])
+            if log:
+                nickname = log.get("user_nickname")
+                # [Fix] Even if nickname is 'Guest', we try to resolve to a Dedicated Guest User
+                if nickname and nickname.lower() != "guest":
+                     linked_user = db.users.find_one({"username": nickname})
+                
+                if not linked_user:
+                    print(f"⚠️ [Verify] Found Generic/Unknown Log. Searching/Creating Dedicated Guest User...")
+                    # Try 'Guest_{code}' pattern
+                    dedicated_guest_name = f"Guest_{code}"
+                    linked_user = db.users.find_one({"username": dedicated_guest_name})
+                    
+                    # [Auto-Create Logic for Recovery]
+                    # If we found a log but no user, and it was 'Guest', we should probably create the dedicated user NOW
+                    # to allow the app to recover an identity.
+                    if not linked_user:
+                         try:
+                             new_guest = {
+                                "username": dedicated_guest_name,
+                                "nickname": "방문자",
+                                "email": f"{dedicated_guest_name}@b2g.auto",
+                                "password": "auto_generated",
+                                "created_at": get_korea_time(),
+                                "source": "B2G_Recovery_Auto_Create",
+                                "linked_center_code": code
+                             }
+                             res = db.users.insert_one(new_guest)
+                             linked_user = new_guest
+                             print(f"🆕 [Verify] Auto-created Dedicated Guest for Recovery: {dedicated_guest_name}")
+                         except:
+                             pass
+
+        user_info = {}
+        if linked_user:
+            user_info = {
+                "username": linked_user.get("username"),
+                "name": linked_user.get("name", linked_user.get("nickname")),
+                "email": linked_user.get("email")
+            }
+
         return jsonify({
             "valid": True,
             "center": {
@@ -41,7 +99,8 @@ def verify_code():
                 "region": center.get("region", "Unknown"),
                 "id": str(center.get("_id")) 
             },
-            "center_id": str(center.get("_id"))
+            "center_id": str(center.get("_id")),
+            "user": user_info # [Recovery Key]
         }), 200
         
     # 2. Proxy Lookup (InsightMind Server)
@@ -195,26 +254,98 @@ def sync_data():
             user = db.users.find_one({"username": nickname}) or db.users.find_one({"nickname": nickname})
             
             if not user:
-                print(f"⚠️ [B2G Sync] User not found for nickname: {nickname}. Creating new user...")
-                try:
-                    # [Auto-Create] 없는 유저면 자동 생성하여 데이터 수용
-                    new_user = {
-                        "username": nickname,
-                        "nickname": nickname,
-                        "email": f"{nickname}@b2g.auto", # 가상 이메일
-                        "password": "auto_generated", # 접속 불가 (비번 모름)
-                        "risk_level": data.get('risk_level', 0),
-                        "created_at": get_korea_time(),
-                        "source": "B2G_Auto_Sync",
-                        "linked_center_code": center_code
-                    }
-                    res = db.users.insert_one(new_user)
-                    user_id = str(res.inserted_id)
-                    print(f"🆕 [B2G Sync] Auto-created user: {nickname} ({user_id})")
-                except Exception as create_err:
-                     print(f"❌ [B2G Sync] User Creation Failed: {create_err}")
-                     return jsonify({"message": "User not found & Creation failed"}), 500
+                # [CRITICAL FIX] "Guest"라는 이름의 유저 자동 생성 방지 (Data Fragmentation 방지)
+                if nickname and nickname.lower() == "guest":
+                    print(f"🛑 [B2G Sync] Blocked creation of generic 'Guest' user. Analyzing center_code ownership...")
+                    
+                    # Try to find the REAL user who owns this center code connection
+                    real_connection = db.b2g_connections.find_one({"center_code": center_code})
+                    if real_connection:
+                        real_user_id = real_connection.get("user_id")
+                        print(f"🔗 [B2G Sync] Found owner via connection: {real_user_id}")
+                        user = db.users.find_one({"_id": ObjectId(real_user_id)})
+                        if user:
+                            print(f"✅ [B2G Sync] Resolved 'Guest' to Real User: {user.get('username')}")
+                            user_id = str(user['_id'])
+                        else:
+                            print("❌ [B2G Sync] Connection exists but User ID is invalid or deleted.")
+                            # Do NOT return 400 here. Fallback to Auto-Heal below to find the *current* owner.
+                            real_connection = None # Reset flag to force Auto-Heal check
+                    
+                    if not real_connection:
+                        print(f"⚠️ [B2G Sync] No connection found for code {center_code}. Attempting Auto-Heal or Reject...")
+                        
+                        # [Auto-Heal Strategy]
+                        # 만약 center_code가 존재하는데 연결정보만 없는 경우 (DB 불일치)
+                        # 혹시 이 코드를 쓰고 있는 유저가 있는지 역추적
+                        potential_user = db.users.find_one({"linked_center_code": center_code})
+                        if potential_user:
+                             print(f"🩹 [B2G Auto-Heal] Found user '{potential_user.get('username')}' linked to code '{center_code}'. Restoring connection.")
+                             user_id = str(potential_user['_id'])
+                             
+                             # Restore Connection Record
+                             try:
+                                 center = db.centers.find_one({"code": center_code})
+                                 if center:
+                                     db.b2g_connections.insert_one({
+                                        "user_id": user_id,
+                                        "center_id": center['_id'],
+                                        "center_code": center_code,
+                                        "status": "ACTIVE",
+                                        "created_at": get_korea_time(),
+                                        "restored_by": "auto_heal_sync"
+                                     })
+                             except:
+                                 pass
+                        else:
+                            # 진짜 주인을 찾을 수 없는 고아 데이터 (Orphan Data)
+                            # Guest 생성을 허용하되, 'Guest_{Code}' 형태로 격리하여 관리
+                            # 이렇게 하면 적어도 데이터는 유실되지 않고 나중에 합칠 수 있음.
+                            
+                            safe_guest_name = f"Guest_{center_code}"
+                            user = db.users.find_one({"username": safe_guest_name})
+                            
+                            if not user:
+                                print(f"🆕 [B2G Sync] Creating Dedicated Guest User: {safe_guest_name}")
+                                new_user = {
+                                    "username": safe_guest_name,
+                                    "nickname": "방문자",
+                                    "email": f"{safe_guest_name}@b2g.auto",
+                                    "password": "auto_generated",
+                                    "risk_level": data.get('risk_level', 0),
+                                    "created_at": get_korea_time(),
+                                    "source": "B2G_Dedicated_Guest",
+                                    "linked_center_code": center_code
+                                }
+                                res = db.users.insert_one(new_user)
+                                user_id = str(res.inserted_id)
+                            else:
+                                user_id = str(user['_id'])
+                            
+                            print(f"⚠️ [B2G Sync] Assigned to Dedicated Guest: {safe_guest_name}")
+                else:
+                    # Generic Auto-Create for NON-GUEST nicknames (Maybe actual new users from B2G)
+                    print(f"⚠️ [B2G Sync] User not found for nickname: {nickname}. Creating new user...")
+                    try:
+                        # [Auto-Create] 없는 유저면 자동 생성하여 데이터 수용
+                        new_user = {
+                            "username": nickname,
+                            "nickname": nickname,
+                            "email": f"{nickname}@b2g.auto", # 가상 이메일
+                            "password": "auto_generated", # 접속 불가 (비번 모름)
+                            "risk_level": data.get('risk_level', 0),
+                            "created_at": get_korea_time(),
+                            "source": "B2G_Auto_Sync",
+                            "linked_center_code": center_code
+                        }
+                        res = db.users.insert_one(new_user)
+                        user_id = str(res.inserted_id)
+                        print(f"🆕 [B2G Sync] Auto-created user: {nickname} ({user_id})")
+                    except Exception as create_err:
+                         print(f"❌ [B2G Sync] User Creation Failed: {create_err}")
+                         return jsonify({"message": "User not found & Creation failed"}), 500
             else:
+                user_id = str(user['_id'])
                 user_id = str(user['_id'])
 
             # Common Logic for Diary Save
@@ -253,11 +384,15 @@ def sync_data():
                                     # 2. Try Standard DB format
                                     created_at_val = datetime.strptime(c_str, '%Y-%m-%d %H:%M:%S')
                                 except:
-                                    # 3. Fallback
                                     pass
+                        else:
+                            # Fallback: If no created_at provided, use the target date's noon
+                            created_at_val = start + timedelta(hours=12)
                         
                         raw_diary = {
                             'user_id': user_id,
+                            'date': date_str,  # [CRITICAL] Explicitly save date
+
                             'event': item.get('event', ''),
                             'mood_level': item.get('mood_level', 3),
                             'mood_intensity': item.get('mood_intensity', 0),

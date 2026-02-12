@@ -9,8 +9,8 @@ struct AppDiaryWriteView: View {
     // 수정할 일기 데이터 (nil이면 새 글 작성)
     var diaryToEdit: Diary? = nil
     
-    // Base URL
-    let baseURL = "http://150.230.7.76"
+    // ✅ Base URL (Managed by APIService)
+    // let baseURL = "https://217.142.253.35.nip.io/api"
     
     // Voice Recorder
     @StateObject private var voiceRecorder = VoiceRecorder()

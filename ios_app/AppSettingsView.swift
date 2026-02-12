@@ -134,19 +134,33 @@ struct AppSettingsView: View {
                                 
                                 Divider()
                                 
-                                // Switch to Custom Login
+                                // 사용자 친화적 로그인 버튼 (Web ID 연동)
                                 Button(action: {
                                     withAnimation { useCustomLogin = true }
                                 }) {
-                                    HStack {
-                                        Image(systemName: "arrow.right.circle")
-                                        Text("기존 웹(Web) 계정으로 로그인")
+                                    HStack(spacing: 12) {
+                                        Image(systemName: "globe")
+                                            .font(.title2)
+                                            .foregroundColor(.white)
+                                            
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text("웹사이트 아이디로 연결하기")
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                            Text("웹 캘린더와 데이터를 동기화합니다")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.9))
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundColor(.white.opacity(0.8))
                                     }
-                                    .font(.subheadline)
-                                    .foregroundColor(.blue)
-                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue) // 브랜드 컬러 유지
+                                    .cornerRadius(12)
+                                    .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
-                                .padding(.top, 4)
+                                .padding(.top, 8)
                             }
                             .padding(.vertical, 8)
                         } else {
@@ -268,13 +282,25 @@ struct AppSettingsView: View {
                                     Text("연동 해제")
                                         .font(.caption)
                                         .fontWeight(.bold)
-                                        .foregroundColor(.red)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 5)
                                         .background(Color.red.opacity(0.1))
-                                        .cornerRadius(6)
+                                        .foregroundColor(.red)
+                                        .cornerRadius(8)
                                 }
-                                .buttonStyle(BorderlessButtonStyle()) // [Fix] Touch Separation
+                            }
+                            
+                            // [Debug Info] Show Current App User ID
+                            if let username = UserDefaults.standard.string(forKey: "app_username") {
+                                HStack {
+                                    Text("앱 계정 ID:")
+                                        .foregroundColor(.gray)
+                                        .font(.caption)
+                                    Text(username)
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .padding(.top, 4)
                             }
                             
                             if b2gManager.lastSyncDate > 0 {
@@ -291,8 +317,11 @@ struct AppSettingsView: View {
                                     let generator = UIImpactFeedbackGenerator(style: .medium)
                                     generator.impactOccurred()
                                     
+                                    // [Fix] Dual Sync: Sync Personal (Calendar) AND B2G (Center)
+                                    LocalDataManager.shared.syncWithServer(force: true)
                                     b2gManager.syncData(force: true)
-                                    activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.\n(잠시 후 대시보드를 새로고침하세요)")
+                                    
+                                    activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.\n(개인 캘린더 및 센터 대시보드 동기화)")
                                 }) {
                                     HStack {
                                         Image(systemName: "arrow.up.circle.fill")
@@ -643,28 +672,32 @@ struct AppSettingsView: View {
         let todayDiaries = allDiaries.filter { $0.date == todayStr }
         
         // Filter & Delete
-        let toDeleteIds = todayDiaries.filter { diary in
+        var toDeleteIds: [String] = []
+        for diary in todayDiaries {
             let content = (diary.event ?? "") + (diary.emotion_desc ?? "")
             for pattern in fakePatterns {
-                if content.contains(pattern) { return true }
+                if content.contains(pattern), let id = diary.id {
+                    toDeleteIds.append(id)
+                    break
+                }
             }
-            return false
-        }.compactMap { $0.id }
+        }
         
         if toDeleteIds.isEmpty {
-            activeAlert = .info("🔍 검색 결과: 총 \(todayDiaries.count)개 발견됨.\n하지만 '가짜 패턴'과 일치하는 항목이 없습니다.\n(날짜: \(todayStr))")
+            activeAlert = .info("🔍 검색 결과: 오늘(\(todayStr)) 작성된 일기 중\n'가짜 패턴'과 일치하는 항목이 없습니다.")
             return
         }
         
-        print("🧹 Cleaning \(toDeleteIds.count) fake diaries...")
+        // Count for alert
+        let deleteCount = toDeleteIds.count
+        
+        print("🧹 Cleaning \(deleteCount) fake diaries...")
         
         for id in toDeleteIds {
             LocalDataManager.shared.deleteDiary(id: id) { _ in }
         }
         
-        let deleted = toDeleteIds.count
-        
-        activeAlert = .info("✨ 청소 완료!\n총 \(todayDiaries.count)개 중 가짜 \(deleted)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
+        activeAlert = .info("✨ 청소 완료!\n오늘 작성된 가짜 일기 \(deleteCount)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
         
         // Refresh Stats
         NotificationCenter.default.post(name: NSNotification.Name("RefreshStats"), object: nil)
