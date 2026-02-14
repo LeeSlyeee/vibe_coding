@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // [Fix] Point to 217 Backend (Flask) where 'test' account exists
-const API_BASE_URL = 'https://217.142.253.35.nip.io/api'
+const API_BASE_URL = 'https://217.142.253.35.nip.io/api/v1'
 
 // axios 인스턴스 생성
 const api = axios.create({
@@ -15,7 +15,8 @@ const api = axios.create({
 // 요청 인터셉터 - 인증 토큰 추가
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken')
+    // [Fix] User Web uses 'authToken', Admin Web uses 'access_token'. Support both!
+    const token = localStorage.getItem('authToken') || localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

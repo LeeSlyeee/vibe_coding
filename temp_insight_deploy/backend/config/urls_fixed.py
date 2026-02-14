@@ -4,6 +4,10 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
+from haru_on.staff_patient_views import PatientListView, PatientDetailView
+from haru_on.staff_views import StaffDiaryViewSet # [New] B2G Dashboard
+from haru_on.views import StatisticsView
+
 schema_view = get_schema_view(
    openapi.Info(
       title="Haru-On API",
@@ -17,17 +21,13 @@ schema_view = get_schema_view(
    permission_classes=(permissions.AllowAny,),
 )
 
-from haru_on.staff_patient_views import PatientListView, PatientDetailView
-from haru_on.staff_views import StaffDiaryViewSet # [New] B2G Dashboard
-from haru_on.views import StatisticsView
-
 urlpatterns = [
     # [Emergency Bypass] 403 방지를 위한 최우선 경로 매핑 (Router 우회)
-    # 1. Patient List & Detail (Fix 404)
+    # 1. Patient List & Detail (Absolute Paths)
     path("api/v1/diaries/staff/patients/<int:user_id>/", PatientDetailView.as_view()),
     path("api/v1/diaries/staff/patients/", PatientListView.as_view()),
     
-    # [Fix] Add simpler alias for frontend compatibility
+    # [Fix] Add simpler alias for frontend compatibility (Direct mapping)
     path("api/staff/patients/", PatientListView.as_view()),
     path("api/staff/patients/<int:user_id>/", PatientDetailView.as_view()),
 

@@ -2,7 +2,8 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 // import api from '@/api'; // Remove api instance
-import axios from 'axios'; // Use raw axios
+// import axios from 'axios'; 
+import api from '@/api';
 
 const router = useRouter();
 const patients = ref([]);
@@ -19,8 +20,8 @@ const fetchPatients = async () => {
     errorMsg.value = '';
     
     try {
-        const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
-        const res = await axios.get(`${baseURL}diaries/staff/patients/`);
+        // const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
+        const res = await api.get('diaries/staff/patients/');
         
         // 데이터 변경 확인 (단순 문자열 비교)
         const newData = res.data;

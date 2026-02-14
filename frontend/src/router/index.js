@@ -1,14 +1,11 @@
-
 import { createRouter, createWebHistory } from 'vue-router'
 
-// 정적 임포트로 변경하여 빌드 오류 해결 시도
+// 정적 임포트
 import LoginPage from '../views/LoginPage.vue'
 import SignupPage from '../views/SignupPage.vue'
 import CalendarPage from '../views/CalendarPage.vue'
 import StatsPage from '../views/StatsPage.vue'
 import GuidePage from '../views/GuidePage.vue'
-import DiaryWritePage from '../views/DiaryWritePage.vue'
-import DiaryDetailPage from '../views/DiaryDetailPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -50,18 +47,6 @@ const router = createRouter({
       path: '/guide',
       name: 'guide',
       component: GuidePage,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/diary/write/:date?',
-      name: 'diary-write',
-      component: DiaryWritePage,
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/diary/:id',
-      name: 'diary-detail',
-      component: DiaryDetailPage,
       meta: { requiresAuth: true }
     },
     {
@@ -108,10 +93,6 @@ router.beforeEach((to, from, next) => {
   } else if ((to.name === 'login' || to.name === 'signup') && isAuthenticated) {
     next('/calendar')
   } else {
-    // Triage Check: If authenticated but not assessed, and trying to go to calendar/main, force assessment.
-    // Exception: If already on assessment page or logout/medication? No, medication also needs assessment probably.
-    // Let's force assessment for everything except assessment page itself.
-    // Triage Check: If authenticated but not assessed, and trying to go to calendar/main, force assessment.
     // [B2G Fix] Skip if center code exists (Linked user)
     const isLinked = localStorage.getItem('b2g_center_code') || localStorage.getItem('b2g_is_linked');
     

@@ -312,3 +312,19 @@ python app.py
 - **품질 보증 (QA)**:
   - **스트레스 테스트(Stress Test)**: 무작위 시나리오(생일 Offset, 연결 방향 랜덤)를 생성하여 **20회 연속 테스트**를 수행했고, **성공률 100% (20/20)**를 달성했습니다.
   - **시뮬레이션 검증**: 실제 iOS 기기 없이도 앱 동작을 검증할 수 있는 `verify_cross_platform_scenarios.py`를 개발하여 로직의 완결성을 입증했습니다.
+
+### 16. B2G 동기화 및 인증 시스템 대대적 개편 (2026.02.12)
+
+- **Guest 모드 전면 폐지 및 실명 인증 동기화**:
+  - **정책 변경**: 데이터 무결성을 위해 불안정한 'Guest' 및 '연동 코드 기반' 동기화 방식을 완전히 제거하고, **100% 로그인된 실명 계정(Authenticated User)** 기반으로만 동기화되도록 시스템을 재설계했습니다.
+  - **보안 강화**: 인증 토큰(JWT)이 없는 요청은 서버(`b2g_routes.py`)와 앱(`APIService.swift`) 양쪽에서 즉시 차단됩니다.
+
+- **iOS 앱 좀비 상태(Zombie State) 자동 복구**:
+  - **문제 해결**: 앱은 로그인 상태로 보이나 내부적으로 유저명(`username`)이 소실되어 동기화가 실패하는 '좀비 상태'를 발견하고 해결했습니다.
+  - **Self-Healing**: 앱 실행(`AppMainTabView`) 시 유저명이 감지되지 않으면, 백그라운드에서 즉시 서버(`api/auth/me`)와 통신하여 유저 정보를 스스로 복구하고 동기화를 재개하는 **자가 치유 로직**을 탑재했습니다.
+
+- **인증 키(Source of Truth) 통일**:
+  - 파편화되어 있던 인증 키(`app_username`, `username`, `authUsername`)를 **`authUsername`** 하나로 통일하여, `AuthManager`, `LocalDataManager`, `APIService` 간의 데이터 불일치 문제를 원천 차단했습니다.
+
+- **B2G 전략 고도화 (Real-Name Dashboard)**:
+  - **대시보드 개편**: 익명 추정치가 아닌, 실명 데이터를 기반으로 한 **정밀 위험군 분석(Red/Yellow)** 및 **즉시 개입**이 가능한 B2G/B2B 관리자 대시보드 전략을 수립했습니다. [`B2G_STRATEGY.md`]

@@ -1,24 +1,24 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '@/api';
-import axios from 'axios'; 
-import {
-  Chart as ChartJS,
-  Title,
-  Tooltip,
-  Legend,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  ArcElement,
-  PointElement,
-  LineElement,
-  Filler
-} from 'chart.js'
-import { Bar, Doughnut, Line } from 'vue-chartjs'
+// import axios from 'axios'; // Removed raw axios 
+// import {
+//   Chart as ChartJS,
+//   Title,
+//   Tooltip,
+//   Legend,
+//   BarElement,
+//   CategoryScale,
+//   LinearScale,
+//   ArcElement,
+//   PointElement,
+//   LineElement,
+//   Filler
+// } from 'chart.js'
+// import { Bar, Doughnut, Line } from 'vue-chartjs'
 
 // Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
+// ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
 
 const allDiaries = ref([]);
 const highRiskDiaries = ref([]); 
@@ -126,12 +126,12 @@ const fetchDashboardData = async () => {
 
     
     try {
-        const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
-        debugLog.value += `\nBaseURL: ${baseURL}`;
+        // const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
+        // debugLog.value += `\nBaseURL: ${baseURL}`;
 
         // 1. 환자 목록 호출
         debugLog.value += "\n1. 환자 목록 호출 중...";
-        const resPatients = await axios.get(baseURL + 'diaries/staff/patients/');
+        const resPatients = await api.get('diaries/staff/patients/');
         debugLog.value += `\n   - 성공: ${resPatients.data.length}명 수신`;
         
         patients.value = resPatients.data || [];
@@ -139,7 +139,7 @@ const fetchDashboardData = async () => {
 
         // 2. 일기 목록 호출
         debugLog.value += "\n2. 일기 목록 호출 중...";
-        const resDiaries = await axios.get(baseURL + 'diaries/staff/diaries/');
+        const resDiaries = await api.get('diaries/staff/diaries/');
         
         // 데이터 구조 파악
         const rawData = resDiaries.data.results || resDiaries.data;
@@ -179,8 +179,7 @@ const generateCode = async () => {
     errorMsg.value = '';
     generatedCode.value = null;
     try {
-        const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
-        const response = await axios.post(baseURL + 'centers/generate/');
+        const response = await api.post('centers/generate/');
         generatedCode.value = response.data.code;
         
         // [UX] 생성 즉시 클립보드 복사
@@ -335,16 +334,17 @@ onUnmounted(() => {
             <div class="col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <h3 class="text-2xl font-bold text-slate-800 mb-8">📉 전체 대상자 평균 기분 변화 (주간)</h3>
                 <div class="h-80">
-                    <Line :data="flowChartData" :options="commonOptions" />
+                    <!-- <Line :data="flowChartData" :options="commonOptions" /> -->
+                    <p class="text-center text-slate-400 py-10">차트 로딩 중단 (유지보수 중)</p>
                 </div>
             </div>
             
             <!-- 2. 위험군 분포 -->
             <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <h3 class="text-2xl font-bold text-slate-800 mb-8">🚨 감정 상태 분포 (전체)</h3>
-                <div class="h-64 relative" v-if="riskDistributionData?.datasets?.[0]?.data">
+                <!-- <div class="h-64 relative" v-if="riskDistributionData?.datasets?.[0]?.data">
                     <Doughnut :data="riskDistributionData" :options="doughnutOptions" />
-                </div>
+                </div> -->
                  <div class="mt-8 space-y-4" v-if="riskDistributionData?.datasets?.[0]?.data">
                     <!-- 범례 -->
                     <div class="flex justify-between text-base">

@@ -179,7 +179,7 @@ class APIService: NSObject {
             let dateStr = diary.date ?? ""
             
             // 1. Check existence by Date [Fix] Remove trailing slash
-            self.performRequest(endpoint: "/diaries/date/\(dateStr)", method: "GET") { result in
+            self.performRequest(endpoint: "/diaries/date/\(dateStr)/", method: "GET") { result in
                 switch result {
                 case .success(let data):
                     // Found -> Update (PUT)
@@ -231,7 +231,7 @@ class APIService: NSObject {
         print("🚀 [API] Creating New Diary: \(diary.date ?? "")")
         
         // [Fix] Remove trailing slash
-        performRequest(endpoint: "/diaries", method: "POST", body: payload) { result in
+        performRequest(endpoint: "/diaries/", method: "POST", body: payload) { result in
             switch result {
             case .success(let data):
                 print("✅ [API] Diary Created. ID: \(data["id"] ?? "null")")
@@ -248,7 +248,7 @@ class APIService: NSObject {
         print("🚀 [API] Updating Diary ID: \(diaryId)")
         
         // [Fix] Remove trailing slash
-        performRequest(endpoint: "/diaries/\(diaryId)", method: "PUT", body: payload) { result in
+        performRequest(endpoint: "/diaries/\(diaryId)/", method: "PUT", body: payload) { result in
             switch result {
             case .success:
                 print("✅ [API] Diary Updated.")
@@ -370,7 +370,7 @@ class APIService: NSObject {
         ensureAuth { success in
             guard success else { completion(nil); return }
             // [Fix] Remove trailing slash
-            self.performRequestList(endpoint: "/diaries", method: "GET") { result in
+            self.performRequestList(endpoint: "/diaries/", method: "GET") { result in
                 if case .success(let list) = result { completion(list) } else { completion(nil) }
             }
         }
@@ -382,7 +382,7 @@ class APIService: NSObject {
             guard success else { completion(false); return }
             print("🗑️ [API] Deleting Diary ID: \(diaryId)")
             // [Fix] Remove trailing slash
-            self.performRequest(endpoint: "/diaries/\(diaryId)", method: "DELETE") { result in
+            self.performRequest(endpoint: "/diaries/\(diaryId)/", method: "DELETE") { result in
                 switch result {
                 case .success:
                     print("✅ [API] Delete Success")
