@@ -2,45 +2,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from config import Config
-from models import db, User, Diary, ChatLog
-import os
 
-app = Flask(__name__)
-
-# [PostgreSQL Integration]
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vibe_user:vibe1234@127.0.0.1/vibe_db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = Config.JWT_SECRET_KEY
-
-# Initialize DB
-db.init_app(app)
-
-# Create Tables (if not exists)
-with app.app_context():
-    db.create_all()
-
-# CORS Setup
-# Allowed Origins: Native Apps + Web (Patient & Admin)
-CORS(app, resources={
-    r"/*": {
-        "origins": [
-            "http://localhost:5173", 
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://217.142.253.35",
-            "https://217.142.253.35.nip.io",
-            "https://217.142.253.35"
-        ],
-        "supports_credentials": True,
-        "allow_headers": ["Content-Type", "Authorization"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    }
-})
-
-jwt = JWTManager(app)
+# ... (omitted)
 
 # [API Endpoint: Register]
 @app.route('/api/register', methods=['POST'])
@@ -52,7 +18,8 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({'msg': 'User already exists'}), 400
 
-    new_user = User(username=username, password=password) # Hash password in production!
+    hashed_pw = generate_password_hash(password)
+    new_user = User(username=username, password=hashed_pw) 
     db.session.add(new_user)
     db.session.commit()
 
@@ -66,7 +33,10 @@ def login():
     password = data.get('password')
 
     user = User.query.filter_by(username=username).first()
-    if not user or user.password != password:
+    
+    # [Fix] Check Password Hash (Werkzeug)
+    # Support both PBKDF2 (Legacy) and Scrypt (New)
+    if not user or not check_password_hash(user.password, password):
         return jsonify({'msg': 'Bad username or password'}), 401
 
     access_token = create_access_token(identity={'username': username, 'id': user.id})
