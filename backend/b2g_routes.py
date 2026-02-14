@@ -34,7 +34,7 @@ def verify_code():
     center = db.centers.find_one({"code": code})
     
     if center:
-    if center:
+
         # [Added] Try to find the user associated with this center (for App Recovery)
         # 1. Direct Link
         linked_user = db.users.find_one({"linked_center_code": code})
