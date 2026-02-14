@@ -1,7 +1,7 @@
 import axios from 'axios'
 
-// [Fix] Point to 217 Backend (Flask) where 'test' account exists
-const API_BASE_URL = 'https://217.142.253.35.nip.io/api/v1'
+// [Fix] Point to 217 Backend (Flask) - remove /v1 mismatch
+const API_BASE_URL = 'https://217.142.253.35.nip.io/api'
 
 // axios 인스턴스 생성
 const api = axios.create({
