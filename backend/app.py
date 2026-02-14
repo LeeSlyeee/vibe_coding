@@ -1775,4 +1775,5 @@ def get_app_config():
 
 if __name__ == '__main__':
     # Use 0.0.0.0 for external access if needed, or default
-    app.run(debug=False, host='0.0.0.0', port=5050, threaded=False)
+    app.run(debug=False, host='0.0.0.0', port=5000, threaded=False)
+
