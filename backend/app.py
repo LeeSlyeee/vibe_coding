@@ -329,8 +329,6 @@ mongo = PyMongo(app)
 # except Exception as e:
 #     print(f"❌ MongoDB Connection Failed: {e}")
 
-# CORS Setup
-# CORS Setup
 # CORS Setup - Allow All (Debug Mode)
 # CORS Setup - Enable for Local Development with Credentials
 CORS(app, resources={
@@ -339,6 +337,15 @@ CORS(app, resources={
             "http://localhost:5173", 
             "http://127.0.0.1:5173",
             "http://217.142.253.35",
+            "https://217.142.253.35.nip.io", # [Fix] Production Domain
+            "https://217.142.253.35",
+            "*" # For Debugging
+        ],
+        "supports_credentials": True,
+        "allow_headers": ["Content-Type", "Authorization"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    }
+})
             "https://217.142.253.35",
             "http://217.142.253.35.nip.io",
             "https://217.142.253.35.nip.io"
