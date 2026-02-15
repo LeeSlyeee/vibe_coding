@@ -8,6 +8,7 @@ import json
 import requests
 import re
 import time
+import ast # Added for safe literal eval
 TRAINING_STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'training_state.json')
 
 try:
@@ -539,61 +540,158 @@ class EmotionAnalysis:
             print(f"Comment Gen Error: {e}")
             return "당신의 마음을 이해해요."
 
-
-    def generate_comprehensive_report(self, diary_summary):
+    def _call_llm(self, prompt, options=None):
         """
-        Generates a detailed 10-paragraph psychological report using Local Gemma 2.
+        Hybrid/Async LLM Caller for Brain (RunPod Priority)
         """
-        import requests
-        print("🧠 [Brain] Generating Comprehensive Report...")
+        if options is None: options = {}
         
+        # RunPod Config
         try:
-            url = "http://localhost:11434/api/generate"
-            
-            prompt_text = (
-                "## SYSTEM: You represent a thoughtful, empathetic counselor with 20 years of experience. You must ANSWER IN KOREAN ONLY.\n"
-                "당신은 20년 경력의 베테랑 심리 상담사입니다. 아래 내담자(사용자)의 일기 기록과 통계를 자세히 읽고 분석해주세요.\n\n"
-                f"### [사용자 데이터]\n{diary_summary}\n\n"
-                "### [작성 지침]\n"
-                "1. **언어**: 반드시 **한국어(Korean)**로만 작성하세요. 영어는 절대 사용하지 마세요.\n"
-                "2. **형식**: 사용자에게 보내는 '심층 심리 분석 리포트' 형식으로 작성하세요.\n"
-                "3. **분량**: 반드시 **서론-본론(진단)-결론(처방)**의 흐름을 갖춘 **총 10문단 이상의 긴 글**이어야 합니다.\n"
-                "4. **어조**: 전문적인 심리학 용어를 사용하되, 따뜻하고 이해하기 쉬운 언어로 풀어주세요.\n\n"
-                "### [리포트 구조]\n"
-                "1부. **마음의 지도 (현상 진단)** (5문단)\n"
-                "   - 내담자가 주로 사용하는 감정 언어와 내면의 상태 분석\n"
-                "   - 반복되는 스트레스 패턴이나 감정의 트리거 파악\n"
-                "   - 숨겨진 긍정적인 자원이나 강점 발굴\n\n"
-                "2부. **나아가야 할 길 (미래 처방)** (5문단)\n"
-                "   - 현재 상태에서 실천할 수 있는 구체적인 심리 기법 3가지 (ACT, CBT 등 활용)\n"
-                "   - 감정의 파도를 다스리는 생활 습관 제안\n"
-                "   - 상담사로서 전하는 진심 어린 격려와 희망의 메시지\n\n"
-                "**중요: 모든 답변은 완벽한 한국어로 작성되어야 합니다. 번역투가 아닌 자연스러운 한국어를 사용하세요.**\n"
-                "지금 바로 한국어로 리포트 작성을 시작하세요."
-            )
-            
-            payload = {
-                "model": "gemma2:2b",
-                "prompt": prompt_text,
-                "stream": False,
-                "options": {
-                    "temperature": 0.7,
-                    "num_predict": 4096, # Maximum length
-                    "repeat_penalty": 1.1,
-                    "top_k": 40,
-                    "top_p": 0.9
+            from config import Config
+            RUNPOD_API_KEY = Config.RUNPOD_API_KEY
+            RUNPOD_LLM_URL = Config.RUNPOD_LLM_URL
+        except:
+            RUNPOD_API_KEY = os.environ.get('RUNPOD_API_KEY')
+            RUNPOD_LLM_URL = os.environ.get('RUNPOD_LLM_URL')
+
+        # 1. RunPod Serverless (Priority)
+        if RUNPOD_API_KEY and RUNPOD_LLM_URL and "YOUR_POD_ID" not in RUNPOD_LLM_URL:
+            try:
+                print("🚀 [Brain] Sending Async request to RunPod...")
+                
+                # Normalize Base URL
+                base_url = RUNPOD_LLM_URL.replace('/runsync', '').replace('/run', '').rstrip('/')
+                submit_url = f"{base_url}/run"
+                
+                headers = {
+                    "Authorization": f"Bearer {RUNPOD_API_KEY}",
+                    "Content-Type": "application/json"
                 }
+                
+                payload = {
+                    "input": {
+                        "prompt": prompt,
+                        "max_tokens": options.get('num_predict', 2048),
+                        "temperature": options.get('temperature', 0.7),
+                        "stream": False
+                    }
+                }
+                
+                res = requests.post(submit_url, json=payload, headers=headers, timeout=30)
+                if res.status_code != 200:
+                    print(f"❌ RunPod Submit Failed: {res.text}")
+                    raise Exception("RunPod Submit Failed")
+                    
+                job_id = res.json()['id']
+                print(f"⏳ [Brain] Job Submitted: {job_id}. Polling...")
+                
+                status_url = f"{base_url}/status/{job_id}"
+                start_time = time.time()
+                
+                while True:
+                    if time.time() - start_time > 600: # 10 min timeout for reports
+                         raise Exception("RunPod Timeout")
+                         
+                    status_res = requests.get(status_url, headers=headers, timeout=30)
+                    status_data = status_res.json()
+                    status = status_data.get('status')
+                    
+                    if status == 'COMPLETED':
+                        output = status_data.get('output')
+                        print("✅ [Brain] RunPod Job Completed!")
+                        
+                        # Process Output
+                        if isinstance(output, dict):
+                             # Try to get text field
+                             if 'reaction' in output:
+                                 clean_str = output['reaction'].strip()
+                                 # Clean Markdown
+                                 if clean_str.startswith('```'):
+                                     clean_str = re.sub(r'^```(?:json)?\s*|\s*```$', '', clean_str, flags=re.MULTILINE)
+                                 return clean_str.strip()
+                             elif 'text' in output:
+                                 return output['text']
+                             elif 'response' in output:
+                                 return output['response']
+                             else:
+                                 return json.dumps(output, ensure_ascii=False)
+                        else:
+                             return str(output)
+                             
+                    elif status in ['FAILED', 'CANCELLED']:
+                        print(f"❌ RunPod Job Failed: {status}")
+                        raise Exception(f"RunPod Failed: {status}")
+                        
+                    time.sleep(2)
+                    
+            except Exception as e:
+                print(f"❌ RunPod Async Failed: {e}")
+                # Fallthrough
+
+        # 2. Local Ollama (Fallback)
+        try:
+            print("🦙 [Brain] Fallback to Local Ollama...")
+            url = "http://localhost:11434/api/generate"
+            payload = {
+                "model": options.get('model', 'gemma2:2b'),
+                "prompt": prompt,
+                "stream": False,
+                "options": options
             }
-            
-            # Timeout 600s (10 mins) - Increased for OCI environment
             response = requests.post(url, json=payload, timeout=600)
-            
             if response.status_code == 200:
                 result = response.json().get('response', '')
                 return result
+        except Exception as e:
+             print(f"❌ Local AI Failed: {e}")
+             
+        return None
+    def generate_comprehensive_report(self, diary_summary):
+        """
+        Generates a detailed 10-paragraph psychological report using Hybrid AI (RunPod Priority).
+        """
+        print("🧠 [Brain] Generating Comprehensive Report...")
+        
+        prompt_text = (
+            "## SYSTEM: You represent a thoughtful, empathetic counselor with 20 years of experience. You must ANSWER IN KOREAN ONLY.\n"
+            "당신은 20년 경력의 베테랑 심리 상담사입니다. 아래 내담자(사용자)의 일기 기록과 통계를 자세히 읽고 분석해주세요.\n\n"
+            f"### [사용자 데이터]\n{diary_summary}\n\n"
+            "### [작성 지침]\n"
+            "1. **언어**: 반드시 **한국어(Korean)**로만 작성하세요. 영어는 절대 사용하지 마세요.\n"
+            "2. **형식**: 사용자에게 보내는 '심층 심리 분석 리포트' 형식으로 작성하세요.\n"
+            "3. **분량**: 반드시 **서론-본론(진단)-결론(처방)**의 흐름을 갖춘 **총 10문단 이상의 긴 글**이어야 합니다.\n"
+            "4. **어조**: 전문적인 심리학 용어를 사용하되, 따뜻하고 이해하기 쉬운 언어로 풀어주세요.\n\n"
+            "### [리포트 구조]\n"
+            "1부. **마음의 지도 (현상 진단)** (5문단)\n"
+            "   - 내담자가 주로 사용하는 감정 언어와 내면의 상태 분석\n"
+            "   - 반복되는 스트레스 패턴이나 감정의 트리거 파악\n"
+            "   - 숨겨진 긍정적인 자원이나 강점 발굴\n\n"
+            "2부. **나아가야 할 길 (미래 처방)** (5문단)\n"
+            "   - 현재 상태에서 실천할 수 있는 구체적인 심리 기법 3가지 (ACT, CBT 등 활용)\n"
+            "   - 감정의 파도를 다스리는 생활 습관 제안\n"
+            "   - 상담사로서 전하는 진심 어린 격려와 희망의 메시지\n\n"
+            "**중요: 모든 답변은 완벽한 한국어로 작성되어야 합니다. 번역투가 아닌 자연스러운 한국어를 사용하세요.**\n"
+            "지금 바로 한국어로 리포트 작성을 시작하세요."
+        )
+        
+        try:
+            options = {
+                "model": "gemma2:2b", # For fallback
+                "temperature": 0.7,
+                "num_predict": 4096, # Max length for report
+                "repeat_penalty": 1.1,
+                "top_k": 40,
+                "top_p": 0.9
+            }
+            
+            result = self._call_llm(prompt_text, options)
+            
+            if result:
+                return result
             else:
                 return "죄송합니다. AI가 리포트를 작성하는 도중 연결이 끊겼습니다."
-                
+
         except Exception as e:
             print(f"❌ Report Generation Error: {e}")
             return "리포트 생성 시스템에 오류가 발생했습니다."

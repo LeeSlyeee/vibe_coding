@@ -153,9 +153,11 @@ export const diaryAPI = {
       mood_intensity: data.mood_intensity,
       symptoms: data.symptoms,
       gratitude_note: data.gratitude_note,
+      gratitude_note: data.gratitude_note,
       safety_flag: data.safety_flag
     }
-    const response = await api.put(`/diaries/${id}`, mappedData)
+    // [Fix] Use POST instead of PUT to avoid CORS Preflight/Proxy issues on some networks
+    const response = await api.post(`/diaries/${id}`, mappedData)
     return response.data
   },
 

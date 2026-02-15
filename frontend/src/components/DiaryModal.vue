@@ -55,7 +55,7 @@
 
       <EmojiSelector v-model="formData.mood" />
 
-      <!-- Common: Sleep & Event -->
+      <!-- Common: Sleep -->
       <QuestionAccordion
         :question="uiMode === 'red' ? '잠은 푹 주무셨나요? (수면의 질)' : '잠은 잘 주무셨나요?'"
         v-model="formData.question_sleep"
@@ -65,8 +65,9 @@
         @record="toggleRecording('question_sleep')"
       />
 
+      <!-- Common: Event -->
       <QuestionAccordion
-        :question="uiMode === 'green' ? '오늘 가장 즐거웠던 일은?' : '오늘 무슨일이 있었나요?'"
+        question="오늘 있었던 일은?"
         v-model="formData.question1"
         :required="true"
         :default-open="true"
@@ -78,17 +79,6 @@
       <!-- Red Mode Specific: Physical Symptoms (REMOVED) -->
       
       <!-- Red Mode Specific: Mood Intensity Slider (REMOVED) -->
-
-
-      <!-- Green Mode Specific: Gratitude -->
-      <QuestionAccordion
-        v-if="uiMode === 'green'"
-        question="오늘 나를 칭찬해준다면?"
-        v-model="formData.gratitude_note"
-        placeholder="작은 성공이라도 좋아요!"
-        :recording="activeField === 'gratitude_note'"
-        @record="toggleRecording('gratitude_note')"
-      />
 
       <QuestionAccordion
         question="어떤 감정이 들었나요?"
@@ -108,13 +98,13 @@
       />
 
       <QuestionAccordion
-        :question="uiMode === 'green' ? '내일의 목표는 무엇인가요?' : '나에게 보내는 따뜻한 위로'"
+        question="나에게 해주고 싶은 말 (칭찬, 위로)"
         v-model="formData.question4"
-        placeholder="긍정적인 다짐을 적어보세요..."
+        placeholder="스스로에게 힘이 되는 말을 적어보세요..."
         :recording="activeField === 'question4'"
         @record="toggleRecording('question4')"
       />
-      
+
       <!-- Red Mode: Safety Check (REMOVED) -->
 
 

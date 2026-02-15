@@ -566,14 +566,14 @@ export default {
     const handleGenerateReport = async () => {
       // [Fix] 권한 체크: 연동 사용자(isLinked) OR 프리미엄 여부
       // 로컬 스토리지에서 b2g_is_linked 확인
-      const b2gLinked = localStorage.getItem('b2g_is_linked') === 'true';
-      // 진단 패스된 유저는 사실상 프리미엄/연동 유저임 (간접 확인)
-      const isAssessed = localStorage.getItem('assessment_completed') === 'true';
+      // [Fix] 클라이언트 사이드 차단 해제 -> 백엔드 응답을 신뢰
+      // const b2gLinked = localStorage.getItem('b2g_is_linked') === 'true';
+      // const isAssessed = localStorage.getItem('assessment_completed') === 'true';
 
-      if (!b2gLinked && !isAssessed) {
-           alert("유료 사용자 또는 기관 연동 사용자 전용 기능입니다.");
-           return;
-      }
+      // if (!b2gLinked && !isAssessed) {
+      //      // alert("유료 사용자 또는 기관 연동 사용자 전용 기능입니다.");
+      //      // return;
+      // }
 
       if (isGeneratingReport.value) return; // Prevent double click
 

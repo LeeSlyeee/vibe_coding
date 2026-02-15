@@ -66,14 +66,16 @@ WSGI_APPLICATION = "config.wsgi.application"
 # 기본적으로 MySQL을 사용하되 설정을 .env에서 제어
 # 연결 실패 시 SQLite로 fallback하는 로직은 없으나, 초기 개발을 위해
 # DB_MODE 환경변수로 제어하거나 일단 MySQL로 강제.
+# Database
+# [Hard Transition] PostgreSQL
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("DB_NAME", "haruon_db"),
-        "USER": os.getenv("DB_USER", "root"),
-        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("DB_NAME", "mood_diary_db"),
+        "USER": os.getenv("DB_USER", "postgres"), # Default PG User
+        "PASSWORD": os.getenv("DB_PASSWORD", "password"),
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
-        "PORT": os.getenv("DB_PORT", "3306"),
+        "PORT": os.getenv("DB_PORT", "5432"),
     }
 }
 

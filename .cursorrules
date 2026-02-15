@@ -31,3 +31,6 @@ Always prioritize the user's requirements and follow these consolidated project 
 - **Config Check:** Verify existence of key config files (`package.json`, `vite.config.ts`) before starting dev servers.
 - **Dependencies:** If import errors occur, double-check package installation (`npm install <pkg>`).
 - **Backend Logs:** If requests fail silently, use `curl` to test backend isolation first.
+
+## 06. 시간 준수 및 터미널 관리 (Time Management & Terminal Safety)
+- **⏱️ 30초 룰 (30-second Timeout):** 간단한 명령어(`ls`, `cd`, `build`, `start` 등) 실행 후 **30초 이상 응답이 없으면 즉시 작업을 중단**하고, "터미널이 꺼진 것 같으니 확인해달라"고 사용자에게 보고하십시오. 멍하니 기다리는 행위는 엄격히 금지됩니다. (Strictly prohibited).

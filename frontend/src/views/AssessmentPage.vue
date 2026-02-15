@@ -44,7 +44,7 @@
         </div>
       </div>
       <!-- 기관 코드 연동 섹션 (새로 추가됨) -->
-      <div class="linkage-section" v-if="currentStep < questions.length">
+      <div class="linkage-section" v-if="currentStep < questions.length && !isLinked">
           <p class="linkage-title">혹시 기관 코드가 있으신가요?</p>
           <div class="input-group">
             <input 
@@ -65,7 +65,7 @@
 </template>
 
 <script>
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { medicationAPI } from "../services/medication";
 import api from "../services/api";
@@ -163,6 +163,26 @@ export default {
     const inputCode = ref('');
     const isLoadingCode = ref(false);
     const errorCode = ref('');
+    const isLinked = ref(false);
+
+    onMounted(async () => {
+        try {
+            // Check if already linked
+            const res = await api.get('/user/me');
+            if (res.data.center_code) {
+                isLinked.value = true;
+                // [Fix] Linked users skip assessment and go straight to calendar
+                // Verify localStorage is synced
+                localStorage.setItem("b2g_center_code", res.data.center_code);
+                localStorage.setItem("b2g_is_linked", "true");
+                
+                console.log("Already linked to center:", res.data.center_code);
+                router.push('/calendar');
+            }
+        } catch (e) {
+            console.log("User info check failed (probably guest or network error)");
+        }
+    });
 
     const handleConnect = async () => {
       if (!inputCode.value) return;
@@ -192,6 +212,7 @@ export default {
             localStorage.setItem("b2g_center_code", inputCode.value.toUpperCase());
             localStorage.setItem("b2g_is_linked", "true");
             localStorage.setItem("assessment_completed", "true"); // Force Pass!
+            isLinked.value = true;
             
             alert(response.data.message || "연동되었습니다! 검사를 건너뜁니다.");
             router.push('/calendar');
@@ -224,68 +245,33 @@ export default {
       inputCode,
       isLoadingCode,
       errorCode,
-      handleConnect
+      handleConnect,
+      isLinked
     };
   },
 };
 </script>
 
 <style scoped>
-/* New Linkage Section Styles */
-.linkage-section {
-    margin-top: 40px;
-    padding-top: 30px;
-    border-top: 1px solid #eee;
-    text-align: center;
-}
-.linkage-title {
-    font-size: 14px;
-    color: #86868b;
-    margin-bottom: 12px;
-    font-weight: 600;
-}
-.input-group {
-    display: flex;
-    gap: 8px;
-    max-width: 300px;
-    margin: 0 auto;
-}
-.input-code {
-    flex: 1;
-    padding: 10px 12px;
-    border: 1px solid #e5e5ea;
-    border-radius: 10px;
-    font-size: 15px;
-    text-transform: uppercase;
-}
-.btn-connect {
-    padding: 0 16px;
-    background: #5856d6;
-    color: white;
-    border: none;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-}
-.btn-connect:disabled {
-    background: #d1d1d6;
-}
-.error-text {
-    color: #ff3b30;
-    font-size: 13px;
-    margin-top: 8px;
-}
-/* ... Existing Styles ... */
-
-<style scoped>
 .assessment-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background: #f5f5f7;
-  padding: 20px;
+  /* [Fix] 화면 전체를 덮고 최상단에 뜨도록 강제 (z-index Max) */
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 2147483647 !important; 
+  
+  /* 내부 중앙 정렬 */
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  
+  background-color: #f5f5f7 !important;
+  margin: 0 !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
 }
 
 .assessment-card {
@@ -296,6 +282,9 @@ export default {
   border-radius: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
   text-align: center;
+  
+  /* Flex Item 중앙 정렬 보정 */
+  margin: auto !important;
 }
 
 .header h1 {

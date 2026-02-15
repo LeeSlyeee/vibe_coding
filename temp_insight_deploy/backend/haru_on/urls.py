@@ -13,7 +13,7 @@ router.register(r'', HaruOnViewSet, basename='haruon')
 urlpatterns = [
     # 환자 관리 API (가장 먼저 매칭)
     path('staff/patients/', PatientListView.as_view(), name='staff-patient-list'),
-    path('staff/patients/<int:user_id>/', PatientDetailView.as_view(), name='staff-patient-detail'),
+    path('staff/patients/<str:user_id>/', PatientDetailView.as_view(), name='staff-patient-detail'),
 
     path('statistics/', StatisticsView.as_view(), name='statistics'), # [OCI Logic] 통계 API 추가
     path('', include(router.urls)), 
