@@ -48,8 +48,8 @@ const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString();
 };
 
-const goToDetail = (userId) => {
-    router.push(`/admin/patients/${userId}`);
+const goToDetail = (username) => {
+    router.push(`/admin/patients/${username}`);
 };
 
 let intervalId = null;
@@ -115,7 +115,7 @@ onUnmounted(() => {
                         v-for="patient in patients" 
                         :key="patient.id" 
                         class="hover:bg-indigo-50/30 transition cursor-pointer"
-                        @click="goToDetail(patient.id)"
+                        @click="goToDetail(patient.username)"
                     >
                           <td class="px-8 py-6">
                              <div class="flex flex-col">

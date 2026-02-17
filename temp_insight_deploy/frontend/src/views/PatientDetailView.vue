@@ -129,13 +129,13 @@ const handleAnalyze = async () => {
     
     isAnalyzing.value = true;
     try {
-        const userId = route.params.id;
-        // [Fix] SSL 적용 완료! HTTPS 사용
-        const baseURL = 'https://150.230.7.76.nip.io/api/v1/';
+        const username = route.params.username;
+        // [Fix] Relative path for dynamic environment
+        const baseURL = '/api/v1/';
         // DetailView now supports POST for analysis
-        console.log(`📡 Sending POST to ${baseURL}diaries/staff/patients/${userId}/`);
+        console.log(`📡 Sending POST to ${baseURL}diaries/staff/patients/${username}/`);
         
-        const res = await axios.post(`${baseURL}diaries/staff/patients/${userId}/`);
+        const res = await axios.post(`${baseURL}diaries/staff/patients/${username}/`);
         console.log("✅ Response:", res.data);
         
         insightResult.value = res.data.result;
@@ -158,11 +158,16 @@ const formatDate = (dateString, full = false) => {
 
 const fetchPatientDetail = async () => {
     try {
-        const userId = route.params.id;
-        // [Fix] SSL 적용 완료! HTTPS 사용
-        const baseURL = 'https://150.230.7.76.nip.io/api/v1/';
-        const res = await axios.get(`${baseURL}diaries/staff/patients/${userId}/`);
-        console.log("🔍 [DEBUG] API Response:", res.data); // 디버깅용 로그
+        const username = route.params.username;
+        // [Fix] Relative path for dynamic environment
+        const baseURL = '/api/v1/';
+        
+        console.log(`[DEBUG_V2] Fetching patient ${username} from ${baseURL}`);
+        // [Fix] Cache Busting with Timestamp
+        const res = await axios.get(`${baseURL}diaries/staff/patients/${username}/?t=${new Date().getTime()}`);
+        console.log("🔍 [DEBUG_V2] API Response:", res.data); // 디버깅용 로그
+        
+        // [User Request] JSON alert removed
         
         patient.value = res.data.patient;
         console.log("🔍 [DEBUG] Patient Data:", patient.value); // 디버깅용 로그
@@ -230,7 +235,7 @@ const fetchPatientDetail = async () => {
         
     } catch (err) {
         console.error(err);
-        alert('환자 정보를 불러오는데 실패했습니다.');
+        alert(`환자 정보를 불러오는데 실패했습니다: ${err.message} (Detail: ${JSON.stringify(err.response?.data || '')})`);
         router.push('/admin/patients');
     } finally {
         loading.value = false;
@@ -265,7 +270,7 @@ onUnmounted(() => {
              </div>
              <div class="text-lg text-slate-500 text-right">
                 <div class="text-sm text-slate-400">Patient ID</div>
-                <div class="font-mono font-bold text-xl">{{ route.params.id }}</div>
+                <div class="font-mono font-bold text-xl">{{ patient?.id || '-' }}</div>
              </div>
         </header>
 
