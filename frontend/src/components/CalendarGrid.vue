@@ -117,16 +117,31 @@ export default {
         const isFuture = currentDataDate > today
 
         // [Parsing AI Prediction]
-        // "AI가 예측한 당신의 감정은 '행복해 (95%)'입니다." -> "행복해 (95%)"
-        // Also supports: "Emotion: 행복 (95%)" or just "행복 (95%)"
         let predictionData = null
-        // [AI Emotion Display Logic]
+        
+        // Helper for mapping Korean label to Emoji Key
+        const koreanToMoodKey = {
+          "행복": "happy", "기쁨": "happy", "사랑": "happy", "설렘": "happy", "즐거움": "happy", "흥분": "happy",
+            "재미": "happy", "신남": "happy", "만족": "happy",
+          "평온": "calm", "편안": "calm", "감사": "calm", "다짐": "calm", "안도": "calm",
+            "차분": "calm",
+          "평범": "neutral", "무던": "neutral", "보통": "neutral", "지루함": "neutral",
+             "혼란": "neutral", "모호": "neutral",
+          "우울": "sad", "슬픔": "sad", "지침": "sad", "피곤": "sad", "외로움": "sad", "후회": "sad", "상처": "sad",
+             "어려움": "sad", "힘듦": "sad", "괴로움": "sad", "어리움": "sad", "지쳐있음": "sad",
+             "피로": "sad", "무력": "sad", "낙담": "sad",
+          "분노": "angry", "화남": "angry", "짜증": "angry", "스트레스": "angry", "싫어": "angry", "불안": "angry", "걱정": "angry",
+             "답답함": "angry", "억울": "angry"
+        };
+
         if (diary) {
             // Priority 1: New 'ai_emotion' field (Core keyword)
             if (diary.ai_emotion && diary.ai_emotion !== "분석중" && diary.ai_emotion !== "대기중") {
+                const label = diary.ai_emotion.trim();
                 predictionData = {
-                     label: diary.ai_emotion,
+                     label: label,
                      percent: null,
+                     moodKey: koreanToMoodKey[label] || null,
                      isLoading: false
                  }
             }
@@ -138,15 +153,15 @@ export default {
                  // [Loading State Check]
                  if (fullText.includes("재분석 중") || fullText.includes("분석 중") || fullText.includes("기다려주세요")) {
                      predictionData = {
-                         label: '⏳', // Hourglass for waiting
+                         label: '⏳', 
                          percent: null,
+                         moodKey: null,
                          isLoading: true
                      }
                  } else {
-                     // 1. Try to find quoted text first: '행복 (95%)'
-                     const quoteMatch = fullText.match(/'([^']+)'/);
-                     if (quoteMatch && quoteMatch[1]) {
-                        fullText = quoteMatch[1];
+                     // 1. Remove quotes if wrapping
+                     if ((fullText.startsWith("'") && fullText.endsWith("'")) || (fullText.startsWith('"') && fullText.endsWith('"'))) {
+                        fullText = fullText.slice(1, -1);
                      }
     
                      // 2. Parse Label and Percent
@@ -175,17 +190,23 @@ export default {
                         const lowerRaw = rawLabel.toLowerCase();
                         const matchedKey = Object.keys(map).find(k => k.toLowerCase() === lowerRaw);
                         const finalLabel = matchedKey ? map[matchedKey] : rawLabel;
+                        
+                        // Map to MoodKey for Emoji
+                        const moodKey = koreanToMoodKey[finalLabel] || null;
     
                         predictionData = {
                             label: finalLabel,
                             percent: percentStr,
+                            moodKey: moodKey,
                             isLoading: false
                         }
                      } else {
-                         // Fallback: Just show text
+                         // Fallback: Just show text, try to map label
+                         const label = fullText.trim();
                          predictionData = {
-                            label: fullText.length > 5 ? fullText.slice(0, 4) + '..' : fullText,
+                            label: label.length > 5 ? label.slice(0, 4) + '..' : label,
                             percent: null,
+                            moodKey: koreanToMoodKey[label] || null,
                             isLoading: false
                          }
                      }
@@ -193,7 +214,7 @@ export default {
     
               } catch (e) {
                 console.error("AI Pred Parse Error", e);
-                predictionData = { label: '?', percent: null }
+                predictionData = { label: '?', percent: null, moodKey: null }
               }
             }
         }
@@ -204,8 +225,11 @@ export default {
           isCurrentMonth: true,
           isToday,
           hasDiary: !!diary,
-          emoji: diary ? emojiMap[diary.mood] : null,
-          aiPrediction: predictionData, // Pass Object instead of String
+          // [Fix] Prioritize AI Mood Key -> User Mood
+          emoji: (diary && predictionData && predictionData.moodKey) 
+                 ? emojiMap[predictionData.moodKey] 
+                 : (diary ? emojiMap[diary.mood] : null),
+          aiPrediction: predictionData, 
           dateString,
           isFuture
         })

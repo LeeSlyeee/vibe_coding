@@ -13,3 +13,5 @@ faster-whisper
 requests
 
 gunicorn
+flask-sqlalchemy
+psycopg2-binary

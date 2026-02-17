@@ -249,7 +249,9 @@ class B2GManager: ObservableObject {
                 "weather": diary.weather ?? "",
                 "medication_taken": diary.medication_taken,
                 "symptoms": diary.symptoms ?? [], // Array of strings
-                "gratitude": diary.gratitude_note ?? ""
+                "gratitude": diary.gratitude_note ?? "",
+                "temperature": diary.temperature ?? 0.0,
+                "medication_desc": diary.medication_desc ?? ""
             ]
         }
         

@@ -1,4 +1,6 @@
 from rest_framework import views, status, permissions, generics
+from django.utils.decorators import method_decorator
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.response import Response
 from .models import Center, VerificationCode
 from .serializers import CenterSerializer
@@ -202,6 +204,7 @@ class CenterListView(generics.ListAPIView):
     serializer_class = CenterSerializer
     permission_classes = [permissions.AllowAny]
 
+@method_decorator(csrf_exempt, name='dispatch')
 class SyncDataView(views.APIView):
     """
     iOS 앱에서 데이터를 수신하여 저장 (B2G 연동 핵심)

@@ -62,9 +62,8 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         let label: String
     }
     
-    // Helper: Custom Request to 217 Server (where backend code is deployed)
     private func performShareRequest(endpoint: String, method: String, body: [String: Any]? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        // [Important] Target the 217 Server (LLM Node) which has the Share Backend Code
+        // [Verified] Share API is newly implemented at /api/v1/share/
         let baseURL = "https://217.142.253.35.nip.io/api/v1"
         guard let url = URL(string: baseURL + endpoint) else { return }
         
@@ -139,7 +138,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             "user_name": userName
         ]
         
-        performShareRequest(endpoint: "/share/code", method: "POST", body: body) { result in
+        performShareRequest(endpoint: "/share/code/", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):
@@ -160,7 +159,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     // 2. Connect (Viewer)
     func connectWithCode(_ code: String, completion: @escaping (Bool, String) -> Void) {
         let body = ["code": code]
-        performShareRequest(endpoint: "/share/connect", method: "POST", body: body) { result in
+        performShareRequest(endpoint: "/share/connect/", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):
@@ -183,7 +182,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         self.lastErrorMessage = "" // Reset Error
         
         // GET Request with Explicit ID & Role
-        let endpoint = "/share/list?user_id=\(userId)&role=\(role)"
+        let endpoint = "/share/list/?user_id=\(userId)&role=\(role)"
         print("🚀 Fetching List: \(endpoint)")
         
         performShareRequest(endpoint: endpoint, method: "GET") { result in
@@ -228,7 +227,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             "target_id": targetId
         ]
         
-        performShareRequest(endpoint: "/share/disconnect", method: "POST", body: body) { result in
+        performShareRequest(endpoint: "/share/disconnect/", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(_):
@@ -247,7 +246,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     // 5. View Insights
     func fetchSharedStats(targetId: String, completion: @escaping (Bool) -> Void) {
         self.currentSharedStats = nil // Clear previous
-        performShareRequest(endpoint: "/share/insights/\(targetId)", method: "GET") { result in
+        performShareRequest(endpoint: "/share/insights/\(targetId)/", method: "GET") { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):

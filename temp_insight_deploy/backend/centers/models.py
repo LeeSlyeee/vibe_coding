@@ -5,7 +5,8 @@ class Center(models.Model):
     name = models.CharField(max_length=100, verbose_name="센터명")
     region = models.CharField(max_length=50, verbose_name="관할 지역")
     admin_email = models.EmailField(verbose_name="담당자 이메일")
-    # center_code 필드는 제거하거나, 고정 식별자로만 사용
+    # [Fix] B2G Verification Code (Mapped to PG 'code' column)
+    code = models.CharField(max_length=50, null=True, blank=True, verbose_name="기관 식별 코드")
 
     class Meta:
         verbose_name = "보건소/센터"

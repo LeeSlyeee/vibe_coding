@@ -2,7 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
-from flask_pymongo import PyMongo
+# from flask_pymongo import PyMongo # Removed
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from config import Config
@@ -14,19 +14,20 @@ from analysis_worker import start_analysis_thread # [New] Background Worker for 
 app = Flask(__name__)
 
 # [PostgreSQL Integration]
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vibe_user:vibe1234@127.0.0.1/vibe_db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///vibe_db.sqlite'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = Config.JWT_SECRET_KEY
+app.config['PROPAGATE_EXCEPTIONS'] = True # Detail Errors
+app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string'] # [Standard] RFC 6750 Sec 2.3 Fallback
 
-# [MongoDB Integration]
-app.config['MONGO_URI'] = Config.MONGO_URI or "mongodb://localhost:27017/maumon_db" 
-# Ensure Config.MONGO_URI is defined or fallback
+# [MongoDB Removed]
+# app.config['MONGO_URI'] = ... # Deleted
 
 # Initialize DB (Postgres)
 db.init_app(app)
 
-# Initialize MongoDB
-mongo = PyMongo(app)
+# Initialize MongoDB - REMOVED
+# mongo = PyMongo(app)
 
 # Initialize Encryption
 try:
@@ -62,6 +63,7 @@ except Exception as e:
 @app.before_request
 def log_request_info():
     print(f"📡 [Global] Request: {request.method} {request.url}")
+    print(f"📦 [Headers] {request.headers}")
     if request.method in ['PUT', 'POST']:
         pass
 
@@ -114,7 +116,6 @@ def register():
 
     new_user = User(
         username=username,
-        user_id=username, # Legacy mapping
         password=generate_password_hash(password), 
         nickname=nickname,
         role=role
@@ -143,25 +144,14 @@ def login():
 
     access_token = create_access_token(identity=username)
     
-    # [B2G] Sync Center Code if provided on login
+    # [B2G] Center Code from Postgres only
     real_center_code = user.center_code
-    
-    # [Mongo Sync Check]
-    # Check if user exists in Mongo too?
-    # medication_routes depends on Mongo user document.
-    linked_code_mongo = None
-    try:
-        mongo_user = mongo.db.users.find_one({"username": username})
-        if mongo_user and mongo_user.get('linked_center_code'):
-             linked_code_mongo = mongo_user.get('linked_center_code')
-    except:
-        pass
 
     return jsonify({
         'access_token': access_token,
         'username': user.username,
         'center_code': user.center_code, # Postgres
-        'linked_center_code': linked_code_mongo, # Mongo (B2G Priority)
+        'linked_center_code': user.center_code, # Fallback to same field
         'role': user.role
     })
 
@@ -175,19 +165,10 @@ def get_me():
     if not user:
         return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404
         
-    # Sync with Mongo
-    linked_code_mongo = None
-    try:
-        mongo_user = mongo.db.users.find_one({"username": current_username})
-        if mongo_user:
-            linked_code_mongo = mongo_user.get('linked_center_code')
-    except:
-        pass
-
     return jsonify({
         'username': user.username,
         'center_code': user.center_code,
-        'linked_center_code': linked_code_mongo, # Include Mongo linkage
+        'linked_center_code': user.center_code, # Fallback
         'role': user.role,
         'is_premium': (user.role == 'premium' or user.role == 'admin')
     })
@@ -207,6 +188,10 @@ def safe_encrypt(text):
         return crypto.encrypt(text)
     except:
         return text
+
+# Alias for external usage (e.g. b2g_routes)
+def encrypt_data(text):
+    return safe_encrypt(text)
 
 # [API Endpoint: Get Diaries]
 @app.route('/api/diaries', methods=['GET'])
@@ -243,6 +228,11 @@ def create_diary():
     user = User.query.filter_by(username=current_username).first()
     data = request.get_json()
 
+    # [Strict Date Validation] Prevent retroactive diary misdating
+    client_date = data.get('date')
+    if not client_date:
+        return jsonify({"msg": "Diary date is required"}), 400
+
     # Encrypt Content Fields
     encrypted_event = safe_encrypt(data.get('event') or data.get('question1'))
     encrypted_emotion_desc = safe_encrypt(data.get('emotion_desc') or data.get('question2'))
@@ -255,7 +245,7 @@ def create_diary():
 
     new_diary = Diary(
         user_id=user.id,
-        date=data.get('date', datetime.now().strftime('%Y-%m-%d')),
+        date=client_date,
         event=encrypted_event, # Encrypted
         sleep_condition=encrypted_sleep, # Encrypted
         emotion_desc=encrypted_emotion_desc, # Encrypted
@@ -287,12 +277,20 @@ def create_diary():
     )
 
     response_data = serialize_diary(new_diary)
+    
+    # [Local Sync] Push to Medical Dashboard (Localhost:8000)
+    try:
+        from b2g_routes import sync_to_insight_mind
+        sync_to_insight_mind(response_data, user.id)
+    except Exception as e:
+        print(f"⚠️ Sync Trigger Failed: {e}")
+
     response_data['msg'] = '일기가 저장되었습니다.'
     return jsonify(response_data), 201
 
 def serialize_diary(d):
     return {
-        'id': d.id,
+        'id': str(d.id), # Cast to String for iOS
         'date': d.date,
         'mood_level': d.mood_level,
         'weather': d.weather,
@@ -305,11 +303,32 @@ def serialize_diary(d):
         'gratitude_note': safe_decrypt(d.gratitude_note),
         'ai_comment': safe_decrypt(d.ai_comment),
         'ai_emotion': safe_decrypt(d.ai_emotion),
+        'ai_prediction': safe_decrypt(d.ai_emotion), # Map for iOS
         'mode': d.mode,
         'mood_intensity': d.mood_intensity,
-        'safety_flag': d.safety_flag,
-        'created_at': d.created_at.isoformat() if d.created_at else None
+        'safety_flag': d.safety_flag if hasattr(d, 'safety_flag') else False,
+        'created_at': d.created_at.isoformat() if d.created_at else None,
+        'ai_prediction': safe_decrypt(d.ai_emotion), # Mapped
+        'medication': False,
+        'symptoms': []
     }
+
+# [API Endpoint: Get Single Diary by Date] - PostgreSQL Only
+@app.route('/api/diaries/date/<string:date_str>', methods=['GET'])
+@jwt_required()
+def get_diary_by_date(date_str):
+    current_username = get_jwt_identity()
+    user = User.query.filter_by(username=current_username).first()
+    
+    if not user:
+         return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404
+
+    diary = Diary.query.filter_by(user_id=user.id, date=date_str).first()
+    
+    if not diary:
+        return jsonify({'msg': '일기를 찾을 수 없습니다.'}), 404
+    
+    return jsonify(serialize_diary(diary))
 
 # [API Endpoint: Get Single Diary]
 @app.route('/api/diaries/<int:diary_id>', methods=['GET'])
@@ -421,6 +440,31 @@ def update_diary(diary_id):
     response_data['msg'] = '일기가 수정되었습니다.'
     return jsonify(response_data)
 
+
+# [API Endpoint: Get Diary List]
+@app.route('/api/diaries', methods=['GET'])
+@jwt_required()
+def get_diary_list():
+    try:
+        current_username = get_jwt_identity()
+        user = User.query.filter_by(username=current_username).first()
+        
+        if not user:
+            return jsonify([]), 200
+
+        # Fetch all diaries for user, sorted by date desc
+        diaries = Diary.query.filter_by(user_id=user.id).all()
+        
+        # Sort manually to ensure date consistency (Desc)
+        diaries.sort(key=lambda x: x.date, reverse=True)
+        
+        result = [serialize_diary(d) for d in diaries]
+        return jsonify(result), 200
+        
+    except Exception as e:
+        print(f"❌ Get Diaries Error: {e}")
+        return jsonify([]), 500
+
 # [API Endpoint: Delete Diary]
 @app.route('/api/diaries/<int:diary_id>', methods=['DELETE'])
 @jwt_required()
@@ -432,9 +476,10 @@ def delete_diary(diary_id):
     if not diary:
         return jsonify({'msg': '일기를 찾을 수 없습니다.'}), 404
 
+    target_date = diary.date
     db.session.delete(diary)
     db.session.commit()
-
+    
     return jsonify({'msg': '일기가 삭제되었습니다.'})
 
 # [API Endpoint: Verify Center Code]

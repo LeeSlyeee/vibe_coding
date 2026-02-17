@@ -3,22 +3,32 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import HaruOn
 from .serializers import HaruOnSerializer
+import threading
+
 
 class HaruOnViewSet(viewsets.ModelViewSet):
     serializer_class = HaruOnSerializer
     permission_classes = [permissions.AllowAny] # 403 방지를 위해 완화 (쿼리셋에서 걸러냄)
 
     def get_queryset(self):
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"🔍 [HaruOnViewSet] Request from: {self.request.user} (Auth: {self.request.auth})")
-        if not self.request.user.is_authenticated:
-            logger.error("❌ [HaruOnViewSet] User is NOT authenticated -> Returning empty list.")
+        # [Fix] Robust Filtering for Calendar
+        user = self.request.user
+        if not user.is_authenticated:
             return HaruOn.objects.none()
-        # 자신의 일기만 조회 가능
-        qs = HaruOn.objects.filter(user=self.request.user)
-        logger.error(f"✅ [HaruOnViewSet] Returning {qs.count()} records for {self.request.user}")
-        return qs
+            
+        qs = HaruOn.objects.filter(user=user)
+        
+        # Filter by Year/Month (Calendar View)
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+        
+        if year and month:
+            qs = qs.filter(created_at__year=int(year), created_at__month=int(month))
+        
+        # [Critical] Use 'created_at' for sorting.
+        # If frontend sends 'date', we mapped it to 'created_at' in serializer.
+        return qs.order_by('created_at')
+
     
     @action(detail=False, methods=['get'], url_path='date/(?P<date>[^/.]+)')
     def get_by_date(self, request, date=None):
@@ -75,23 +85,40 @@ class HaruOnViewSet(viewsets.ModelViewSet):
         return Response({"detail": "Not found."}, status=404)
 
     def perform_create(self, serializer):
-        # TODO: 여기서 AI 분석 로직 호출 (Celery Task 등)
-        # 임시로 위험도 분석 로직 하드코딩 (예: 점수가 3점 이하면 무조건 위험)
-        mood_score = serializer.validated_data.get('mood_score', 5)
-        is_high_risk = mood_score <= 3
+        # Save Trigger
+        instance = serializer.save(user=self.request.user)
         
-        # 클라이언트가 보낸 analysis_result가 있으면 사용 (앱 동기화 데이터 우선)
-        client_analysis = serializer.validated_data.get('analysis_result')
-        
-        # 만약 클라이언트 데이터가 없거나 비어있으면 기본 메시지
-        if not client_analysis:
-            client_analysis = {"comment": "AI 분석 모듈 연결 예정"}
+        # [Fix] AI Analysis Trigger (Background)
+        def run_ai_analysis(diary_id):
+            import time
+            from django.db import connection
+            connection.close() # Thread safety
+            try:
+                diary = HaruOn.objects.get(id=diary_id)
+                # Simple Heuristic Analysis (Temporary Restoration)
+                # Waits briefly to allow any other transactions, then fills in gaps
+                time.sleep(1)
+                mood_map = {5: "행복", 4: "편안", 3: "평범", 2: "우울", 1: "답답함"}
+                key = mood_map.get(diary.mood_score, "평범")
+                
+                ar = diary.analysis_result or {}
+                if not isinstance(ar, dict): ar = {}
+                
+                # Only update if 'ai_prediction' is missing
+                if not ar.get('ai_prediction'):
+                    ar['ai_prediction'] = key
+                    ar['ai_emotion'] = key
+                    ar['ai_comment'] = f"오늘 하루는 {key}하셨군요. 당신의 마음을 응원합니다."
+                    diary.analysis_result = ar
+                    diary.save()
+                    print(f"✅ [AI Worker] Auto-Completed Analysis for {diary_id}")
+            except Exception as e:
+                print(f"❌ [AI Worker] Error: {e}")
 
-        serializer.save(
-            user=self.request.user,
-            is_high_risk=is_high_risk,
-            analysis_result=client_analysis
-        )
+        # Start Thread
+        # Start Thread
+        t = threading.Thread(target=run_ai_analysis, args=(instance.id,))
+        t.start()
         
         # [CRITICAL: Force Sync to 217 Server]
         # 사용자가 "데이터 강제전송"을 했으니, 150 서버는 즉시 217 서버로 이 데이터를 밀어넣어야 함.

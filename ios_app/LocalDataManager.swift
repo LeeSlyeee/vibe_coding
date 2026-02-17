@@ -226,9 +226,17 @@ class LocalDataManager: ObservableObject {
         
         print("🧠 [SmartSync] Starting Standard Sync... (User: \(username), Force: \(force))")
         
-        
-        // 1. Fetch Server State First
-        APIService.shared.fetchDiaries { [weak self] serverData in
+        // [Fix] Use APIService.ensureAuth to handle login cycle correctly BEFORE fetch
+        APIService.shared.ensureAuth { [weak self] authSuccess in
+            guard let self = self else { return }
+            
+            if !authSuccess {
+                print("⚠️ [SmartSync] Server Sync Failed (Auth/Network). Aborting.")
+                return
+            }
+            
+            // 1. Fetch Server State First
+            APIService.shared.fetchDiaries { [weak self] serverData in
             guard let self = self else { return }
             
             // [Strict Sync] Server State is REQUIRED.
@@ -296,7 +304,8 @@ class LocalDataManager: ObservableObject {
                     print("✅ [SmartSync] Synchronization Complete.")
                 }
             }
-        }
+        } // End Fetch
+        } // End Auth
     }
     
     
@@ -345,7 +354,8 @@ class LocalDataManager: ObservableObject {
                 let aiComment = (item["ai_comment"] as? String) ?? (analysisMap?["ai_comment"] as? String) ?? (analysisMap?["comment"] as? String)
                 let aiAnalysis = (item["ai_analysis"] as? String) ?? (analysisMap?["ai_analysis"] as? String) ?? (analysisMap?["analysis"] as? String)
                 let aiAdvice = (item["ai_advice"] as? String) ?? (analysisMap?["ai_advice"] as? String) ?? (analysisMap?["advice"] as? String)
-                let aiPrediction = (item["ai_prediction"] as? String) ?? (analysisMap?["ai_prediction"] as? String) ?? (analysisMap?["prediction"] as? String)
+                // [Robust Parsing] Check all possible keys for AI Emotion
+                let aiPrediction = (item["ai_prediction"] as? String) ?? (item["ai_emotion"] as? String) ?? (analysisMap?["ai_prediction"] as? String) ?? (analysisMap?["prediction"] as? String) ?? (analysisMap?["emotion"] as? String)
                 
                 let sleepDesc = (item["sleep_condition"] as? String) ?? (item["sleep_desc"] as? String) ?? (analysisMap?["sleep_condition"] as? String) ?? (analysisMap?["sleep_desc"] as? String)
                 let weather = (item["weather"] as? String) ?? (analysisMap?["weather"] as? String)
@@ -353,6 +363,13 @@ class LocalDataManager: ObservableObject {
                 let emotionMeaning = (item["emotion_meaning"] as? String) ?? (analysisMap?["emotion_meaning"] as? String)
                 let selfTalk = (item["self_talk"] as? String) ?? (analysisMap?["self_talk"] as? String)
                 
+                // [New] Extended Fields Parsing
+                let temperature = (item["temperature"] as? Double) ?? (analysisMap?["temperature"] as? Double)
+                let gratitudeNote = (item["gratitude_note"] as? String) ?? (analysisMap?["gratitude_note"] as? String) ?? (analysisMap?["gratitude"] as? String)
+                let medicationTaken = (item["medication_taken"] as? Bool) ?? (analysisMap?["medication_taken"] as? Bool) ?? (analysisMap?["medication"] as? Bool)
+                let medicationDesc = (item["medication_desc"] as? String) ?? (analysisMap?["medication_desc"] as? String)
+                let symptoms = (analysisMap?["symptoms"] as? [String]) ?? []
+
                 var serverDiary = Diary(
                     id: UUID().uuidString,
                     _id: id,
@@ -364,57 +381,61 @@ class LocalDataManager: ObservableObject {
                     self_talk: selfTalk,
                     sleep_desc: sleepDesc,
                     weather: weather,
-                    temperature: nil,
+                    temperature: temperature,
                     sleep_condition: nil,
                     ai_prediction: aiPrediction,
                     ai_comment: aiComment,
                     ai_analysis: aiAnalysis,
                     ai_advice: aiAdvice,
                     created_at: createdAt,
-                    medication: nil,
-                    medication_desc: nil
+                    medication: medicationTaken,
+                    medication_desc: medicationDesc,
+                    symptoms: symptoms,
+                    gratitude_note: gratitudeNote
                 )
                 serverDiary.isSynced = true
                 
                 if let index = self.diaries.firstIndex(where: {
-                    // 1. Server ID Exact Match (Best)
-                    if let existingId = $0._id, existingId == id { return true }
-                    // 2. Local UUID Match (Fallback)
-                    // if $0.id == serverDiary.id { return true }
-                    // 3. Date Match (Logical)
-                    if ($0.date ?? "").prefix(10) == dateStr.prefix(10) { return true }
+                    if let sid = $0._id, sid == id { return true }
+                    if let date = $0.date, date == dateStr { return true }
                     return false
                 }) {
-                    // [Conflict Resolution]
-                    if self.diaries[index].isSynced == false {
+                    // Update Existing
+                    var existing = self.diaries[index]
+                    
+                    // [Start] Dirty Check
+                    if existing.isSynced == false {
                         print("🛡️ [Sync] Skipping overwrite of unsynced local diary (Date: \(dateStr))")
                         continue
                     }
+                    // [End] Dirty Check
                     
-                    // [Critical Fix] If Server ID and Local Server ID differ
-                    if let oldServerId = self.diaries[index]._id, oldServerId != id {
-                        print("♻️ [Sync] Server ID changed for \(dateStr). (Old: \(oldServerId) -> New: \(id))")
+                    // Preserve Local UUID
+                    // Preserve Local UUID
+                    let localUUID = existing.id
+                    
+                    // [Data Safety] Preserve AI Analysis if Server value is missing but Local has it
+                    // This prevents overwriting valid AI data with empty/null from server (e.g. partial response)
+                    if (serverDiary.ai_prediction == nil || serverDiary.ai_prediction?.isEmpty == true) {
+                        if let existingPred = existing.ai_prediction, !existingPred.isEmpty {
+                            print("🛡️ [Sync] Preserving existing AI Prediction: \(existingPred)")
+                            serverDiary.ai_prediction = existingPred
+                        }
                     }
-                    
-                    print("🔄 [SyncDebug] Updating Local Diary for \(dateStr)...")
-                    
-                    // Update Logic
-                    // 1. Preserve Local UUID (for UI stability)
-                    let stableLocalUUID = self.diaries[index].id
-                    
-                    // 2. Overwrite EVERYTHING else with Server Data
+                    if (serverDiary.ai_comment == nil || serverDiary.ai_comment?.isEmpty == true) {
+                        if let existingCom = existing.ai_comment, !existingCom.isEmpty {
+                             serverDiary.ai_comment = existingCom
+                        }
+                    }
+
                     self.diaries[index] = serverDiary
-                    
-                    // 3. Restore Local UUID
-                    self.diaries[index].id = stableLocalUUID
-                    
-                    // 4. Ensure Synced State
+                    self.diaries[index].id = localUUID
                     self.diaries[index].isSynced = true
                     
                     updatedCount += 1
                 } else {
                     // New Entry
-                    print("🆕 [SyncDebug] Adding New Diary for \(dateStr)")
+                    print("🆕 [Sync] Adding New Diary (Date: \(dateStr))")
                     self.diaries.append(serverDiary)
                     newCount += 1
                 }

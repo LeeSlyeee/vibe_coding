@@ -65,11 +65,16 @@ class UserDetailView(APIView):
         from centers.models import VerificationCode
         user = request.user
         
-        # [Fix] Center has no 'center_code'. Find it from VerificationCode.
+        # [Fix] Center has no 'center_code'. Find explicitly.
+        # [Update] Center.code Priority
         center_code_val = None
-        vc = VerificationCode.objects.filter(used_by=user, is_used=True).first()
-        if vc:
-            center_code_val = vc.code
+        if user.center and hasattr(user.center, 'code') and user.center.code:
+            center_code_val = user.center.code
+        
+        if not center_code_val:
+            vc = VerificationCode.objects.filter(used_by=user, is_used=True).first()
+            if vc:
+                center_code_val = vc.code
             
         print(f"👤 [UserDetail] User: {user.username}, CenterCode: {center_code_val}")
         
@@ -123,9 +128,15 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 refresh = RefreshToken.for_user(target_user)
                 
                 # [Fix] Center model has no 'center_code'. Find explicitly.
-                from centers.models import VerificationCode
-                vc_obj = VerificationCode.objects.filter(used_by=target_user, is_used=True).first()
-                code_val = vc_obj.code if vc_obj else None
+                # [Update] Center.code Priority
+                code_val = None
+                if target_user.center and hasattr(target_user.center, 'code') and target_user.center.code:
+                    code_val = target_user.center.code
+                
+                if not code_val:
+                    from centers.models import VerificationCode
+                    vc_obj = VerificationCode.objects.filter(used_by=target_user, is_used=True).first()
+                    code_val = vc_obj.code if vc_obj else None
                 
                 # [Fix] UserSerializer 대신 명시적 딕셔너리 생성 (앱 호환성 100% 보장)
                 user_data = {

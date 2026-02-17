@@ -1,0 +1,21 @@
+
+# [API Endpoint: Get Diary List]
+@app.route('/api/diaries', methods=['GET'])
+@jwt_required()
+def get_diary_list():
+    try:
+        current_username = get_jwt_identity()
+        user = User.query.filter_by(username=current_username).first()
+        
+        if not user:
+            return jsonify([]), 200
+
+        # Fetch all diaries for user, sorted by date desc
+        diaries = Diary.query.filter_by(user_id=user.id).order_by(Diary.date.desc()).all()
+        
+        result = [serialize_diary(d) for d in diaries]
+        return jsonify(result), 200
+        
+    except Exception as e:
+        print(f"❌ Get Diaries Error: {e}")
+        return jsonify([]), 500

@@ -608,6 +608,7 @@ struct AppSettingsView: View {
                     
                     // [New] Clean Today's Fake Data
                     Button(action: {
+                        print("🧹 [Settings] Requesting cleanup...")
                         cleanTodayFakeData()
                     }) {
                         Text("🧹 오늘 가짜 데이터 청소 (Clean Today's Fake)")

@@ -12,6 +12,33 @@ SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-key-for-dev")
 DEBUG = os.getenv("DEBUG", "True") == "True"
 ALLOWED_HOSTS = ["*"]
 
+# [Fix] Prevent POST redirect issues (Body loss -> 400 Bad Request)
+APPEND_SLASH = False
+
+# [Security] HTTPS & Proxy Settings
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.nip.io",
+    "https://mind-diary.kro.kr",
+]
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = True
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+CSRF_COOKIE_SECURE = True
+CSRF_TRUSTED_ORIGINS = [
+    "https://217.142.253.35.nip.io", # Standard HTTPS
+    "http://217.142.253.35.nip.io",  # Verify
+    "https://217.142.253.35.nip.io:8000", # Just in case
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+# [Fix] Reverted to default names for Frontend compatibility
+# CSRF_COOKIE_NAME = "csrftoken"
+# SESSION_COOKIE_NAME = "sessionid"
+
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -30,14 +57,16 @@ INSTALLED_APPS = [
     "centers",
     "haru_on",
     "b2g_sync",
+    "share",
 ]
 
 MIDDLEWARE = [
+    'config.middleware_dump.DumpRequestMiddleware',  # [Debug] Dump Raw Request
     "corsheaders.middleware.CorsMiddleware",  # CORS
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
+    # 'django.middleware.csrf.CsrfViewMiddleware', # [Debug] Disable CSRF to check 400 error
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -71,9 +100,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "mood_diary_db"),
-        "USER": os.getenv("DB_USER", "postgres"), # Default PG User
-        "PASSWORD": os.getenv("DB_PASSWORD", "password"),
+        "NAME": os.getenv("DB_NAME", "reboot_db"), # [Found] Local DB
+        "USER": os.getenv("DB_USER", "slyeee"),    # [Found] Local User
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),  # No Password for local socket
         "HOST": os.getenv("DB_HOST", "127.0.0.1"),
         "PORT": os.getenv("DB_PORT", "5432"),
     }
@@ -150,3 +179,22 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://127\.0\.0\.1(:[0-9]+)?$",
     r"^https?://.*\.nip\.io$",
 ]
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/home/ubuntu/project/temp_insight_deploy/backend/django_root.log',
+        },
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['file', 'console'],
+        'level': 'DEBUG',
+    },
+}

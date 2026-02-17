@@ -364,6 +364,11 @@ struct AppMainTabView: View {
                 withAnimation(.easeInOut(duration: 0.1)) {
                     selection = index
                 }
+                // [Auto-Sync] 캘린더 탭 진입 시 데이터 최신화 (새로고침 부재 대응)
+                if index == 0 {
+                    print("🔄 [Tab] Switched to Calendar. Triggering Sync...")
+                    LocalDataManager.shared.syncWithServer()
+                }
             }) {
                 VStack(spacing: 4) {
                     // 시스템 아이콘 사용

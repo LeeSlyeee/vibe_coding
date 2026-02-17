@@ -86,12 +86,13 @@ class AuthManager: ObservableObject {
     
     // 실제 서버 로그인 API 호출
     // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
+    // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
     func performLogin(username: String, password: String, name: String? = nil, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
-        // [Fix] Use HTTPS and Correct API V1 Endpoint (217 Server)
-        let baseUrl = "https://217.142.253.35.nip.io/api/v1" 
+        // [Fix] Use HTTPS and Correct API Endpoint (217 Server)
+        let baseUrl = "https://217.142.253.35.nip.io/api" 
         
         // 1. Attempt Login First
-        let loginUrl = URL(string: "\(baseUrl)/auth/login/")!
+        let loginUrl = URL(string: "\(baseUrl)/login")!
         var request = URLRequest(url: loginUrl)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -117,7 +118,7 @@ class AuthManager: ObservableObject {
     }
     
     private func performRegister(baseUrl: String, username: String, password: String, name: String?, centerCode: String?, completion: @escaping (Bool, String) -> Void) {
-        let regUrl = URL(string: "\(baseUrl)/auth/register/")!
+        let regUrl = URL(string: "\(baseUrl)/register")!
         var request = URLRequest(url: regUrl)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -187,7 +188,7 @@ class AuthManager: ObservableObject {
                     DispatchQueue.main.async {
                         // 결과와 상관없이 로그인은 성공 처리 (연동 실패했다고 로그인 막으면 안됨)
                         // 단, 성공 시 isLinked가 true가 되어 PHQ-9 스킵됨.
-                        if success { 
+                        if success {
                              print("✅ [Auth] B2G Link Restored/Verified!")
                              // [New] 연동 성공 시, 서버 데이터를 즉시 가져옴 (Auto-Restore)
                              B2GManager.shared.syncData(force: true)
@@ -196,8 +197,12 @@ class AuthManager: ObservableObject {
                         }
                         
                         // 3. Finalize Login (Trigger UI)
-                        self.token = token // This triggers isAuthenticated = true
+                        // [Critical Fix] Save username to "authUsername" (Single Source of Truth)
+                        UserDefaults.standard.set(username, forKey: "authUsername")
                         self.username = username
+                        
+                        self.token = token // This triggers isAuthenticated = true
+                        
                         LocalDataManager.shared.syncWithServer()
                         completion(true, "로그인 성공")
                     }
@@ -205,10 +210,12 @@ class AuthManager: ObservableObject {
             } else {
                 // 연동 코드 없음 -> 바로 진입
                 DispatchQueue.main.async {
-                    self.token = token
+                    // [Critical Fix] Save username to "authUsername" (Single Source of Truth)
+                    UserDefaults.standard.set(username, forKey: "authUsername")
                     self.username = username
-                    // [Critical Fix] Ensure APIService can see this username
-                    UserDefaults.standard.set(username, forKey: "app_username")
+                    
+                    self.token = token
+                    
                     LocalDataManager.shared.syncWithServer()
                     completion(true, "로그인 성공")
                 }

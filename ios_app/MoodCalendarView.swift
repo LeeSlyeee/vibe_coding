@@ -90,10 +90,15 @@ struct MoodCalendarView: View {
                         }
                     }
                     
-                    // 달력 그리드
-                    if isLoading {
-                        Spacer(); ProgressView(); Spacer()
-                    } else {
+                    // 달력 그리드 (Pull-to-Refresh)
+                    ScrollView {
+                        // [Fix] Add Spacer to push content down slightly
+                        Spacer(minLength: 10)
+                        
+                        if isLoading {
+                            ProgressView().padding()
+                        }
+                        
                         LazyVGrid(columns: columns, spacing: 15) {
                             ForEach(calendarDays(), id: \.id) { dayItem in
                                 if let date = dayItem.date {
@@ -110,8 +115,10 @@ struct MoodCalendarView: View {
                                             
                                             if let d = diary {
                                                 VStack(spacing: 0) {
-                                                    // 2. 사용자 선택 이모지 (이미지)
-                                                    let asset = getMoodAsset(level: d.mood_level)
+                                                    // 2. 감정 이모지 (AI 우선 적용)
+                                                    let aiAsset = getAIAsset(for: d.ai_prediction)
+                                                    let asset = aiAsset ?? getMoodAsset(level: d.mood_level)
+                                                    
                                                     ZStack(alignment: .bottomTrailing) {
                                                         Image(asset.image)
                                                             .resizable()
@@ -166,12 +173,33 @@ struct MoodCalendarView: View {
                         }
                         .padding()
                         .id(currentDate) // Force view refresh for transition
-                        .transition(.asymmetric(
-                            insertion: .move(edge: slideDirection),
-                            removal: .move(edge: slideDirection == .trailing ? .leading : .trailing)
-                        ))
-                        .animation(.easeInOut(duration: 0.3), value: currentDate) // Apply animation
                     }
+                    .refreshable {
+                        print("🔄 [UI] Pull-to-Refresh Triggered")
+                        await refreshData()
+                    }
+                    
+                    // [New] Bottom Manual Sync Button
+                    Button(action: {
+                        print("🔄 [UI] Manual Sync Triggered (Bottom)")
+                        self.isLoading = true
+                        LocalDataManager.shared.syncWithServer()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            self.isLoading = false
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("데이터 새로고침")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .padding(8)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
+                    }
+                    .padding(.top, 10)
+                    
                     Spacer()
                     
                     // Hidden Navigation Link for Detail
@@ -247,26 +275,25 @@ struct MoodCalendarView: View {
     // Logic Removed
 
     func parseAI(_ text: String?) -> (String, String) {
-        guard var raw = text, !raw.isEmpty else { return ("", "") }
+        guard var raw = text?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return ("", "") }
         
-        // 1. Extract from single quotes if present (e.g., 'Happy (80%)')
-        if let start = raw.firstIndex(of: "'"), let end = raw.lastIndex(of: "'"), start != end {
-            raw = String(raw[raw.index(after: start)..<end])
+        // 1. Remove wrapping quotes (' or ")
+        if (raw.hasPrefix("'") && raw.hasSuffix("'")) || (raw.hasPrefix("\"") && raw.hasSuffix("\"")) {
+            raw = String(raw.dropFirst().dropLast())
         }
         
         var label = ""
         var percent = ""
         
-        // 2. Extract Label and Percent
-        // Check for format "Label (N%)"
-        if raw.hasSuffix(")"), let openParen = raw.lastIndex(of: "(") {
+        // 2. Extract Label and Percent (Flexible)
+        if let openParen = raw.lastIndex(of: "("), let closeParen = raw.lastIndex(of: ")"), openParen < closeParen {
             label = String(raw[..<openParen]).trimmingCharacters(in: .whitespaces)
-            percent = String(raw[openParen...])
+            percent = String(raw[openParen...closeParen])
         } else {
-            label = raw
+            label = raw.trimmingCharacters(in: .whitespaces)
         }
 
-        // 3. Korean Translation Map
+        // 3. Korean Translation Map (Normalized)
         let emotionTranslation: [String: String] = [
             "Happy": "행복",
             "Sad": "슬픔",
@@ -285,8 +312,12 @@ struct MoodCalendarView: View {
             "Tired": "지침"
         ]
         
-        let translatedLabel = emotionTranslation[label] ?? label
+        // 4. Normalize key (First letter Upper, rest lower) to match map keys
+        let normalizedKey = label.prefix(1).uppercased() + label.dropFirst().lowercased()
         
+        let translatedLabel = emotionTranslation[normalizedKey] ?? emotionTranslation[label] ?? label
+        
+        // Percent validation
         if !percent.isEmpty && !percent.contains("%") {
              percent = ""
         }
@@ -325,12 +356,36 @@ struct MoodCalendarView: View {
         }
     }
     
+    // [New] Clean Async Wrapper for Refreshable
+    func refreshData() async {
+        return await withCheckedContinuation { continuation in
+            LocalDataManager.shared.syncWithServer()
+            // Wait for sync notification or just delay slightly to let sync trigger update
+            // Ideally we wait for callback, but syncWithServer is void.
+            // Let's just wait 1.5s for UX.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                continuation.resume()
+            }
+        }
+    }
+    
     // Helpers
     func changeMonth(by value: Int) {
-        slideDirection = value > 0 ? .trailing : .leading
         if let newDate = Calendar.current.date(byAdding: .month, value: value, to: currentDate) {
+            slideDirection = value > 0 ? .trailing : .leading // [Fix] Direction logic was reversed or confusing?
+            // Actually, if value > 0 (Next Month), we are moving to future.
+            // But slide animation usually implies: Next comes from Right.
+            
             withAnimation(.easeInOut(duration: 0.3)) {
                 currentDate = newDate
+            }
+            
+            // [Auto-Sync] 달 변경 시에도 데이터 동기화 시도 (혹시 해당 월 데이터가 없을 수 있으므로)
+            // 너무 잦은 요청 방지를 위해 약간의 딜레이나 조건이 필요할 수 있으나,
+            // 현재 구조상 '서버 전체 데이터'를 가져오므로 한 번만 호출하면 됨.
+            // 하지만 사용자가 오랫동안 켜놓았을 수 있으므로 안전하게 호출.
+            DispatchQueue.global().async {
+                LocalDataManager.shared.syncWithServer()
             }
         }
     }
@@ -360,6 +415,22 @@ struct MoodCalendarView: View {
     func dateString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
     func moodEmoji(_ l: Int) -> String { ["", "😠", "😢", "😐", "😌", "😊"][l] }
     func moodColor(_ l: Int) -> Color { [Color.clear, .red, .blue, .gray, .green, .yellow][l] }
+    
+    // [AI Logic] Convert AI Label to Mood Asset
+    func getAIAsset(for prediction: String?) -> MoodAsset? {
+        let (label, _) = parseAI(prediction)
+        if label.isEmpty { return nil }
+        
+        // Map Korean Labels to Mood Levels (1-5)
+        switch label {
+        case "행복", "기쁨", "사랑", "흥분": return getMoodAsset(level: 5)
+        case "평온", "놀람", "감사": return getMoodAsset(level: 4)
+        case "불안", "두려움", "혼란", "보통": return getMoodAsset(level: 3)
+        case "슬픔", "우울", "지침", "피곤": return getMoodAsset(level: 2)
+        case "분노", "스트레스", "혐오", "짜증": return getMoodAsset(level: 1)
+        default: return nil // Fallback to User Selection
+        }
+    }
 }
 
 // MARK: - PremiumModalView Moved to PremiumModalView.swift

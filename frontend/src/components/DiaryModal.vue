@@ -136,16 +136,16 @@
     <div v-else class="diary-view">
       <div class="view-content-wrapper">
         <!-- 감성적인 감정 카드 -->
-        <div class="view-emoji-premium" :class="getMoodColorClass(currentDiary.mood_level)">
+        <div class="view-emoji-premium" :class="getMoodColorClass(displayMoodLevel)">
           <div class="emoji-container">
             <img
-              :src="getMoodEmoji(currentDiary.mood_level)"
+              :src="getMoodEmoji(displayMoodLevel)"
               class="emoji-large anim-float"
               alt="mood"
             />
             <!-- 감정 이름 위로 배치 -->
             <span class="emoji-label primary-label">{{
-              getMoodName(currentDiary.mood_level)
+              getMoodName(displayMoodLevel)
             }}</span>
 
             <!-- AI 분석 결과 아래로 배치 -->
@@ -355,11 +355,73 @@ export default {
     });
 
     const isValid = computed(() => formData.value.mood && formData.value.question1.trim() && formData.value.question_sleep.trim());
-    const getMoodEmoji = (lvl) => emojiMap[lvl]?.icon || "";
-    const getMoodName = (lvl) => emojiMap[lvl]?.name || "";
+    
+    // [Fix] Robust Mood Mapping (Number or String)
+    const normalizeMood = (val) => {
+        if (!val) return 3; // Default Neutral
+        if (typeof val === 'number') {
+            if (val > 5) return 5;
+            if (val < 1) return 1;
+            return Math.round(val);
+        }
+        const map = { "happy": 5, "calm": 4, "neutral": 3, "sad": 2, "angry": 1 };
+        return map[val] || 3;
+    };
+
+    // [New] AI Keyword Mapping (Sync with CalendarGrid)
+    const koreanToMoodKey = {
+        "행복": 5, "기쁨": 5, "사랑": 5, "설렘": 5, "즐거움": 5, "흥분": 5, "재미": 5, "신남": 5, "만족": 5,
+        "평온": 4, "편안": 4, "감사": 4, "다짐": 4, "안도": 4, "차분": 4,
+        "평범": 3, "무던": 3, "보통": 3, "지루함": 3, "혼란": 3, "모호": 3,
+        "우울": 2, "슬픔": 2, "지침": 2, "피곤": 2, "외로움": 2, "후회": 2, "상처": 2, "어려움": 2, "힘듦": 2, "괴로움": 2, "어리움": 2, "지쳐있음": 2, "피로": 2, "무력": 2, "낙담": 2,
+        "분노": 1, "화남": 1, "짜증": 1, "스트레스": 1, "싫어": 1, "불안": 1, "걱정": 1, "답답함": 1, "억울": 1
+    };
+
+    // [New] Computed Mood logic: AI > User
+    const displayMoodLevel = computed(() => {
+        const d = currentDiary.value;
+        if (!d) return 3;
+
+        console.log(`[DiaryModal] Calculating Mood for ID ${d.id}`);
+        console.log(`- AI Pred: ${d.ai_prediction}, AI Emo: ${d.ai_emotion}`);
+        console.log(`- User Mood: ${d.mood_level} / ${d.mood}`);
+
+        // 1. Try AI Emotion Field
+        if (d.ai_emotion && d.ai_emotion !== "분석중" && d.ai_emotion !== "대기중") {
+             const key = d.ai_emotion.trim();
+             if (koreanToMoodKey[key]) {
+                 console.log(`-> Mapped via AI Emotion (${key}): ${koreanToMoodKey[key]}`);
+                 return koreanToMoodKey[key];
+             }
+        }
+
+        // 2. Try AI Prediction Field
+        if (d.ai_prediction) {
+            let text = d.ai_prediction;
+            if ((text.startsWith("'") && text.endsWith("'")) || (text.startsWith('"') && text.endsWith('"'))) text = text.slice(1, -1);
+            const match = text.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
+            const label = match ? match[1].trim() : text.trim();
+            
+            if (koreanToMoodKey[label]) {
+                console.log(`-> Mapped via AI Prediction (${label}): ${koreanToMoodKey[label]}`);
+                return koreanToMoodKey[label];
+            } else {
+                console.log(`-> Mapping Failed for label: ${label}`);
+            }
+        }
+
+        // 3. Fallback to User Mood
+        const userM = normalizeMood(d.mood_level || d.mood);
+        console.log(`-> Fallback to User Mood: ${userM}`);
+        return userM;
+    });
+
+    const getMoodEmoji = (lvl) => emojiMap[normalizeMood(lvl)]?.icon || "";
+    const getMoodName = (lvl) => emojiMap[normalizeMood(lvl)]?.name || "";
     const getMoodColorClass = (lvl) => {
+        const n = normalizeMood(lvl);
         const map = { 1: "mood-angry", 2: "mood-sad", 3: "mood-neutral", 4: "mood-calm", 5: "mood-happy" };
-        return map[lvl] || "mood-neutral";
+        return map[n] || "mood-neutral";
     };
     const getWeatherIcon = (desc) => {
       if (!desc) return "✨";
@@ -612,6 +674,7 @@ export default {
     return {
       isViewMode, showForm, saving, formData, weatherInfo, weatherInsight,
       panelRef, currentDiary, formattedDate, formattedDateTime, isValid, parsedContent,
+      displayMoodLevel, // [New]
       getMoodEmoji, getMoodName, getMoodColorClass, getWeatherIcon,
       handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
       isProcessing, progressPercent, loadingMessage, eta,

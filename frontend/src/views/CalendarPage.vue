@@ -220,34 +220,44 @@ export default {
     const dominantMood = computed(() => {
       if (diaries.value.length === 0) return { name: "-", emoji: "😶" };
 
-      // Korean Label -> Internal Key Mapping
+      // Korean Label -> Internal Key Mapping (Expanded)
       const labelToKey = {
-        행복해: "happy",
-        기쁨: "happy",
-        평온해: "calm",
-        편안해: "calm",
-        그저그래: "neutral",
-        평범: "neutral",
-        우울해: "sad",
-        슬픔: "sad",
-        화가나: "angry",
-        분노: "angry",
+          "행복": "happy", "기쁨": "happy", "사랑": "happy", "설렘": "happy", "즐거움": "happy", "흥분": "happy",
+            "행복해": "happy",
+          "평온": "calm", "편안": "calm", "감사": "calm", "다짐": "calm", "안도": "calm",
+            "평온해": "calm", "편안해": "calm",
+          "평범": "neutral", "무던": "neutral", "보통": "neutral", "지루함": "neutral",
+            "그저그래": "neutral",
+          "우울": "sad", "슬픔": "sad", "지침": "sad", "피곤": "sad", "외로움": "sad", "후회": "sad", "상처": "sad",
+            "우울해": "sad",
+          "분노": "angry", "화남": "angry", "짜증": "angry", "스트레스": "angry", "싫어": "angry", "불안": "angry", "걱정": "angry",
+            "화가나": "angry"
       };
 
       const counts = diaries.value.reduce((acc, d) => {
         let key = d.mood; // Default fallback
 
-        // Try to use AI Prediction
-        if (d.ai_prediction) {
-          // Extract 'label' from "AI... 'label (95%)'..." or just "label"
-          const match = d.ai_prediction.match(/'([^']+)'/);
-          if (match && match[1]) {
-            // "평온해 (90%)" -> "평온해"
-            const label = match[1].split("(")[0].trim();
-            if (labelToKey[label]) {
-              key = labelToKey[label];
-            }
-          }
+        let aiLabel = null;
+        // Priority 1: AI Emotion field
+        if (d.ai_emotion && d.ai_emotion !== "분석중" && d.ai_emotion !== "대기중") {
+            aiLabel = d.ai_emotion.trim();
+        } 
+        // Priority 2: AI Prediction Parsing
+        else if (d.ai_prediction) {
+             let fullText = d.ai_prediction;
+             if ((fullText.startsWith("'") && fullText.endsWith("'")) || (fullText.startsWith('"') && fullText.endsWith('"'))) {
+                fullText = fullText.slice(1, -1);
+             }
+             const parts = fullText.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
+             if (parts) {
+                 aiLabel = parts[1].trim();
+             } else {
+                 aiLabel = fullText.trim();
+             }
+        }
+
+        if (aiLabel && labelToKey[aiLabel]) {
+            key = labelToKey[aiLabel];
         }
 
         acc[key] = (acc[key] || 0) + 1;
@@ -310,7 +320,8 @@ export default {
 
         diaries.value = diaryArray.map((d) => ({
           ...d,
-          date: d.created_at ? d.created_at.split("T")[0] : d.date,
+          // [Fix] Prioritize user-selected date over creation timestamp
+          date: d.date || (d.created_at ? d.created_at.split("T")[0] : null),
           mood: d.mood_level ? moodMap[d.mood_level] : d.mood || null,
         }));
       } catch (error) {
@@ -329,7 +340,7 @@ export default {
         const response = await diaryAPI.searchDiaries(searchQuery.value);
         searchResults.value = response.map((d) => ({
           ...d,
-          date: d.created_at ? d.created_at.split("T")[0] : d.date,
+          date: d.date || (d.created_at ? d.created_at.split("T")[0] : null),
         }));
       } catch (error) {
         console.error("Search failed:", error);
@@ -348,7 +359,7 @@ export default {
         const moodMap = { 1: "angry", 2: "sad", 3: "neutral", 4: "calm", 5: "happy" };
         selectedDiary.value = {
           ...loadedDiary,
-          date: loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : loadedDiary.date,
+          date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
           mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
           question1: loadedDiary.event || "",
           question2: loadedDiary.emotion_desc || "",
@@ -394,7 +405,7 @@ export default {
           // 백엔드 필드명을 프론트엔드 형식으로 변환
           selectedDiary.value = {
             ...loadedDiary,
-            date: loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : loadedDiary.date,
+            date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
             mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
             question1: loadedDiary.event || "",
             sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",
@@ -444,9 +455,7 @@ export default {
             // 최신 데이터로 selectedDiary 업데이트
             selectedDiary.value = {
               ...loadedDiary,
-              date: loadedDiary.created_at
-                ? loadedDiary.created_at.split("T")[0]
-                : loadedDiary.date,
+              date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
               mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
               question1: loadedDiary.event || "",
               sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",

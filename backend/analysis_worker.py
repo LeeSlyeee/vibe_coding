@@ -163,10 +163,12 @@ def generate_ai_analysis(content):
         "### 지시사항:\n"
         "1. 'comment': 회원의 감정을 읽고 따뜻하게 위로하는 말 (해요체, 150자 내외)\n"
         "2. 'emotion': 회원의 현재 감정을 나타내는 **단 하나의 핵심 단어** (예: 불안함, 설렘, 홀가분함, 답답함)\n"
-        "3. 반드시 아래 JSON 형식으로만 답변해.\n\n"
+        "3. 'score': 회원의 감정 상태를 **1점(매우 나쁨/우울)**에서 **10점(매우 좋음/행복)** 사이의 정수로 평가해.\n"
+        "4. 반드시 아래 JSON 형식으로만 답변해.\n\n"
         "{\n"
         '  "emotion": "핵심감정단어",\n'
-        '  "comment": "위로의 메시지..."\n'
+        '  "comment": "위로의 메시지...",\n'
+        '  "score": 5\n'
         "}"
     )
     
@@ -176,18 +178,16 @@ def generate_ai_analysis(content):
         raw = call_llm_hybrid(prompt_text, options=options)
         
         if raw:
-             # raw = res.json().get('response', '').strip() # handled in wrapper
              # Try parse JSON
              try:
                  data = json.loads(raw)
-                 return data.get('comment', ''), data.get('emotion', '')
+                 return data.get('comment', ''), data.get('emotion', ''), data.get('score', 5)
              except Exception as e:
                  print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {raw}")
-                 # Fallback regex?
-                 return raw, "분석중"
+                 return raw, "분석중", 5
     except Exception as e:
         print(f"❌ AI Gen Error: {e}")
-    return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중"
+    return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5
 
 
 # Set up logging
@@ -201,14 +201,14 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
     logging.info(f"🧵 [Thread] Starting Analysis for Diary {diary_id}...")
     print(f"🧵 [Thread] Starting Analysis for Diary {diary_id}...")
     
-    # 1. Generate Comment & Emotion
+    # 1. Generate Comment & Emotion & Score
     full_text = f"날짜: {date}\n수면: {sleep}\n사건: {event}\n감정: {emotion_desc}\n의미: {emotion_meaning}\n스스로에게: {self_talk}"
     # Remove None or empty strings from formatting if needed, but simple string interpolation is fine
     
-    comment, emotion = generate_ai_analysis(full_text)
+    comment, emotion, score = generate_ai_analysis(full_text)
     
     # ... (rest is same, but let's include it to be safe or use Context)
-    print(f"🤖 AI Result - Emotion: {emotion}, Comment: {comment[:20]}...")
+    print(f"🤖 AI Result - Score: {score}, Emotion: {emotion}, Comment: {comment[:20]}...")
 
     # 2. Encrypt
     enc_comment = crypto.encrypt(comment)
@@ -216,13 +216,24 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
     
     # 3. Update DB
     try:
-        conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST)
+        db_url = os.environ.get('DATABASE_URL')
+        if db_url:
+            conn = psycopg2.connect(db_url)
+        else:
+            conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST)
         conn.autocommit = True
         cur = conn.cursor()
         
+        # Ensure score is integer and within range
+        try:
+            score = int(score)
+            score = max(1, min(10, score))
+        except:
+            score = 5
+
         cur.execute(
-            "UPDATE diaries SET ai_comment = %s, ai_emotion = %s WHERE id = %s", 
-            (enc_comment, enc_emotion, diary_id)
+            "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
+            (enc_comment, enc_emotion, score, diary_id)
         )
         
         print(f"✅ [Thread] Analysis Complete for Diary {diary_id}")
@@ -232,5 +243,7 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
         print(f"❌ [Thread] DB Update Failed: {e}")
 
 def start_analysis_thread(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk):
+    print(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id}")
+    logging.info(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id}")
     t = threading.Thread(target=run_analysis_process, args=(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk))
     t.start()
