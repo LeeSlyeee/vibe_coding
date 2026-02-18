@@ -24,20 +24,18 @@
         <div class="insight-bubble insight-bubble-purple">
           <span class="insight-icon">🧘‍♀️</span>
           <span style="color: #4a148c">
-            {{ isLoadingInsight ? "마음의 흐름을 읽고 있어요..." : (mindsetInsight || "오늘 하루는 어떠셨나요? 편안하게 기록해보세요.") }}
+            {{
+              isLoadingInsight
+                ? "마음의 흐름을 읽고 있어요..."
+                : mindsetInsight || "오늘 하루는 어떠셨나요? 편안하게 기록해보세요."
+            }}
           </span>
         </div>
 
-        <p class="empty-hint">
-          작은 기록이 모여 당신의 마음 지도를 만듭니다.
-        </p>
+        <p class="empty-hint">작은 기록이 모여 당신의 마음 지도를 만듭니다.</p>
 
         <!-- 버튼 -->
-        <button
-          @click="startWriting"
-          class="btn btn-primary btn-large shadow-hover"
-          type="button"
-        >
+        <button @click="startWriting" class="btn btn-primary btn-large shadow-hover" type="button">
           오늘의 감정 기록하기
         </button>
       </div>
@@ -77,7 +75,7 @@
       />
 
       <!-- Red Mode Specific: Physical Symptoms (REMOVED) -->
-      
+
       <!-- Red Mode Specific: Mood Intensity Slider (REMOVED) -->
 
       <QuestionAccordion
@@ -107,15 +105,20 @@
 
       <!-- Red Mode: Safety Check (REMOVED) -->
 
-
       <!-- Medication Check: Only for Severe/Paid Users (Red Mode) -->
       <!-- 경증 사용자(Green)는 약물 체크 불가 -->
-      <div v-if="uiMode === 'red'" class="medication-check-section" style="margin-top: 16px; padding: 0 10px;">
-          <label class="checkbox-container">
-              <input type="checkbox" v-model="formData.medication_taken">
-              <span class="checkmark"></span>
-              <span style="font-weight: 600; font-size: 15px; margin-left: 8px; color: #555;">💊 오늘 약은 챙겨 드셨나요?</span>
-          </label>
+      <div
+        v-if="uiMode === 'red'"
+        class="medication-check-section"
+        style="margin-top: 16px; padding: 0 10px"
+      >
+        <label class="checkbox-container">
+          <input type="checkbox" v-model="formData.medication_taken" />
+          <span class="checkmark"></span>
+          <span style="font-weight: 600; font-size: 15px; margin-left: 8px; color: #555"
+            >💊 오늘 약은 챙겨 드셨나요?</span
+          >
+        </label>
       </div>
 
       <!-- 작성 모드 하단 버튼 (인라인으로 변경) -->
@@ -138,15 +141,9 @@
         <!-- 감성적인 감정 카드 -->
         <div class="view-emoji-premium" :class="getMoodColorClass(displayMoodLevel)">
           <div class="emoji-container">
-            <img
-              :src="getMoodEmoji(displayMoodLevel)"
-              class="emoji-large anim-float"
-              alt="mood"
-            />
+            <img :src="getMoodEmoji(displayMoodLevel)" class="emoji-large anim-float" alt="mood" />
             <!-- 감정 이름 위로 배치 -->
-            <span class="emoji-label primary-label">{{
-              getMoodName(displayMoodLevel)
-            }}</span>
+            <span class="emoji-label primary-label">{{ getMoodName(displayMoodLevel) }}</span>
 
             <!-- AI 분석 결과 아래로 배치 -->
             <span
@@ -240,7 +237,7 @@ export default {
   },
   emits: ["close", "saved"],
   setup(props, { emit }) {
-    const router = useRouter(); 
+    const router = useRouter();
     console.log("🔥 DiaryModal V3.1 SETUP (Cleaned) 🔥");
 
     // === Refs & Data ===
@@ -253,8 +250,14 @@ export default {
 
     // === Mode Logic ===
     const userRiskLevel = ref(1);
-    const uiMode = computed(() => userRiskLevel.value >= 3 ? 'red' : 'green');
-    const symptomOptions = ["두통/어지러움", "소화불량/식욕저하", "불면/과수면", "가슴 답답함", "만성 피로"];
+    const uiMode = computed(() => (userRiskLevel.value >= 3 ? "red" : "green"));
+    const symptomOptions = [
+      "두통/어지러움",
+      "소화불량/식욕저하",
+      "불면/과수면",
+      "가슴 답답함",
+      "만성 피로",
+    ];
 
     // === Form Data ===
     const formData = ref({
@@ -264,12 +267,12 @@ export default {
       question2: "",
       question3: "",
       question4: "",
-      mode: 'green',
+      mode: "green",
       mood_intensity: 5,
       symptoms: [],
       gratitude_note: "",
       safety_flag: false,
-      medication_taken: false
+      medication_taken: false,
     });
 
     // === Weather & AI Insight Data ===
@@ -277,7 +280,7 @@ export default {
     const weatherInsight = ref("");
     const mindsetInsight = ref("");
     const isLoadingInsight = ref(false);
-    
+
     // === AI Processing State ===
     const isProcessing = ref(false);
     const progressPercent = ref(0);
@@ -321,16 +324,16 @@ export default {
     const parsedContent = computed(() => {
       const d = currentDiary.value;
       const raw = d.event || d.content || "";
-      
+
       // If NOT restored format (checks for specific header), treat as legacy/simple
       if (!raw.includes("[잠은 잘 주무셨나요?]")) {
-          return {
-              sleep: d.sleep_condition || d.sleep_desc,
-              event: d.event,
-              emotion: d.emotion_desc,
-              meaning: d.emotion_meaning,
-              selftalk: d.self_talk
-          };
+        return {
+          sleep: d.sleep_condition || d.sleep_desc,
+          event: d.event,
+          emotion: d.emotion_desc,
+          meaning: d.emotion_meaning,
+          selftalk: d.self_talk,
+        };
       }
 
       // Restored Format Parsing
@@ -342,86 +345,147 @@ export default {
           const t = line.trim();
           if (!t) continue;
           
-          if (t === "[잠은 잘 주무셨나요?]") currentSection = "sleep";
-          else if (t === "[오늘 무슨일이 있었나요?]") currentSection = "event";
-          else if (t === "[어떤 감정이 들었나요?]") currentSection = "emotion";
-          else if (t === "[자신의 감정을 깊게 탐색해보면...]") currentSection = "meaning";
-          else if (t === "[나에게 보내는 따뜻한 위로]") currentSection = "selftalk";
+          if (t.includes("[잠은 잘 주무셨나요?]")) currentSection = "sleep";
+          else if (t.includes("[오늘 무슨일이 있었나요?]") || t.includes("[오늘 있었던 일은?]")) currentSection = "event";
+          else if (t.includes("[어떤 감정이 들었나요?]")) currentSection = "emotion";
+          else if (t.includes("[자신의 감정을 깊게 탐색해보면...]")) currentSection = "meaning";
+          else if (t.includes("[나에게 보내는 따뜻한 위로]")) currentSection = "selftalk";
           else if (currentSection) {
               result[currentSection] += (result[currentSection] ? "\n" : "") + line;
           }
       }
+      
+      // [Safety Fallback] If parsing failed to extract event, use raw text if it doesn't look like a structured format
+      if (!result.event && d.event && !result.sleep) {
+          result.event = d.event;
+      }
+      
       return result;
     });
 
-    const isValid = computed(() => formData.value.mood && formData.value.question1.trim() && formData.value.question_sleep.trim());
-    
+    const isValid = computed(
+      () =>
+        formData.value.mood &&
+        formData.value.question1.trim() &&
+        formData.value.question_sleep.trim(),
+    );
+
     // [Fix] Robust Mood Mapping (Number or String)
     const normalizeMood = (val) => {
-        if (!val) return 3; // Default Neutral
-        if (typeof val === 'number') {
-            if (val > 5) return 5;
-            if (val < 1) return 1;
-            return Math.round(val);
-        }
-        const map = { "happy": 5, "calm": 4, "neutral": 3, "sad": 2, "angry": 1 };
-        return map[val] || 3;
+      if (!val) return 3; // Default Neutral
+      if (typeof val === "number") {
+        if (val > 5) return 5;
+        if (val < 1) return 1;
+        return Math.round(val);
+      }
+      const map = { happy: 5, calm: 4, neutral: 3, sad: 2, angry: 1 };
+      return map[val] || 3;
     };
 
     // [New] AI Keyword Mapping (Sync with CalendarGrid)
     const koreanToMoodKey = {
-        "행복": 5, "기쁨": 5, "사랑": 5, "설렘": 5, "즐거움": 5, "흥분": 5, "재미": 5, "신남": 5, "만족": 5,
-        "평온": 4, "편안": 4, "감사": 4, "다짐": 4, "안도": 4, "차분": 4,
-        "평범": 3, "무던": 3, "보통": 3, "지루함": 3, "혼란": 3, "모호": 3,
-        "우울": 2, "슬픔": 2, "지침": 2, "피곤": 2, "외로움": 2, "후회": 2, "상처": 2, "어려움": 2, "힘듦": 2, "괴로움": 2, "어리움": 2, "지쳐있음": 2, "피로": 2, "무력": 2, "낙담": 2,
-        "분노": 1, "화남": 1, "짜증": 1, "스트레스": 1, "싫어": 1, "불안": 1, "걱정": 1, "답답함": 1, "억울": 1
+      행복: 5,
+      기쁨: 5,
+      사랑: 5,
+      설렘: 5,
+      즐거움: 5,
+      흥분: 5,
+      재미: 5,
+      신남: 5,
+      만족: 5,
+      평온: 4,
+      편안: 4,
+      감사: 4,
+      다짐: 4,
+      안도: 4,
+      차분: 4,
+      평범: 3,
+      무던: 3,
+      보통: 3,
+      지루함: 3,
+      혼란: 3,
+      모호: 3,
+      우울: 2,
+      슬픔: 2,
+      지침: 2,
+      피곤: 2,
+      외로움: 2,
+      후회: 2,
+      상처: 2,
+      어려움: 2,
+      힘듦: 2,
+      괴로움: 2,
+      어리움: 2,
+      지쳐있음: 2,
+      피로: 2,
+      무력: 2,
+      낙담: 2,
+      분노: 1,
+      화남: 1,
+      짜증: 1,
+      스트레스: 1,
+      싫어: 1,
+      불안: 1,
+      걱정: 1,
+      답답함: 1,
+      억울: 1,
     };
 
     // [New] Computed Mood logic: AI > User
     const displayMoodLevel = computed(() => {
-        const d = currentDiary.value;
-        if (!d) return 3;
+      const d = currentDiary.value;
+      if (!d) return 3;
 
-        console.log(`[DiaryModal] Calculating Mood for ID ${d.id}`);
-        console.log(`- AI Pred: ${d.ai_prediction}, AI Emo: ${d.ai_emotion}`);
-        console.log(`- User Mood: ${d.mood_level} / ${d.mood}`);
+      console.log(`[DiaryModal] Calculating Mood for ID ${d.id}`);
+      console.log(`- AI Pred: ${d.ai_prediction}, AI Emo: ${d.ai_emotion}`);
+      console.log(`- User Mood: ${d.mood_level} / ${d.mood}`);
 
-        // 1. Try AI Emotion Field
-        if (d.ai_emotion && d.ai_emotion !== "분석중" && d.ai_emotion !== "대기중") {
-             const key = d.ai_emotion.trim();
-             if (koreanToMoodKey[key]) {
-                 console.log(`-> Mapped via AI Emotion (${key}): ${koreanToMoodKey[key]}`);
-                 return koreanToMoodKey[key];
-             }
+      // 1. Try AI Emotion Field
+      if (d.ai_emotion && d.ai_emotion !== "분석중" && d.ai_emotion !== "대기중") {
+        const key = d.ai_emotion.trim();
+        if (koreanToMoodKey[key]) {
+          console.log(`-> Mapped via AI Emotion (${key}): ${koreanToMoodKey[key]}`);
+          return koreanToMoodKey[key];
         }
+      }
 
-        // 2. Try AI Prediction Field
-        if (d.ai_prediction) {
-            let text = d.ai_prediction;
-            if ((text.startsWith("'") && text.endsWith("'")) || (text.startsWith('"') && text.endsWith('"'))) text = text.slice(1, -1);
-            const match = text.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
-            const label = match ? match[1].trim() : text.trim();
-            
-            if (koreanToMoodKey[label]) {
-                console.log(`-> Mapped via AI Prediction (${label}): ${koreanToMoodKey[label]}`);
-                return koreanToMoodKey[label];
-            } else {
-                console.log(`-> Mapping Failed for label: ${label}`);
-            }
+      // 2. Try AI Prediction Field
+      if (d.ai_prediction) {
+        let text = d.ai_prediction;
+        if (
+          (text.startsWith("'") && text.endsWith("'")) ||
+          (text.startsWith('"') && text.endsWith('"'))
+        )
+          text = text.slice(1, -1);
+        const match = text.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
+        const label = match ? match[1].trim() : text.trim();
+
+        if (koreanToMoodKey[label]) {
+          console.log(`-> Mapped via AI Prediction (${label}): ${koreanToMoodKey[label]}`);
+          return koreanToMoodKey[label];
+        } else {
+          console.log(`-> Mapping Failed for label: ${label}`);
         }
+      }
 
-        // 3. Fallback to User Mood
-        const userM = normalizeMood(d.mood_level || d.mood);
-        console.log(`-> Fallback to User Mood: ${userM}`);
-        return userM;
+      // 3. Fallback to User Mood
+      const userM = normalizeMood(d.mood_level || d.mood);
+      console.log(`-> Fallback to User Mood: ${userM}`);
+      return userM;
     });
 
     const getMoodEmoji = (lvl) => emojiMap[normalizeMood(lvl)]?.icon || "";
     const getMoodName = (lvl) => emojiMap[normalizeMood(lvl)]?.name || "";
     const getMoodColorClass = (lvl) => {
-        const n = normalizeMood(lvl);
-        const map = { 1: "mood-angry", 2: "mood-sad", 3: "mood-neutral", 4: "mood-calm", 5: "mood-happy" };
-        return map[n] || "mood-neutral";
+      const n = normalizeMood(lvl);
+      const map = {
+        1: "mood-angry",
+        2: "mood-sad",
+        3: "mood-neutral",
+        4: "mood-calm",
+        5: "mood-happy",
+      };
+      return map[n] || "mood-neutral";
     };
     const getWeatherIcon = (desc) => {
       if (!desc) return "✨";
@@ -442,23 +506,28 @@ export default {
       clearTimers();
       isProcessing.value = false;
       progressPercent.value = 100;
-      
+
       if (currentDiary.value.id) {
-          try {
-            const fresh = await diaryAPI.getDiary(currentDiary.value.id);
-            localDiary.value = fresh;
-            
-            if (fresh.followup_required) {
-               console.log("🚨 Follow-up Required! Switching to Chatbot...");
-               emit("close");
-               localStorage.setItem('followup_context', JSON.stringify({
-                   diaryId: fresh.id,
-                   question: fresh.followup_question || "오늘 기록하신 내용을 조금 더 이야기해볼까요?"
-               }));
-               router.push(`/chat/${props.date}`);
-               return;
-            }
-          } catch(e) { console.error(e); }
+        try {
+          const fresh = await diaryAPI.getDiary(currentDiary.value.id);
+          localDiary.value = fresh;
+
+          if (fresh.followup_required) {
+            console.log("🚨 Follow-up Required! Switching to Chatbot...");
+            emit("close");
+            localStorage.setItem(
+              "followup_context",
+              JSON.stringify({
+                diaryId: fresh.id,
+                question: fresh.followup_question || "오늘 기록하신 내용을 조금 더 이야기해볼까요?",
+              }),
+            );
+            router.push(`/chat/${props.date}`);
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
       }
       emit("saved");
     };
@@ -468,17 +537,26 @@ export default {
       progressPercent.value = 5;
       loadingMessage.value = "AI 분석 중...";
       eta.value = 15;
-      timerIds.value.push(setInterval(() => { if (eta.value > 0) eta.value--; }, 1000));
-      timerIds.value.push(setInterval(async () => {
+      timerIds.value.push(
+        setInterval(() => {
+          if (eta.value > 0) eta.value--;
+        }, 1000),
+      );
+      timerIds.value.push(
+        setInterval(async () => {
           try {
             const status = await diaryAPI.getTaskStatus(taskId);
             if (status.state === "PROGRESS") {
               progressPercent.value = status.process_percent;
               loadingMessage.value = status.message;
             } else if (status.state === "SUCCESS") finishPolling();
-            else if (status.state === "FAILURE") { isProcessing.value = false; clearTimers(); }
+            else if (status.state === "FAILURE") {
+              isProcessing.value = false;
+              clearTimers();
+            }
           } catch (e) {}
-      }, 1000));
+        }, 1000),
+      );
     };
 
     const startFakePolling = () => {
@@ -486,7 +564,8 @@ export default {
       loadingMessage.value = "분석 결과 확인 중...";
       progressPercent.value = 30;
       eta.value = 5;
-      timerIds.value.push(setInterval(async () => {
+      timerIds.value.push(
+        setInterval(async () => {
           if (progressPercent.value < 90) progressPercent.value += 10;
           if (eta.value > 0) eta.value--;
           if (currentDiary.value.id) {
@@ -498,7 +577,8 @@ export default {
               }
             } catch (e) {}
           }
-      }, 1500));
+        }, 1500),
+      );
     };
 
     const handleSave = async () => {
@@ -519,7 +599,7 @@ export default {
           symptoms: formData.value.symptoms,
           gratitude_note: formData.value.gratitude_note,
           safety_flag: formData.value.safety_flag,
-          medication_taken: formData.value.medication_taken
+          medication_taken: formData.value.medication_taken,
         };
         const result = props.diary
           ? await diaryAPI.updateDiary(props.diary.id, payload)
@@ -532,12 +612,18 @@ export default {
         emit("saved");
       } catch (e) {
         alert("저장 실패: " + e.message);
-      } finally { saving.value = false; }
+      } finally {
+        saving.value = false;
+      }
     };
 
     const handleDelete = async () => {
       if (!confirm("정말 삭제하시겠습니까?")) return;
-      try { await diaryAPI.deleteDiary(currentDiary.value.id); emit("saved"); emit("close"); } catch (e) {}
+      try {
+        await diaryAPI.deleteDiary(currentDiary.value.id);
+        emit("saved");
+        emit("close");
+      } catch (e) {}
     };
 
     // === Weather & Insight ===
@@ -546,141 +632,222 @@ export default {
       isLoadingInsight.value = true;
       const weatherDesc = weatherInfo.value ? weatherInfo.value.desc : null;
       try {
-        const minTime = new Promise(resolve => setTimeout(resolve, 1500));
+        const minTime = new Promise((resolve) => setTimeout(resolve, 1500));
         const [res] = await Promise.all([
-            diaryAPI.getMindsetInsight(props.date, weatherDesc).catch(() => ({ message: "오늘 하루는 어떠셨나요?" })),
-            minTime
+          diaryAPI
+            .getMindsetInsight(props.date, weatherDesc)
+            .catch(() => ({ message: "오늘 하루는 어떠셨나요?" })),
+          minTime,
         ]);
         mindsetInsight.value = res.message || "오늘 하루는 어떠셨나요?";
-      } catch (e) { mindsetInsight.value = "편안하게 기록해보세요."; }
-      finally { isLoadingInsight.value = false; }
+      } catch (e) {
+        mindsetInsight.value = "편안하게 기록해보세요.";
+      } finally {
+        isLoadingInsight.value = false;
+      }
     };
 
     const getWeatherFromAPI = async (lat, lon, date = null) => {
-        // (Simplified for brevity, same logic as before)
-        try {
-            let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
-            if (date) {
-                const today = new Date().toISOString().split('T')[0];
-                if (date < today) url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max&timezone=auto`;
-            }
-            const res = await fetch(url);
-            const data = await res.json();
-            let code, temp;
-            if (data.daily) { code = data.daily.weathercode[0]; temp = data.daily.temperature_2m_max[0]; }
-            else if (data.current_weather) { code = data.current_weather.weathercode; temp = data.current_weather.temperature; }
-            
-            if (code !== undefined) {
-                const map = { 0:"맑음 ☀️", 1:"대체로 맑음 🌤️", 2:"구름 조금 ⛅", 3:"흐림 ☁️", 61:"비 ☔", 95:"뇌우 ⚡" };
-                weatherInfo.value = { temp, desc: map[code] || "흐림" };
-                if (!props.diary) fetchMindsetInsight();
-            }
-        } catch(e) { if(!props.diary) fetchMindsetInsight(); }
+      // (Simplified for brevity, same logic as before)
+      try {
+        let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&timezone=auto`;
+        if (date) {
+          const today = new Date().toISOString().split("T")[0];
+          if (date < today)
+            url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${date}&end_date=${date}&daily=weathercode,temperature_2m_max&timezone=auto`;
+        }
+        const res = await fetch(url);
+        const data = await res.json();
+        let code, temp;
+        if (data.daily) {
+          code = data.daily.weathercode[0];
+          temp = data.daily.temperature_2m_max[0];
+        } else if (data.current_weather) {
+          code = data.current_weather.weathercode;
+          temp = data.current_weather.temperature;
+        }
+
+        if (code !== undefined) {
+          const map = {
+            0: "맑음 ☀️",
+            1: "대체로 맑음 🌤️",
+            2: "구름 조금 ⛅",
+            3: "흐림 ☁️",
+            61: "비 ☔",
+            95: "뇌우 ⚡",
+          };
+          weatherInfo.value = { temp, desc: map[code] || "흐림" };
+          if (!props.diary) fetchMindsetInsight();
+        }
+      } catch (e) {
+        if (!props.diary) fetchMindsetInsight();
+      }
     };
 
     const checkWeather = (date) => {
-        if (!weatherInfo.value) getWeatherFromAPI(37.5665, 126.978, date); // Default Seoul
-        if (navigator.geolocation) {
-             navigator.geolocation.getCurrentPosition(pos => getWeatherFromAPI(pos.coords.latitude, pos.coords.longitude, date));
-        }
+      if (!weatherInfo.value) getWeatherFromAPI(37.5665, 126.978, date); // Default Seoul
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) =>
+          getWeatherFromAPI(pos.coords.latitude, pos.coords.longitude, date),
+        );
+      }
     };
 
     // === Voice Recording ===
     const toggleRecording = (field) => {
-        if (activeField.value === field && isRecording.value) stopRecording();
-        else startRecording(field);
+      if (activeField.value === field && isRecording.value) stopRecording();
+      else startRecording(field);
     };
     const startRecording = async (field) => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-            activeField.value = field;
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-            mediaRecorder.onstop = async () => {
-                isRecording.value = false; activeField.value = null;
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                if(blob.size < 100) return;
-                isTranscribing.value = true;
-                const fd = new FormData(); fd.append("file", blob, "voice.webm"); fd.append("auto_fill", "false");
-                try {
-                    const res = await diaryAPI.transcribeVoice(fd);
-                    if(res.text) formData.value[field] = (formData.value[field] || "") + " " + res.text;
-                } catch(e){ alert("변환 실패"); }
-                finally { isTranscribing.value = false; stream.getTracks().forEach(t=>t.stop()); }
-            };
-            mediaRecorder.start(); isRecording.value = true;
-        } catch(e) { alert("마이크 오류"); }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        activeField.value = field;
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+          isRecording.value = false;
+          activeField.value = null;
+          const blob = new Blob(audioChunks, { type: "audio/webm" });
+          if (blob.size < 100) return;
+          isTranscribing.value = true;
+          const fd = new FormData();
+          fd.append("file", blob, "voice.webm");
+          fd.append("auto_fill", "false");
+          try {
+            const res = await diaryAPI.transcribeVoice(fd);
+            if (res.text) formData.value[field] = (formData.value[field] || "") + " " + res.text;
+          } catch (e) {
+            alert("변환 실패");
+          } finally {
+            isTranscribing.value = false;
+            stream.getTracks().forEach((t) => t.stop());
+          }
+        };
+        mediaRecorder.start();
+        isRecording.value = true;
+      } catch (e) {
+        alert("마이크 오류");
+      }
     };
-    const stopRecording = () => { if(mediaRecorder) mediaRecorder.stop(); };
+    const stopRecording = () => {
+      if (mediaRecorder) mediaRecorder.stop();
+    };
 
     // === UI Handlers ===
-    const startWriting = () => { showForm.value = true; formData.value.mode = uiMode.value; };
-    const cancelWriting = () => { showForm.value = false; emit("close"); };
+    const startWriting = () => {
+      showForm.value = true;
+      formData.value.mode = uiMode.value;
+    };
+    const cancelWriting = () => {
+      showForm.value = false;
+      emit("close");
+    };
     const handleEdit = () => {
-        isViewMode.value = false; showForm.value = true;
-        const d = currentDiary.value;
-        const parsed = parsedContent.value;
-        
-        formData.value = {
-            mood: moodLevelToName[d.mood_level] || "neutral",
-            question_sleep: parsed.sleep || "",
-            question1: parsed.event || "",
-            question2: parsed.emotion || "",
-            question3: parsed.meaning || "",
-            question4: parsed.selftalk || "",
-            mode: d.mode || 'green',
-            mood_intensity: d.mood_intensity || 5,
-            symptoms: d.symptoms || [],
-            gratitude_note: d.gratitude_note || "",
-            safety_flag: d.safety_flag || false,
-            medication_taken: d.medication_taken || false
-        };
+      isViewMode.value = false;
+      showForm.value = true;
+      const d = currentDiary.value;
+      const parsed = parsedContent.value;
+
+      formData.value = {
+        mood: moodLevelToName[d.mood_level] || "neutral",
+        question_sleep: parsed.sleep || "",
+        question1: parsed.event || "",
+        question2: parsed.emotion || "",
+        question3: parsed.meaning || "",
+        question4: parsed.selftalk || "",
+        mode: d.mode || "green",
+        mood_intensity: d.mood_intensity || 5,
+        symptoms: d.symptoms || [],
+        gratitude_note: d.gratitude_note || "",
+        safety_flag: d.safety_flag || false,
+        medication_taken: d.medication_taken || false,
+      };
     };
 
     // === Lifecycle ===
     onMounted(() => {
-        const stored = localStorage.getItem('risk_level');
-        if (stored) userRiskLevel.value = parseInt(stored, 10);
+      const stored = localStorage.getItem("risk_level");
+      if (stored) userRiskLevel.value = parseInt(stored, 10);
     });
 
-    watch([() => props.diary, () => props.date], ([newDiary, newDate], [oldDiary, oldDate]) => {
+    watch(
+      [() => props.diary, () => props.date],
+      ([newDiary, newDate], [oldDiary, oldDate]) => {
         if (newDate === oldDate && newDiary?.id === oldDiary?.id) return;
-        
+
         isViewMode.value = !!newDiary;
         showForm.value = false;
         localDiary.value = null;
         clearTimers();
         isProcessing.value = false;
-        
+
         if (newDiary) {
-            weatherInfo.value = newDiary.weather ? { desc: newDiary.weather, temp: newDiary.temperature } : null;
-            if (newDiary.ai_prediction?.includes("분석 중")) {
-                 if (newDiary.task_id) startRealPolling(newDiary.task_id);
-                 else startFakePolling();
-            }
+          weatherInfo.value = newDiary.weather
+            ? { desc: newDiary.weather, temp: newDiary.temperature }
+            : null;
+          if (newDiary.ai_prediction?.includes("분석 중")) {
+            if (newDiary.task_id) startRealPolling(newDiary.task_id);
+            else startFakePolling();
+          }
         } else {
-            // New Entry
-            formData.value = { 
-                mood: "neutral", question_sleep: "", question1: "", question2: "", question3: "", question4: "", 
-                mode: userRiskLevel.value >= 3 ? 'red' : 'green', mood_intensity: 5, symptoms: [], gratitude_note: "", safety_flag: false 
-            };
-            checkWeather(newDate);
+          // New Entry
+          formData.value = {
+            mood: "neutral",
+            question_sleep: "",
+            question1: "",
+            question2: "",
+            question3: "",
+            question4: "",
+            mode: userRiskLevel.value >= 3 ? "red" : "green",
+            mood_intensity: 5,
+            symptoms: [],
+            gratitude_note: "",
+            safety_flag: false,
+          };
+          checkWeather(newDate);
         }
-    }, { immediate: true });
+      },
+      { immediate: true },
+    );
 
     onUnmounted(() => clearTimers());
 
     return {
-      isViewMode, showForm, saving, formData, weatherInfo, weatherInsight,
-      panelRef, currentDiary, formattedDate, formattedDateTime, isValid, parsedContent,
+      isViewMode,
+      showForm,
+      saving,
+      formData,
+      weatherInfo,
+      weatherInsight,
+      panelRef,
+      currentDiary,
+      formattedDate,
+      formattedDateTime,
+      isValid,
+      parsedContent,
       displayMoodLevel, // [New]
-      getMoodEmoji, getMoodName, getMoodColorClass, getWeatherIcon,
-      handleSave, startWriting, cancelWriting, handleEdit, handleDelete,
-      isProcessing, progressPercent, loadingMessage, eta,
-      mindsetInsight, isLoadingInsight,
-      isRecording, isTranscribing, toggleRecording, activeField,
-      uiMode, symptomOptions
+      getMoodEmoji,
+      getMoodName,
+      getMoodColorClass,
+      getWeatherIcon,
+      handleSave,
+      startWriting,
+      cancelWriting,
+      handleEdit,
+      handleDelete,
+      isProcessing,
+      progressPercent,
+      loadingMessage,
+      eta,
+      mindsetInsight,
+      isLoadingInsight,
+      isRecording,
+      isTranscribing,
+      toggleRecording,
+      activeField,
+      uiMode,
+      symptomOptions,
     };
   },
 };
@@ -1127,114 +1294,120 @@ export default {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .fade-in {
-    animation: fadeIn 0.4s ease-out;
+  animation: fadeIn 0.4s ease-out;
 }
 
 /* Symptom Chips */
 .symptom-check-section {
-    margin-bottom: 24px;
-    background: #fff0f0; /* Light Red tint for warning context */
-    padding: 16px;
-    border-radius: 12px;
+  margin-bottom: 24px;
+  background: #fff0f0; /* Light Red tint for warning context */
+  padding: 16px;
+  border-radius: 12px;
 }
 .section-label {
-    display: block;
-    margin-bottom: 12px;
-    font-weight: 600;
-    font-size: 14px;
-    color: #c62828;
+  display: block;
+  margin-bottom: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #c62828;
 }
 .symptom-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 .symptom-chip {
-    padding: 8px 16px;
-    background: white;
-    border: 1px solid #ffcdd2;
-    border-radius: 20px;
-    font-size: 13px;
-    color: #b71c1c;
-    cursor: pointer;
-    transition: all 0.2s;
-    user-select: none;
+  padding: 8px 16px;
+  background: white;
+  border: 1px solid #ffcdd2;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #b71c1c;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
 }
 .symptom-chip.active {
-    background: #ff5252;
-    color: white;
-    border-color: #ff5252;
-    font-weight: 600;
+  background: #ff5252;
+  color: white;
+  border-color: #ff5252;
+  font-weight: 600;
 }
 
 /* Slider */
 .slider-section {
-    margin-bottom: 24px;
-    padding: 0 10px;
+  margin-bottom: 24px;
+  padding: 0 10px;
 }
 .slider-container {
-    display: flex;
-    align-items: center;
-    gap: 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .range-slider {
-    flex: 1;
-    -webkit-appearance: none;
-    height: 6px;
-    background: #e0e0e0;
-    border-radius: 3px;
-    outline: none;
+  flex: 1;
+  -webkit-appearance: none;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  outline: none;
 }
 .range-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #ff5252;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ff5252;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 .slider-value {
-    font-size: 18px;
-    font-weight: 800;
-    color: #ff5252;
-    min-width: 24px;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ff5252;
+  min-width: 24px;
 }
 .slider-hint {
-    font-size: 11px;
-    color: #999;
-    margin-top: 6px;
-    text-align: right;
+  font-size: 11px;
+  color: #999;
+  margin-top: 6px;
+  text-align: right;
 }
 
 /* Safety Checkbox */
 .safety-check-box {
-    margin-bottom: 24px;
-    padding: 16px;
-    border: 1px solid #ef9a9a;
-    border-radius: 12px;
-    background: #ffebee;
+  margin-bottom: 24px;
+  padding: 16px;
+  border: 1px solid #ef9a9a;
+  border-radius: 12px;
+  background: #ffebee;
 }
 .warning-text {
-    color: #c62828;
-    font-weight: 600;
-    font-size: 14px;
-    margin-left: 8px;
+  color: #c62828;
+  font-weight: 600;
+  font-size: 14px;
+  margin-left: 8px;
 }
 .checkbox-container {
-    display: flex;
-    align-items: center;
-    cursor: pointer;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
 }
 input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
-    accent-color: #c62828;
+  width: 18px;
+  height: 18px;
+  accent-color: #c62828;
 }
 
 /* Voice UI */

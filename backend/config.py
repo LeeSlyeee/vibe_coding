@@ -21,11 +21,16 @@ class Config:
     # Default to localhost:27017 if MONGO_URI not provided
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/mood_diary_db'
 
-    # [CRITICAL FIX] Hardcode Secret Key to match Main Server (150)
+    # [CRITICAL FIX] Hardcode Secret Key to match Main Server (150 & 217)
     # Environment variable loading via SystemD is failing, so we enforce it here.
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'django-insecure-dev-key-12345'
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'django-insecure-key-for-dev'
     # JWT 토큰 만료 시간 설정 (24시간)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
+    
+    # [CRITICAL FIX] Django SimpleJWT Compatibility
+    # Django uses 'user_id' claim, Flask expects 'sub' by default.
+    # We must tell Flask to look for 'user_id'.
+    JWT_IDENTITY_CLAIM = 'user_id'
 
     # Celery Configuration
     CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL') or 'redis://localhost:6379/0'
