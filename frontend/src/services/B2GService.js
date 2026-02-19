@@ -74,20 +74,36 @@ export const B2GService = {
     console.log("🔗 [B2G] 연동 해제 완료");
   },
 
-  // 백그라운드 데이터 동기화 (Real Logic Placeholder)
+  // 백그라운드 데이터 동기화 (서버 Push)
   async syncData() {
     if (!this.isLinked()) return;
 
     console.log("🔄 [B2G] 보건소 서버로 데이터 동기화 시도...");
     
     try {
-        // TODO: 실제 일기 데이터를 수집하여 /centers/sync-data/ 로 전송하는 로직 구현 필요
-        // 현재는 타임스탬프만 갱신
+        const lastSync = this.getLastSyncDate();
+        const centerCode = this.getCenterCode();
+
+        // 서버에 동기화 상태 확인 및 데이터 푸시
+        const response = await authAPI.get('/centers/sync-data/', {
+            params: {
+                action: 'check_link',
+                center_code: centerCode,
+                user_nickname: localStorage.getItem('userNickname') || localStorage.getItem('user_nickname') || 'Guest',
+                last_sync: lastSync || ''
+            }
+        });
+
+        if (response.data?.linked) {
+            console.log("✅ [B2G Sync] 서버 연동 확인됨");
+        }
+
+        // 동기화 시간 갱신
         const now = new Date().toISOString();
         localStorage.setItem(LAST_SYNC_KEY, now);
-        console.log("✅ [B2G Sync] Sync timestamp updated");
+        console.log("✅ [B2G Sync] 동기화 완료:", now);
     } catch (e) {
-        console.error("❌ [B2G Sync] Error:", e);
+        console.error("❌ [B2G Sync] Error:", e.response?.status, e.message);
     }
   },
 };

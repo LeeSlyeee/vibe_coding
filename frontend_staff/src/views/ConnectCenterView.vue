@@ -26,10 +26,7 @@ const verifyCode = async () => {
             verificationCodeId.value = response.data.verification_code_id; // 저장
         }
     } catch (err) {
-        // [긴급 디버깅] 에러 상세 정보 출력
-        console.error("DEBUG ERR:", err);
-        const debugInfo = `URL: ${err.config?.url}\nStatus: ${err.response?.status}\nRes: ${JSON.stringify(err.response?.data)}`;
-        alert(`[디버그 정보]\n${debugInfo}\n\n에러: ${err.message}`);
+        console.error("[B2G] 코드 검증 에러:", err.response?.status, err.response?.data);
 
         if (err.response && err.response.data.error) {
             errorMsg.value = err.response.data.error;

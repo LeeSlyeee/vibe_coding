@@ -225,7 +225,31 @@ def get_me():
     
     if not user:
         return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404
-        
+
+    # --- 동적 assessment/risk 계산 ---
+    from datetime import datetime, timedelta
+    diary_count = Diary.query.filter_by(user_id=user.id).count()
+    assessment_done = diary_count > 0
+
+    # 최근 7일 일기 기반 위험도 판단
+    risk = 'low'
+    recent_cutoff = datetime.utcnow() - timedelta(days=7)
+    recent_diaries = Diary.query.filter(
+        Diary.user_id == user.id,
+        Diary.created_at >= recent_cutoff
+    ).all()
+
+    if recent_diaries:
+        avg_mood = sum(d.mood_level or 3 for d in recent_diaries) / len(recent_diaries)
+        has_safety_flag = any(
+            getattr(d, 'safety_flag', None) in ['need_help', 'danger', True]
+            for d in recent_diaries
+        )
+        if has_safety_flag or avg_mood <= 2:
+            risk = 'high'
+        elif avg_mood <= 3:
+            risk = 'moderate'
+
     return jsonify({
         'id': user.id,
         'username': user.username,
@@ -234,9 +258,9 @@ def get_me():
         'email': getattr(user, 'email', ''),
         'role': getattr(user, 'role', 'user'),
         'center_code': user.center_code,
-        'linked_center_code': user.center_code, 
-        'assessment_completed': True, # [Fix]
-        'risk_level': 'low', # [Fix]
+        'linked_center_code': user.center_code,
+        'assessment_completed': assessment_done,
+        'risk_level': risk,
         'is_premium': (getattr(user, 'role', 'user') in ['premium', 'admin'])
     }), 200
     
