@@ -20,6 +20,7 @@ class User(db.Model):
     nickname = db.Column(db.String(80), nullable=True)
     center_code = db.Column(db.String(50), nullable=True)
     role = db.Column(db.String(20), nullable=True)
+    birth_date = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, nullable=True) # vibe_db has this
 
     # Relationships

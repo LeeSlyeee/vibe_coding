@@ -74,8 +74,8 @@ def verify_code():
 @b2g_bp.route('/api/b2g_sync/connect/', methods=['POST'])
 @jwt_required()
 def connect_center():
-    current_username = get_jwt_identity()
-    user = User.query.filter_by(username=current_username).first()
+    current_user_id = int(get_jwt_identity())
+    user = User.query.filter_by(id=current_user_id).first()
     
     if not user:
         return jsonify({"message": "User not found"}), 404
@@ -107,8 +107,8 @@ def connect_center():
 @b2g_bp.route('/api/b2g_sync/status/', methods=['GET'])
 @jwt_required()
 def check_status():
-    current_username = get_jwt_identity()
-    user = User.query.filter_by(username=current_username).first()
+    current_user_id = int(get_jwt_identity())
+    user = User.query.filter_by(id=current_user_id).first()
     
     if not user:
         return jsonify({"linked": False, "message": "User not found"}), 404

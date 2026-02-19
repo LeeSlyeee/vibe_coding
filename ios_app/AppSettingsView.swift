@@ -184,6 +184,8 @@ struct AppSettingsView: View {
                                     UserDefaults.standard.set(loginId, forKey: "app_username")
                                     UserDefaults.standard.set(loginPw, forKey: "app_password")
                                     UserDefaults.standard.set(loginId, forKey: "userNickname") // Display Name
+                                    // [Fix] authUsername도 함께 설정 (Single Source of Truth)
+                                    UserDefaults.standard.set(loginId, forKey: "authUsername")
                                     
                                     // 2. Auth Check
                                     APIService.shared.ensureAuth { success in
@@ -192,8 +194,9 @@ struct AppSettingsView: View {
                                             authManager.username = loginId // Update UI state if needed
                                             activeAlert = .info("로그인 성공! 이제 이 계정으로 동기화됩니다.")
                                         } else {
+                                            // [Fix] 실패 시 authUsername 롤백
+                                            UserDefaults.standard.removeObject(forKey: "authUsername")
                                             activeAlert = .info("로그인 실패. 아이디/비밀번호를 확인하세요.")
-                                            // Revert if failed? Maybe let them try again.
                                         }
                                         // loginPw = "" // Keep it for retry convenience
                                     }

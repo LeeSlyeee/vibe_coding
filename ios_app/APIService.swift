@@ -47,31 +47,28 @@ class APIService: NSObject {
             return
         }
         
-        // 2. Get or Generate Password
-        var password = UserDefaults.standard.string(forKey: "app_password")
-        
-        // [Emergency Fix] Force Password for 'slyeee' to match Server Reset (1234)
-        if username == "slyeee" {
-            password = "1234"
-        } else if password == nil {
-            // Generate random password for others
-            password = String(UUID().uuidString.prefix(8))
-            UserDefaults.standard.set(password, forKey: "app_password")
+        // [Fix] 토큰이 이미 있으면 재로그인 없이 바로 통과
+        // 토큰 만료 시 서버가 401을 반환하면 그때 실패 처리
+        if let existingToken = self.token, !existingToken.isEmpty {
+            completion(true)
+            return
         }
         
+        // 토큰이 없는 경우에만 재로그인 시도
+        // [Fix] 사용자가 실제 입력한 비밀번호 사용 (랜덤 UUID 생성 제거)
+        guard let password = UserDefaults.standard.string(forKey: "app_password"), !password.isEmpty else {
+            print("⚠️ [API-OCI] No stored password. User must re-login from Login screen.")
+            completion(false)
+            return
+        }
         
-        let body: [String: Any] = ["username": username, "password": password!]
-        
-        // [Security] Mask password in logs
-        let maskedPW = String(repeating: "*", count: password?.count ?? 0)
-        // print("🔐 [API-217] Attempting Auth for: '\(username)' (PW: \(maskedPW))")
+        let body: [String: Any] = ["username": username, "password": password]
         
         // [Fix] Endpoint: /login (Correct path under /api/)
         performRequest(baseURL: self.baseURL, endpoint: "/login", method: "POST", body: body, requiresAuth: false) { result in
             switch result {
             case .success(let response):
                 if let accessToken = response["access_token"] as? String {
-                     // print("🔑 [API-OCI] Saving Token: \(accessToken.prefix(20))... for user: \(username)")
                      self.token = accessToken
                      
                      // [Name Sync]
@@ -100,31 +97,16 @@ class APIService: NSObject {
                          }
                      }
                      
-                     // print("🌐 [API-217] Login Success: \(username)")
                      completion(true)
                 } else {
                     completion(false)
                 }
-             case .failure:
-                // ... (Registration Logic)
-                // 회원가입 시도 [Fix] Endpoint: /register
-                self.performRequest(baseURL: self.baseURL, endpoint: "/register", method: "POST", body: body, requiresAuth: false) { regResult in
-                    switch regResult {
-                    case .success:
-                         self.performRequest(baseURL: self.baseURL, endpoint: "/login", method: "POST", body: body, requiresAuth: false) { loginRetry in
-                            if case .success(let retryResp) = loginRetry,
-                               let accessToken = retryResp["access_token"] as? String {
-                                self.token = accessToken
-                                self.syncUserInfo { _ in completion(true) }
-                            } else {
-                                completion(false)
-                            }
-                         }
-                    case .failure(let err):
-                        print("🌐 [API-217] Registration failed: \(err)")
-                        completion(false)
-                    }
-                }
+             case .failure(let err):
+                // [Fix] 로그인 실패 시 랜덤 회원가입 시도 제거
+                // ensureAuth는 이미 가입된 사용자의 토큰 갱신 전용
+                // 신규 가입은 AppLoginView → AuthManager.performLogin()에서 처리
+                print("⚠️ [API-OCI] Re-login failed: \(err). User must re-login from Login screen.")
+                completion(false)
             }
         }
     }
@@ -132,7 +114,8 @@ class APIService: NSObject {
     // [New] User Info Sync without Re-login
     // [New] User Info Sync without Re-login (Targets 217 Server)
     func syncUserInfo(completion: @escaping (Bool) -> Void) {
-        let urlStr = self.llmServerURL + "/auth/me/"
+        // [Fix] /api/auth/me/ → /api/user/me (Flask 엔드포인트, nginx 라우팅 정상)
+        let urlStr = self.baseURL + "/user/me"
         guard let url = URL(string: urlStr) else { completion(false); return }
         
         var request = URLRequest(url: url)
@@ -345,8 +328,8 @@ class APIService: NSObject {
     func connectToCenter(centerId: Any, completion: @escaping (Bool) -> Void) {
         let payload: [String: Any] = ["center_id": centerId]
         
-        // [Fix] Endpoint: /centers/connect/
-        performRequest(baseURL: self.medicalURL, endpoint: "/centers/connect/", method: "POST", body: payload, requiresAuth: true) { result in
+        // [Fix] Endpoint: /b2g_sync/connect/ (Django urls.py에 등록된 경로)
+        performRequest(baseURL: self.medicalURL, endpoint: "/b2g_sync/connect/", method: "POST", body: payload, requiresAuth: true) { result in
             switch result {
             case .success:
                 completion(true)

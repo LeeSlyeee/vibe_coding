@@ -108,6 +108,8 @@ class AuthManager: ObservableObject {
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 // Login Success
+                // [Fix] 비밀번호 저장 (ensureAuth 토큰 갱신에 필요)
+                UserDefaults.standard.set(password, forKey: "app_password")
                 self.handleLoginResponse(data: data, username: username, centerCode: centerCode, completion: completion)
             } else {
                 // Login Failed -> Try Registration
@@ -236,12 +238,20 @@ class AuthManager: ObservableObject {
     func logout() {
         self.token = nil
         self.username = nil
+        self.birthDate = nil
         self.isAuthenticated = false
         self.riskLevel = 1
         self.isPremium = false
-        UserDefaults.standard.removeObject(forKey: "authToken")
-        UserDefaults.standard.removeObject(forKey: "authUsername")
-        UserDefaults.standard.removeObject(forKey: "userRiskLevel")
-        UserDefaults.standard.removeObject(forKey: "userIsPremium")
+        
+        // [Fix] 모든 인증/프로필 관련 UserDefaults 완전 정리
+        let keysToRemove = [
+            "authToken", "authUsername", "userRiskLevel", "userIsPremium",
+            "serverAuthToken", "app_password", "userId", "realName",
+            "userNickname", "userBirthDate", "app_username",
+            "hasCompletedAssessment"
+        ]
+        for key in keysToRemove {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
     }
 }

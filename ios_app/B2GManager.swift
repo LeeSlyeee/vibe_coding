@@ -205,9 +205,11 @@ class B2GManager: ObservableObject {
         print("🔄 [B2G] Push Local Data to Server (Force: \(force))...")
         
         // 1. 로컬 데이터 수집
-        // CRITICAL FIX: Eliminate "Guest" concept. Require explicit user identity.
-        guard let nickname = UserDefaults.standard.string(forKey: "app_username") ?? UserDefaults.standard.string(forKey: "userNickname") else {
-            print("❌ [B2G] Sync Aborted: No User Identity (Guest is banned).")
+        // [Fix] Single Source of Truth: authUsername 우선 사용
+        guard let nickname = UserDefaults.standard.string(forKey: "authUsername")
+            ?? UserDefaults.standard.string(forKey: "app_username")
+            ?? UserDefaults.standard.string(forKey: "userNickname") else {
+            print("❌ [B2G] Sync Aborted: No User Identity (authUsername missing).")
             DispatchQueue.main.async { self.isSyncing = false }
             return
         }
