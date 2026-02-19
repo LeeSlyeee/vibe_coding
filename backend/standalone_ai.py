@@ -19,7 +19,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
     # 3. Prompt Switching
     # Combined Prompt for continuous conversation
     prompt_text = (
-        f"너는 다정하고 통찰력 있는 심리 상담사 '하루온'이야.\n"
+        f"너는 다정하고 통찰력 있는 심리 상담사 '마음온'이야.\n"
         f"{context_str}"
         f"### [내담자의 현재 말]: \"{sanitized}\"\n\n"
         "### [지시사항]:\n"
@@ -43,7 +43,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
 
     try:
         payload = {
-            "model": "haru-on-gemma",
+            "model": "maumON-gemma",
             "prompt": prompt_text,
             "stream": False,
             "options": {
@@ -112,7 +112,7 @@ def analyze_chat_sentiment_background(user_text, ai_reaction):
     
     try:
         payload = {
-            "model": "haru-on-gemma",
+            "model": "maumON-gemma",
             "prompt": prompt_text,
             "stream": False,
             "options": {

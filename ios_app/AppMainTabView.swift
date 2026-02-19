@@ -53,7 +53,7 @@ struct AppMainTabView: View {
                         
                         HStack(spacing: 0) {
                             TabButton(index: 0, title: "캘린더", image: "tab_calendar", systemIcon: "calendar", selection: $selection)
-                            TabButton(index: 1, title: "통계", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
+                            TabButton(index: 1, title: "분석", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
                             TabButton(index: 2, title: "상담", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
                             TabButton(index: 3, title: "긴급", image: "tab_emergency", systemIcon: "exclamationmark.triangle.fill", selection: $selection)
                         }
@@ -315,7 +315,9 @@ struct AppMainTabView: View {
             }
             .onChange(of: scenePhase) { newPhase in
                 if newPhase == .active && authManager.isAuthenticated {
-                    print("📱 [App] Scene Active. Checking Auth Status...")
+                    let uid = UserDefaults.standard.string(forKey: "userId") ?? "N/A"
+                    let uname = UserDefaults.standard.string(forKey: "authUsername") ?? "N/A"
+                    print("📱 [App] Scene Active. Auth Status: userId=\(uid), username=\(uname)")
                     
                     // [Step 1] Verify Login Integrity First (Single Source of Truth)
                     if let username = authManager.username, !username.isEmpty {
@@ -471,7 +473,7 @@ struct AppGuideView: View {
                         Text("📖 사용 설명서")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(Color(hexString: "1D1D1F"))
-                        Text("하루온(Haru-On)을 100% 활용하는 방법을 알려드려요.")
+                        Text("마음온(maumON)을 100% 활용하는 방법을 알려드려요.")
                             .font(.system(size: 15))
                             .foregroundColor(Color(hexString: "86868B"))
                     }

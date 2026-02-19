@@ -479,7 +479,7 @@ struct AppSettingsView: View {
                     HStack {
                         Text("개발자")
                         Spacer()
-                        Text("Haru-on Team")
+                        Text("Maum-on Team")
                             .foregroundColor(.gray)
                     }
                     
@@ -654,7 +654,9 @@ struct AppSettingsView: View {
     // 이스터에그 함수
     func seedData() {
         DataSeeder.shared.seedDummyData { count in
-            activeAlert = .info("테스트용 일기 \(count)개가 생성되었습니다.\n캘린더와 통계 탭을 확인해보세요.")
+            // [Test] 친구 데이터도 함께 생성
+            DataSeeder.shared.seedDummyFriends()
+            activeAlert = .info("테스트용 일기 \(count)개와\n가짜 친구(오늘 생일)가 생성되었습니다.\n앱을 재시작하거나 탭을 이동해보세요.")
         }
     }
     

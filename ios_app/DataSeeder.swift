@@ -100,6 +100,47 @@ class DataSeeder {
         }
     }
     
+    func seedDummyFriends() {
+        print("🌱 Seeding Dummy Friends for Birthday Test...")
+        let today = Date()
+        let cal = Calendar.current
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        
+        // 1. 오늘 생일 (Happy Birthday!)
+        let todayStr = f.string(from: today)
+        let friend1 = ShareManager.SharedUser(
+            id: UUID().uuidString,
+            name: "단짝 친구 (오늘 생일)",
+            role: "viewer",
+            birthDate: todayStr, // 오늘 날짜 그대로
+            connectedAt: todayStr
+        )
+        
+        // 2. 내일 생일 (Upcoming D-1)
+        if let tmr = cal.date(byAdding: .day, value: 1, to: today) {
+            let tmrStr = f.string(from: tmr)
+            let friend2 = ShareManager.SharedUser(
+                id: UUID().uuidString,
+                name: "직장 동료 (내일 생일)",
+                role: "viewer",
+                birthDate: tmrStr,
+                connectedAt: todayStr
+            )
+            
+            // ShareManager에 주입 (메모리 상에서만 존재, 앱 재실행 시 사라짐)
+            DispatchQueue.main.async {
+                ShareManager.shared.connectedUsers.append(contentsOf: [friend1, friend2])
+                print("✅ Seeded 2 Friends. Triggering UI Refresh...")
+                
+                // 알림 강제 트리거 (AppMainTabView에서 감지하도록)
+                // 3초 후 체크 로직이 돌지만, 여기서 강제로 View를 갱신할 수 없으니
+                // AppMainTabView의 onAppear 로직이나, NotificationCenter를 이용해야 함.
+                // 하지만 사용자가 탭을 갔다오면 갱신될 것임.
+            }
+        }
+    }
+
     // Content Tuple Update
     private func generateContent(for mood: Int) -> (event: String, emotion: String, meaning: String, selfTalk: String) {
         switch mood {

@@ -183,7 +183,8 @@ struct MoodCalendarView: View {
                     Button(action: {
                         print("🔄 [UI] Manual Sync Triggered (Bottom)")
                         self.isLoading = true
-                        LocalDataManager.shared.syncWithServer()
+                        // [Fix] Force Sync to recover 'Tombstoned' (Deleted) diaries if they exist on server
+                        LocalDataManager.shared.syncWithServer(force: true)
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                             self.isLoading = false
                         }
@@ -257,8 +258,10 @@ struct MoodCalendarView: View {
         }
         .contentShape(Rectangle()) // ✅ 전체 영역 터치 가능하게 설정
         .highPriorityGesture( // ✅ 버튼보다 스와이프 우선 인식하되,
-            DragGesture(minimumDistance: 30, coordinateSpace: .local) // ⭐️ 30pt 이상 움직여야만 드래그로 인식 (단순 터치는 통과)
+            // [UX Fix] 일기 상세 보기 중에는 스와이프 비활성화 (minimumDistance를 극대화)
+            DragGesture(minimumDistance: showDetail ? 10000 : 30, coordinateSpace: .local)
                 .onEnded { value in
+                    guard !showDetail else { return } // 이중 안전장치
                     if value.translation.width < 0 {
                         // 왼쪽으로 스와이프 -> 다음 달
                         changeMonth(by: 1)
@@ -331,6 +334,13 @@ struct MoodCalendarView: View {
             self.selectedDiary = diary
             self.showDetail = true
         } else {
+            // [OOM Prevention] AI 모델 로딩 전 진입 차단
+            if !LLMService.shared.isModelLoaded {
+                self.errorMessage = "AI 모델을 폰으로 모셔오는 중이에요.\n잠시만 기다려주세요! 🚚 (약 5초)"
+                self.showErrorAlert = true
+                return
+            }
+            
             // 일기가 없으면 작성 모달 (데이터를 먼저 담고 시트 오픈)
             self.writeTarget = WriteTargetDate(date: date)
         }

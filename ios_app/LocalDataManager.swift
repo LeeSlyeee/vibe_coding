@@ -63,6 +63,13 @@ class LocalDataManager: ObservableObject {
         }
     }
     
+    // [Public] 서버에서 삭제된 일기를 로컬에서도 제거
+    func removeServerDeletedDiary(serverId: String?, dateStr: String?) {
+        self.diaries.removeAll { $0._id == serverId || $0.date == dateStr }
+        self.saveToDisk()
+        NotificationCenter.default.post(name: NSNotification.Name("RefreshDiaries"), object: nil)
+    }
+    
     // [New] Auto-Recovery for Diaries stuck in "Re-analyzing..." state (Crash Recovery)
     // [Auto-Recovery]
     // [Fix] Smart Recovery: Reset status first to unblock UI, then Lazy Load Model.
@@ -213,104 +220,66 @@ class LocalDataManager: ObservableObject {
     
     // MARK: - Server Sync
     
-    // [Smart Sync] Pull First -> Diff -> Push Missing -> Merge
-    // [Smart Sync] Pull First -> Diff -> Push Missing -> Merge
-    // 효율적이고 정확한 동기화: 서버에 없는 데이터만 골라서 전송
+    // [Smart Sync] Push First -> Pull -> Merge
+    // "Medical Staff Dashboard as Standard" Implementation
     func syncWithServer(force: Bool = false) {
         // [Standard Architecture] Strict Auth Check
-        // CRITICAL FIX: Use "authUsername" (Single Source of Truth) instead of "app_username"
         guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
             print("🚫 [SmartSync] Aborted. Missing User Identity (authUsername). Please Login.")
             return
         }
         
-        print("🧠 [SmartSync] Starting Standard Sync... (User: \(username), Force: \(force))")
+        print("🧠 [SmartSync] Starting Standard Sync (Server Authority)... (User: \(username))")
         
-        // [Fix] Use APIService.ensureAuth to handle login cycle correctly BEFORE fetch
         APIService.shared.ensureAuth { [weak self] authSuccess in
             guard let self = self else { return }
+            if !authSuccess { return }
             
-            if !authSuccess {
-                print("⚠️ [SmartSync] Server Sync Failed (Auth/Network). Aborting.")
-                return
-            }
+            // 1. Push Phase: Identify & Upload Dirty Items
+            // We push BEFORE fetching to ensure we don't overwrite our own recent changes with stale server data.
+            let outputGroup = DispatchGroup()
+            let itemsToPush = self.diaries.filter { $0.isSynced == false || force }
             
-            // 1. Fetch Server State First
-            APIService.shared.fetchDiaries { [weak self] serverData in
-            guard let self = self else { return }
-            
-            // [Strict Sync] Server State is REQUIRED.
-            // If fetch fails (Auth error or Network), we CANNOT proceed safely.
-            guard let finalServerItems = serverData else {
-                print("⚠️ [SmartSync] Server Sync Failed (Auth/Network). Aborting.")
-                return 
-            }
-            
-            let serverItems = finalServerItems
-            
-            // 2. Build Server Inventory (Dates & IDs)
-            let serverDates = Set(finalServerItems.compactMap { ($0["created_at"] as? String)?.prefix(10).description })
-            // let serverIDs = Set(finalServerItems.compactMap { $0["id"] as? String })
-            
-            print("📋 [SmartSync] Server has \(finalServerItems.count) items.")
-            
-            let group = DispatchGroup()
-            
-            // 3. Identify Missing Items (Local has it, Server doesn't)
-            // Condition: (isSynced == false) OR (Date missing on Server) OR (Force == true)
-            let itemsToPush = self.diaries.filter { diary in
-                // [Force Sync] 무조건 전송
-                if force { return true }
-                
-                // 1. Explicitly dirty (User just wrote it)
-                if diary.isSynced == false { return true }
-                
-                // 2. Server missing check (Integrity Repair)
-                if let date = diary.date {
-                    let dateKey = String(date.prefix(10))
-                    if !serverDates.contains(dateKey) {
-                        print("🚑 [SmartSync] Found missing item on server: \(dateKey)")
-                        return true
-                    }
-                }
-                
-                return false
-            }
-            
-            if itemsToPush.isEmpty {
-                print("✅ [SmartSync] Server and Local are in sync. No upload needed.")
-            } else {
-                print("📤 [SmartSync] Uploading \(itemsToPush.count) missing/dirty items...")
+            if !itemsToPush.isEmpty {
+                print("📤 [SmartSync] Pushing \(itemsToPush.count) local changes to Server...")
                 for diary in itemsToPush {
-                    group.enter()
+                    outputGroup.enter()
                     APIService.shared.syncDiary(diary) { success in
                         if success {
+                            // Optimistic Update
                             DispatchQueue.main.async {
                                 if let index = self.diaries.firstIndex(where: { $0.id == diary.id }) {
                                     self.diaries[index].isSynced = true
                                 }
                             }
                         }
-                        group.leave()
+                        outputGroup.leave()
+                    }
+                }
+            } else {
+                print("✅ [SmartSync] No local changes to push.")
+            }
+            
+            // 2. Pull Phase: Fetch Latest Server State (After Push)
+            outputGroup.notify(queue: .main) {
+                print("📥 [SmartSync] Fetching latest server data (Source of Truth)...")
+                APIService.shared.fetchDiaries { [weak self] serverData in
+                    guard let self = self, let finalServerItems = serverData else {
+                        print("⚠️ [SmartSync] Fetch Failed. Sync Aborted.")
+                        return 
+                    }
+                    
+                    // 3. Merge Phase: Apply Server Data to Local
+                    self.mergeServerDiaries(finalServerItems, ignoreTombstones: force) {
+                        print("✅ [SmartSync] Synchronization Complete.")
                     }
                 }
             }
-            
-            // 4. After Push, Merge Server Updates (Two-way Sync)
-            group.notify(queue: .main) {
-                print("🔄 [SmartSync] Push done. Merging server updates...")
-                self.saveToDisk() // Save 'isSynced' status
-                self.mergeServerDiaries(finalServerItems) {
-                    print("✅ [SmartSync] Synchronization Complete.")
-                }
-            }
-        } // End Fetch
-        } // End Auth
+        }
     }
     
-    
-    // 서버 데이터를 로컬에 병합 (서버 우선)
-    func mergeServerDiaries(_ serverData: [[String: Any]], completion: @escaping () -> Void = {}) {
+    // 서버 데이터를 로컬에 병합 (서버 우선 / Server Authority)
+    func mergeServerDiaries(_ serverData: [[String: Any]], ignoreTombstones: Bool = false, completion: @escaping () -> Void = {}) {
         DispatchQueue.main.async {
             var updatedCount = 0
             var newCount = 0
@@ -318,32 +287,44 @@ class LocalDataManager: ObservableObject {
             for item in serverData {
                 let id = "\(item["id"] ?? "")"
                 let dateRaw = (item["date"] as? String) ?? (item["created_at"] as? String) ?? "Unknown"
-                print("👀 [SyncDebug] Processing Server Item: ID=\(id), Date=\(dateRaw)")
+                // print("👀 [SyncDebug] Processing Server Item: ID=\(id), Date=\(dateRaw)")
                 
-                // [Tombstone] 사용자가 삭제한 ID라면 병합 제외
-                if self.deletedDiaryIds.contains(id) { 
-                    print("🚫 [SyncDebug] Skipped (Tombstone ID): \(id)")
-                    continue 
+                // [Tombstone] 사용자가 삭제한 ID라면 병합 제외 (단, 강제 동기화 시 복구 및 차단 해제)
+                if self.deletedDiaryIds.contains(id) {
+                    if ignoreTombstones {
+                        // [Recovery] 사용자가 강제 복구를 요청했으므로, 차단 목록에서 영구 제거 (Standard: Restore)
+                        self.deletedDiaryIds.removeAll { $0 == id }
+                        print("♻️ [Recovery] Tombstone removed for ID: \(id)")
+                    } else {
+                        continue
+                    }
                 }
                 
                 guard let createdAt = item["created_at"] as? String else { continue }
                 
-                // [Critical Fix] Prefer explicitly mapped 'date' field if available, else derive from created_at
-                // 서버가 'date' 필드를 보내주지 않는 경우, created_at(UTC)이 한국 시간과 달라 날짜가 밀리는 현상 방지
+                // [Critical Fix] Prefer explicitly mapped 'date' field
                 let serverDateRaw = (item["date"] as? String) ?? createdAt
                 let dateStr = String(serverDateRaw.prefix(10))
                 
-                // [Tombstone] 날짜 차단 확인
-                if self.deletedDiaryDates.contains(dateStr) { 
-                    print("🚫 [SyncDebug] Skipped (Tombstone Date): \(dateStr)")
-                    continue 
+                // [Tombstone] 날짜 차단 확인 (단, 강제 동기화 시 복구 및 차단 해제)
+                if self.deletedDiaryDates.contains(dateStr) {
+                    if ignoreTombstones {
+                        // [Recovery] 강제 복구 시 날짜 차단도 해제
+                        self.deletedDiaryDates.removeAll { $0 == dateStr }
+                        print("♻️ [Recovery] Tombstone removed for Date: \(dateStr)")
+                    } else {
+                        continue
+                    }
                 }
                 
-                // ... (Parsing logic omitted for brevity, stick to current impl) ...
-                // [Robust Parsing] Field Name Fallbacks
+                // [Fix] mood_level(1~5 원본)을 우선 사용, mood_score(10점 환산)는 fallback
+                // 무한증식 방지: mood_score를 mood_level로 저장 → Push → 다시 ×2 = 무한 루프
                 var moodScore = 3
-                if let ms = item["mood_score"] as? Int { moodScore = ms }
-                else if let ml = item["mood_level"] as? Int { moodScore = ml }
+                if let ml = item["mood_level"] as? Int {
+                    moodScore = ml > 5 ? max(1, min(5, ml / 2)) : ml  // 비정상값 클램프
+                } else if let ms = item["mood_score"] as? Int {
+                    moodScore = ms > 5 ? max(1, min(5, ms / 2)) : ms  // 10점 → 5점 변환
+                }
                 
                 var content = ""
                 if let c = item["content"] as? String { content = c }
@@ -354,7 +335,6 @@ class LocalDataManager: ObservableObject {
                 let aiComment = (item["ai_comment"] as? String) ?? (analysisMap?["ai_comment"] as? String) ?? (analysisMap?["comment"] as? String)
                 let aiAnalysis = (item["ai_analysis"] as? String) ?? (analysisMap?["ai_analysis"] as? String) ?? (analysisMap?["analysis"] as? String)
                 let aiAdvice = (item["ai_advice"] as? String) ?? (analysisMap?["ai_advice"] as? String) ?? (analysisMap?["advice"] as? String)
-                // [Robust Parsing] Check all possible keys for AI Emotion
                 let aiPrediction = (item["ai_prediction"] as? String) ?? (item["ai_emotion"] as? String) ?? (analysisMap?["ai_prediction"] as? String) ?? (analysisMap?["prediction"] as? String) ?? (analysisMap?["emotion"] as? String)
                 
                 let sleepDesc = (item["sleep_condition"] as? String) ?? (item["sleep_desc"] as? String) ?? (analysisMap?["sleep_condition"] as? String) ?? (analysisMap?["sleep_desc"] as? String)
@@ -403,14 +383,11 @@ class LocalDataManager: ObservableObject {
                     // Update Existing
                     var existing = self.diaries[index]
                     
-                    // [Start] Dirty Check
-                    if existing.isSynced == false {
-                        print("🛡️ [Sync] Skipping overwrite of unsynced local diary (Date: \(dateStr))")
-                        continue
-                    }
-                    // [End] Dirty Check
+                    // [Server Authority]
+                    // We REMOVED the "Dirty Check" here.
+                    // If Server provides data, it overrides Local even if Local was unsynced.
+                    // (But since we Pushed first, Local changes should already be on Server if valid)
                     
-                    // Preserve Local UUID
                     // Preserve Local UUID
                     let localUUID = existing.id
                     
@@ -418,7 +395,6 @@ class LocalDataManager: ObservableObject {
                     // This prevents overwriting valid AI data with empty/null from server (e.g. partial response)
                     if (serverDiary.ai_prediction == nil || serverDiary.ai_prediction?.isEmpty == true) {
                         if let existingPred = existing.ai_prediction, !existingPred.isEmpty {
-                            print("🛡️ [Sync] Preserving existing AI Prediction: \(existingPred)")
                             serverDiary.ai_prediction = existingPred
                         }
                     }
@@ -435,18 +411,33 @@ class LocalDataManager: ObservableObject {
                     updatedCount += 1
                 } else {
                     // New Entry
-                    print("🆕 [Sync] Adding New Diary (Date: \(dateStr))")
                     self.diaries.append(serverDiary)
                     newCount += 1
                 }
             } // End Loop
             
+            // [Standard] 서버에 없는 로컬 항목 정리
+            // 서버 ID 목록을 수집하여, 로컬에만 남아있는 "이미 동기화된" 항목을 제거
+            // (isSynced=false인 항목은 아직 Push 전이므로 보존)
+            let serverIds = Set(serverData.compactMap { "\($0["id"] ?? "")" })
+            let beforeCount = self.diaries.count
+            self.diaries.removeAll { diary in
+                guard diary.isSynced == true,             // 이미 동기화된 항목만 대상
+                      let sid = diary._id,               // 서버 ID가 있는 항목만
+                      !sid.isEmpty,
+                      !serverIds.contains(sid)           // 서버에 없으면 제거
+                else { return false }
+                print("🗑️ [Sync] Removed stale local diary: \(diary.date ?? "?") (server ID: \(sid))")
+                return true
+            }
+            let removedCount = beforeCount - self.diaries.count
+            
             self.diaries.sort { ($0.created_at ?? "") > ($1.created_at ?? "") }
             self.saveToDisk()
             
-            print("📥 [Sync] Merge Complete. New: \(newCount), Updated: \(updatedCount)")
+            print("📥 [Sync] Merge Complete. New: \(newCount), Updated: \(updatedCount), Removed: \(removedCount)")
             
-            // [Fix] Broadcast Update explicitly to force UI Refresh
+            // [Fix] Broadcast Update
             NotificationCenter.default.post(name: NSNotification.Name("RefreshDiaries"), object: nil)
             
             completion()

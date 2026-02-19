@@ -44,7 +44,7 @@ crypto = SimpleCrypto(ENCRYPTION_KEY)
 RUNPOD_API_KEY = os.getenv('RUNPOD_API_KEY')
 RUNPOD_LLM_URL = os.getenv('RUNPOD_LLM_URL')
 
-def call_llm_hybrid(prompt, model="haruON-gemma:latest", options=None):
+def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
     """
     Hybrid LLM Caller: RunPod (Priority) -> Local Ollama (Fallback)
     """
@@ -112,7 +112,7 @@ def call_llm_hybrid(prompt, model="haruON-gemma:latest", options=None):
 
 def generate_ai_analysis(content):
     prompt_text = (
-        f"너는 다정하고 섬세한 심리 상담 AI '하루온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
+        f"너는 다정하고 섬세한 심리 상담 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
         f"{content}\n\n"
         "### 지시사항:\n"
         "1. 'comment': 회원의 감정을 읽고 따뜻하게 위로하는 말 (해요체, 150자 내외)\n"
@@ -167,25 +167,10 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
             score = max(1, min(10, score))
         except: score = 5
 
-        # Update both JSON and individual columns if using Django model structure
-        # Wait, Django model 'HaruOn' might use different table structure?
-        # Assuming table is 'haru_on_haruon' or 'diaries'?
-        # 217 server uses 'haru_on_haruon' table (Django App 'haru_on') ???
-        # NO, user said 'LegacyUser' was mapped to 'users'.
-        # 'HaruOn' model mapped to... let's check Django migration or simple guess.
-        # Actually, let's update using Django ORM in wrapper if possible?
-        # But this function is raw SQL. 
-        # Check table name first!
-        
-        # If we are unsure about table name, use Django ORM inside thread?
-        # But setting up Django inside thread is tricky without setup.
-        
-        # Let's assume table is 'haru_on_haruon' (default Django app_model)
-        # OR 'diaries' if legacy?
-        
-        # Safe bet: Update 'haru_on_haruon'
+        # Update diary record in DB
+        # Django model uses db_table = "diaries"
         cur.execute(
-            "UPDATE haru_on_haruon SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
+            "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
             (enc_comment, enc_emotion, score, diary_id)
         )
         
@@ -194,20 +179,6 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
         conn.close()
     except Exception as e:
         print(f"❌ [Thread] DB Update Failed: {e}")
-        # Try 'diaries' table as fallback
-        try:
-            conn = psycopg2.connect(DATABASE_URL)
-            conn.autocommit = True
-            cur = conn.cursor()
-            cur.execute(
-                "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
-                (enc_comment, enc_emotion, score, diary_id)
-            )
-            print(f"✅ [Thread] Analysis Complete for Diary {diary_id} (Fallback Table)")
-            cur.close()
-            conn.close()
-        except:
-            pass
 
 def start_analysis_thread(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk):
     t = threading.Thread(target=run_analysis_process, args=(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk))

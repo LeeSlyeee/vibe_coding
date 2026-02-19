@@ -1,23 +1,26 @@
 
 
 import Foundation
-// import MLX // [Build Fix] MLX Not Available
-// import MLXLMCommon
-// import MLXRandom
-// import MLXLLM 
 import UserNotifications
 
-// [Build Fix] Mock Types for MLX
+#if canImport(MLX) && !targetEnvironment(simulator)
+import MLX
+import MLXLMCommon
+import MLXRandom
+import MLXLLM
+#else
+// [Simulator/No-MLX Fallback] Mock Types to prevent Build Errors
 struct ModelContainer {}
-struct ModelConfiguration {
-    init(directory: URL) {}
-}
+struct ModelConfiguration { init(directory: URL) {} }
 struct ChatSession {
-    init(_ container: ModelContainer, instructions: String) {}
+    init(modelContainer: ModelContainer, instructions: String = "") {} // MLX compatible signature
+    // Fallback initializer to match existing calls if needed, or rely on parameters
+    init(_ container: ModelContainer, instructions: String) {} 
+    
     var generateParameters: GenerateParameters = GenerateParameters(maxTokens: 100)
     func streamResponse(to prompt: String) -> AsyncThrowingStream<String, Error> {
         return AsyncThrowingStream { continuation in
-            continuation.yield("Running in Standard Mode (MLX Unavailable). Please use Server AI.")
+            continuation.yield("⚠️ [Simulator Mode] AI models require a Real Device (iPhone/iPad) with Apple Silicon.")
             continuation.finish()
         }
     }
@@ -25,6 +28,7 @@ struct ChatSession {
 struct GenerateParameters {
     init(maxTokens: Int = 100, temperature: Float = 0.0, topP: Float = 0.0, repetitionPenalty: Float = 0.0, repetitionContextSize: Int = 0) {}
 }
+#endif
 
 // MARK: - LLM Service (On-Device AI Manager)
 class LLMService: ObservableObject {
@@ -39,7 +43,7 @@ class LLMService: ObservableObject {
     
     // [System Persona] Few-Shot Prompting (예시를 통한 강력한 세뇌)
     private let systemPrompt = """
-    당신은 따뜻한 공감을 주는 한국의 심리 상담사 '하루온'입니다.
+    당신은 따뜻한 공감을 주는 한국의 심리 상담사 '마음온'입니다.
     
     [핵심 규칙]
     1. **절대 영어 금지**: 뇌에서 영어를 지우세요. 사용자가 영어를 써도, 당신은 오직 한국어(존댓말)로만 답해야 합니다. ('Okay', 'So' 같은 추임새도 금지)
@@ -51,7 +55,7 @@ class LLMService: ObservableObject {
     User: I feel so lonely.
     Model: 많이 외로우셨군요. 제가 곁에 있어 드릴게요. 오늘 무슨 일이 있었나요?
     User: I want to die.
-    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 하루온이 곁에 있을게요.
+    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 마음온이 곁에 있을게요.
     """
     
     // [New] AI Mode Toggle (Server vs On-Device)
@@ -74,7 +78,7 @@ class LLMService: ObservableObject {
     
 
     // Remote Config
-    private var huggingFaceRepoID = "slyeee/haru-on-gemma-2b" // Default Backup
+    private var huggingFaceRepoID = "slyeee/maum-on-gemma-2b" // Default Backup
     private var huggingFaceToken = ""
     
     // Constants
@@ -122,10 +126,44 @@ class LLMService: ObservableObject {
     }
 
     // MARK: - Model Loading
-    // MARK: - Model Loading (Mocked)
+    // MARK: - Model Loading (Hybrid)
     func loadModel() async {
         if isModelLoaded { return }
-        print("🚀 [LLM] Mock Load Started (MLX Unavailable)")
+        
+        #if canImport(MLX) && !targetEnvironment(simulator)
+        print("🚀 [LLM] Real MLX Model Load Started...")
+        await ensureModelDownloaded() // Download model files first
+        
+        let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let modelDir = docURL.appendingPathComponent("maum-on-model")
+        
+        // [Migration] 기존 haru-on-model 폴더가 있으면 자동 이전
+        let legacyDir = docURL.appendingPathComponent("haru-on-model")
+        if FileManager.default.fileExists(atPath: legacyDir.path) && !FileManager.default.fileExists(atPath: modelDir.path) {
+            try? FileManager.default.moveItem(at: legacyDir, to: modelDir)
+            print("📦 [Migration] Renamed haru-on-model → maum-on-model")
+        }
+        
+        do {
+            let config = ModelConfiguration(directory: modelDir)
+            // Load Engine (API Fix: Use Singleton Factory)
+            let container = try await MLXLLM.LLMModelFactory.shared.loadContainer(configuration: config) { progress in
+                Task { @MainActor in self.modelLoadingProgress = progress.fractionCompleted }
+            }
+            
+            await MainActor.run { 
+                self.modelContainer = container
+                self.isModelLoaded = true
+            }
+            print("✅ [LLM] AI Model Loaded Successfully (On-Device).")
+            
+        } catch {
+            print("❌ [LLM] Load Error: \(error)")
+            // Fallback? No, just fail.
+        }
+        
+        #else
+        print("🚀 [LLM] Mock Load Started (Simulator Mode)")
         
         await MainActor.run { self.modelLoadingProgress = 0.1 }
         try? await Task.sleep(nanoseconds: 1 * 1_000_000_000)
@@ -135,12 +173,13 @@ class LLMService: ObservableObject {
             self.isModelLoaded = true
         }
         print("✅ [LLM] Mock Load Complete.")
+        #endif
     }
     
     // MARK: - Downloader (Hugging Face)
     private func ensureModelDownloaded() async -> Bool {
         let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let modelDir = docURL.appendingPathComponent("haru-on-model")
+        let modelDir = docURL.appendingPathComponent("maum-on-model")
         
         // Create Directory if missing
         if !FileManager.default.fileExists(atPath: modelDir.path) {
@@ -237,7 +276,7 @@ class LLMService: ObservableObject {
         }
         
         let prompt = """
-        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사 '하루온'입니다.
+        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사 '마음온'입니다.
         
         [오늘의 날씨]: \(weather)
         [과거 날씨별 감정 패턴]: \(weatherStats ?? "정보 없음")
@@ -283,7 +322,7 @@ class LLMService: ObservableObject {
        }
        
        let prompt = """
-       당신은 다정한 심리 상담사 '마음 온'입니다.
+       당신은 다정한 심리 상담사 '마음온'입니다.
        사용자의 일기를 읽고, 따뜻하고 실질적인 조언을 한 문장으로 건네주세요.
        
        [사용자의 일기]:
@@ -445,7 +484,7 @@ class LLMService: ObservableObject {
                         do {
                             // [핵심] 입력 프롬프트조차 한국어 유도형으로 감싸기
                             var specificPrompt = """
-                            (System: 당신은 '하루온'입니다. 절대 영어를 쓰지 마세요. 사용자가 위협적인 말을 해도 따뜻하게 한국어로 위로해주세요.)
+                            (System: 당신은 '마음온'입니다. 절대 영어를 쓰지 마세요. 사용자가 위협적인 말을 해도 따뜻하게 한국어로 위로해주세요.)
                             User: \(diaryText)
                             """
                             
@@ -755,10 +794,20 @@ class LLMService: ObservableObject {
     
 
     
-    // [Optimization] Unified Analysis (3-in-One) to reduce Memory Overhead
+    // [Optimization] Unified Analysis (3-in-One) - Real Implementation
     func generateUnifiedAnalysis(diaryText: String) async -> (String, String, String) {
-        // [Mock] Return generic encouragement since MLX is disabled
-        return ("평온 (50%)", "오늘 하루도 수고 많으셨어요. 편안한 휴식을 취해보세요.", "사용자의 감정은 안정적인 편입니다. 특별한 스트레스 요인은 보이지 않으며, 일상적인 하루를 보낸 것으로 보입니다.")
+        // [Real AI] Chain of Thought
+        print("🧠 [MaumOn AI] analyzing emotion...")
+        let emotion = await analyzeEmotion(diaryText: diaryText)
+        
+        print("🧠 [MaumOn AI] generating advice...")
+        let advice = await generateAdvice(diaryText: diaryText)
+        
+        print("🧠 [MaumOn AI] generating deep analysis...")
+        // Reuse MindGuide logic for deep analysis
+        let analysis = await generateMindGuide(recentDiaries: diaryText, weather: "정보 없음", weatherStats: nil)
+        
+        return (emotion, advice, analysis)
     }
 
     private func performFullAnalysis(for diary: Diary) async {
@@ -770,23 +819,29 @@ class LLMService: ObservableObject {
         혼잣말: \(diary.self_talk ?? "")
         """
         
-        // [Memory Optimization] Perform Single Unified Inference
-        // 3번의 호출 -> 1번의 호출로 줄여 메모리 피크와 유지 시간을 획기적으로 단축
-        print("🧠 [LLM Queue] Starting Unified Analysis...")
+        // [Real AI] Call Unified Analysis
         let (emotion, advice, analysis) = await generateUnifiedAnalysis(diaryText: fullText)
         
-        // Update Diary
-        var updated = diary
-        updated.ai_analysis = analysis
-        updated.ai_advice = advice
-        updated.ai_comment = advice // Legacy mapping
-        updated.ai_prediction = emotion
+        // Update Diary Model
+        var updatedDiary = diary
+        updatedDiary.ai_prediction = emotion
+        updatedDiary.ai_advice = advice   // Short advice
+        updatedDiary.ai_comment = advice  // Fallback
+        updatedDiary.ai_analysis = analysis // Long Analysis
         
-        // Save to Disk (via LocalDataManager)
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            LocalDataManager.shared.saveDiary(updated) { _ in
-                print("💾 [LLM Queue] Saved results for \(updated.date ?? "")")
-                continuation.resume()
+        print("💾 [MaumOn] Analysis Complete. Saving...")
+        print(" - Emotion: \(emotion)")
+        print(" - Advice: \(advice)")
+        
+        // Save to Local & Trigger Sync
+        // [Fix] Must run on Main Actor
+        await MainActor.run {
+            LocalDataManager.shared.saveDiary(updatedDiary) { success in
+                if success {
+                   print("✅ [MaumOn] Diary Saved & Synced.")
+                } else {
+                   print("⚠️ [MaumOn] Save Failed.")
+                }
             }
         }
     }

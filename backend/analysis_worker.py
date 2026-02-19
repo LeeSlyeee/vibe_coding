@@ -24,7 +24,7 @@ crypto = EncryptionManager(os.environ.get('ENCRYPTION_KEY'))
 RUNPOD_API_KEY = os.getenv('RUNPOD_API_KEY')
 RUNPOD_LLM_URL = os.getenv('RUNPOD_LLM_URL')
 
-def call_llm_hybrid(prompt, model="haruON-gemma:latest", options=None):
+def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
     """
     Hybrid LLM Caller: RunPod (Priority) -> Local Ollama (Fallback)
     """
@@ -142,8 +142,9 @@ def call_llm_hybrid(prompt, model="haruON-gemma:latest", options=None):
             "format": "json" if options.get('format') == 'json' else "",
             "options": options
         }
-        # Increased timeout for CPU
-        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=180)
+        # Increased timeout for CPU (Long generation needs more time)
+        # 180 -> 300 seconds (5 minutes)
+        res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=300)
         
         logging.info(f"✅ Ollama Response: {res.status_code}")
         if res.status_code == 200:
@@ -158,7 +159,7 @@ def call_llm_hybrid(prompt, model="haruON-gemma:latest", options=None):
 
 def generate_ai_analysis(content):
     prompt_text = (
-        f"너는 다정하고 섬세한 심리 상담 AI '하루온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
+        f"너는 다정하고 섬세한 심리 상담 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
         f"{content}\n\n"
         "### 지시사항:\n"
         "1. 'comment': 회원의 감정을 읽고 따뜻하게 위로하는 말 (해요체, 150자 내외)\n"
@@ -181,9 +182,24 @@ def generate_ai_analysis(content):
              # Try parse JSON
              try:
                  data = json.loads(raw)
-                 return data.get('comment', ''), data.get('emotion', ''), data.get('score', 5)
+                 comment = data.get('comment', '')
+                 emotion = data.get('emotion', '')
+                 score = data.get('score', 5)
+
+                 # [Fix] Fallback for empty emotion
+                 if not emotion:
+                     if score >= 8: emotion = "행복"
+                     elif score >= 6: emotion = "기쁨"
+                     elif score >= 5: emotion = "평온"
+                     elif score >= 3: emotion = "불안"
+                     else: emotion = "우울"
+                 
+                 return comment, emotion, score
              except Exception as e:
                  print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {raw}")
+                 # Try to salvage raw text if it looks like a comment
+                 if len(raw) > 10 and "{" not in raw:
+                     return raw, "분석중", 5
                  return raw, "분석중", 5
     except Exception as e:
         print(f"❌ AI Gen Error: {e}")
@@ -215,13 +231,14 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
     enc_emotion = crypto.encrypt(emotion)
     
     # 3. Update DB
+    # 3. Update DB
     try:
         db_url = os.environ.get('DATABASE_URL')
         if db_url:
             conn = psycopg2.connect(db_url)
         else:
             conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST)
-        conn.autocommit = True
+        # conn.autocommit = True # [Fix] Use manual commit for rollback safety
         cur = conn.cursor()
         
         # Ensure score is integer and within range
@@ -231,16 +248,44 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
         except:
             score = 5
 
-        cur.execute(
-            "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
-            (enc_comment, enc_emotion, score, diary_id)
-        )
+        # [Resilient Update Strategy]
+        # Try 'mood_score' first (Legacy/Current Schema?)
+        try:
+            cur.execute(
+                "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
+                (enc_comment, enc_emotion, score, diary_id)
+            )
+            conn.commit()
+            print(f"✅ [Thread] Database Updated (mood_score)")
+        except Exception as e:
+            conn.rollback()
+            print(f"⚠️ [Thread] 'mood_score' update failed, trying 'mood_intensity': {e}")
+            
+            # Try 'mood_intensity' (Models.py Schema)
+            try:
+                cur.execute(
+                    "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_intensity = %s WHERE id = %s", 
+                    (enc_comment, enc_emotion, score, diary_id)
+                )
+                conn.commit()
+                print(f"✅ [Thread] Database Updated (mood_intensity)")
+            except Exception as e2:
+                conn.rollback()
+                print(f"⚠️ [Thread] 'mood_intensity' update failed, fallback to basic update: {e2}")
+                
+                # Fallback: Update only AI fields
+                cur.execute(
+                    "UPDATE diaries SET ai_comment = %s, ai_emotion = %s WHERE id = %s", 
+                    (enc_comment, enc_emotion, diary_id)
+                )
+                conn.commit()
+                print(f"✅ [Thread] Database Updated (Basic)")
         
         print(f"✅ [Thread] Analysis Complete for Diary {diary_id}")
         cur.close()
         conn.close()
     except Exception as e:
-        print(f"❌ [Thread] DB Update Failed: {e}")
+        print(f"❌ [Thread] Final DB Update Failed: {e}")
 
 def start_analysis_thread(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk):
     print(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id}")

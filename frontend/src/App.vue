@@ -3,7 +3,7 @@
     <!-- 데스크탑용 상단 네비게이션 -->
     <header class="navbar desktop-nav" v-if="showNavbar">
       <div class="navbar-content">
-        <h1 class="logo" @click="goHome">haruON</h1>
+        <h1 class="logo" @click="goHome">maumON</h1>
         <div class="nav-actions">
           <button
             v-if="isAuthenticated"
@@ -39,7 +39,7 @@
     <!-- 모바일용 상단 헤더 (앱 타이틀만) -->
     <header class="navbar mobile-header" v-if="showNavbar">
       <div class="mobile-navbar-content">
-        <h1 class="logo" @click="goHome">haruON</h1>
+        <h1 class="logo" @click="goHome">maumON</h1>
         <div class="mobile-nav-actions" v-if="isAuthenticated">
           <button @click="$router.push('/guide')" class="mobile-icon-btn" title="가이드">📘</button>
           <button @click="goToStats" class="mobile-icon-btn" title="분석">📊</button>
@@ -232,10 +232,10 @@
 
 <script>
 import { RouterView } from "vue-router";
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import SafetyModal from "./components/SafetyModal.vue";
-import { authAPI } from "./services/api"; // Import authAPI
+import api, { authAPI } from "./services/api"; // Import api instance
 
 export default {
   name: "App",
@@ -354,6 +354,50 @@ export default {
         router.push("/login");
       }
     };
+
+    // [Fix] Global Auto-Sync for Unsaved Drafts
+    const runGlobalAutoSync = async () => {
+        try {
+            const draftStr = localStorage.getItem('chat_diary_draft');
+            if (!draftStr) return;
+
+            const draft = JSON.parse(draftStr);
+            // Check if draft has minimum required fields (content or answers)
+            if (draft.answers && (draft.answers.event || draft.answers.content || draft.answers.mood_score)) {
+                console.log("🔄 [Global Sync] Found unsaved draft. Attempting to sync...", draft.date);
+                
+                const payload = {
+                    ...draft.answers,
+                    created_at: draft.date
+                };
+
+                // Date/Time formatting logic specific to payload
+                const now = new Date();
+                // If draft.date is valid "YYYY-MM-DD", combine with current time
+                if (draft.date && draft.date.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                     const [y, m, d] = draft.date.split('-');
+                     now.setFullYear(y, m-1, d);
+                     payload.created_at = now.toISOString();
+                }
+
+                await api.post('/diaries', payload); // Use api directly for raw payload
+                
+                console.log("✅ [Global Sync] Success! Draft recovered.");
+                localStorage.removeItem('chat_diary_draft');
+                
+                // Optional: Notify user
+                // alert('누락된 일기가 성공적으로 복구되었습니다.');
+                // Refresh data if on stats/calendar (Trigger Event)
+            }
+        } catch (e) {
+            console.error("⚠️ [Global Sync] Failed:", e);
+        }
+    };
+
+    onMounted(() => {
+        checkAuth();
+        runGlobalAutoSync(); // Execute on app start
+    });
 
     return {
       showNavbar,

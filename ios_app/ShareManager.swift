@@ -63,16 +63,29 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     }
     
     private func performShareRequest(endpoint: String, method: String, body: [String: Any]? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        // [Verified] Share API is newly implemented at /api/v1/share/
+        // [Verified] Share API is newly implemented at /api/v1/share/ (No trailing slash in urls.py)
         let baseURL = "https://217.142.253.35.nip.io/api/v1"
-        guard let url = URL(string: baseURL + endpoint) else { return }
+        
+        // [Standard] RFC 6750 Sec 2.3 & Custom Nginx: URI Query Parameter
+        // APIService does this, so ShareManager should too for consistency.
+        var components = URLComponents(string: baseURL + endpoint)
+        
+        // Auth Token (Get from APIService / UserDefaults)
+        let token = UserDefaults.standard.string(forKey: "serverAuthToken")
+        
+        if let token = token {
+            var items = components?.queryItems ?? []
+            items.append(URLQueryItem(name: "jwt", value: token))
+            components?.queryItems = items
+        }
+        
+        guard let url = components?.url else { return }
         
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Auth Token (Get from APIService / UserDefaults)
-        if let token = UserDefaults.standard.string(forKey: "serverAuthToken") {
+        if let token = token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
@@ -82,8 +95,11 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         
         print("🚀 [Share] \(method) \(url.absoluteString)")
         
-        // Use 'self.session' instead of 'URLSession.shared' to apply SSL Bypass
-        self.session.dataTask(with: request) { data, response, error in
+        print("🚀 [Share] \(method) \(url.absoluteString)")
+        
+        // [Standardization] Use URLSession.shared for 217 Server (Official Cert)
+        // SSL Bypass is no longer needed/recommended for nip.io with Let's Encrypt
+        URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 completion(.failure(error))
                 return
@@ -96,6 +112,10 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             
             if !(200...299).contains(httpResponse.statusCode) {
                 print("❌ [Share] Status: \(httpResponse.statusCode)")
+                // [Debug] Print Body
+                if let str = String(data: data, encoding: .utf8) {
+                    print("📝 [Share] Response Body: \(str)")
+                }
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode)))
                 return
             }
@@ -129,16 +149,27 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     func generateCode(completion: @escaping (String?) -> Void) {
         // [BYPASS FIX] Send Identity explicitly in Body to bypass JWT Key Mismatch
         let defaults = UserDefaults.standard
-        // If "userId" key is different in your app (e.g. "mongoId"), please verify. Using standard "userId"
-        let userId = defaults.string(forKey: "userId") ?? "unknown_ios_user" 
-        let userName = defaults.string(forKey: "userNickname") ?? "사용자"
+        
+        // [GEMINI Rule: No Silent Fallback] Verify identity strictly
+        guard let userId = defaults.string(forKey: "userId"), !userId.isEmpty,
+              let authUsername = defaults.string(forKey: "authUsername"), !authUsername.isEmpty else {
+            let missing = (defaults.string(forKey: "userId") == nil) ? "userId" : "authUsername"
+            self.lastErrorMessage = "로그인 정보 누락 (\(missing)). 재로그인 해주세요."
+            print("❌ Generate Code Aborted: Missing User Identity (\(missing))")
+            completion(nil)
+            return
+        }
+        
+        let nickname = defaults.string(forKey: "userNickname") ?? "사용자"
         
         let body: [String: Any] = [
             "user_id": userId,
-            "user_name": userName
+            "username": authUsername, // [Fix] Add explicit username
+            "user_name": nickname
         ]
         
-        performShareRequest(endpoint: "/share/code/", method: "POST", body: body) { result in
+        // [Fix] Remove trailing slash
+        performShareRequest(endpoint: "/share/code", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):
@@ -159,7 +190,8 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     // 2. Connect (Viewer)
     func connectWithCode(_ code: String, completion: @escaping (Bool, String) -> Void) {
         let body = ["code": code]
-        performShareRequest(endpoint: "/share/connect/", method: "POST", body: body) { result in
+        // [Fix] Remove trailing slash
+        performShareRequest(endpoint: "/share/connect", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):
@@ -177,12 +209,20 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     // 3. List
     func fetchList(role: String = "viewer") {
         let defaults = UserDefaults.standard
-        let userId = defaults.string(forKey: "userId") ?? "unknown_ios_user"
+        
+        // [GEMINI Rule: No Silent Fallback]
+        guard let userId = defaults.string(forKey: "userId"), !userId.isEmpty else {
+            self.lastErrorMessage = "사용자 정보를 불러올 수 없습니다."
+            print("❌ Fetch List Aborted: Missing userId")
+            return
+        }
+        let username = defaults.string(forKey: "authUsername") ?? ""
         
         self.lastErrorMessage = "" // Reset Error
         
         // GET Request with Explicit ID & Role
-        let endpoint = "/share/list/?user_id=\(userId)&role=\(role)"
+        // [Fix] Include username query param for robustness. Remove trailing slash
+        let endpoint = "/share/list?user_id=\(userId)&username=\(username)&role=\(role)"
         print("🚀 Fetching List: \(endpoint)")
         
         performShareRequest(endpoint: endpoint, method: "GET") { result in
@@ -220,14 +260,23 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     // 4. Disconnect (Added)
     func disconnect(targetId: String, completion: @escaping (Bool) -> Void) {
         let defaults = UserDefaults.standard
-        let userId = defaults.string(forKey: "userId") ?? "unknown_ios_user"
+        
+        // [GEMINI Rule: No Silent Fallback]
+        guard let userId = defaults.string(forKey: "userId"), !userId.isEmpty else {
+            print("❌ Disconnect Aborted: Missing userId")
+            completion(false)
+            return
+        }
+        let username = defaults.string(forKey: "authUsername") ?? ""
         
         let body: [String: Any] = [
             "user_id": userId,
+            "username": username, // [Fix] Add explicit username
             "target_id": targetId
         ]
         
-        performShareRequest(endpoint: "/share/disconnect/", method: "POST", body: body) { result in
+        // [Fix] Remove trailing slash
+        performShareRequest(endpoint: "/share/disconnect", method: "POST", body: body) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(_):
@@ -242,11 +291,12 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             }
         }
     }
-
+    
     // 5. View Insights
     func fetchSharedStats(targetId: String, completion: @escaping (Bool) -> Void) {
         self.currentSharedStats = nil // Clear previous
-        performShareRequest(endpoint: "/share/insights/\(targetId)/", method: "GET") { result in
+        // [Fix] Remove trailing slash
+        performShareRequest(endpoint: "/share/insights/\(targetId)", method: "GET") { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let json):

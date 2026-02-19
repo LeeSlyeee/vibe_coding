@@ -445,6 +445,15 @@ onMounted(() => {
     const draft = JSON.parse(localStorage.getItem('chat_diary_draft'));
     // 날짜가 같으면 모달 표시
     if (draft.date === targetDate) {
+        // [Fix] Auto-Sync for Completed Drafts
+        if (draft.step >= questions.value.length) {
+            console.log("🔄 Auto-syncing unsaved completed draft...");
+            answers.value = draft.answers;
+            savedDraft.value = null; // Clear modal trigger
+            submitDiary(); // Auto Submit
+            return;
+        }
+
         savedDraft.value = draft;
         showRestoreModal.value = true;
         return;

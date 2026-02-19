@@ -28,14 +28,16 @@ def get_medication_logs():
 def submit_assessment():
     return jsonify({"message": "진단 기능 점검 중입니다.", "risk_level": "mild", "care_plan": ""}), 200
 
-@med_bp.route('/api/report/start', methods=['POST'])
-def start_report():
-    return jsonify({"message": "리포트 기능 점검 중입니다."}), 200
+# [Disabled] Report handled by app.py
+# @med_bp.route('/api/report/start', methods=['POST'])
+# def start_report():
+#     return jsonify({"message": "리포트 기능 점검 중입니다."}), 200
 
-@med_bp.route('/api/report/status', methods=['GET'])
-def get_report_status():
-    return jsonify({"status": "completed", "report": "시스템 점검 중입니다."}), 200
+# @med_bp.route('/api/report/status', methods=['GET'])
+# def get_report_status():
+#     return jsonify({"status": "completed", "report": "시스템 점검 중입니다."}), 200
 
-@med_bp.route('/api/statistics', methods=['GET'])
-def get_statistics():
-    return jsonify({"timeline": [], "moods": [], "daily": [], "weather": []}), 200
+# [Disabled] Statistics handled by app.py
+# @med_bp.route('/api/statistics', methods=['GET'])
+# def get_statistics():
+#    return jsonify({"timeline": [], "moods": [], "daily": [], "weather": []}), 200

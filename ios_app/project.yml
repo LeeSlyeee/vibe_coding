@@ -24,14 +24,20 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: "Haru-on"
-        CFBundleName: "Haru-on"
+        CFBundleDisplayName: "maumON"
+        CFBundleName: "maumON"
         UILaunchStoryboardName: "LaunchScreen"
     dependencies:
       - package: mlx-swift
         product: MLX
       - package: mlx-swift
         product: MLXRandom
+      - package: mlx-swift
+        product: MLXNN
+      - package: mlx-swift
+        product: MLXOptimizers
+      - package: mlx-swift
+        product: MLXFFT
       - package: mlx-swift-lm
         product: MLXLMCommon
       - package: mlx-swift-lm
@@ -47,6 +53,7 @@ targets:
       - sdk: CoreAudio.framework
       - sdk: AVFoundation.framework
     settings:
+      EXCLUDED_ARCHS[sdk=iphonesimulator*]: "x86_64"
       Check Pods Manifest.lock: false
       INFOPLIST_FILE: Info.plist
       PRODUCT_BUNDLE_IDENTIFIER: com.slyeee.MindDiaryApp
@@ -55,6 +62,7 @@ targets:
       OTHER_LDFLAGS:
         [
           "$(inherited)",
+          "-Wl,-ld_classic",
           "-framework",
           "Metal",
           "-framework",

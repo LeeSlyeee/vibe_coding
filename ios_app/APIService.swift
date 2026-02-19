@@ -9,12 +9,10 @@ class APIService: NSObject {
     // [Target Fix] Updated to 217 Server for Web/App Sync
     private let baseURL = "https://217.142.253.35.nip.io/api"
     
-    // [Legacy] 150 Server (Deprecated for main logic, maybe used for recovery)
-    // private let legacyURL = "https://150.230.7.76.nip.io/api/v1"
+    // [Medical Dashboard] Django API (Role: Source of Truth for Diaries)
+    private let medicalURL = "https://217.142.253.35.nip.io/api/v1"
     
     // [Target Fix] Dedicated LLM Node (217.142...)
-    // 채팅 및 AI 기능은 이 주소를 타겟으로 함 (User Specified)
-    // Note: baseURL과 동일하므로 중복되지만, 명시적으로 남겨둠.
     private let llmServerURL = "https://217.142.253.35.nip.io/api"
     
     private var memoryToken: String?
@@ -37,6 +35,9 @@ class APIService: NSObject {
     }
     
     // MARK: - Auth
+    // ... (Auth methods remain unchanged, using baseURL/Flask) ...
+    // Note: Login generates token valid for both Flask and Django (Shared Secret)
+
     func ensureAuth(completion: @escaping (Bool) -> Void) {
         // [Auth - Unified Identity]
         // CRITICAL FIX: Use "authUsername" (Single Source of Truth)
@@ -63,47 +64,58 @@ class APIService: NSObject {
         
         // [Security] Mask password in logs
         let maskedPW = String(repeating: "*", count: password?.count ?? 0)
-        print("🔐 [API-217] Attempting Auth for: '\(username)' (PW: \(maskedPW))")
-        
-        // Token Existence Check (Optimistic Auth)
-        // Token Existence Check (Optimistic Auth)
-        // Token Existence Check (Optimistic Auth)
-        // [Safety] Force Re-login to ensure token freshness (Server Restarted)
-        // if let currentToken = self.token, !currentToken.isEmpty {
-        //    print("🔑 [API-OCI] Optimistic Auth: Token present for \(username)")
-        //    completion(true)
-        //    return
-        // }
+        // print("🔐 [API-217] Attempting Auth for: '\(username)' (PW: \(maskedPW))")
         
         // [Fix] Endpoint: /login (Correct path under /api/)
-        performRequest(endpoint: "/login", method: "POST", body: body, requiresAuth: false) { result in
+        performRequest(baseURL: self.baseURL, endpoint: "/login", method: "POST", body: body, requiresAuth: false) { result in
             switch result {
             case .success(let response):
                 if let accessToken = response["access_token"] as? String {
-                     print("🔑 [API-OCI] Saving Token: \(accessToken.prefix(20))... for user: \(username)")
+                     // print("🔑 [API-OCI] Saving Token: \(accessToken.prefix(20))... for user: \(username)")
                      self.token = accessToken
                      
-                     // [Name Sync] 로그인 시 실명 정보 저장
+                     // [Name Sync]
                      if let rName = response["name"] as? String, !rName.isEmpty {
                          UserDefaults.standard.set(rName, forKey: "realName")
                      }
                      
-                     print("🌐 [API-217] Login Success: \(username)")
+                     // [ID Sync Strategy: JWT Decoding]
+                     var idSaved = false
+                     
+                     // 1. Try Response Body
+                     if let uid = response["id"] as? Int {
+                         UserDefaults.standard.set(String(uid), forKey: "userId")
+                         idSaved = true
+                     } else if let uidStr = response["id"] as? String {
+                         UserDefaults.standard.set(uidStr, forKey: "userId")
+                         idSaved = true
+                     }
+                     
+                     // 2. Try JWT Decoding (Fallback)
+                     if !idSaved {
+                         if let jwtId = self.decodeUserIdFromJWT(token: accessToken) {
+                             UserDefaults.standard.set(jwtId, forKey: "userId")
+                             idSaved = true
+                             print("✅ [Auth] Extracted User ID from JWT: \(jwtId)")
+                         }
+                     }
+                     
+                     // print("🌐 [API-217] Login Success: \(username)")
                      completion(true)
                 } else {
                     completion(false)
                 }
              case .failure:
-                print("🌐 [API-217] Login failed, trying registration for: \(username)")
+                // ... (Registration Logic)
                 // 회원가입 시도 [Fix] Endpoint: /register
-                self.performRequest(endpoint: "/register", method: "POST", body: body, requiresAuth: false) { regResult in
+                self.performRequest(baseURL: self.baseURL, endpoint: "/register", method: "POST", body: body, requiresAuth: false) { regResult in
                     switch regResult {
                     case .success:
-                         self.performRequest(endpoint: "/login", method: "POST", body: body, requiresAuth: false) { loginRetry in
+                         self.performRequest(baseURL: self.baseURL, endpoint: "/login", method: "POST", body: body, requiresAuth: false) { loginRetry in
                             if case .success(let retryResp) = loginRetry,
                                let accessToken = retryResp["access_token"] as? String {
                                 self.token = accessToken
-                                completion(true)
+                                self.syncUserInfo { _ in completion(true) }
                             } else {
                                 completion(false)
                             }
@@ -131,7 +143,7 @@ class APIService: NSObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
-        print("🚀 [API-217] Syncing User Info: \(urlStr)")
+        // print("🚀 [API-217] Syncing User Info: \(urlStr)")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
@@ -149,11 +161,11 @@ class APIService: NSObject {
             // Success Logic
             if let id = json["id"] as? String {
                 UserDefaults.standard.set(id, forKey: "userId") // [CRITICAL] Store User ID
-                print("✅ [API-217] User ID Synced: \(id)")
+                // print("✅ [API-217] User ID Synced: \(id)")
             }
             if let name = json["name"] as? String, !name.isEmpty {
                 UserDefaults.standard.set(name, forKey: "realName")
-                print("✅ [API-217] Real Name Synced: \(name)")
+                // print("✅ [API-217] Real Name Synced: \(name)")
             }
             if let nickname = json["nickname"] as? String, !nickname.isEmpty {
                 UserDefaults.standard.set(nickname, forKey: "userNickname")
@@ -171,7 +183,7 @@ class APIService: NSObject {
         if let n = nickname { body["nickname"] = n }
         if let b = birthDate { body["birth_date"] = b }
         
-        performRequest(endpoint: "/user/profile/", method: "PUT", body: body) { result in
+        performRequest(baseURL: self.baseURL, endpoint: "/user/profile/", method: "PUT", body: body) { result in
             switch result {
             case .success:
                 if let n = nickname { UserDefaults.standard.set(n, forKey: "userNickname") }
@@ -186,16 +198,9 @@ class APIService: NSObject {
     // MARK: - Diary Sync
     
     // Unified Sync Method
-    // Unified Sync Method
     func syncDiary(_ diary: Diary, completion: @escaping (Bool) -> Void = { _ in }) {
         let dateStr = diary.date ?? "Unknown"
-        print("🔄 [API] Syncing Diary: \(dateStr)")
-        
-        // [B2G Strategy]
-        if B2GManager.shared.isLinked {
-            print("🏥 [B2G] Triggering Center Sync as Primary Backup...")
-            B2GManager.shared.syncData()
-        }
+        // print("🔄 [API] Syncing Diary: \(dateStr)")
         
         ensureAuth { success in
             guard success else {
@@ -204,86 +209,84 @@ class APIService: NSObject {
                 return
             }
             
-            // Check if exists
-            // [Fix] Remove trailing slash
-            self.performRequest(endpoint: "/diaries/date/\(dateStr)", method: "GET") { result in
+            // [Switch] Use Medical Dashboard API (Django)
+            // Django Endpoint: /diaries/date/YYYY-MM-DD/
+            self.performRequest(baseURL: self.medicalURL, endpoint: "/diaries/date/\(dateStr)/", method: "GET") { result in
                 switch result {
                 case .success(let data):
                     // Found -> Update (PUT)
-                    print("✅ [API] Found existing diary for \(dateStr). Updating...")
+                    // print("✅ [API] Found existing diary for \(dateStr). Updating...")
                     if let id = data["id"] as? Int {
-                        // Cast Int ID to String
                         self.updateDiaryOnServer(diaryId: String(id), diary: diary, completion: completion)
                     } else if let id = data["id"] as? String {
                         self.updateDiaryOnServer(diaryId: id, diary: diary, completion: completion)
                     } else {
-                         // ID parsing failed, try create
                          print("⚠️ [API] ID parsing failed. Falling back to Create.")
                          self.createDiaryOnServer(diary, completion: completion)
                     }
                 case .failure(let error):
-                    // Not Found or Error -> Create (POST)
-                    print("⚠️ [API] Lookup failed for \(dateStr): \(error). Attempting Create...")
-                    self.createDiaryOnServer(diary, completion: completion)
+                    // Not Found (404)
+                    // [Fix] 이미 동기화된 항목인데 서버에 없다면 → 서버에서 삭제된 것
+                    // 재생성하지 않고 로컬에서도 제거
+                    if diary.isSynced == true, let sid = diary._id, !sid.isEmpty {
+                        print("🗑️ [API-Medical] Server-deleted diary detected: \(dateStr) (was ID: \(sid)). Skipping re-create.")
+                        DispatchQueue.main.async {
+                            LocalDataManager.shared.removeServerDeletedDiary(serverId: sid, dateStr: dateStr)
+                        }
+                        completion(true)
+                    } else {
+                        // 순수 로컬 신규 항목 → 서버에 새로 생성
+                        self.createDiaryOnServer(diary, completion: completion)
+                    }
                 }
             }
         }
     }
 
 
-    // [Helper] Build Payload
+    // [Helper] Build Payload (Django Schema)
     private func buildDiaryPayload(_ diary: Diary) -> [String: Any] {
+        // Django Model: content, mood_score, date(for creation), sleep_condition, etc.
         var basePayload: [String: Any] = [
-            "date": diary.date ?? "",
-            "event": diary.event ?? "",
-            "mood_level": diary.mood_level,
+            "date": diary.date ?? "", // Serializer will map this to created_at
+            "content": diary.event ?? "", // [Fix] 'content' instead of 'event'
+            "mood_score": diary.mood_level, // [Fix] 'mood_score' instead of 'mood_level'
             "weather": diary.weather ?? "",
             "sleep_condition": diary.sleep_desc ?? (diary.sleep_condition ?? ""),
             "emotion_desc": diary.emotion_desc ?? "",
             "emotion_meaning": diary.emotion_meaning ?? "",
             "self_talk": diary.self_talk ?? "",
             "gratitude_note": diary.gratitude_note ?? "",
-            "medication_taken": diary.medication_taken,
-            "symptoms": diary.symptoms ?? [],
-            "temperature": diary.temperature ?? 0.0
+            "medication_taken": diary.medication_taken
         ]
             
-        // [New] Explicit Analysis Result for Backend Compatibility
-        var analysisResult: [String: Any] = [
-            "medication_taken": diary.medication_taken,
-            "medication_desc": diary.medication_desc ?? "",
-            "symptoms": diary.symptoms ?? [],
-            "sleep_condition": diary.sleep_desc ?? (diary.sleep_condition ?? ""),
-            "weather": diary.weather ?? "",
-            "temperature": diary.temperature ?? 0.0,
-            "gratitude_note": diary.gratitude_note ?? "",
-            "emotion_desc": diary.emotion_desc ?? "",
-            "emotion_meaning": diary.emotion_meaning ?? "",
-            "self_talk": diary.self_talk ?? ""
-        ]
+        // Flat fields for legacy/extended support (Django Serializer flattens them)
+        // No need for nested 'analysis_result' if serializer handles it,
+        // But Django Serializer updates analysis_result JSON field if we send specific keys.
+        // We send them as top-level keys because `MaumOnSerializer.update` expects them.
         
-        basePayload["analysis_result"] = analysisResult
-
-        // AI Data (Optional)
         basePayload["ai_prediction"] = diary.ai_prediction ?? ""
         basePayload["ai_analysis"] = diary.ai_analysis ?? ""
         basePayload["ai_comment"] = diary.ai_comment ?? (diary.ai_advice ?? "")
+        basePayload["ai_advice"] = diary.ai_advice ?? ""
+        basePayload["symptoms"] = diary.symptoms ?? []
+        basePayload["temperature"] = String(diary.temperature ?? 0.0) // String or Number? Django CharField.
         
         return basePayload
     }
 
     private func createDiaryOnServer(_ diary: Diary, completion: @escaping (Bool) -> Void) {
         var payload = buildDiaryPayload(diary)
-        print("🚀 [API] Creating New Diary: \(diary.date ?? "")")
+        print("🚀 [API-Medical] Creating New Diary: \(diary.date ?? "")")
         
-        // [Fix] Remove trailing slash
-        performRequest(endpoint: "/diaries", method: "POST", body: payload) { result in
+        // Django Endpoint: /diaries/ (POST)
+        performRequest(baseURL: self.medicalURL, endpoint: "/diaries/", method: "POST", body: payload) { result in
             switch result {
             case .success(let data):
-                print("✅ [API] Diary Created. ID: \(data["id"] ?? "null")")
+                print("✅ [API-Medical] Diary Created. ID: \(data["id"] ?? "null")")
                 completion(true)
             case .failure(let error):
-                print("❌ [API] Create Failed: \(error.localizedDescription)")
+                print("❌ [API-Medical] Create Failed: \(error.localizedDescription)")
                 completion(false)
             }
         }
@@ -291,33 +294,28 @@ class APIService: NSObject {
     
     private func updateDiaryOnServer(diaryId: String, diary: Diary, completion: @escaping (Bool) -> Void) {
         var payload = buildDiaryPayload(diary)
-        print("🚀 [API] Updating Diary ID: \(diaryId)")
+        print("🚀 [API-Medical] Updating Diary ID: \(diaryId)")
         
-        // [Fix] Remove trailing slash
-        performRequest(endpoint: "/diaries/\(diaryId)", method: "PUT", body: payload) { result in
+        // Django Endpoint: /diaries/{id}/ (PUT)
+        performRequest(baseURL: self.medicalURL, endpoint: "/diaries/\(diaryId)/", method: "PUT", body: payload) { result in
             switch result {
             case .success:
-                print("✅ [API] Diary Updated.")
+                print("✅ [API-Medical] Diary Updated.")
                 completion(true)
             case .failure(let error):
-                let nsError = error as NSError
-                if nsError.code == 404 {
-                     print("⚠️ [API] Update Failed (404). Trying Create instead...")
-                     self.createDiaryOnServer(diary, completion: completion)
-                } else {
-                    print("❌ [API] Update Failed: \(error.localizedDescription)")
-                    completion(false)
-                }
+                print("❌ [API-Medical] Update Failed: \(error.localizedDescription)")
+                completion(false)
             }
         }
     }
     
     // ... (helper methods skipped) ...
     
-    // MARK: - B2G Data Sync (Push)
+    // MARK: - B2G / Center Data Sync
+    
     func syncCenterData(payload: [String: Any], completion: @escaping (Bool, String?) -> Void) {
         // [Fix] Endpoint: /centers/sync-data/ (Base URL already includes /v1)
-        performRequest(endpoint: "/centers/sync-data/", method: "POST", body: payload, requiresAuth: true) { result in
+        performRequest(baseURL: self.medicalURL, endpoint: "/centers/sync-data/", method: "POST", body: payload, requiresAuth: true) { result in
             switch result {
             case .success(let json):
                 if let success = json["success"] as? Bool, success == true { 
@@ -325,7 +323,7 @@ class APIService: NSObject {
                 } else if let message = json["message"] as? String, message.contains("Data synced") {
                      completion(true, nil)
                 } else {
-                    print("⚠️ [Sync] JSON 'success' field missing, but HTTP 200 OK. Assuming Success.")
+                    // print("⚠️ [Sync] JSON 'success' field missing, but HTTP 200 OK. Assuming Success.")
                     completion(true, nil)
                 }
             case .failure(let error):
@@ -336,77 +334,43 @@ class APIService: NSObject {
     
     func verifyCenterCode(_ code: String, completion: @escaping (Result<[String: Any], Error>) -> Void) {
         let nickname = UserDefaults.standard.string(forKey: "userNickname") ?? "Guest"
-        // [Fix] Direct URL Request to bypass '/api' prefix issue
-        // [Fix] Revert to V1 Endpoint which is confirmed to work (or verify path)
-        // Previous error: 404 on .../verify-code-v2/
-        let urlStr = "https://217.142.253.35.nip.io/api/v1/centers/verify-code/"
-        guard let url = URL(string: urlStr) else { return }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // [Fix] Add headers just in case
-        request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
-        
         let payload = ["code": code, "user_nickname": nickname]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         
-        print("🚀 [API-Direct] POST \(urlStr)")
+        // [Fix] Endpoint: /centers/verify-code/
+        performRequest(baseURL: self.medicalURL, endpoint: "/centers/verify-code/", method: "POST", body: payload, requiresAuth: false) { result in
+            completion(result)
+        }
+    }
+
+    func connectToCenter(centerId: Any, completion: @escaping (Bool) -> Void) {
+        let payload: [String: Any] = ["center_id": centerId]
         
-        // Use Shared Session
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                print("❌ [API-Direct] Error: \(error.localizedDescription)")
-                completion(.failure(error))
-                return
+        // [Fix] Endpoint: /centers/connect/
+        performRequest(baseURL: self.medicalURL, endpoint: "/centers/connect/", method: "POST", body: payload, requiresAuth: true) { result in
+            switch result {
+            case .success:
+                completion(true)
+            case .failure(let error):
+                print("❌ [API] Connect Center Failed: \(error.localizedDescription)")
+                completion(false)
             }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(NSError(domain: "No Response", code: 0, userInfo: nil)))
-                return
-            }
-            
-            print("📡 [API-Direct] Status: \(httpResponse.statusCode)")
-            
-            if (200...299).contains(httpResponse.statusCode), let data = data {
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        completion(.success(json))
-                    } else {
-                        // Sometimes array wrapper?
-                         if let jsonArr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]], let first = jsonArr.first {
-                              completion(.success(first))
-                         } else {
-                             completion(.failure(NSError(domain: "Invalid JSON", code: -1, userInfo: nil)))
-                         }
-                    }
-                } catch {
-                     // Try parsing as simple string message
-                     if let str = String(data: data, encoding: .utf8) {
-                         print("📝 [API-Direct] Response: \(str)")
-                     }
-                     completion(.failure(error))
-                }
-            } else {
-                // [Debug] Log Body on Failure
-                if let data = data, let str = String(data: data, encoding: .utf8) {
-                    print("📝 [API-Direct] Fail Body: \(str)")
-                }
-                completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
-            }
-        }.resume()
+        }
     }
     
-    func connectToCenter(centerId: Any, completion: @escaping (Bool) -> Void) {
+    // MARK: - Mind Guide
+    func fetchMindGuide(completion: @escaping ([String: Any]?) -> Void) {
         ensureAuth { success in
-            guard success else { completion(false); return }
-            var payload: [String: Any] = [:]
-            if let idInt = centerId as? Int { payload["center_id"] = idInt }
-            else if let idStr = centerId as? String { payload["center_id"] = idStr }
+            guard success else { completion(nil); return }
             
-            // [Fix] Endpoint: /connect/request/ (Matches b2g_sync.urls)
-            self.performRequest(endpoint: "/connect/request/", method: "POST", body: payload) { result in
-                if case .success = result { completion(true) } else { completion(false) }
+            // [Fix] Endpoint: /mind-guide/today/
+            self.performRequest(baseURL: self.medicalURL, endpoint: "/mind-guide/today/", method: "GET") { result in
+                switch result {
+                case .success(let data):
+                    completion(data)
+                case .failure(let error):
+                    print("❌ [API] Fetch MindGuide Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
             }
         }
     }
@@ -414,13 +378,13 @@ class APIService: NSObject {
     func fetchDiaries(completion: @escaping ([[String: Any]]?) -> Void) {
         ensureAuth { success in
             guard success else { completion(nil); return }
-            // [Fix] Remove trailing slash
-            self.performRequestList(endpoint: "/diaries", method: "GET") { result in
+            // Django Endpoint: /diaries/ (GET List)
+            self.performRequestList(baseURL: self.medicalURL, endpoint: "/diaries/", method: "GET") { result in
                 switch result {
                 case .success(let list):
                     completion(list)
                 case .failure(let error):
-                    print("❌ [API] Fetch Diaries Failed: \(error.localizedDescription)")
+                    print("❌ [API-Medical] Fetch Diaries Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -431,57 +395,23 @@ class APIService: NSObject {
     func deleteDiaryOnServer(diaryId: String, completion: @escaping (Bool) -> Void = { _ in }) {
         ensureAuth { success in
             guard success else { completion(false); return }
-            print("🗑️ [API] Deleting Diary ID: \(diaryId)")
-            // [Fix] Remove trailing slash
-            self.performRequest(endpoint: "/diaries/\(diaryId)/", method: "DELETE") { result in
+            print("🗑️ [API-Medical] Deleting Diary ID: \(diaryId)")
+            
+            // Django Endpoint: /diaries/{id}/ (DELETE)
+            self.performRequest(baseURL: self.medicalURL, endpoint: "/diaries/\(diaryId)/", method: "DELETE") { result in
                 switch result {
                 case .success:
-                    print("✅ [API] Delete Success")
+                    print("✅ [API-Medical] Delete Success")
                     completion(true)
                 case .failure(let error):
-                    let nsError = error as NSError
-                    if nsError.code == 3840 { 
-                         print("✅ [API] Delete Success (Empty Body)")
-                         completion(true)
-                    } else {
-                        print("❌ [API] Delete Failed: \(error.localizedDescription)")
-                        completion(false)
-                    }
+                    print("❌ [API-Medical] Delete Failed: \(error.localizedDescription)")
+                    completion(false)
                 }
             }
         }
     }
     
-    // MARK: - Mind Guide (Weekly Analysis)
-    func fetchMindGuide(date: Date, weather: String, completion: @escaping (String?) -> Void) {
-        ensureAuth { success in
-            guard success else { completion(nil); return }
-            
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd"
-            let dateStr = f.string(from: date)
-            
-            // Query Params
-            let weatherParam = weather.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let endpoint = "/insight?date=\(dateStr)&weather=\(weatherParam)"
-            
-            self.performRequest(endpoint: endpoint, method: "GET") { result in
-                switch result {
-                case .success(let data):
-                    if let msg = data["message"] as? String {
-                        completion(msg)
-                    } else {
-                        completion(nil)
-                    }
-                case .failure(let error):
-                    print("❌ [API] Mind Guide Failed: \(error.localizedDescription)")
-                    completion(nil)
-                }
-            }
-        }
-    }
-    
-    // MARK: - Chat (OCI Server Mode: haruON 217 Node)
+    // MARK: - Chat (OCI Server Mode: maumON 217 Node)
     func sendChatMessage(text: String, history: String, completion: @escaping (Result<String, Error>) -> Void) {
         ensureAuth { success in
             guard success else {
@@ -490,7 +420,6 @@ class APIService: NSObject {
             }
             
             // [Config] 217 Server for LLM
-            // Class-level property 사용으로 타겟 명확화
             let llmBaseURL = self.llmServerURL
             let endpoint = "/chat/reaction"
             
@@ -515,7 +444,7 @@ class APIService: NSObject {
             
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
             
-            print("🚀 [API-217] Chat Request to LLM Node: \(llmBaseURL)")
+            // print("🚀 [API-217] Chat Request to LLM Node: \(llmBaseURL)")
             
             URLSession.shared.dataTask(with: request) { data, response, error in
                 if let error = error {
@@ -552,23 +481,24 @@ class APIService: NSObject {
         }
     }
     
-
-    // MARK: - Core Networking
+    // ... (Core Networking needs to support variable baseURL) ...
     
     // MARK: - Core Networking
-    
-    // [Standardization] Use URLSession.shared for cleaner state
-    // private lazy var session: URLSession = { ... }
 
-    func performRequest(endpoint: String, method: String, body: [String: Any]? = nil, requiresAuth: Bool = true, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+    // Refactored to accept baseURL
+    func performRequest(baseURL: String? = nil, endpoint: String, method: String, body: [String: Any]? = nil, requiresAuth: Bool = true, completion: @escaping (Result<[String: Any], Error>) -> Void) {
+        
+        let targetBase = baseURL ?? self.baseURL // Default to Flask if not specified
+        
         // [Fix] Ensure Endpoint Format (Add '/' if missing, Remove Trailing Slash)
         var safeEndpoint = endpoint
         if !safeEndpoint.hasPrefix("/") { safeEndpoint = "/" + safeEndpoint }
-        if safeEndpoint.hasSuffix("/") { safeEndpoint = String(safeEndpoint.dropLast()) }
+        // Django requires trailing slash usually, Flask doesn't.
+        // Django APPEND_SLASH=False setting checks.
+        // Safe bet: Do not strip trailing slash if it exists.
         
-        // [Standard] RFC 6750 Sec 2.3: URI Query Parameter
-        // Use URLComponents to append 'jwt' query param for Nginx traversal
-        var components = URLComponents(string: baseURL + safeEndpoint)
+        // [Standard] RFC 6750 Sec 2.3
+        var components = URLComponents(string: targetBase + safeEndpoint)
         
         if requiresAuth, let token = self.token {
             var items = components?.queryItems ?? []
@@ -653,14 +583,17 @@ class APIService: NSObject {
     }
     
     // Array Response helper
-    func performRequestList(endpoint: String, method: String, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
+    func performRequestList(baseURL: String? = nil, endpoint: String, method: String, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
+        let targetBase = baseURL ?? self.baseURL
+        
         // [Fix] Ensure Endpoint Format (Add '/' if missing, Remove Trailing Slash)
         var safeEndpoint = endpoint
         if !safeEndpoint.hasPrefix("/") { safeEndpoint = "/" + safeEndpoint }
-        if safeEndpoint.hasSuffix("/") { safeEndpoint = String(safeEndpoint.dropLast()) }
+        // Django expects trailing slashes sometimes, but let's stick to no trailing for consistency unless required.
+        // if safeEndpoint.hasSuffix("/") { safeEndpoint = String(safeEndpoint.dropLast()) }
         
         // [Standard] RFC 6750 Sec 2.3: URI Query Parameter
-        var components = URLComponents(string: baseURL + safeEndpoint)
+        var components = URLComponents(string: targetBase + safeEndpoint)
         
         if let token = self.token {
             var items = components?.queryItems ?? []
@@ -731,6 +664,36 @@ class APIService: NSObject {
                 completion(.failure(error))
             }
         }.resume()
+    }
+
+        // MARK: - JWT Helper
+    private func decodeUserIdFromJWT(token: String) -> String? {
+        let segments = token.components(separatedBy: ".")
+        guard segments.count > 1 else { return nil }
+        
+        var base64String = segments[1]
+        let requiredLength = (4 * ceil((Double(base64String.count) / 4.0)))
+        let nbrPaddings = Int(requiredLength) - base64String.count
+        if nbrPaddings > 0 {
+            let padding = String(repeating: "=", count: nbrPaddings)
+            base64String += padding
+        }
+        
+        base64String = base64String.replacingOccurrences(of: "-", with: "+")
+        base64String = base64String.replacingOccurrences(of: "_", with: "/")
+        
+        guard let decodedData = Data(base64Encoded: base64String, options: .ignoreUnknownCharacters),
+              let json = try? JSONSerialization.jsonObject(with: decodedData) as? [String: Any] else {
+            return nil
+        }
+        
+        // Try common keys for User ID
+        if let sub = json["user_id"] as? Int { return String(sub) }
+        if let subStr = json["user_id"] as? String { return subStr }
+        if let id = json["id"] as? Int { return String(id) }
+        
+        
+        return nil
     }
     
     // MARK: - SSL Bypass Delegate (Legacy Removed)

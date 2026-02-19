@@ -119,7 +119,7 @@
         </div>
         <div class="info-row">
             <span>개발자</span>
-            <span class="text-gray">haruON Team</span>
+            <span class="text-gray">maumON Team</span>
         </div>
       </section>
 

@@ -89,9 +89,21 @@ struct AppShareView: View {
                         
                         // List Section
                         VStack(alignment: .leading) {
-                            Text("연결된 사용자 목록")
-                                .font(.headline)
-                                .padding(.horizontal)
+                            HStack {
+                                Text("연결된 사용자 목록")
+                                    .font(.headline)
+                                Spacer()
+                                Button(action: {
+                                    shareManager.fetchList(role: "viewer")
+                                }) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .foregroundColor(.blue)
+                                        .padding(8)
+                                        .background(Color.blue.opacity(0.1))
+                                        .clipShape(Circle())
+                                }
+                            }
+                            .padding(.horizontal)
                             
                             if shareManager.connectedUsers.isEmpty {
                                 Text("연결된 사용자가 없습니다.")

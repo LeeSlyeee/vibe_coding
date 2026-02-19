@@ -443,28 +443,21 @@ struct AppDiaryWriteView: View {
     }
 
     func fetchInsight() {
-        // [Local Mode] Fetch from Local LLM
-        print("🧠 [Insight] Generating Mind Guide via Local LLM...")
-        isLoadingInsight = true
+        // [OOM Prevention] Disable Auto-Inference on View Load
+        // Writing Screen should be lightweight. Inference happens only AFTER save.
+        print("🧠 [Insight] Skipped for Performance.")
         
-        // 1. Get Local Data Context
-        let recentDiaries = LocalDataManager.shared.diaries.prefix(5) // Last 5 diaries
-        var context = ""
-        for diary in recentDiaries {
-            let date = diary.date ?? ""
-            let mood = moodEmoji(diary.mood_level)
-            let event = diary.event ?? ""
-            context += "- [\(date)] 기분:\(mood) / 내용: \(event.prefix(30))...\n"
-        }
+        isLoadingInsight = false
         
-        if context.isEmpty {
-            // First time user
-            isLoadingInsight = false
-            insightMessage = "오늘의 날씨는 \(weatherDesc)이네요. 첫 기록을 기다리고 있어요!"
-            return
-        }
-
-        // 2. Call Local LLM
+        let quotes = [
+            "오늘 하루도 수고 많으셨어요.",
+            "당신의 감정은 소중합니다.",
+            "천천히, 편안하게 기록해보세요.",
+            "오늘의 날씨처럼 마음도 변할 수 있어요."
+        ]
+        insightMessage = quotes.randomElement() ?? "오늘 하루도 수고 많으셨어요."
+        
+        /* [Legacy: Auto LLM Call causing OOM]
         Task {
             let message = await LLMService.shared.generateMindGuide(
                 recentDiaries: context, 
@@ -477,6 +470,7 @@ struct AppDiaryWriteView: View {
                 self.insightMessage = message
             }
         }
+        */
     }
     
     // Logic: 저장 (Local + LLM)

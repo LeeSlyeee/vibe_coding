@@ -296,7 +296,7 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "haruON-gemma", # Use Custom Model Name
+                "model": "maumON-gemma", # Use Custom Model Name
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {
@@ -305,7 +305,7 @@ class EmotionAnalysis:
                 }
             }
             
-            print(f"🦙 [Insight] Requesting Ollama (Haru-On Gemma)...")
+            print(f"🦙 [Insight] Requesting Ollama (Maum-On Gemma)...")
             url = "http://localhost:11434/api/generate"
             
             # Timeout Increased to 60s (OCI CPU might be slow or busy)
@@ -335,7 +335,7 @@ class EmotionAnalysis:
         import json
         
         # Local Ollama URL
-        print(f"🦙 [Local AI] Requesting Ollama (Haru-On Gemma)...", end=" ", flush=True)
+        print(f"🦙 [Local AI] Requesting Ollama (Maum-On Gemma)...", end=" ", flush=True)
         try:
             url = "http://localhost:11434/api/generate"
             
@@ -384,7 +384,7 @@ class EmotionAnalysis:
             )
             
             payload = {
-                "model": "haruON-gemma",
+                "model": "maumON-gemma",
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {

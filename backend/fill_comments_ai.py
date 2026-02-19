@@ -25,7 +25,7 @@ def generate_ai_comment_for_text(diary_dict):
         """
         
         prompt_text = (
-            f"너는 다정하고 섬세한 심리 상담 AI '하루온'이야. 아래 회원의 일기를 읽고, 따뜻한 위로와 공감의 코멘트를 남겨줘.\n"
+            f"너는 다정하고 섬세한 심리 상담 AI '마음온'이야. 아래 회원의 일기를 읽고, 따뜻한 위로와 공감의 코멘트를 남겨줘.\n"
             f"{content}\n\n"
             "### 지시사항:\n"
             "1. 회원의 감정을 깊이 경청하고 있다는 느낌을 줘.\n"
@@ -37,7 +37,7 @@ def generate_ai_comment_for_text(diary_dict):
         )
         
         payload = {
-            "model": "haru-on-gemma",
+            "model": "maumON-gemma",
             "prompt": prompt_text,
             "stream": False,
             "options": {

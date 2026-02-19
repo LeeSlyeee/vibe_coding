@@ -16,12 +16,12 @@ struct AppSplashView: View {
                         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
                     
                     VStack(spacing: 8) {
-                        Text("haruON")
+                        Text("maumON")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.white.opacity(0.9))
                             
-                        Text("당신의 하루를, 온전히")
+                        Text("당신의 마음을, 온전히")
                             .font(.subheadline)
                             .foregroundColor(.white.opacity(0.7))
                             .padding(.top, 4)
@@ -37,7 +37,7 @@ struct AppSplashView: View {
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(1.2)
                     
-                    Text("하루를 여는 중...")
+                    Text("마음을 여는 중...")
                         .font(.caption)
                         .foregroundColor(.white.opacity(0.8))
                 }

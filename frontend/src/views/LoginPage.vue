@@ -2,7 +2,7 @@
   <div class="auth-page">
     <div class="auth-container">
       <div class="auth-card card">
-        <h1 class="auth-title">haruON</h1>
+        <h1 class="auth-title">maumON</h1>
         
         <form @submit.prevent="handleLogin" class="auth-form">
           <div class="test-account-info">
@@ -64,7 +64,7 @@
         </form>
 
         <div class="auth-footer">
-          <p>© 2026 haruON. All rights reserved.</p>
+          <p>© 2026 maumON. All rights reserved.</p>
         </div>
       </div>
     </div>
