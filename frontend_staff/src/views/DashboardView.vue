@@ -265,8 +265,8 @@ let intervalId = null;
 
 onMounted(() => {
     fetchDashboardData();
-    // 5초마다 데이터 갱신 (실시간성 확보)
-    intervalId = setInterval(fetchDashboardData, 5000);
+    // 30초마다 데이터 갱신 (실시간성 확보 + 서버 부하 경감)
+    intervalId = setInterval(fetchDashboardData, 30000);
 });
 
 import { onUnmounted } from 'vue';

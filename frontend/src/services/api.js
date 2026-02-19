@@ -15,10 +15,11 @@ const api = axios.create({
 // 요청 인터셉터 - 인증 토큰 추가
 api.interceptors.request.use(
   (config) => {
-    // [Fix] User Web uses 'authToken', Admin Web uses 'access_token'. Support both!
+    // [Fix] User Web uses 'authToken' only.
+    // 'access_token' is Django SimpleJWT (Staff Portal) - must NOT be used here
+    // as Flask JWT validation will return 422 for Django tokens.
     const token =
       localStorage.getItem("authToken") ||
-      localStorage.getItem("access_token") ||
       localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -155,7 +156,6 @@ export const diaryAPI = {
       mode: data.mode,
       mood_intensity: data.mood_intensity,
       symptoms: data.symptoms,
-      gratitude_note: data.gratitude_note,
       gratitude_note: data.gratitude_note,
       safety_flag: data.safety_flag,
     };
