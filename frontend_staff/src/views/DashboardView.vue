@@ -278,7 +278,7 @@ onUnmounted(() => {
     <div class="min-h-screen bg-slate-50 p-6 font-sans">
         <header class="mb-10 flex items-center justify-between">
             <div>
-                <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">InsightMind Dashboard</h1>
+                <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Maum-On Dashboard</h1>
                 <p class="text-xl text-slate-500 font-medium mt-2">도봉구 정신건강복지센터 통합 관제 시스템</p>
             </div>
             <div class="flex items-center gap-6">

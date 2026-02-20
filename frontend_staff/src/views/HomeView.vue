@@ -100,7 +100,7 @@ const goDashboard = () => {
       
       <!-- Footer -->
       <p class="mt-8 text-center text-xs text-slate-400 font-medium">
-          InsightMind B2G Clinical System v2.0 <br>
+          Maum-On B2G Clinical System v2.0 <br>
           Authorized Access Only
       </p>
     </div>
