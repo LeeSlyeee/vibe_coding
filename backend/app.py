@@ -192,17 +192,26 @@ def login():
         identity=str(user.id),
         additional_claims={"username": user.username}
     )
-    
-    # [B2G] Center Code from Postgres only
+    # 동적 assessment/risk 계산 (로그인 시)
+    from datetime import datetime, timedelta
     real_center_code = user.center_code
+    diary_count = Diary.query.filter_by(user_id=user.id).count()
+    login_assessment = diary_count > 0
+    login_risk = 'low'
+    recent_cutoff = datetime.utcnow() - timedelta(days=7)
+    recent = Diary.query.filter(Diary.user_id == user.id, Diary.created_at >= recent_cutoff).all()
+    if recent:
+        avg = sum(d.mood_level or 3 for d in recent) / len(recent)
+        has_flag = any(getattr(d, 'safety_flag', None) in ['need_help', 'danger'] for d in recent)
+        if has_flag or avg <= 2: login_risk = 'high'
+        elif avg <= 3: login_risk = 'moderate'
 
     # [Fix] Frontend Compatibility: Include FULL user object & token alias
-    # Prevent 'undefined' errors in frontend by providing all potential fields
     return jsonify({
         'access_token': access_token,
         'token': access_token, # Alias
-        'assessment_completed': True, # [Fix] Bypass Assessment
-        'risk_level': 'low', # [Fix] Default Risk
+        'assessment_completed': login_assessment,
+        'risk_level': login_risk,
         'user': {
             'id': user.id,
             'username': user.username,
@@ -242,7 +251,7 @@ def get_me():
     if recent_diaries:
         avg_mood = sum(d.mood_level or 3 for d in recent_diaries) / len(recent_diaries)
         has_safety_flag = any(
-            getattr(d, 'safety_flag', None) in ['need_help', 'danger', True]
+            getattr(d, 'safety_flag', None) in ['need_help', 'danger']
             for d in recent_diaries
         )
         if has_safety_flag or avg_mood <= 2:
