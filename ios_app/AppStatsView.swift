@@ -33,8 +33,7 @@ struct AppStatsView: View {
     // [New] Settings Modal State
     @State private var showSettings = false
     
-    // [Target Fix] Updated to 217 Server
-    let baseURL = "https://217.142.253.35.nip.io/api"
+    
     
     let tabs = [
         ("flow", "흐름"),
@@ -340,16 +339,8 @@ struct AppStatsView: View {
         }
     }
     
-    // pollStatus는 더 이상 필요 없음
-    func apiCall(path: String, method: String, completion: @escaping (Data?) -> Void) {
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-        guard let url = URL(string: "\(baseURL)\(path)") else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        URLSession.shared.dataTask(with: request) { d, _, _ in completion(d) }.resume()
-    }
 }
+
 
 // MARK: - Reusable Card Style
 struct CardModifier: ViewModifier {

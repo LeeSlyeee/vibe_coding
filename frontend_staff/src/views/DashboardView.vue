@@ -1,24 +1,23 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '@/api';
-// import axios from 'axios'; // Removed raw axios 
-// import {
-//   Chart as ChartJS,
-//   Title,
-//   Tooltip,
-//   Legend,
-//   BarElement,
-//   CategoryScale,
-//   LinearScale,
-//   ArcElement,
-//   PointElement,
-//   LineElement,
-//   Filler
-// } from 'chart.js'
-// import { Bar, Doughnut, Line } from 'vue-chartjs'
+import {
+  Chart as ChartJS,
+  Title,
+  Tooltip,
+  Legend,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  ArcElement,
+  PointElement,
+  LineElement,
+  Filler
+} from 'chart.js'
+import { Doughnut, Line } from 'vue-chartjs'
 
 // Register ChartJS components
-// ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement, Filler)
 
 const allDiaries = ref([]);
 const highRiskDiaries = ref([]); 
@@ -350,17 +349,16 @@ onUnmounted(() => {
             <div class="col-span-2 bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <h3 class="text-2xl font-bold text-slate-800 mb-8">📉 전체 대상자 평균 기분 변화 (주간)</h3>
                 <div class="h-80">
-                    <!-- <Line :data="flowChartData" :options="commonOptions" /> -->
-                    <p class="text-center text-slate-400 py-10">차트 로딩 중단 (유지보수 중)</p>
+                    <Line :data="flowChartData" :options="commonOptions" />
                 </div>
             </div>
             
             <!-- 2. 위험군 분포 -->
             <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
                 <h3 class="text-2xl font-bold text-slate-800 mb-8">🚨 감정 상태 분포 (전체)</h3>
-                <!-- <div class="h-64 relative" v-if="riskDistributionData?.datasets?.[0]?.data">
+                <div class="h-64 relative" v-if="riskDistributionData?.datasets?.[0]?.data">
                     <Doughnut :data="riskDistributionData" :options="doughnutOptions" />
-                </div> -->
+                </div>
                  <div class="mt-8 space-y-4" v-if="riskDistributionData?.datasets?.[0]?.data">
                     <!-- 범례 -->
                     <div class="flex justify-between text-base">
