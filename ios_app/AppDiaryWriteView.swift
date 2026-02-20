@@ -372,29 +372,16 @@ struct AppDiaryWriteView: View {
     
     // Components (질문 카드)
     func questionCard(title: String, binding: Binding<String>, fieldId: Int) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title).font(.headline).foregroundColor(Color.secondary)
-                Spacer()
-                // 마이크 버튼
-                Button(action: { toggleRecording(for: fieldId, currentText: binding.wrappedValue) }) {
-                    Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .red : .blue)
-                        .scaleEffect((activeRecordingField == fieldId && voiceRecorder.isRecording) ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
-                }
+        QuestionCardView(
+            title: title,
+            text: binding,
+            fieldId: fieldId,
+            activeRecordingField: $activeRecordingField,
+            voiceRecorder: voiceRecorder,
+            onToggleRecording: { fid, currentText in
+                toggleRecording(for: fid, currentText: currentText)
             }
-            TextEditor(text: binding)
-                .frame(height: 100)
-                .padding(8)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(12)
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+        )
     }
     
     // Logic: 녹음 토글
@@ -691,5 +678,71 @@ struct MedicationSettingView: View {
     
     func saveMedications() {
         UserDefaults.standard.set(medications, forKey: key)
+    }
+}
+
+// MARK: - QuestionCardView (포커스 상태 시각 피드백)
+struct QuestionCardView: View {
+    let title: String
+    @Binding var text: String
+    let fieldId: Int
+    @Binding var activeRecordingField: Int?
+    @ObservedObject var voiceRecorder: VoiceRecorder
+    var onToggleRecording: (Int, String) -> Void
+    
+    @FocusState private var isFocused: Bool
+    
+    private let placeholders: [Int: String] = [
+        0: "수면 상태를 적어보세요...",
+        1: "오늘 있었던 일을 적어보세요...",
+        2: "느낀 감정을 표현해보세요...",
+        3: "그 감정이 나에게 어떤 의미인지...",
+        4: "스스로에게 해주고 싶은 말..."
+    ]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title).font(.headline).foregroundColor(Color.secondary)
+                Spacer()
+                // 마이크 버튼
+                Button(action: { onToggleRecording(fieldId, text) }) {
+                    Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .red : .blue)
+                        .scaleEffect((activeRecordingField == fieldId && voiceRecorder.isRecording) ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
+                }
+            }
+            
+            ZStack(alignment: .topLeading) {
+                // Placeholder (텍스트가 비어있고 포커스 아닐 때)
+                if text.isEmpty {
+                    Text(placeholders[fieldId] ?? "여기에 입력하세요...")
+                        .foregroundColor(Color.gray.opacity(0.5))
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 16)
+                        .allowsHitTesting(false)
+                }
+                
+                TextEditor(text: $text)
+                    .focused($isFocused)
+                    .frame(height: 100)
+                    .padding(8)
+                    .scrollContentBackground(.hidden)
+                    .background(isFocused ? Color.blue.opacity(0.04) : Color.gray.opacity(0.08))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isFocused ? Color.blue.opacity(0.6) : Color.clear, lineWidth: 2)
+                    )
+                    .tint(.blue) // 커서 색상
+                    .animation(.easeInOut(duration: 0.2), value: isFocused)
+            }
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
 }
