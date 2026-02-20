@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '@/api';
+import { useAuthStore } from '@/stores/auth';
 import {
   Chart as ChartJS,
   Title,
@@ -25,9 +26,14 @@ const patients = ref([]);
 const totalPatients = ref(0);
 const totalDiaryCount = ref(0); 
 const debugLog = ref("초기화 중...");
-const loading = ref(false); // 누락된 변수 복구
-const generatedCode = ref(null); // 누락된 변수 복구
-const errorMsg = ref(''); // 누락된 변수 복구
+const loading = ref(false);
+const generatedCode = ref(null);
+const errorMsg = ref('');
+const centerName = ref('');
+
+// Auth Store에서 로그인 사용자 정보
+const authStore = useAuthStore();
+const staffName = computed(() => authStore.user?.username || '담당자');
 
 // Chart Data Computed Properties
 const flowChartData = computed(() => {
@@ -117,14 +123,19 @@ const doughnutOptions = {
 };
 
 // Data Fetching
-// Data Fetching
-// Data Fetching
 const fetchDashboardData = async () => {
     loading.value = true;
     debugLog.value = "데이터 로딩 시작...";
 
     
     try {
+        // 0. 센터 정보 로딩
+        try {
+            const resCenters = await api.get('centers/list/');
+            if (resCenters.data && resCenters.data.length > 0) {
+                centerName.value = resCenters.data[0].name || '';
+            }
+        } catch { /* 센터 정보 없어도 대시보드는 동작 */ }
         // const baseURL = import.meta.env.PROD ? '/api/v1/' : 'http://127.0.0.1:8000/api/v1/';
         // debugLog.value += `\nBaseURL: ${baseURL}`;
 
@@ -279,7 +290,7 @@ onUnmounted(() => {
         <header class="mb-10 flex items-center justify-between">
             <div>
                 <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Maum-On Dashboard</h1>
-                <p class="text-xl text-slate-500 font-medium mt-2">도봉구 정신건강복지센터 통합 관제 시스템</p>
+                <p class="text-xl text-slate-500 font-medium mt-2">{{ centerName || '정신건강복지센터' }} 통합 관제 시스템</p>
             </div>
             <div class="flex items-center gap-6">
                 <button 
@@ -290,7 +301,7 @@ onUnmounted(() => {
                 </button>
                 <div class="bg-white px-6 py-3 rounded-xl shadow-sm border border-slate-200 text-base">
                     <span class="text-slate-500">담당자:</span>
-                    <span class="font-bold text-slate-800 ml-2 text-lg">관리자(Admin)</span>
+                    <span class="font-bold text-slate-800 ml-2 text-lg">{{ staffName }}</span>
                 </div>
             </div>
         </header>
@@ -312,7 +323,7 @@ onUnmounted(() => {
                     <h3 class="text-5xl font-extrabold text-red-600">{{ highRiskDiaries.length }}<span class="text-xl font-normal text-slate-400 ml-2">건</span></h3>
                 </div>
                 <div class="mt-6 flex items-center text-sm font-medium text-red-600 bg-red-50 w-fit px-3 py-1.5 rounded-lg">
-                    <span>⚠️ 최근 감지 (10건)</span>
+                    <span>⚠️ 최근 감지 ({{ highRiskDiaries.length }}건)</span>
                 </div>
             </div>
              <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-col justify-between">

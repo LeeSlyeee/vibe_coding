@@ -40,10 +40,10 @@ struct PremiumModalView: View {
             HStack(alignment: .top, spacing: 10) {
                 Text("🏥")
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("도봉구청 상담 안내")
+                    Text("보건소/상담센터 안내")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(hexString: "15803d"))
-                    Text("도봉구청에서 상담을 받으면 무료 업그레이드가 가능합니다.")
+                    Text("관할 보건소나 정신건강복지센터에서 상담을 받으면 무료 업그레이드가 가능합니다.")
                         .font(.system(size: 13))
                         .foregroundColor(Color(hexString: "15803d"))
                         .fixedSize(horizontal: false, vertical: true)

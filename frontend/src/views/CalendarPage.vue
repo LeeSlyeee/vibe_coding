@@ -87,8 +87,8 @@
 
             <div class="dobong-notice" style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; border: 1px solid #dcfce7;">
                <p style="margin: 0; color: #15803d; font-size: 13px; line-height: 1.5; font-weight: 500;">
-                 <strong>🏥 도봉구청 상담 안내</strong><br/>
-                 도봉구청에서 상담을 받으시면 무료 업그레이드가 가능합니다.
+                 <strong>🏥 보건소/상담센터 안내</strong><br/>
+                 관할 보건소나 정신건강복지센터에서 상담을 받으시면 무료 업그레이드가 가능합니다.
                </p>
             </div>
 

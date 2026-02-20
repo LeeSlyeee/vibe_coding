@@ -270,7 +270,7 @@ export default {
     };
 
     const handleUpgrade = () => {
-        alertMessage.value = "🌟 마음챙김 플러스\n\n현재 도봉구민 대상 무료 시범 운영 중입니다.\n가까운 보건소에 문의하세요!";
+        alertMessage.value = "🌟 마음챙김 플러스\n\n현재 무료 시범 운영 중입니다.\n가까운 보건소에 문의하세요!";
         showAlert.value = true;
     };
 
@@ -309,6 +309,7 @@ export default {
       handleDisconnect,
       handleLogout,
       handleForceSync,
+      handleUpgrade,
       formatDate
     };
   }
