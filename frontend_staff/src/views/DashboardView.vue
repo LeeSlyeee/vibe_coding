@@ -89,10 +89,11 @@ const riskDistributionData = computed(() => {
         };
     }
 
-    // 전체 일기 기준 분포 (mood_score 없을 경우 대비)
-    const dangerous = allDiaries.value.filter(d => (d.mood_score || 0) <= 2).length;
-    const caution = allDiaries.value.filter(d => (d.mood_score || 0) === 3 || (d.mood_score || 0) === 4).length;
-    const stable = allDiaries.value.filter(d => (d.mood_score || 0) >= 5).length;
+    // Django Staff API: mood_score는 10점 만점 (Flask mood_level x2)
+    // 위험: 4점 이하, 주의: 5-6점, 안정: 7점 이상
+    const dangerous = allDiaries.value.filter(d => (d.mood_score || 0) <= 4).length;
+    const caution = allDiaries.value.filter(d => (d.mood_score || 0) >= 5 && (d.mood_score || 0) <= 6).length;
+    const stable = allDiaries.value.filter(d => (d.mood_score || 0) >= 7).length;
     
     return {
         labels: ['안정', '주의', '위험'],
@@ -160,7 +161,7 @@ const fetchDashboardData = async () => {
 
         // 고위험군
         highRiskDiaries.value = allDiaries.value
-            .filter(d => (d.mood_score || 0) <= 2)
+            .filter(d => (d.mood_score || 0) <= 4)
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
             .slice(0, 10);
 
@@ -373,15 +374,15 @@ onUnmounted(() => {
                  <div class="mt-8 space-y-4" v-if="riskDistributionData?.datasets?.[0]?.data">
                     <!-- 범례 -->
                     <div class="flex justify-between text-base">
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-3"></span>안정 (5점 이상)</span>
+                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-3"></span>안정 (7점 이상)</span>
                         <span class="font-bold text-slate-700 text-lg">{{ riskDistributionData.datasets[0].data[0] || 0 }}건</span>
                     </div>
                     <div class="flex justify-between text-base">
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-400 mr-3"></span>주의 (3-4점)</span>
+                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-400 mr-3"></span>주의 (5-6점)</span>
                         <span class="font-bold text-slate-700 text-lg">{{ riskDistributionData.datasets[0].data[1] || 0 }}건</span>
                     </div>
                      <div class="flex justify-between text-base">
-                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-3"></span>위험 (2점 이하)</span>
+                        <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-3"></span>위험 (4점 이하)</span>
                         <span class="font-bold text-red-600 text-lg">{{ riskDistributionData.datasets[0].data[2] || 0 }}건</span>
                     </div>
                 </div>
@@ -417,12 +418,12 @@ onUnmounted(() => {
                                 {{ (diary.content || '').length > 25 ? (diary.content || '').slice(0,25) + '...' : (diary.content || '-') }}
                             </td>
                             <td class="px-8 py-6">
-                                <span class="font-extrabold text-xl" :class="diary.mood_score <= 2 ? 'text-red-500' : 'text-slate-700'">
+                                <span class="font-extrabold text-xl" :class="diary.mood_score <= 4 ? 'text-red-500' : 'text-slate-700'">
                                     {{ diary.mood_score }}점
                                 </span>
                             </td>
                             <td class="px-8 py-6">
-                                <span v-if="diary.mood_score <= 2" class="bg-red-100 text-red-800 text-sm font-bold px-4 py-1.5 rounded-full">고위험</span>
+                                <span v-if="diary.mood_score <= 4" class="bg-red-100 text-red-800 text-sm font-bold px-4 py-1.5 rounded-full">고위험</span>
                                 <span v-else class="bg-orange-100 text-orange-800 text-sm font-bold px-4 py-1.5 rounded-full">주의</span>
                             </td>
                             <td class="px-8 py-6">
