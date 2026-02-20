@@ -62,9 +62,7 @@ def log_medication():
 def get_medication_logs():
     return jsonify([]), 200
 
-@med_bp.route('/api/assessment', methods=['POST'])
-def submit_assessment():
-    return jsonify({"message": "진단 기능 점검 중입니다.", "risk_level": "mild", "care_plan": ""}), 200
+# [Moved] /api/assessment → app.py (PHQ-9 기반 동적 판정)
 
 # [Disabled] Report handled by app.py
 # @med_bp.route('/api/report/start', methods=['POST'])

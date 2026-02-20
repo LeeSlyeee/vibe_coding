@@ -915,5 +915,39 @@ def get_statistics():
         # Return empty structure instead of 500 to avoid crash
         return jsonify({'daily': [], 'timeline': [], 'moods': [], 'weather': []}), 200
 
+# ─────────────────────────────────────────────
+# [Assessment] PHQ-9 초기 심리 진단 결과 수신
+# ─────────────────────────────────────────────
+@app.route('/api/assessment', methods=['POST'])
+@jwt_required()
+def submit_assessment():
+    """iOS AppAssessmentView에서 전송하는 PHQ-9 점수 수신"""
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    data = request.get_json() or {}
+    score = data.get('score', 0)
+    answers = data.get('answers', [])
+
+    # PHQ-9 기준 risk_level 판정
+    # 0-4: minimal, 5-9: mild, 10-14: moderate, 15-19: moderately severe, 20+: severe
+    if score >= 15:
+        risk = 'high'
+    elif score >= 10:
+        risk = 'moderate'
+    else:
+        risk = 'low'
+
+    print(f"📊 [Assessment] user={user.username}, score={score}, risk={risk}")
+
+    return jsonify({
+        'status': 'ok',
+        'score': score,
+        'risk_level': risk,
+        'message': '진단이 완료되었습니다.'
+    }), 200
+
 if __name__ == '__main__':
     app.run(debug=False, host='127.0.0.1', port=5000, threaded=True)

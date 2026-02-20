@@ -1,0 +1,20 @@
+Script started on Fri Feb 20 13:29:36 2026
+[1m[7m%[27m[1m[0m                                                                                                                                        [0m[27m[24m[Jslyeee@Slyeees-MacBook-Pro vibe_coding % [K[?2004h[?2004l
+[1m[7m%[27m[1m[0m                                                                                                                                        [0m[27m[24m[Jslyeee@Slyeees-MacBook-Pro vibe_coding % [K[?2004hsscp -i oracle_ssh_key_217 /tmp/ollama-warmup.sh /tmp/ollama-warmup.service ubuntu@217.142.253.3 [K55:/tmp/ && ssh -o ConnectTimeout=10 -i oracle_ssh_key_217 ubuntu@217.142.253.35 "[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo cp /tmp/ollama-warmup.sh /usr/local/bin/ollama-warmup.sh[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo chmod +x /usr/local/bin/ollama-warmup.sh[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo cp /tmp/ollama-warmup.service /etc/systemd/system/ollama-warmup.service[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo systemctl daemon-reload[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo systemctl enable ollama-warmup.service[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004heecho 'WARMUP SERVICE INSTALLED'[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004hssudo systemctl status ollama-warmup.service --no-pager | head -5[?2004l
+[0m[27m[24m[Jcmdand dquote> [K[?2004h"[?2004l
+ollama-warmup.sh                                                                                        0%    0     0.0KB/s   --:-- ETAollama-warmup.sh                                                                                      100%  457     7.2KB/s   00:00    
+ollama-warmup.service                                                                                   0%    0     0.0KB/s   --:-- ETAollama-warmup.service                                                                                 100%  223     3.5KB/s   00:00    
+Created symlink /etc/systemd/system/multi-user.target.wants/ollama-warmup.service → /etc/systemd/system/ollama-warmup.service.
+WARMUP SERVICE INSTALLED
+○ ollama-warmup.service - Ollama Model Warmup (maumON-gemma)
+     Loaded: loaded (/etc/systemd/system/ollama-warmup.service; enabled; preset: enabled)
+     Active: inactive (dead)
+[1m[7m%[27m[1m[0m                                                                                                                                        [0m[27m[24m[Jslyeee@Slyeees-MacBook-Pro vibe_coding % [K[?2004h[?2004l
+[1m[7m%[27m[1m[0m                                                                                                                                        [0m[27m[24m[Jslyeee@Slyeees-MacBook-Pro vibe_coding % [K[?2004h
