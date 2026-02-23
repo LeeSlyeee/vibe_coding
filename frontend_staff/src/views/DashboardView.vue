@@ -295,6 +295,12 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center gap-6">
                 <button 
+                  @click="$router.push('/admin/staff')"
+                  class="bg-white border border-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl hover:bg-slate-50 transition flex items-center gap-3 text-lg"
+                >
+                    <span>🧑‍⚕️ 상담사 관리</span>
+                </button>
+                <button 
                   @click="$router.push('/admin/patients')"
                   class="bg-white border border-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl hover:bg-slate-50 transition flex items-center gap-3 text-lg"
                 >
