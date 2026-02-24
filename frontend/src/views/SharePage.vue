@@ -31,8 +31,8 @@
             <input 
               v-model="inputCode" 
               type="text" 
-              placeholder="6자리 코드 입력" 
-              maxlength="6"
+              placeholder="8자리 코드 입력" 
+              maxlength="8"
               @keyup.enter="connectWithCode"
             />
             <button @click="connectWithCode" :disabled="!inputCode || isLoading">

@@ -37,7 +37,10 @@ api.interceptors.response.use(
   (error) => {
     // 401 에러 발생 시 로그아웃 처리 (단, 로그인 요청 자체의 실패는 제외)
     // 또한, 이미 로그인 페이지에 있다면 리다이렉트(새로고침) 하지 않음
-    if (error.response?.status === 401 && !error.config.url.includes("/login")) {
+    if (
+      (error.response?.status === 401 || error.response?.status === 422) &&
+      !error.config.url.includes("/login")
+    ) {
       if (window.location.pathname !== "/login") {
         localStorage.removeItem("authToken");
         localStorage.removeItem("token"); // 호환성 유지

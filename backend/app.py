@@ -6,7 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from config import Config
-from models import db, User, Diary, ChatLog, Center
+from models import db, User, Diary, ChatLog, Center, ShareCode, ShareRelationship
 import os
 import sys
 from dotenv import load_dotenv # [Fix] Explicit loading

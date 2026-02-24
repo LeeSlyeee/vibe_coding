@@ -357,3 +357,39 @@ python app.py
 
 - **Nginx 정적 파일 서빙 경로 수정**:
   - 의료진 프론트엔드가 잘못된 경로(`temp_insight_deploy/`)에서 서빙되던 문제를 `/home/ubuntu/project/frontend/dist/`로 정정.
+
+### 18. 가족공유(Share) 기능 전면 재구현 및 보안 강화 (2026.02.24)
+
+- **API 경로 정합성 수정**:
+  - **문제**: 프론트엔드(`/api/share/...`) ↔ 백엔드(`/api/v1/share/...`) 경로 불일치로 **404 Not Found** 발생.
+  - **수정**: `share_routes.py`의 모든 라우트에서 `/v1/` 접두사 제거하여 `/api/share/...`로 통일.
+  - **Nginx 프록시 규칙 추가**: `/api/share/` 경로가 Django(8000)가 아닌 Flask(5000)로 전달되도록 프록시 규칙 신규 등록.
+
+- **스텁(Stub) → 실제 로직 완전 구현**:
+  - **이전**: 모든 엔드포인트가 하드코딩된 임시 응답(`"TEMP00"`, `"점검 중입니다."`)만 반환.
+  - **현재**: DB 연동, JWT 인증, 보안 검증을 포함한 **5개 API 엔드포인트 완전 구현**.
+    - `POST /api/share/code` — 암호학적 랜덤 코드 생성 (`secrets` 모듈), 10분 만료, 기존 미사용 코드 자동 폐기.
+    - `POST /api/share/connect` — 코드 검증, 만료 확인, 자기 자신 연결 차단, 중복 연결 방지.
+    - `GET /api/share/list` — JWT 기반 연결된 사용자 목록 조회.
+    - `POST /api/share/disconnect` — 관계 해제.
+    - `GET /api/share/insights/<id>` — 권한 확인 후 최근 30일 감정 통계(평균 기분, 추세 그래프, 연속 작성일) 제공.
+
+- **DB 모델 신규 추가 (`models.py`)**:
+  - `ShareCode` — 일회용 초대 코드 테이블 (`code`, `user_id`, `expires_at`, `used`).
+  - `ShareRelationship` — 공유자(sharer) ↔ 조회자(viewer) 관계 테이블 (`sharer_id`, `viewer_id`, `connected_at`).
+
+- **보안 강화 (코드 길이 확장)**:
+  - **6자리 → 8자리**로 변경: 36^6 ≈ 21.7억 → **36^8 ≈ 2.8조** 조합으로 무차별 대입(Brute Force) 공격 실질적 불가능.
+  - DB 컬럼 `ALTER TABLE share_codes ALTER COLUMN code TYPE varchar(8)` 적용.
+
+- **프론트엔드 수정 (웹)**:
+  - `SharePage.vue`: 입력 필드 `maxlength="8"`, placeholder `"8자리 코드 입력"`.
+  - `api.js`: Flask-JWT-Extended의 422 (UNPROCESSABLE ENTITY) 응답도 인증 실패로 처리하여 로그인 페이지 자동 리다이렉트.
+
+- **iOS 수정**:
+  - `AppShareView.swift`: "6자리 코드" → "8자리 코드", placeholder 대시 8개(`--------`).
+  - `ShareManager.swift`: baseURL `/api/v1` → `/api`로 변경하여 백엔드 경로와 정합.
+
+- **서버 인프라**:
+  - `flask.service` 발견 및 활용: 기존 `mood_backend.service`(경로 불일치로 실패 반복)와 별도로 실제 서비스를 담당하는 `flask.service` 확인 및 재시작 체계 확립.
+  - Nginx reload를 통한 무중단 프록시 규칙 적용.

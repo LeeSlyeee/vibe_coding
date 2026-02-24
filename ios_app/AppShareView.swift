@@ -58,7 +58,7 @@ struct AppShareView: View {
                                 .font(.headline)
                             
                             HStack {
-                                TextField("6자리 코드", text: $inputCode)
+                                TextField("8자리 코드", text: $inputCode)
                                     .textFieldStyle(RoundedBorderTextFieldStyle())
                                     #if os(iOS)
                                     .textInputAutocapitalization(.characters)
@@ -151,7 +151,7 @@ struct AppShareView: View {
                             .font(.headline)
                             .foregroundColor(.gray)
                         
-                        Text(shareManager.myCode.isEmpty ? "------" : shareManager.myCode)
+                        Text(shareManager.myCode.isEmpty ? "--------" : shareManager.myCode)
                             .font(.system(size: 40, weight: .heavy, design: .monospaced))
                             .foregroundColor(.blue)
                             .tracking(5)

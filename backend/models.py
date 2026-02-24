@@ -106,3 +106,27 @@ class ChatLog(db.Model):
     message = db.Column(db.Text, nullable=False)
     sender = db.Column(db.String(10), nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ShareCode(db.Model):
+    """일회용 가족공유 초대 코드 (10분 만료)"""
+    __tablename__ = 'share_codes'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    code = db.Column(db.String(6), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used = db.Column(db.Boolean, default=False)
+
+
+class ShareRelationship(db.Model):
+    """공유자(sharer) ↔ 조회자(viewer) 관계"""
+    __tablename__ = 'share_relationships'
+    id = db.Column(db.Integer, primary_key=True)
+    sharer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    viewer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    connected_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    sharer = db.relationship('User', foreign_keys=[sharer_id], backref='shared_to')
+    viewer = db.relationship('User', foreign_keys=[viewer_id], backref='shared_from')
+
