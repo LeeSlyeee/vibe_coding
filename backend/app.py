@@ -39,7 +39,7 @@ if not jwt_key:
 
 app.config['JWT_SECRET_KEY'] = jwt_key
 # [UX Fix] Extend Token Lifetime (Default 15m is too short for long analysis)
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=3)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=3650)  # 10년 (모바일 앱 영구 로그인)
 app.config['PROPAGATE_EXCEPTIONS'] = True
 app.config['JSON_AS_ASCII'] = False # For Korean characters
 app.config['JWT_TOKEN_LOCATION'] = ['headers', 'query_string'] # [Standard] RFC 6750 Sec 2.3 Fallback
@@ -83,6 +83,13 @@ try:
     print("✅ Share Routes Registered")
 except Exception as e:
     print(f"⚠️ Failed to register Share Routes: {e}")
+
+try:
+    from chat_routes import chat_bp
+    app.register_blueprint(chat_bp)
+    print("✅ Chat Routes Registered")
+except Exception as e:
+    print(f"⚠️ Failed to register Chat Routes: {e}")
 
 
 @app.before_request

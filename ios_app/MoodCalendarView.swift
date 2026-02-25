@@ -163,7 +163,7 @@ struct MoodCalendarView: View {
                                         .frame(maxWidth: .infinity)
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
-                                                .fill(diary != nil ? getMoodAsset(level: diary!.mood_level).color.opacity(0.15) : Color.clear)
+                                                .fill(diary != nil ? emotionBackgroundColor(for: diary!) : Color.clear)
                                         )
                                     }
                                 } else {
@@ -425,6 +425,37 @@ struct MoodCalendarView: View {
     func dateString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
     func moodEmoji(_ l: Int) -> String { ["", "😠", "😢", "😐", "😌", "😊"][l] }
     func moodColor(_ l: Int) -> Color { [Color.clear, .red, .blue, .gray, .green, .yellow][l] }
+    
+    /// AI 감정 분석 기반 배경색 (Android와 동일)
+    func emotionBackgroundColor(for diary: Diary) -> Color {
+        let emotion = (diary.ai_prediction ?? diary.ai_comment ?? "").lowercased()
+        
+        if emotion.contains("행복") || emotion.contains("기쁨") || emotion.contains("즐거") || emotion.contains("사랑") {
+            return Color(red: 1.0, green: 0.878, blue: 0.902).opacity(0.85) // 연핑크
+        } else if emotion.contains("평온") || emotion.contains("편안") || emotion.contains("안정") || emotion.contains("감사") {
+            return Color(red: 0.878, green: 0.961, blue: 0.914).opacity(0.85) // 연초록
+        } else if emotion.contains("보통") || emotion.contains("무난") || emotion.contains("그저") {
+            return Color(red: 1.0, green: 0.953, blue: 0.878).opacity(0.85) // 연오렌지
+        } else if emotion.contains("우울") || emotion.contains("슬") || emotion.contains("외로") {
+            return Color(red: 0.910, green: 0.878, blue: 0.961).opacity(0.85) // 연보라
+        } else if emotion.contains("화") || emotion.contains("짜증") || emotion.contains("분노") || emotion.contains("스트레스") {
+            return Color(red: 1.0, green: 0.878, blue: 0.878).opacity(0.85) // 연빨강
+        } else if emotion.contains("불안") || emotion.contains("걱정") || emotion.contains("긴장") || emotion.contains("두려움") {
+            return Color(red: 0.878, green: 0.925, blue: 0.961).opacity(0.85) // 연파랑
+        } else if emotion.contains("뿌듯") || emotion.contains("성취") || emotion.contains("흥분") {
+            return Color(red: 1.0, green: 0.976, blue: 0.878).opacity(0.85) // 연노랑
+        } else {
+            // AI 감정 없으면 mood_level 기반 폴백
+            switch diary.mood_level {
+            case 5: return Color(red: 1.0, green: 0.878, blue: 0.902).opacity(0.7)
+            case 4: return Color(red: 0.878, green: 0.961, blue: 0.914).opacity(0.7)
+            case 3: return Color(red: 1.0, green: 0.953, blue: 0.878).opacity(0.7)
+            case 2: return Color(red: 0.910, green: 0.878, blue: 0.961).opacity(0.7)
+            case 1: return Color(red: 1.0, green: 0.878, blue: 0.878).opacity(0.7)
+            default: return Color.gray.opacity(0.1)
+            }
+        }
+    }
     
     // [AI Logic] Convert AI Label to Mood Asset
     func getAIAsset(for prediction: String?) -> MoodAsset? {

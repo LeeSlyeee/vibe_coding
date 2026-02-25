@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 개발 환경: 자체 서명 인증서 도메인 허용 -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">217.142.253.35.nip.io</domain>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
