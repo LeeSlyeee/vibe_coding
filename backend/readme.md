@@ -393,3 +393,32 @@ python app.py
 - **서버 인프라**:
   - `flask.service` 발견 및 활용: 기존 `mood_backend.service`(경로 불일치로 실패 반복)와 별도로 실제 서비스를 담당하는 `flask.service` 확인 및 재시작 체계 확립.
   - Nginx reload를 통한 무중단 프록시 규칙 적용.
+
+### 19. RunPod Serverless EXAONE 배포 및 Android 채팅 고도화 (2026.02.25 ~ 2026.02.26)
+
+- **RunPod Serverless EXAONE-3.5-7.8B 배포**:
+  - **모델 선정**: LG AI Research의 **EXAONE-3.5-7.8B-Instruct** 모델을 채택. 한국어 특화 대형 언어 모델로 기존 Ollama(maumON-gemma 2B) 대비 월등한 공감 상담 성능.
+  - **Docker 이미지**: `runpod/worker-v1-vllm:v2.13.0` (최신 vLLM 엔진 내장).
+  - **핵심 해결 과제**:
+    - `rope_scaling` KeyError: 구버전 vLLM(`stable-cuda12.1.0`)에서 EXAONE의 커스텀 rope_scaling 설정을 인식하지 못하는 호환성 문제 → **v2.13.0 이미지**로 해결.
+    - `trust_remote_code` 미반영: 환경변수 값을 `"1"`이 아닌 **`"true"`**로 설정해야 v2.13.0 Worker가 인식 → RunPod 서포트(Roman)의 가이드로 해결.
+    - `ROPE_SCALING=dict` 환경변수 추가 필요.
+  - **최종 엔드포인트**: `whddqa7upe94ve` (GPU: L4, RTX A5000, RTX 3090, A6000, A40 / Container Disk: 100GB).
+
+- **하이브리드 AI 시스템 (`standalone_ai.py`)**:
+  - **3단계 Fallback 아키텍처**:
+    1. **RunPod EXAONE** (우선): 7.8B 파라미터 한국어 특화 모델로 고품질 공감 상담 응답.
+    2. **Ollama maumON-gemma** (Fallback): RunPod 장애 시 로컬 서버에서 즉시 응답.
+    3. **고정 응답 메시지** (최종): 모든 AI 호출 실패 시 사전 정의된 위로 메시지 반환.
+  - **자동 전환**: RunPod이 정상이면 EXAONE, 장애 시 자동으로 Ollama로 전환. 코드 수정 없이 동작.
+  - **감정 분석 API**: `analyze_chat_sentiment_background()` 함수도 동일한 Fallback 구조 적용.
+
+- **Android 앱 위기 감지 배너 개선**:
+  - **전화 연결 기능**: 위기 감지 배너(자살예방 상담전화 1393) 클릭 시 **바로 전화 다이얼 화면**(`Intent.ACTION_DIAL`)으로 연결.
+  - **UI 개선**: 📞 아이콘 추가, "(터치하여 연결)" 안내 문구 표시로 사용자 행동 유도.
+
+- **RunPod 운영 정보**:
+  - **엔드포인트 ID**: `whddqa7upe94ve`
+  - **API Key**: 환경변수 `RUNPOD_API_KEY`로 관리.
+  - **비용 모델**: Serverless (사용한 만큼만 과금, 유휴 시 비용 없음).
+  - **환경변수 목록**: `MODEL_NAME`, `TRUST_REMOTE_CODE=true`, `MAX_MODEL_LEN=4096`, `GPU_MEMORY_UTILIZATION=0.90`, `DTYPE=float16`, `HF_TOKEN`, `ROPE_SCALING=dict`.
