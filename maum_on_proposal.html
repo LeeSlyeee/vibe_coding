@@ -1,0 +1,1403 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>마음온(Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #4f46e5;
+        --primary-light: #818cf8;
+        --primary-dark: #3730a3;
+        --accent: #06b6d4;
+        --accent-light: #67e8f9;
+        --warm: #f59e0b;
+        --danger: #ef4444;
+        --success: #10b981;
+        --bg: #ffffff;
+        --text: #1e293b;
+        --text-light: #64748b;
+        --text-lighter: #94a3b8;
+        --surface: #f8fafc;
+        --border: #e2e8f0;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          "Noto Sans KR",
+          -apple-system,
+          sans-serif;
+        color: var(--text);
+        background: var(--bg);
+        line-height: 1.7;
+        font-size: 11pt;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ===== Print / PDF Settings ===== */
+      @page {
+        size: A4;
+        margin: 0;
+      }
+
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        .page {
+          page-break-after: always;
+          page-break-inside: avoid;
+          box-shadow: none !important;
+          margin: 0 !important;
+          height: 297mm !important;
+          max-height: 297mm !important;
+          overflow: hidden !important;
+        }
+        .page:last-child {
+          page-break-after: auto;
+        }
+        .page-inner {
+          height: 297mm !important;
+          max-height: 297mm !important;
+          overflow: hidden !important;
+        }
+        .no-print {
+          display: none !important;
+        }
+      }
+
+      /* ===== Page Container ===== */
+      .page {
+        width: 210mm;
+        height: 297mm;
+        max-height: 297mm;
+        margin: 20px auto;
+        background: white;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+      }
+
+      .page-inner {
+        padding: 40px 50px;
+        height: 297mm;
+        max-height: 297mm;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* ===== Cover Page ===== */
+      .cover {
+        background: #ffffff;
+        color: var(--text);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 72px 64px;
+      }
+
+      .cover-badge {
+        display: inline-block;
+        background: #f0f0ff;
+        border: 1px solid #c7d2fe;
+        border-radius: 24px;
+        padding: 6px 20px;
+        font-size: 11pt;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+        margin-bottom: 32px;
+        color: var(--primary);
+      }
+
+      .cover h1 {
+        font-size: 42pt;
+        font-weight: 900;
+        line-height: 1.15;
+        margin-bottom: 8px;
+        letter-spacing: -1px;
+        color: var(--text);
+      }
+
+      .cover h1 span {
+        display: block;
+        font-size: 16pt;
+        font-weight: 400;
+        color: #64748b;
+        letter-spacing: 2px;
+        margin-top: 6px;
+      }
+
+      .cover-subtitle {
+        font-size: 15pt;
+        font-weight: 300;
+        line-height: 1.6;
+        margin-top: 28px;
+        max-width: 520px;
+        color: #475569;
+      }
+
+      .cover-divider {
+        width: 80px;
+        height: 3px;
+        background: var(--primary);
+        border-radius: 2px;
+        margin: 36px 0;
+      }
+
+      .cover-keywords {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+      }
+
+      .cover-keyword {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-size: 10pt;
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      .cover-bottom {
+        margin-top: auto;
+        padding-top: 48px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        width: 100%;
+      }
+
+      .cover-contact {
+        font-size: 9.5pt;
+        color: #64748b;
+        line-height: 1.8;
+      }
+
+      .cover-date {
+        font-size: 10pt;
+        color: #94a3b8;
+        text-align: right;
+      }
+
+      /* ===== Section Headers ===== */
+      .section-num {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        background: linear-gradient(
+          135deg,
+          var(--primary),
+          var(--primary-light)
+        );
+        color: white;
+        border-radius: 8px;
+        font-size: 14pt;
+        font-weight: 700;
+        margin-right: 12px;
+        flex-shrink: 0;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        margin-bottom: 28px;
+      }
+
+      .section-title h2 {
+        font-size: 18pt;
+        font-weight: 700;
+        color: var(--primary-dark);
+        letter-spacing: -0.5px;
+      }
+
+      .section-title h2 small {
+        display: block;
+        font-size: 9pt;
+        font-weight: 500;
+        color: var(--text-light);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 2px;
+      }
+
+      /* ===== Page Header (non-cover) ===== */
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 2px solid var(--primary);
+        padding-bottom: 12px;
+        margin-bottom: 36px;
+      }
+
+      .page-header-logo {
+        font-size: 12pt;
+        font-weight: 700;
+        color: var(--primary);
+      }
+
+      .page-header-title {
+        font-size: 9pt;
+        color: var(--text-light);
+        font-weight: 500;
+      }
+
+      /* ===== Problem Cards ===== */
+      .problem-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 24px;
+      }
+
+      .problem-card {
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 24px;
+        border-left: 4px solid var(--danger);
+      }
+
+      .problem-card.full {
+        grid-column: 1 / -1;
+        border-left-color: var(--warm);
+        background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      }
+
+      .problem-card h4 {
+        font-size: 11pt;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .problem-card p {
+        font-size: 10pt;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      /* ===== Feature Comparison ===== */
+      .compare-item {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
+        align-items: stretch;
+      }
+
+      .compare-icon {
+        width: 48px;
+        height: 48px;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20pt;
+        flex-shrink: 0;
+        margin-top: 4px;
+      }
+
+      .compare-content {
+        flex: 1;
+      }
+
+      .compare-content h4 {
+        font-size: 11pt;
+        font-weight: 700;
+        margin-bottom: 6px;
+        color: var(--text);
+      }
+
+      .compare-row {
+        display: flex;
+        gap: 12px;
+        font-size: 9.5pt;
+      }
+
+      .compare-old {
+        flex: 1;
+        background: #fef2f2;
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+      }
+
+      .compare-new {
+        flex: 1;
+        background: #ecfdf5;
+        border-radius: 8px;
+        padding: 10px 14px;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+        font-weight: 500;
+      }
+
+      .compare-label {
+        font-size: 8pt;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 4px;
+        display: block;
+      }
+
+      .compare-old .compare-label {
+        color: #dc2626;
+      }
+      .compare-new .compare-label {
+        color: #059669;
+      }
+
+      /* ===== Solution Architecture ===== */
+      .arch-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin: 24px 0;
+      }
+
+      .arch-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+        text-align: center;
+        transition: all 0.3s;
+      }
+
+      .arch-card.patient {
+        border-top: 4px solid var(--primary);
+      }
+
+      .arch-card.provider {
+        border-top: 4px solid var(--accent);
+      }
+
+      .arch-card-icon {
+        font-size: 36pt;
+        margin-bottom: 12px;
+      }
+
+      .arch-card h4 {
+        font-size: 12pt;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .arch-card .subtitle {
+        font-size: 9pt;
+        color: var(--text-light);
+        margin-bottom: 16px;
+      }
+
+      .arch-card ul {
+        list-style: none;
+        text-align: left;
+        font-size: 9.5pt;
+      }
+
+      .arch-card ul li {
+        padding: 5px 0;
+        padding-left: 20px;
+        position: relative;
+        color: var(--text-light);
+      }
+
+      .arch-card ul li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: var(--success);
+        font-weight: 700;
+      }
+
+      /* ===== Tech Badge ===== */
+      .tech-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+        border: 1px solid #a7f3d0;
+        border-radius: 8px;
+        padding: 10px 18px;
+        font-size: 10pt;
+        font-weight: 600;
+        color: #065f46;
+        margin-top: 8px;
+      }
+
+      /* ===== Roadmap ===== */
+      .roadmap {
+        position: relative;
+        margin: 16px 0;
+      }
+
+      .roadmap::before {
+        content: "";
+        position: absolute;
+        left: 24px;
+        top: 0;
+        bottom: 0;
+        width: 3px;
+        background: linear-gradient(to bottom, var(--primary), var(--accent));
+        border-radius: 2px;
+      }
+
+      .roadmap-step {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 24px;
+        position: relative;
+      }
+
+      .roadmap-dot {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        font-size: 13pt;
+        color: white;
+        flex-shrink: 0;
+        z-index: 1;
+      }
+
+      .roadmap-step:nth-child(1) .roadmap-dot {
+        background: var(--primary);
+      }
+      .roadmap-step:nth-child(2) .roadmap-dot {
+        background: var(--primary-light);
+      }
+      .roadmap-step:nth-child(3) .roadmap-dot {
+        background: var(--accent);
+      }
+
+      .roadmap-content {
+        flex: 1;
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 20px 24px;
+      }
+
+      .roadmap-content h4 {
+        font-size: 11pt;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .roadmap-content p {
+        font-size: 9.5pt;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      .kpi-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: white;
+        border-radius: 6px;
+        padding: 3px 10px;
+        font-size: 8.5pt;
+        font-weight: 600;
+        margin-top: 8px;
+      }
+
+      /* ===== Expected Outcome ===== */
+      .outcome-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 16px;
+        margin: 20px 0;
+      }
+
+      .outcome-card {
+        text-align: center;
+        padding: 24px 16px;
+        border-radius: 16px;
+        background: var(--surface);
+      }
+
+      .outcome-card:nth-child(1) {
+        border-bottom: 4px solid var(--primary);
+      }
+      .outcome-card:nth-child(2) {
+        border-bottom: 4px solid var(--accent);
+      }
+      .outcome-card:nth-child(3) {
+        border-bottom: 4px solid var(--success);
+      }
+
+      .outcome-icon {
+        font-size: 28pt;
+        margin-bottom: 10px;
+      }
+
+      .outcome-card h4 {
+        font-size: 11pt;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+
+      .outcome-card p {
+        font-size: 9pt;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      /* ===== Team / Contact ===== */
+      .contact-box {
+        background: linear-gradient(135deg, #1e1b4b, #312e81);
+        border-radius: 16px;
+        padding: 36px 40px;
+        color: white;
+        margin-top: 20px;
+      }
+
+      .contact-box h3 {
+        font-size: 14pt;
+        font-weight: 700;
+        margin-bottom: 20px;
+      }
+
+      .contact-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .contact-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 10pt;
+      }
+
+      .contact-icon {
+        width: 36px;
+        height: 36px;
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14pt;
+      }
+
+      .contact-item span {
+        opacity: 0.7;
+        font-size: 8.5pt;
+        display: block;
+      }
+
+      /* ===== Highlight Box ===== */
+      .highlight-box {
+        background: linear-gradient(135deg, #eef2ff, #e0e7ff);
+        border: 1px solid #c7d2fe;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin: 20px 0;
+        font-size: 10.5pt;
+        line-height: 1.7;
+        text-align: center;
+        color: var(--primary-dark);
+        font-weight: 500;
+      }
+
+      .highlight-box strong {
+        font-weight: 700;
+      }
+
+      /* ===== Team Section ===== */
+      .team-card {
+        background: var(--surface);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 16px;
+        border-left: 4px solid var(--primary);
+      }
+
+      .team-card h4 {
+        font-size: 11pt;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .team-card p {
+        font-size: 9.5pt;
+        color: var(--text-light);
+        line-height: 1.6;
+      }
+
+      /* ===== Stack Tags ===== */
+      .stack-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .stack-tag {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 4px 12px;
+        font-size: 8.5pt;
+        font-weight: 500;
+        color: var(--text-light);
+      }
+
+      /* ===== Footer ===== */
+      .page-footer {
+        margin-top: auto;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        font-size: 8pt;
+        color: var(--text-lighter);
+      }
+
+      /* ===== Vision Quote ===== */
+      .vision-quote {
+        background: linear-gradient(
+          135deg,
+          var(--primary-dark),
+          var(--primary)
+        );
+        border-radius: 16px;
+        padding: 36px 40px;
+        color: white;
+        text-align: center;
+        margin: 24px 0;
+      }
+
+      .vision-quote p {
+        font-size: 14pt;
+        font-weight: 500;
+        line-height: 1.6;
+        opacity: 0.95;
+      }
+
+      .vision-quote p strong {
+        font-weight: 700;
+        font-size: 16pt;
+      }
+
+      /* ===== Stat highlight ===== */
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin: 20px 0;
+      }
+
+      .stat-item {
+        text-align: center;
+        padding: 20px;
+        background: var(--surface);
+        border-radius: 12px;
+      }
+
+      .stat-value {
+        font-size: 28pt;
+        font-weight: 900;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .stat-label {
+        font-size: 9pt;
+        color: var(--text-light);
+        margin-top: 4px;
+      }
+
+      /* ===== Print helper ===== */
+      .no-print {
+        text-align: center;
+        padding: 20px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 12px;
+        margin: 20px auto;
+        max-width: 210mm;
+        font-size: 10pt;
+        color: #92400e;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Print Instructions -->
+    <div class="no-print">
+      💡 <strong>PDF 저장 방법</strong>: ⌘+P (Mac) 또는 Ctrl+P (Windows) → 대상:
+      "PDF로 저장" → 여백: 없음 → 저장
+    </div>
+
+    <!-- ===== PAGE 1: COVER ===== -->
+    <div class="page cover">
+      <div class="cover-badge">
+        개인정보 완벽 보호 · 인터넷 없이 작동 · 의료진 연동
+      </div>
+      <h1>
+        마음온
+        <span>Maum-On Platform</span>
+      </h1>
+      <p class="cover-subtitle">
+        내 폰 안에서만 작동하는 가장 안전한 방식으로<br />
+        마음의 온도를 지키는 AI 정신건강 돌봄 플랫폼
+      </p>
+      <div class="cover-divider"></div>
+      <div class="cover-keywords">
+        <div class="cover-keyword">🔐 데이터 전송 0%</div>
+        <div class="cover-keyword">📡 오프라인 24시간 감정 케어</div>
+        <div class="cover-keyword">🩺 의료진 대시보드</div>
+        <div class="cover-keyword">⚖️ 의료법 규제 준수</div>
+      </div>
+      <div class="cover-bottom">
+        <div class="cover-contact">
+          이성희 | 대표<br />
+          slyeee@naver.com<br />
+          010-7795-1023
+        </div>
+        <div class="cover-date">
+          2026. 03<br />
+          프로젝트 소개서 v1.0
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 2: PROBLEM ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num">1</div>
+          <h2>문제 인식<small>오늘날 정신건강 돌봄의 한계</small></h2>
+        </div>
+
+        <div class="problem-grid">
+          <div class="problem-card">
+            <h4>🔓 프라이버시 딜레마</h4>
+            <p>
+              사용자들은 AI 기반 감정 케어를 원하지만, 자신의 감정 기록이 외부 서버에
+              저장되는 것을 두려워합니다. 최근 빈번한 개인정보 유출 사고로
+              거부감은 더 커지고 있습니다.
+            </p>
+          </div>
+          <div class="problem-card">
+            <h4>🏥 진료실 밖 블랙박스</h4>
+            <p>
+              전문의 1인당 담당 환자 수 초과. 내원 간격 사이 감정 변화를 파악할
+              수 없어 재발 징후 조기 포착이 어렵습니다.
+            </p>
+          </div>
+          <div class="problem-card">
+            <h4>⚖️ 규제 장벽</h4>
+            <p>
+              개인정보보호법과 의료법으로 인해 환자의 민감한 심리 기록을
+              ChatGPT 같은 외부 AI에 보내는 것이 사실상 불가능합니다.
+            </p>
+          </div>
+          <div class="problem-card">
+            <h4>💸 높은 AI 운영비</h4>
+            <p>
+              외부 AI 서비스는 사용자가 늘어날수록 서버 이용료가 급증합니다.
+              공공기관의 제한된 예산으로는 지속 운영이 어렵습니다.
+            </p>
+          </div>
+        </div>
+
+        <div class="problem-card full">
+          <h4>💡 핵심 질문</h4>
+          <p>
+            <strong
+              >"데이터를 서버에 보내지 않으면서도 AI 감정 케어가 가능할까?"</strong
+            ><br />
+            마음온은 이 질문에 대한 답을 찾았습니다. AI가 외부 서버가 아닌
+            <strong>사용자의 휴대폰 안에서 직접 작동</strong>하기 때문에,
+            개인정보 보호와 접근성을 동시에 해결합니다.
+          </p>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>2 / 9</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 3: SOLUTION ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num">2</div>
+          <h2>솔루션 소개<small>마음온은 이렇게 작동합니다</small></h2>
+        </div>
+
+        <div class="arch-grid">
+          <div class="arch-card patient">
+            <div class="arch-card-icon">📱</div>
+            <h4>환자용 앱</h4>
+            <div class="subtitle">스마트폰 앱 (아이폰 / 안드로이드)</div>
+            <ul>
+              <li>인터넷 없이도 AI 감정 기록 가능</li>
+              <li>말로 감정을 기록 (음성 인식)</li>
+              <li>"오늘 기분 어때요?" AI가 먼저 말 걸기</li>
+              <li>일간/주간/월간 감정 변화 리포트</li>
+              <li>어르신도 쉽게 쓸 수 있는 음성 중심 설계</li>
+            </ul>
+          </div>
+          <div class="arch-card provider">
+            <div class="arch-card-icon">💻</div>
+            <h4>의료진 대시보드</h4>
+            <div class="subtitle">의료진 전용 웹 화면</div>
+            <ul>
+              <li>환자의 감정 변화 · 수면 · 스트레스 한눈에 파악</li>
+              <li>위험 신호 감지 시 즉시 알림</li>
+              <li>진료 전 환자 상태를 미리 확인</li>
+              <li>담당 환자 정보만 열람 가능 (보안 통제)</li>
+              <li>안전하게 암호화된 정보 전달</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="tech-badge">
+          ✅ 핵심 AI 엔진 개발 완료 — 스마트폰에서 바로 작동 가능
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>3 / 9</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 3-B: DIFFERENTIATORS ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num" style="background: linear-gradient(135deg, var(--accent), var(--success));">3</div>
+          <h2>핵심 차별화<small>기존 AI 서비스와 무엇이 다른가요?</small></h2>
+        </div>
+
+        <div class="compare-item">
+          <div class="compare-icon">🔐</div>
+          <div class="compare-content">
+            <h4>데이터 보안</h4>
+            <div class="compare-row">
+              <div class="compare-old">
+                <span class="compare-label">기존 AI 서비스</span>
+                외부 서버로 전송 → 유출 위험
+              </div>
+              <div class="compare-new">
+                <span class="compare-label">마음온</span>
+                전송 0%. 내 폰 안에서만 처리, 물리적 유출 불가
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-item">
+          <div class="compare-icon">📡</div>
+          <div class="compare-content">
+            <h4>인터넷 의존도</h4>
+            <div class="compare-row">
+              <div class="compare-old">
+                <span class="compare-label">기존 AI 서비스</span>
+                인터넷 필수, 오프라인 시 사용 불가
+              </div>
+              <div class="compare-new">
+                <span class="compare-label">마음온</span>
+                인터넷 불필요. 비행기 모드에서도 24시간 감정 케어 가능
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-item">
+          <div class="compare-icon">💰</div>
+          <div class="compare-content">
+            <h4>AI 운영비</h4>
+            <div class="compare-row">
+              <div class="compare-old">
+                <span class="compare-label">기존 AI 서비스</span>
+                사용자가 많아질수록 서버 이용료가 급증
+              </div>
+              <div class="compare-new">
+                <span class="compare-label">마음온</span>
+                AI가 각자의 폰 안에서 작동 → 사용자가 늘어도 추가 비용 없음
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-item">
+          <div class="compare-icon">⚖️</div>
+          <div class="compare-content">
+            <h4>법적 규제 대응</h4>
+            <div class="compare-row">
+              <div class="compare-old">
+                <span class="compare-label">기존 AI 서비스</span>
+                개인정보보호법·의료법상 환자 데이터를 외부로 보내기 어려움
+              </div>
+              <div class="compare-new">
+                <span class="compare-label">마음온</span>
+                데이터가 휴대폰 밖으로 나가지 않아 규제 부담을 원천 해소
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="compare-item">
+          <div class="compare-icon">🩺</div>
+          <div class="compare-content">
+            <h4>의료진 연계</h4>
+            <div class="compare-row">
+              <div class="compare-old">
+                <span class="compare-label">기존 AI 서비스</span>
+                환자 자가 기록에 그침 (의료진 활용 불가)
+              </div>
+              <div class="compare-new">
+                <span class="compare-label">마음온</span>
+                의료진 전용 대시보드 + 위험 신호 자동 알림
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>4 / 9</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 4: MARKET & ROADMAP ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num">4</div>
+          <h2>시장 진입 전략<small>어떻게 성장할 것인가</small></h2>
+        </div>
+
+        <p
+          style="
+            font-size: 10.5pt;
+            color: var(--text-light);
+            margin-bottom: 24px;
+            line-height: 1.7;
+          "
+        >
+          마음온은 병원·클리닉과 공공기관(보건소·지자체)을 주요 고객으로
+          설정하여, 안정적이고 지속 가능한 수익 구조를 확보합니다.
+        </p>
+
+        <div class="roadmap">
+          <div class="roadmap-step">
+            <div class="roadmap-dot">1</div>
+            <div class="roadmap-content">
+              <h4>1단계: 시범 도입</h4>
+              <p>
+                대학병원 정신건강의학과 및 지역 보건소와 협약을 맺고,
+                실제 현장에서 효과를 검증합니다.
+              </p>
+              <div class="kpi-badge">검증 목표: 환자 참여율 향상 · 진료 효율 개선 (파일럿 예정)</div>
+            </div>
+          </div>
+          <div class="roadmap-step">
+            <div class="roadmap-dot">2</div>
+            <div class="roadmap-content">
+              <h4>2단계: 공식 인증 취득</h4>
+              <p>
+                식약처 디지털 치료 인증 및 임상시험 승인을 추진하여,
+                건강보험 적용을 통한 대중화를 실현합니다.
+              </p>
+              <div class="kpi-badge">목표: 혁신의료기기 지정</div>
+            </div>
+          </div>
+          <div class="roadmap-step">
+            <div class="roadmap-dot">3</div>
+            <div class="roadmap-content">
+              <h4>3단계: 전국 확산</h4>
+              <p>
+                전국 보건소 및 거점 병원에 공급을 확대하고, 지자체 공공 사업과
+                연계하여 전국민 정신건강 돌봄 인프라를 구축합니다.
+              </p>
+              <div class="kpi-badge">목표: 전국 50개 이상 보건소 도입</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>5 / 9</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 5-B: EXPECTED OUTCOME ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num" style="background: linear-gradient(135deg, var(--warm), #f97316)">5</div>
+          <h2>기대 효과<small>누가 어떤 혜택을 누리나요?</small></h2>
+        </div>
+
+        <div class="outcome-grid" style="grid-template-columns: 1fr 1fr;">
+          <div class="outcome-card">
+            <div class="outcome-icon">🏥</div>
+            <h4>의료기관</h4>
+            <p>데이터 기반 정확한 진료<br />위험군 조기 발견<br />진료 효율 극대화</p>
+          </div>
+          <div class="outcome-card">
+            <div class="outcome-icon">🧑</div>
+            <h4>환자 · 주민</h4>
+            <p>24시간 AI 케어 안정감<br />철저한 프라이버시 보장<br />디지털 소외 계층 포용</p>
+          </div>
+          <div class="outcome-card">
+            <div class="outcome-icon">👨‍👩‍👦</div>
+            <h4>보호자 · 가족</h4>
+            <p>환자 동의 하 마음 온도 알림<br />위기 시 긴급 알림 수신<br />말 못 할 걱정을 덜어주는 안전망</p>
+          </div>
+          <div class="outcome-card">
+            <div class="outcome-icon">🌏</div>
+            <h4>사회적 가치</h4>
+            <p>의료 격차 해소<br />고독사 예방 (상시 모니터링)<br />국가 의료비 절감</p>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>6 / 10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 5-C: SAFETY DESIGN ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num" style="background: linear-gradient(135deg, #dc2626, #f97316)">🛡</div>
+          <h2>안전 설계<small>어떻게 안전하게 운영하나요?</small></h2>
+        </div>
+
+        <!-- 마음 온도 체계 -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 11pt; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">🌡️ 마음 온도 측정 체계</h4>
+          <p style="font-size: 9.5pt; color: var(--text-light); margin-bottom: 12px; line-height: 1.6;">
+            마음온은 사용자의 감정 상태를 <strong>0~100°</strong>의 직관적 점수로 시각화합니다.
+          </p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
+            <div style="text-align: center; padding: 12px 8px; background: #ecfdf5; border-radius: 10px; border-bottom: 3px solid #10b981;">
+              <div style="font-size: 16pt; font-weight: 900; color: #059669;">80~100°</div>
+              <div style="font-size: 8.5pt; color: #065f46; font-weight: 600;">안정</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #eff6ff; border-radius: 10px; border-bottom: 3px solid #3b82f6;">
+              <div style="font-size: 16pt; font-weight: 900; color: #2563eb;">60~79°</div>
+              <div style="font-size: 8.5pt; color: #1e40af; font-weight: 600;">흐림</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #fffbeb; border-radius: 10px; border-bottom: 3px solid #f59e0b;">
+              <div style="font-size: 16pt; font-weight: 900; color: #d97706;">40~59°</div>
+              <div style="font-size: 8.5pt; color: #92400e; font-weight: 600;">주의</div>
+            </div>
+            <div style="text-align: center; padding: 12px 8px; background: #fef2f2; border-radius: 10px; border-bottom: 3px solid #ef4444;">
+              <div style="font-size: 16pt; font-weight: 900; color: #dc2626;">0~39°</div>
+              <div style="font-size: 8.5pt; color: #991b1b; font-weight: 600;">위험</div>
+            </div>
+          </div>
+          <p style="font-size: 8.5pt; color: var(--text-lighter); margin-top: 8px; line-height: 1.5;">
+            산정 기준: 감정 키워드 긍·부정 비율(40%) + 기록 빈도(20%) + 수면 시간(20%) + 활동량(20%)
+          </p>
+        </div>
+
+        <!-- 위기 대응 프로토콜 -->
+        <div style="margin-bottom: 20px;">
+          <h4 style="font-size: 11pt; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">🚨 위기 대응 프로토콜 (3단계)</h4>
+          <div style="display: grid; gap: 10px;">
+            <div style="background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 10px 10px 0; padding: 14px 18px;">
+              <div style="font-size: 9pt; font-weight: 700; color: #92400e; margin-bottom: 4px;">Level 1 · 위험 키워드 감지</div>
+              <div style="font-size: 9pt; color: var(--text-light); line-height: 1.5;">AI가 공감 대화 모드로 전환 → 안전 확인 질문 수행</div>
+            </div>
+            <div style="background: #fef2f2; border-left: 4px solid #f97316; border-radius: 0 10px 10px 0; padding: 14px 18px;">
+              <div style="font-size: 9pt; font-weight: 700; color: #9a3412; margin-bottom: 4px;">Level 2 · 자살 계획 구체화 감지</div>
+              <div style="font-size: 9pt; color: var(--text-light); line-height: 1.5;">자살예방상담전화(1393) 원터치 연결 + 담당 의료진·보호자에게 긴급 알림 발송</div>
+            </div>
+            <div style="background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 0 10px 10px 0; padding: 14px 18px;">
+              <div style="font-size: 9pt; font-weight: 700; color: #991b1b; margin-bottom: 4px;">Level 3 · 즉각적 위험</div>
+              <div style="font-size: 9pt; color: var(--text-light); line-height: 1.5;">119 응급 연결 안내 + 모든 지정 보호자·의료진 동시 알림 + 위기 개입 화면 전환</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 환자 주도 공유 + 보호자 모드 -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+          <div style="background: var(--surface); border-radius: 12px; padding: 18px; border-top: 3px solid var(--primary);">
+            <h4 style="font-size: 10pt; font-weight: 700; margin-bottom: 6px;">🔒 환자 주도 공유 모델</h4>
+            <ul style="list-style: none; font-size: 9pt; color: var(--text-light); line-height: 1.7;">
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>대화 원문은 절대 외부 전달 불가</li>
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>마음 온도 점수 + 위험 신호만 공유</li>
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>공유 항목은 환자가 직접 선택</li>
+            </ul>
+          </div>
+          <div style="background: var(--surface); border-radius: 12px; padding: 18px; border-top: 3px solid var(--accent);">
+            <h4 style="font-size: 10pt; font-weight: 700; margin-bottom: 6px;">👨‍👩‍👦 보호자 알림 모드</h4>
+            <ul style="list-style: none; font-size: 9pt; color: var(--text-light); line-height: 1.7;">
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>환자 동의 하 보호자 1~2명 등록</li>
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>위험 신호 및 7일 미기록 알림</li>
+              <li style="padding-left: 16px; position: relative;"><span style="position: absolute; left: 0;">✓</span>대화 내용은 보호자에게 비공개</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 면책 및 포지셔닝 -->
+        <div style="background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 1px solid #c7d2fe; border-radius: 12px; padding: 16px 20px; text-align: center; font-size: 9.5pt; line-height: 1.7; color: var(--primary-dark);">
+          <strong>⚖️ 서비스 포지셔닝</strong><br />
+          마음온은 <strong>의료 행위를 대체하지 않는 감정 기록 보조 도구</strong>입니다.<br />
+          최종 의료적 판단은 의료진에게 있으며, AI 분석 결과는 참고 자료로 제공됩니다.
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>7 / 10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 5: TEAM & VISION ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num">6</div>
+          <h2>비즈니스 모델<small>수익 창출 방식</small></h2>
+        </div>
+
+        <div class="arch-grid">
+          <div class="arch-card" style="border-top: 4px solid var(--warm)">
+            <div class="arch-card-icon">🏢</div>
+            <h4>월정액 구독 모델</h4>
+            <div class="subtitle">민간 병원 · 심리상담센터</div>
+            <ul>
+              <li>의사 1인당 월 이용료 방식</li>
+              <li>환자 수에 따른 합리적 요금 체계</li>
+              <li>초기 도입 부담을 최소화</li>
+              <li>매월 안정적인 수익 구조</li>
+            </ul>
+          </div>
+          <div class="arch-card" style="border-top: 4px solid var(--success)">
+            <div class="arch-card-icon">🏛️</div>
+            <h4>공공 조달 모델</h4>
+            <div class="subtitle">보건소 · 정신건강복지센터 · 지자체</div>
+            <ul>
+              <li>청년 마음건강 · 고독사 예방 사업 예산 활용</li>
+              <li>일괄 납품 및 유지보수 계약</li>
+              <li>대규모 연간 계약 → 매출 기반 확보</li>
+              <li>사회적 가치 창출 및 레퍼런스 확보</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>8 / 10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 8: TEAM ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="section-title">
+          <div class="section-num" style="background: linear-gradient(135deg, #7c3aed, #a78bfa)">7</div>
+          <h2>팀 역량<small>누가 만들고 있나요?</small></h2>
+        </div>
+
+        <div class="team-card">
+          <h4>🛠 기술 개발</h4>
+          <p>
+            앱·웹·서버를 모두 자체 개발할 수 있는 역량을 보유하고 있습니다.
+            스마트폰에서 직접 작동하는 AI 엔진 개발이 완료되었으며,
+            의료정보 보안 표준에 맞춘 안전한 데이터 처리 체계를 구현했습니다.
+          </p>
+          <div class="stack-tags">
+            <span class="stack-tag">스마트폰 앱</span>
+            <span class="stack-tag">웹 대시보드</span>
+            <span class="stack-tag">AI 엔진</span>
+            <span class="stack-tag">음성 인식</span>
+            <span class="stack-tag">의료 보안</span>
+            <span class="stack-tag">서버 운영</span>
+          </div>
+        </div>
+        <div class="team-card" style="border-left-color: var(--accent)">
+          <h4>🩺 임상 자문</h4>
+          <p>
+            현직 정신건강의학과 전문의와 보건소 실무자들이 자문에 참여하고 있습니다.
+            현장의 목소리를 제품에 즉각 반영하여 실질적으로 쓸 수 있는 도구를 만듭니다.
+          </p>
+        </div>
+        <div class="team-card" style="border-left-color: var(--success)">
+          <h4>📊 사업 전략</h4>
+          <p>
+            국내외 유사 서비스 분석을 완료하고, 병원 및 공공기관 맞춤 사업 전략을
+            수립했습니다. 정부 예비창업 지원사업을 통해 초기 사업 검증을 진행 중입니다.
+          </p>
+        </div>
+
+        <div class="page-footer">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>9 / 10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== PAGE 6: CLOSING ===== -->
+    <div class="page">
+      <div class="page-inner">
+        <div class="page-header">
+          <div class="page-header-logo">마음온 Maum-On</div>
+          <div class="page-header-title">프로젝트 소개서</div>
+        </div>
+
+        <div class="vision-quote">
+          <p>
+            "Network-OFF, AI-ON"<br /><br />
+            <strong
+              >마음온은 가장 안전한 방식으로<br />마음의 온도를 지키는 유일한
+              AI입니다.</strong
+            >
+          </p>
+        </div>
+
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-value">0%</div>
+            <div class="stat-label">데이터 외부 전송률</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">24h</div>
+            <div class="stat-label">오프라인 AI 감정 케어</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value">50+</div>
+            <div class="stat-label">목표 보건소 도입 수</div>
+          </div>
+        </div>
+
+        <div class="highlight-box">
+          마음온은 <strong>보안</strong>, <strong>임상 통합</strong>,
+          <strong>비용 효율</strong> 세 가지를 동시에 해결하는<br />
+          의료기관을 위한 가장 안전하고 확실한 멘탈케어 AI 솔루션입니다.
+        </div>
+
+        <div class="contact-box">
+          <h3>📬 Contact</h3>
+          <div class="contact-grid">
+            <div class="contact-item">
+              <div class="contact-icon">👤</div>
+              <div>
+                <span>대표</span>
+                <strong>이성희</strong>
+              </div>
+            </div>
+            <div class="contact-item">
+              <div class="contact-icon">📧</div>
+              <div>
+                <span>이메일</span>
+                <strong>slyeee@naver.com</strong>
+              </div>
+            </div>
+            <div class="contact-item">
+              <div class="contact-icon">📱</div>
+              <div>
+                <span>연락처</span>
+                <strong>010-7795-1023</strong>
+              </div>
+            </div>
+            <div class="contact-item">
+              <div class="contact-icon">🌐</div>
+              <div>
+                <span>데모</span>
+                <strong>217.142.253.35.nip.io</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="page-footer" style="margin-top: auto; padding-top: 32px">
+          <span>마음온 (Maum-On) — On-Device AI 정신건강 돌봄 플랫폼</span>
+          <span>10 / 10</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Print Instructions -->
+    <div class="no-print" style="margin-bottom: 40px">
+      💡 <strong>PDF 저장 완료 후</strong> 이 HTML 파일은 삭제해도 됩니다. PDF만
+      보관하세요.
+    </div>
+  </body>
+</html>
