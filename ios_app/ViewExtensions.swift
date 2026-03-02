@@ -1,6 +1,56 @@
 
 import SwiftUI
 import UIKit
+import Combine
+
+// MARK: - Keyboard Observer (키보드 높이 실시간 감지)
+#if os(iOS)
+class KeyboardObserver: ObservableObject {
+    @Published var keyboardHeight: CGFloat = 0
+    @Published var isKeyboardVisible: Bool = false
+    
+    private var cancellables = Set<AnyCancellable>()
+    private var hideWorkItem: DispatchWorkItem?
+    
+    init() {
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            .compactMap { notification -> CGFloat? in
+                (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect)?.height
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] height in
+                // [Keyboard Fix] 언어 전환 시 Hide→Show 빠른 전환: 대기 중인 Hide 취소
+                self?.hideWorkItem?.cancel()
+                self?.hideWorkItem = nil
+                self?.keyboardHeight = height
+                self?.isKeyboardVisible = true
+            }
+            .store(in: &cancellables)
+        
+        NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                // [Keyboard Fix] 디바운스(0.15s): 키보드 언어 전환 시 Hide→Show 사이클 흡수
+                self?.hideWorkItem?.cancel()
+                let workItem = DispatchWorkItem { [weak self] in
+                    self?.keyboardHeight = 0
+                    self?.isKeyboardVisible = false
+                    self?.hideWorkItem = nil
+                }
+                self?.hideWorkItem = workItem
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
+            }
+            .store(in: &cancellables)
+    }
+}
+#endif
+
+// MARK: - Global Keyboard Dismiss Utility
+#if os(iOS)
+func dismissKeyboard() {
+    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+}
+#endif
 
 // MARK: - Safe Data Wrapper
 // (기존 코드 유지)
@@ -16,7 +66,60 @@ extension View {
             self.onChange(of: value, perform: action)
         }
     }
+    
+    // 드래그 시 키보드 닫기 modifier
+    #if os(iOS)
+    func dismissKeyboardOnDrag() -> some View {
+        self.gesture(
+            DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                .onChanged { _ in
+                    dismissKeyboard()
+                }
+        )
+    }
+    
+    // [Cursor Fix] 빈 영역 탭 시 키보드 닫기 (TextField 포커스를 방해하지 않음)
+    // SwiftUI onTapGesture는 TextField의 First Responder 획득을 가로채므로,
+    // UIKit UITapGestureRecognizer(cancelsTouchesInView: false)를 사용
+    func dismissKeyboardOnTap() -> some View {
+        self.background(
+            KeyboardDismissTapView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        )
+    }
+    #endif
 }
+
+// MARK: - [Cursor Fix] UIKit 기반 키보드 닫기 탭 뷰
+// SwiftUI의 onTapGesture는 TextField/TextEditor의 First Responder 획득을 방해하므로,
+// UIKit의 UITapGestureRecognizer(cancelsTouchesInView: false)를 사용하여
+// 입력창 터치 시 커서가 정상적으로 나타나면서, 빈 영역 탭 시에만 키보드가 닫히도록 함
+#if os(iOS)
+struct KeyboardDismissTapView: UIViewRepresentable {
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.backgroundColor = .clear
+        
+        let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
+        tapGesture.cancelsTouchesInView = false // ⭐️ 핵심: TextField 터치를 방해하지 않음
+        view.addGestureRecognizer(tapGesture)
+        
+        return view
+    }
+    
+    func updateUIView(_ uiView: UIView, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator: NSObject {
+        @objc func handleTap() {
+            dismissKeyboard()
+        }
+    }
+}
+#endif
 
 // MARK: - Color Extensions
 // (Color Extension 코드는 유지)
@@ -61,8 +164,13 @@ extension Color {
 
 // MARK: - Screenshot Prevention (Stability Fix)
 
+// [Keyboard Fix] First Responder 가로채기 방지: 키보드를 절대 올리지 않는 TextField
+private class NonFocusableTextField: UITextField {
+    override var canBecomeFirstResponder: Bool { false }
+}
+
 class SecureWrapperView<Content: View>: UIView {
-    private let textField = UITextField()
+    private let textField = NonFocusableTextField()
     private var hostingController: UIHostingController<Content>?
     
     var isProtected: Bool = true {

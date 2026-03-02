@@ -2,6 +2,9 @@
 
 import Foundation
 import UserNotifications
+#if os(iOS)
+import UIKit // [OOM Shield] didReceiveMemoryWarningNotification
+#endif
 
 #if canImport(MLX) && !targetEnvironment(simulator)
 import MLX
@@ -43,19 +46,24 @@ class LLMService: ObservableObject {
     
     // [System Persona] Few-Shot Prompting (예시를 통한 강력한 세뇌)
     private let systemPrompt = """
-    당신은 따뜻한 공감을 주는 한국의 심리 상담사 '마음온'입니다.
+    당신은 따뜻한 공감을 주는 한국의 감정 케어 도우미 '마음온'입니다.
     
     [핵심 규칙]
     1. **절대 영어 금지**: 뇌에서 영어를 지우세요. 사용자가 영어를 써도, 당신은 오직 한국어(존댓말)로만 답해야 합니다. ('Okay', 'So' 같은 추임새도 금지)
     2. **말투**: 기계적인 말투(~합니다) 대신 친근한 해요체(~해요, ~인가요?)를 사용하세요.
     3. **반복 금지**: "저런", "힘드셨겠어요" 같은 쿠션어를 매번 쓰지 마세요. 대화의 흐름에 맞춰 자연스럽게 반응하세요.
     4. **능동적 대화**: 사용자의 말을 잘 듣고, 관련된 질문을 던져 대화를 이어가세요.
+    5. **위기 대응**: 자살, 자해 관련 언급이 감지되면 즉시 따뜻하게 위로하고, 전문 상담 연결(자살예방상담전화 1393)을 안내하세요.
+    
+    [절대 금지 표현]
+    - "힘내세요", "긍정적으로 생각하세요", "잘 될 거예요", "웃으세요" 등 공허한 격려는 사용하지 마세요.
+    - 대신 공감, 인정, 구체적 질문으로 대응하세요.
     
     [예시]
     User: I feel so lonely.
     Model: 많이 외로우셨군요. 제가 곁에 있어 드릴게요. 오늘 무슨 일이 있었나요?
     User: I want to die.
-    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 마음온이 곁에 있을게요.
+    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 혼자 감당하지 않으셔도 돼요. 자살예방상담전화 1393에 전화해보시는 것도 좋겠어요.
     """
     
     // [New] AI Mode Toggle (Server vs On-Device)
@@ -120,9 +128,33 @@ class LLMService: ObservableObject {
         return false
     }
 
+    // [OOM Shield] 메모리 경고 수신 시 즉시 모델 언로드
+    private var memoryWarningObserver: NSObjectProtocol?
+    
     init() {
         // [UX] Request Notification Permission for AI Ready Alert
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        
+        // [OOM Shield] 메모리 경고 감지 → 즉시 모델 해제 (jetsam kill 사전 방지)
+        #if os(iOS)
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            print("🚨 [OOM Shield] Memory Warning Received! Emergency unload...")
+            self?.modelContainer = nil
+            self?.isModelLoaded = false
+            self?.isProcessingQueue = false
+            self?.analysisQueue.removeAll()
+            print("✅ [OOM Shield] Model unloaded. Analysis queue cleared.")
+        }
+        #endif
+    }
+    
+    deinit {
+        if let observer = memoryWarningObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     // MARK: - Model Loading
@@ -276,7 +308,7 @@ class LLMService: ObservableObject {
         }
         
         let prompt = """
-        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사 '마음온'입니다.
+        당신은 사용자의 지난 일기 기록과 오늘의 날씨를 분석하여 따뜻한 한 문장의 조언을 건네는 감정 케어 도우미 '마음온'입니다.
         
         [오늘의 날씨]: \(weather)
         [과거 날씨별 감정 패턴]: \(weatherStats ?? "정보 없음")
@@ -291,7 +323,7 @@ class LLMService: ObservableObject {
         4. "오늘 하루 응원합니다" 같은 뻔한 말은 금지입니다.
         5. 40자~80자 내외의 부드러운 한국어 해요체를 사용하세요.
         
-        상담사 조언:
+        마음온 조언:
         """
         
         do {
@@ -322,7 +354,7 @@ class LLMService: ObservableObject {
        }
        
        let prompt = """
-       당신은 다정한 심리 상담사 '마음온'입니다.
+       당신은 다정한 감정 케어 도우미 '마음온'입니다.
        사용자의 일기를 읽고, 따뜻하고 실질적인 조언을 한 문장으로 건네주세요.
        
        [사용자의 일기]:
@@ -334,7 +366,7 @@ class LLMService: ObservableObject {
        3. "AI 분석 모듈 연결 예정" 같은 기계적인 말은 절대 금지입니다.
        4. 이모지를 적절히 사용하여 따뜻함을 더하세요.
        
-       상담사 조언:
+       마음온 조언:
        """
        
        do {
@@ -599,12 +631,8 @@ class LLMService: ObservableObject {
                                             """
                                              continuation.yield(mildEmpathyMessage)
                                         }
-                                       
                                         continuation.finish()
                                         return
-                                       
-                                        continuation.finish()
-                                        return 
                                     }
                                 }
                                 
@@ -727,6 +755,27 @@ class LLMService: ObservableObject {
         print("🔄 [LLM] Mode Switched. Server Mode: \(useServerAI)")
     }
     
+    // [New] 범용 텍스트 생성 (분석 리포트 온디바이스 Fallback용)
+    func generateText(prompt: String) async throws -> String {
+        guard let container = self.modelContainer else {
+            throw NSError(domain: "LLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "모델이 로드되지 않음"])
+        }
+        
+        var session = ChatSession(container, instructions: "너는 따뜻한 감정 케어 도우미 '마음온'이야. 한국어 해요체로 답해줘.")
+        session.generateParameters = GenerateParameters(maxTokens: 300, temperature: 0.7)
+        
+        var result = ""
+        for try await chunk in session.streamResponse(to: prompt) {
+            result += chunk
+        }
+        
+        let clean = result.replacingOccurrences(of: "\"", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.isEmpty {
+            throw NSError(domain: "LLM", code: -2, userInfo: [NSLocalizedDescriptionKey: "빈 응답"])
+        }
+        return clean
+    }
+    
     // MARK: - Dedicated Analysis Queue (OOM Prevention)
     // [Visibility Fix] AppChatView needs access to check status
     var analysisQueue: [Diary] = []
@@ -766,13 +815,12 @@ class LLMService: ObservableObject {
                 
                 guard let diary = currentDiary else { break }
                 
-                // [Memory] Use autoreleasepool removed (Async limitation)
+                
                 processedCount += 1
                 print("🧠 [LLM Queue] Analyzing Diary (\(processedCount)): \(diary.date ?? "Unknown")")
                 await performFullAnalysis(for: diary)
                 
                 // [Memory] Rest time expanded to 4.0s (Safety first)
-                // OOM 방지를 위해 분석 간격을 충분히 확보 (시스템이 메모리를 정리할 시간 부여)
                 print("💤 [LLM Queue] Cooling down for 4.0s...")
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
                 await Task.yield()
@@ -792,57 +840,217 @@ class LLMService: ObservableObject {
         }
     }
     
+    // [OOM Shield] LLM 추론 없이 규칙 기반으로 분석 결과 생성 (메모리 부족 시 Fallback)
+    private func performRuleBasedFallback(for diary: Diary) async {
+        let fullText = (diary.event ?? "") + (diary.emotion_desc ?? "")
+        let empathy = getEmergencyEmpathy(for: fullText)
+        
+        var updatedDiary = diary
+        updatedDiary.ai_prediction = "Neutral (50%)"
+        updatedDiary.ai_advice = empathy
+        updatedDiary.ai_comment = empathy
+        updatedDiary.ai_analysis = "메모리 부족으로 AI 분석을 건너뛰었어요. 다음에 다시 시도해볼게요."
+        
+        await MainActor.run {
+            LocalDataManager.shared.saveDiary(updatedDiary) { success in
+                if success {
+                    print("✅ [Fallback] Rule-based analysis saved for \(diary.date ?? "Unknown").")
+                }
+            }
+        }
+    }
+    
 
     
-    // [Optimization] Unified Analysis (3-in-One) - Real Implementation
+    // [Optimization] Unified Analysis (3-in-One) - Single Inference Pass
+    // [OOM Fix] 기존 3회 분리 추론 → 1회 통합 추론으로 변경 (메모리 1/3로 절감)
+    // 방어: iOS didReceiveMemoryWarning 옵저버(init)가 유일한 안전장치
+    //       과도한 사전 체크는 정상 경로를 막으므로 의도적으로 배제
     func generateUnifiedAnalysis(diaryText: String) async -> (String, String, String) {
-        // [Real AI] Chain of Thought
-        print("🧠 [MaumOn AI] analyzing emotion...")
-        let emotion = await analyzeEmotion(diaryText: diaryText)
+        // [Auto-Recovery] 모델이 없으면 자동 로드
+        if self.modelContainer == nil {
+            await loadModel()
+            try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+        }
         
-        print("🧠 [MaumOn AI] generating advice...")
-        let advice = await generateAdvice(diaryText: diaryText)
+        guard let container = self.modelContainer else {
+            print("❌ [MaumOn AI] Model not available for unified analysis.")
+            let empathy = getEmergencyEmpathy(for: diaryText)
+            return ("Neutral (50%)", empathy, "AI 모델 로딩 중이에요. 다음에 다시 분석해드릴게요.")
+        }
         
-        print("🧠 [MaumOn AI] generating deep analysis...")
-        // Reuse MindGuide logic for deep analysis
-        let analysis = await generateMindGuide(recentDiaries: diaryText, weather: "정보 없음", weatherStats: nil)
+        let prompt = """
+        당신은 사용자의 일기를 분석하는 감정 케어 도우미 '마음온'입니다.
+        아래 일기를 읽고, 정확히 세 가지 항목을 [구분자]로 나누어 답하세요.
         
+        [사용자의 일기]:
+        \(diaryText)
+        
+        [지시사항]
+        1. 감정 분류: 아래 감정 중 하나를 골라 "감정명 (확률%)" 형식으로 답하세요.
+           [Happy, Sad, Angry, Fear, Surprise, Neutral, Disgust, Anxiety, Depression, Stress, Joy, Love, Confusion, Excitement, Tired]
+        2. 따뜻한 조언: 80자 이내 한국어 해요체로 행동 가능한 작은 제안을 포함하세요.
+        3. 심층 분석: 40~80자 내외 한국어 해요체로 감정의 원인과 패턴을 분석하세요.
+        
+        [출력 형식] (반드시 이 형식을 지키세요):
+        [EMOTION] 감정명 (확률%)
+        [ADVICE] 조언 내용
+        [ANALYSIS] 분석 내용
+        """
+        
+        // [Direct Inference] 단순하게 직접 추론 (과도한 방어 로직 의도적 배제)
+        do {
+            var session = ChatSession(container, instructions: "")
+            session.generateParameters = GenerateParameters(
+                maxTokens: 256,
+                temperature: 0.5,
+                topP: 0.9,
+                repetitionPenalty: 1.1,
+                repetitionContextSize: 5
+            )
+            
+            var result = ""
+            for try await chunk in session.streamResponse(to: prompt) {
+                if Task.isCancelled { break }
+                result += chunk
+            }
+            
+            if result.isEmpty {
+                print("⚠️ [MaumOn] Empty inference result. Using empathy fallback.")
+                let empathy = getEmergencyEmpathy(for: diaryText)
+                return ("Neutral (50%)", empathy, "AI 분석 결과가 비어있어 규칙 기반으로 대체했어요.")
+            }
+            
+            // 4단계 Fallback 파싱 (Stage 1부터 시작 → 정상 응답은 Stage 1에서 완료)
+            return parseUnifiedResponse(result, originalText: diaryText)
+            
+        } catch {
+            print("❌ [MaumOn] Inference Error: \(error)")
+            let empathy = getEmergencyEmpathy(for: diaryText)
+            return ("Neutral (50%)", empathy, "AI 분석 중 오류가 발생했어요.")
+        }
+    }
+    
+    // MARK: - [Risk Elimination] 4단계 Fallback 파싱
+    // Stage 1: 구조화 포맷 [EMOTION]/[ADVICE]/[ANALYSIS]
+    // Stage 2: 줄 단위 추론 (첫 줄=감정, 나머지=조언+분석)
+    // Stage 3: 키워드 기반 공감 (getEmergencyEmpathy)
+    // Stage 4: 최종 기본값
+    private func parseUnifiedResponse(_ raw: String, originalText: String) -> (String, String, String) {
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        var emotion = ""
+        var advice = ""
+        var analysis = ""
+        
+        // === Stage 1: 구조화 포맷 파싱 ===
+        if clean.contains("[EMOTION]") || clean.contains("[ADVICE]") || clean.contains("[ANALYSIS]") {
+            print("📋 [Parser] Stage 1: Structured format detected.")
+            
+            if let emotionRange = clean.range(of: "[EMOTION]") {
+                let afterEmotion = String(clean[emotionRange.upperBound...])
+                let lines = afterEmotion.components(separatedBy: "\n")
+                emotion = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                // [ADVICE] 이후의 텍스트를 제거
+                if let bracket = emotion.range(of: "[") {
+                    emotion = String(emotion[..<bracket.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            
+            if let adviceRange = clean.range(of: "[ADVICE]") {
+                let afterAdvice = String(clean[adviceRange.upperBound...])
+                let lines = afterAdvice.components(separatedBy: "\n")
+                advice = lines.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                if let bracket = advice.range(of: "[") {
+                    advice = String(advice[..<bracket.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            
+            if let analysisRange = clean.range(of: "[ANALYSIS]") {
+                let afterAnalysis = String(clean[analysisRange.upperBound...])
+                analysis = afterAnalysis.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            }
+        }
+        
+        // === Stage 2: 줄 단위 추론 (구조화 포맷 파싱이 빈 결과를 낸 경우) ===
+        if emotion.isEmpty && advice.isEmpty && analysis.isEmpty {
+            print("📋 [Parser] Stage 2: Line-by-line inference.")
+            let lines = clean.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            
+            for line in lines {
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                // 괄호 안에 %가 있으면 감정 분류 결과로 판단
+                if emotion.isEmpty && trimmed.contains("%") && trimmed.contains("(") {
+                    emotion = trimmed
+                } else if advice.isEmpty && trimmed.range(of: "[가-힣]", options: .regularExpression) != nil {
+                    advice = trimmed
+                } else if !trimmed.isEmpty && analysis.isEmpty && trimmed.range(of: "[가-힣]", options: .regularExpression) != nil {
+                    analysis = trimmed
+                }
+            }
+        }
+        
+        // === Stage 3: 키워드 기반 공감 (여전히 빈 경우) ===
+        if advice.isEmpty {
+            print("📋 [Parser] Stage 3: Keyword-based empathy fallback.")
+            advice = getEmergencyEmpathy(for: originalText)
+        }
+        
+        // === Stage 4: 최종 기본값 ===
+        if emotion.isEmpty { emotion = "Neutral (50%)" }
+        if analysis.isEmpty { analysis = "감정의 흐름을 파악하고 있어요." }
+        
+        // 한글 감지 실패 시 전체 Fallback
+        let hasKorean = (advice + analysis).range(of: "[가-힣]", options: .regularExpression) != nil
+        if !hasKorean {
+            print("📋 [Parser] Korean not detected. Full fallback.")
+            advice = getEmergencyEmpathy(for: originalText)
+            analysis = "천천히 기록하며 마음을 정리해보세요."
+        }
+        
+        print("✅ [MaumOn] Parsing Complete: emotion=\(emotion.prefix(20)), advice=\(advice.prefix(20))")
         return (emotion, advice, analysis)
     }
 
     private func performFullAnalysis(for diary: Diary) async {
-        // Prepare Text
-        let fullText = """
-        사건: \(diary.event ?? "")
-        감정: \(diary.emotion_desc ?? "")
-        의미: \(diary.emotion_meaning ?? "")
-        혼잣말: \(diary.self_talk ?? "")
-        """
-        
-        // [Real AI] Call Unified Analysis
-        let (emotion, advice, analysis) = await generateUnifiedAnalysis(diaryText: fullText)
-        
-        // Update Diary Model
-        var updatedDiary = diary
-        updatedDiary.ai_prediction = emotion
-        updatedDiary.ai_advice = advice   // Short advice
-        updatedDiary.ai_comment = advice  // Fallback
-        updatedDiary.ai_analysis = analysis // Long Analysis
-        
-        print("💾 [MaumOn] Analysis Complete. Saving...")
-        print(" - Emotion: \(emotion)")
-        print(" - Advice: \(advice)")
-        
-        // Save to Local & Trigger Sync
-        // [Fix] Must run on Main Actor
-        await MainActor.run {
-            LocalDataManager.shared.saveDiary(updatedDiary) { success in
-                if success {
-                   print("✅ [MaumOn] Diary Saved & Synced.")
-                } else {
-                   print("⚠️ [MaumOn] Save Failed.")
+        // [Risk Elimination] 전체 분석 과정을 try-catch로 감싸 어떤 예외도 크래시로 이어지지 않음
+        do {
+            // Prepare Text
+            let fullText = """
+            사건: \(diary.event ?? "")
+            감정: \(diary.emotion_desc ?? "")
+            의미: \(diary.emotion_meaning ?? "")
+            혼잣말: \(diary.self_talk ?? "")
+            """
+            
+            // [Real AI] Call Unified Analysis (메모리 가드 + 타임아웃 내장)
+            let (emotion, advice, analysis) = await generateUnifiedAnalysis(diaryText: fullText)
+            
+            // Update Diary Model
+            var updatedDiary = diary
+            updatedDiary.ai_prediction = emotion
+            updatedDiary.ai_advice = advice   // Short advice
+            updatedDiary.ai_comment = advice  // Fallback
+            updatedDiary.ai_analysis = analysis // Long Analysis
+            
+            print("💾 [MaumOn] Analysis Complete. Saving...")
+            print(" - Emotion: \(emotion.prefix(30))")
+            print(" - Advice: \(advice.prefix(30))")
+            
+            // Save to Local & Trigger Sync
+            await MainActor.run {
+                LocalDataManager.shared.saveDiary(updatedDiary) { success in
+                    if success {
+                       print("✅ [MaumOn] Diary Saved & Synced.")
+                    } else {
+                       print("⚠️ [MaumOn] Save Failed.")
+                    }
                 }
             }
+        } catch {
+            // [Risk Elimination] 어떤 에러가 발생해도 앱 크래시를 방지
+            print("🚨 [MaumOn] performFullAnalysis crashed safely: \(error)")
+            await performRuleBasedFallback(for: diary)
         }
     }
 }

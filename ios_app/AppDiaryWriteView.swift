@@ -198,6 +198,9 @@ struct AppDiaryWriteView: View {
                             }
                             .padding()
                         }
+                        #if os(iOS)
+                        .scrollDismissesKeyboard(.interactively)
+                        #endif
                     }
                     .transition(.opacity)
                 } else {
@@ -264,6 +267,7 @@ struct AppDiaryWriteView: View {
                 }
             }
             #if os(iOS)
+            .dismissKeyboardOnTap() // [Cursor Fix] UIKit 기반 키보드 닫기 (TextField 포커스 방해 없음)
             .navigationBarHidden(true)
             #endif
             .alert(isPresented: $showError) {
@@ -352,7 +356,7 @@ struct AppDiaryWriteView: View {
         // [New] 약물 설정 시트
         .sheet(isPresented: $showingMedSetting, onDismiss: loadMedications) {
             MedicationSettingView()
-                .screenshotProtected(isProtected: true) // 스크린샷 방지
+                .screenshotProtected(isProtected: false) // 스크린샷 방지
         }
         // 음성 인식 텍스트 반영
         .onChangeCompat(of: voiceRecorder.transcribedText) { newText in
@@ -528,36 +532,32 @@ struct AppDiaryWriteView: View {
                 // [Safety] 성공 시 스냅샷 제거
                 UserDefaults.standard.removeObject(forKey: "diary_crash_snapshot")
                 
-                // 2. Enqueue AI Task (Background Queue)
-                // [OOM Prevention] UI Dismiss 후 메모리가 안정화될 때까지 0.5초 지연
-                print("📤 [UI] requesting AI Analysis...")
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    let accepted = LLMService.shared.tryEnqueueDiaryAnalysis(newDiary)
+                // [UX Fix] 저장 즉시 화면 닫기 (AI 분석 완료를 기다리지 않음)
+                // AI 분석은 백그라운드에서 진행되며, 완료 시 자동으로 일기에 반영됨
+                DispatchQueue.main.async {
+                    // [B2G] 저장 즉시 센터로 데이터 동기화
+                    if B2GManager.shared.isLinked {
+                        print("📤 [AutoSync] Triggering B2G Sync after save...")
+                        B2GManager.shared.syncData()
+                    }
                     
+                    self.isSaving = false
+                    self.onSave()
+                    self.isPresented = false
+                }
+                
+                // [OOM Prevention] UI Dismiss 후 메모리가 안정화될 때까지 1초 지연 후 AI 분석 시작
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let accepted = LLMService.shared.tryEnqueueDiaryAnalysis(newDiary)
                     if accepted {
-                         // 성공 시 화면 닫기 (기존 로직)
-                         DispatchQueue.main.async {
-                             // [B2G] 저장 즉시 센터로 데이터 동기화
-                             if B2GManager.shared.isLinked {
-                                 print("📤 [AutoSync] Triggering B2G Sync after save...")
-                                 B2GManager.shared.syncData()
-                             }
-                             
-                             self.isSaving = false
-                             self.onSave()
-                             self.isPresented = false
-                         }
+                        print("📤 [AI] Analysis enqueued successfully.")
                     } else {
-                        // 실패 시 (분석 중) 화면 유지 + 알림
-                        DispatchQueue.main.async {
-                            // [UX] 재분석 중 상태 해제? -> 아니요, 이미 저장됨.
-                            // 하지만 사용자에게 '분석 대기' 임을 알림.
-                            self.isSaving = false
-                            
-                            // 분석 거절 알림
-                            self.errorMessage = "현재 다른 일기를 분석 중입니다.\n기존 분석이 끝난 후 다시 시도해주세요."
-                            self.showError = true
+                        // AI 분석이 거절되어도 일기는 이미 저장됨
+                        // "재분석 중..." 상태를 해제하여 캘린더에서 정상 표시
+                        print("⚠️ [AI] Analysis busy. Clearing '재분석 중...' placeholder.")
+                        if let index = LocalDataManager.shared.diaries.firstIndex(where: { $0.id == newDiary.id }) {
+                            LocalDataManager.shared.diaries[index].ai_prediction = nil
+                            LocalDataManager.shared.diaries[index].ai_analysis = nil
                         }
                     }
                 }

@@ -118,7 +118,6 @@ class ShareCode(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     used = db.Column(db.Boolean, default=False)
 
-
 class ShareRelationship(db.Model):
     """공유자(sharer) ↔ 조회자(viewer) 관계"""
     __tablename__ = 'share_relationships'
@@ -126,6 +125,22 @@ class ShareRelationship(db.Model):
     sharer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     viewer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     connected_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # [Phase 5] 보호자 역할 및 알림 설정
+    role = db.Column(db.String(20), default='viewer')  # 'guardian' or 'viewer'
+    
+    # 알림 설정 (보호자가 받을 알림 종류)
+    alert_mood_drop = db.Column(db.Boolean, default=True)    # 마음 온도 급락 알림
+    alert_crisis = db.Column(db.Boolean, default=True)       # 위기 신호 알림
+    alert_inactivity = db.Column(db.Boolean, default=True)   # 장기 미기록 알림 (7일)
+    
+    # [Phase 6] 공유 범위 설정 (내담자가 제어)
+    share_mood = db.Column(db.Boolean, default=True)         # 마음 온도 공유
+    share_report = db.Column(db.Boolean, default=False)      # 주간 리포트 공유
+    share_crisis = db.Column(db.Boolean, default=True)       # 위기 신호 공유
+    
+    # 마지막 알림 발송 시각 (중복 알림 방지)
+    last_alert_at = db.Column(db.DateTime, nullable=True)
 
     sharer = db.relationship('User', foreign_keys=[sharer_id], backref='shared_to')
     viewer = db.relationship('User', foreign_keys=[viewer_id], backref='shared_from')

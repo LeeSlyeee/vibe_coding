@@ -89,11 +89,16 @@ def connect_share():
     if existing:
         return jsonify({"message": "이미 연결된 사용자입니다."}), 409
 
-    # 관계 생성
+    # 관계 생성 (role 지정 가능)
+    requested_role = data.get('role', 'viewer')  # 'guardian' or 'viewer'
+    if requested_role not in ('guardian', 'viewer'):
+        requested_role = 'viewer'
+    
     rel = ShareRelationship(
         sharer_id=share_code.user_id,
         viewer_id=current_user_id,
-        connected_at=datetime.utcnow()
+        connected_at=datetime.utcnow(),
+        role=requested_role
     )
     db.session.add(rel)
 
@@ -126,7 +131,11 @@ def get_shared_list():
                 "sharer_id": sharer.id,
                 "name": sharer.nickname or sharer.username,
                 "birth_date": sharer.birth_date,
-                "connected_at": rel.connected_at.isoformat() if rel.connected_at else None
+                "connected_at": rel.connected_at.isoformat() if rel.connected_at else None,
+                "role": rel.role or 'viewer',
+                "alert_mood_drop": rel.alert_mood_drop if rel.alert_mood_drop is not None else True,
+                "alert_crisis": rel.alert_crisis if rel.alert_crisis is not None else True,
+                "alert_inactivity": rel.alert_inactivity if rel.alert_inactivity is not None else True
             })
 
     return jsonify(result), 200
@@ -217,14 +226,30 @@ def get_shared_insights(target_id):
     else:
         status = "좋음 😊"
 
-    return jsonify({
+    # [Phase 6] 공유 범위 필터링
+    response_data = {
         "sharer_name": sharer.nickname or sharer.username if sharer else "알 수 없음",
         "total_entries": total,
-        "avg_mood": avg_mood,
-        "mood_trend": mood_trend,
         "recent_status": status,
         "writing_streak": _calc_streak(diaries)
-    }), 200
+    }
+    
+    # 마음 온도 공유 허용 시에만 포함
+    share_mood = getattr(rel, 'share_mood', True)
+    if share_mood is None or share_mood:
+        response_data["avg_mood"] = avg_mood
+        response_data["mood_trend"] = mood_trend
+    else:
+        response_data["avg_mood"] = None
+        response_data["mood_trend"] = []
+        response_data["mood_restricted"] = True
+    
+    # 위기 신호 공유 허용 시에만 포함
+    share_crisis = getattr(rel, 'share_crisis', True)
+    if share_crisis is None or share_crisis:
+        response_data["has_safety_concern"] = has_safety
+    
+    return jsonify(response_data), 200
 
 
 def _calc_streak(diaries):
@@ -244,3 +269,197 @@ def _calc_streak(diaries):
         except ValueError:
             break
     return streak
+
+
+# ========================================
+# [Phase 5] 보호자 알림 관련 API
+# ========================================
+
+@share_bp.route('/api/share/role', methods=['PUT'])
+@jwt_required()
+def update_role():
+    """보호자의 역할 변경 (guardian ↔ viewer)"""
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    sharer_id = data.get('sharer_id')
+    new_role = data.get('role', 'viewer')
+    
+    if new_role not in ('guardian', 'viewer'):
+        return jsonify({"message": "역할은 'guardian' 또는 'viewer'만 가능합니다."}), 400
+    
+    rel = ShareRelationship.query.filter_by(
+        sharer_id=int(sharer_id),
+        viewer_id=current_user_id
+    ).first()
+    
+    if not rel:
+        return jsonify({"message": "연결된 관계를 찾을 수 없습니다."}), 404
+    
+    rel.role = new_role
+    db.session.commit()
+    
+    return jsonify({"message": f"역할이 '{new_role}'로 변경되었습니다."}), 200
+
+
+@share_bp.route('/api/share/alert-settings', methods=['PUT'])
+@jwt_required()
+def update_alert_settings():
+    """보호자의 알림 설정 변경"""
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    sharer_id = data.get('sharer_id')
+    
+    rel = ShareRelationship.query.filter_by(
+        sharer_id=int(sharer_id),
+        viewer_id=current_user_id
+    ).first()
+    
+    if not rel:
+        return jsonify({"message": "연결된 관계를 찾을 수 없습니다."}), 404
+    
+    if 'alert_mood_drop' in data:
+        rel.alert_mood_drop = bool(data['alert_mood_drop'])
+    if 'alert_crisis' in data:
+        rel.alert_crisis = bool(data['alert_crisis'])
+    if 'alert_inactivity' in data:
+        rel.alert_inactivity = bool(data['alert_inactivity'])
+    
+    db.session.commit()
+    
+    return jsonify({"message": "알림 설정이 업데이트되었습니다."}), 200
+
+
+@share_bp.route('/api/share/share-scope', methods=['PUT'])
+@jwt_required()
+def update_share_scope():
+    """[Phase 6] 내담자가 보호자에게 공유할 데이터 범위 설정"""
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    viewer_id = data.get('viewer_id')
+    
+    # 내담자(sharer) 본인만 설정 가능
+    rel = ShareRelationship.query.filter_by(
+        sharer_id=current_user_id,
+        viewer_id=int(viewer_id)
+    ).first()
+    
+    if not rel:
+        return jsonify({"message": "연결된 관계를 찾을 수 없습니다."}), 404
+    
+    if 'share_mood' in data:
+        rel.share_mood = bool(data['share_mood'])
+    if 'share_report' in data:
+        rel.share_report = bool(data['share_report'])
+    if 'share_crisis' in data:
+        rel.share_crisis = bool(data['share_crisis'])
+    
+    db.session.commit()
+    
+    return jsonify({"message": "공유 범위가 업데이트되었습니다."}), 200
+
+
+@share_bp.route('/api/share/guardians', methods=['GET'])
+@jwt_required()
+def get_my_guardians():
+    """내담자(sharer)가 자신에게 연결된 보호자/조회자 목록 확인"""
+    current_user_id = int(get_jwt_identity())
+    
+    relationships = ShareRelationship.query.filter_by(sharer_id=current_user_id).all()
+    
+    result = []
+    for rel in relationships:
+        viewer = User.query.get(rel.viewer_id)
+        if viewer:
+            result.append({
+                "viewer_id": viewer.id,
+                "name": viewer.nickname or viewer.username,
+                "role": rel.role or 'viewer',
+                "connected_at": rel.connected_at.isoformat() if rel.connected_at else None,
+                "share_mood": rel.share_mood if rel.share_mood is not None else True,
+                "share_report": rel.share_report if rel.share_report is not None else False,
+                "share_crisis": rel.share_crisis if rel.share_crisis is not None else True
+            })
+    
+    return jsonify(result), 200
+
+
+@share_bp.route('/api/share/guardian-alerts', methods=['GET'])
+@jwt_required()
+def get_guardian_alerts():
+    """보호자가 확인해야 할 알림 목록 조회 (위기 신호 + 미기록)"""
+    current_user_id = int(get_jwt_identity())
+    
+    # 보호자로 연결된 관계만 조회
+    relationships = ShareRelationship.query.filter_by(
+        viewer_id=current_user_id,
+        role='guardian'
+    ).all()
+    
+    alerts = []
+    now = datetime.utcnow()
+    
+    for rel in relationships:
+        sharer = User.query.get(rel.sharer_id)
+        if not sharer:
+            continue
+        
+        sharer_name = sharer.nickname or sharer.username
+        
+        # 최근 7일 일기 조회
+        cutoff_7d = now - timedelta(days=7)
+        recent_diaries = Diary.query.filter(
+            Diary.user_id == rel.sharer_id,
+            Diary.created_at >= cutoff_7d
+        ).order_by(Diary.created_at.desc()).all()
+        
+        # 1. 위기 신호 알림 (alert_crisis 설정 시)
+        if rel.alert_crisis is not False:
+            share_crisis = getattr(rel, 'share_crisis', True)
+            if share_crisis is not False:
+                has_crisis = any(
+                    getattr(d, 'safety_flag', None) in ['need_help', 'danger', True]
+                    for d in recent_diaries
+                )
+                if has_crisis:
+                    alerts.append({
+                        "type": "crisis",
+                        "sharer_id": rel.sharer_id,
+                        "sharer_name": sharer_name,
+                        "message": f"{sharer_name}님에게 위기 신호가 감지되었습니다.",
+                        "severity": "high",
+                        "icon": "🚨"
+                    })
+        
+        # 2. 마음 온도 급락 알림 (alert_mood_drop 설정 시)
+        if rel.alert_mood_drop is not False and len(recent_diaries) >= 2:
+            share_mood = getattr(rel, 'share_mood', True)
+            if share_mood is not False:
+                moods = [d.mood_level or 3 for d in recent_diaries[:3]]
+                avg_recent = sum(moods) / len(moods)
+                if avg_recent <= 2.0:
+                    alerts.append({
+                        "type": "mood_drop",
+                        "sharer_id": rel.sharer_id,
+                        "sharer_name": sharer_name,
+                        "message": f"{sharer_name}님의 마음 온도가 낮은 상태입니다.",
+                        "severity": "medium",
+                        "icon": "💙",
+                        "avg_mood": round(avg_recent, 1)
+                    })
+        
+        # 3. 장기 미기록 알림 (alert_inactivity 설정 시)
+        if rel.alert_inactivity is not False:
+            if len(recent_diaries) == 0:
+                alerts.append({
+                    "type": "inactivity",
+                    "sharer_id": rel.sharer_id,
+                    "sharer_name": sharer_name,
+                    "message": f"{sharer_name}님이 7일 이상 기록을 남기지 않았습니다.",
+                    "severity": "low",
+                    "icon": "📝"
+                })
+    
+    return jsonify({
+        "alerts": alerts,
+        "total": len(alerts)
+    }), 200

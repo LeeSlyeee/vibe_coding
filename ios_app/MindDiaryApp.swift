@@ -20,7 +20,7 @@ struct MindDiaryApp: App {
                         .zIndex(0)
                 }
             }
-            .screenshotProtected(isProtected: true) // 스크린샷 방지 적용 (검은 화면 처리)
+            .screenshotProtected(isProtected: false) // 스크린샷 방지 적용 (검은 화면 처리)
             .ignoresSafeArea() // [Fix] 전체 화면 꽉 차게 (스플래시 상하 여백 제거)
             .preferredColorScheme(.light) // Force Light Mode
             .onAppear {

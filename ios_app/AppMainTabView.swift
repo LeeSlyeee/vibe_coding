@@ -5,6 +5,9 @@ struct AppMainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.scenePhase) var scenePhase // [New] Detect App Background/Foreground
     @StateObject private var networkMonitor = NetworkMonitor()
+    #if os(iOS)
+    @StateObject private var keyboardObserver = KeyboardObserver() // [Keyboard Fix] Direct observation
+    #endif
     @State private var showAssessment = false
     @State private var selection = 0
     @State private var isTabBarHidden = false // [New] TabBar Visibility Control
@@ -23,11 +26,29 @@ struct AppMainTabView: View {
     }
     @State private var upcomingBirthdays: [BirthdayInfo] = []
     
+    // [Keyboard Fix] 탭바 표시 여부: KeyboardObserver가 직접 감지 (Notification 불필요)
+    private var shouldShowTabBar: Bool {
+        #if os(iOS)
+        return !keyboardObserver.isKeyboardVisible
+        #else
+        return true
+        #endif
+    }
+    
     var body: some View {
         if !authManager.isAuthenticated {
             AppLoginView()
         } else {
             ZStack(alignment: .bottom) {
+                Color.clear.frame(height: 0)
+                    .onAppear {
+                        #if os(iOS)
+                        dismissKeyboard()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            dismissKeyboard()
+                        }
+                        #endif
+                    }
                 // Main Content Area
                 MoodCalendarView()
                     .opacity(selection == 0 ? 1 : 0)
@@ -46,7 +67,8 @@ struct AppMainTabView: View {
                     .allowsHitTesting(selection == 3)
                 
                 // Custom Tab Bar
-                if !isTabBarHidden {
+                // [Keyboard Fix] 키보드가 올라오면 탭바 숨김, 내려오면 탭바 표시
+                if shouldShowTabBar {
                     VStack(spacing: 0) {
                         Divider()
                             .background(Color.gray.opacity(0.1))
@@ -54,7 +76,7 @@ struct AppMainTabView: View {
                         HStack(spacing: 0) {
                             TabButton(index: 0, title: "캘린더", image: "tab_calendar", systemIcon: "calendar", selection: $selection)
                             TabButton(index: 1, title: "분석", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
-                            TabButton(index: 2, title: "상담", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
+                            TabButton(index: 2, title: "대화", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
                             TabButton(index: 3, title: "긴급", image: "tab_emergency", systemIcon: "exclamationmark.triangle.fill", selection: $selection)
                         }
                         .padding(.top, 10)
@@ -62,7 +84,7 @@ struct AppMainTabView: View {
                         .background(Color.white)
                         .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
                     }
-                    .transition(.move(edge: .bottom)) // Smooth transition
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
                 // [New] AI Loaded Toast (Floating above TabBar)
@@ -211,12 +233,13 @@ struct AppMainTabView: View {
             }
             .edgesIgnoringSafeArea(.bottom)
             #if os(iOS)
+            .environmentObject(keyboardObserver) // [Keyboard Fix] 하위 뷰에 단일 인스턴스 공유
             .fullScreenCover(isPresented: $showAssessment) {
                 AppAssessmentView()
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
-                    .screenshotProtected(isProtected: true) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
             #else
             .sheet(isPresented: $showAssessment) {
@@ -224,7 +247,7 @@ struct AppMainTabView: View {
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
-                    .screenshotProtected(isProtected: true) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
             #endif
             .onAppear {
@@ -266,14 +289,8 @@ struct AppMainTabView: View {
                     self.selection = 2
                 }
                 
-                // [New] Keyboard/TabBar Observers
-                NotificationCenter.default.addObserver(forName: NSNotification.Name("HideTabBar"), object: nil, queue: .main) { _ in
-                    withAnimation { self.isTabBarHidden = true }
-                }
-                
-                NotificationCenter.default.addObserver(forName: NSNotification.Name("ShowTabBar"), object: nil, queue: .main) { _ in
-                    withAnimation { self.isTabBarHidden = false }
-                }
+                // [Removed] HideTabBar/ShowTabBar Notification 방식 제거
+                // KeyboardObserver가 shouldShowTabBar에서 직접 감지하므로 Notification 불필요
                 
                 // [New] Safe Loading (10s Delay)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
@@ -412,15 +429,15 @@ struct AppMainTabView: View {
     
     func checkAssessmentStatus() {
         // [Hotfix] Disable Automatic PHQ-9 Popup unconditionally based on user feedback.
-        // 사용자가 원할 때만 진단을 수행하도록 UX 변경 예정.
+        // 사용자가 원할 때만 감정 체크를 수행하도록 UX 변경 예정.
         print("🛑 [App] Automatic Assessment disabled by User Request.")
         return
         
         /*
-        // 로그인된 상태에서만 진단 여부를 체크해야 함.
+        // 로그인된 상태에서만 감정 체크 여부를 체크해야 함.
         guard authManager.isAuthenticated else { return }
         
-        // [Fix] B2G 연동 유저는 PHQ-9 진단 건너뛰기 (이미 기관 관리 대상임)
+        // [Fix] B2G 연동 유저는 PHQ-9 감정 체크 건너뛰기 (이미 기관 관리 대상임)
         if B2GManager.shared.isLinked {
             print("🏥 [App] B2G Linked. Skipping Initial Assessment.")
             UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
@@ -493,18 +510,18 @@ struct AppGuideView: View {
                     
                     // Section 2: AI 분석
                     VStack(alignment: .leading, spacing: 20) {
-                        GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "전문 상담사급 AI가 당신의 마음을 읽어드립니다.")
+                        GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "AI가 당신의 마음을 따뜻하게 읽어드립니다.")
                         
                         GuideFeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
-                        GuideFeatureCard(icon: "💬", title: "전문 상담사급 AI 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
+                        GuideFeatureCard(icon: "💬", title: "AI 감정 분석 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
                     }
                     
                     // Section 3: 프라이버시 & 심층 분석
                     VStack(alignment: .leading, spacing: 20) {
                         GuideSectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
                         
-                        GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 상담사", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
-                        GuideFeatureCard(icon: "📑", title: "🧠 심층 심리 리포트", desc: "일기가 3개 이상 모이면, **나만의 심리 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)")
+                        GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 감정 분석", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
+                        GuideFeatureCard(icon: "📑", title: "🧠 심층 감정 리포트", desc: "일기가 3개 이상 모이면, **나만의 감정 분석 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 분석)")
                         GuideFeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
                         
                         HStack(spacing: 14) {

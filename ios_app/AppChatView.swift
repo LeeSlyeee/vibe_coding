@@ -9,8 +9,6 @@ struct AppChatView: View {
     @State private var isTyping: Bool = false
     @State private var scrollViewProxy: ScrollViewProxy? = nil
     
-    // Phase 2: Report Modal State
-    @State private var showReport = false
     
     // [UX] Cold Start Hint
     @State private var loadingHint: String? = nil
@@ -28,6 +26,20 @@ struct AppChatView: View {
     // [New] Focus State based Keyboard Handling
     @FocusState private var isInputFocused: Bool
     
+    // [Keyboard Fix] Real keyboard height observer (AppMainTabView에서 주입)
+    #if os(iOS)
+    @EnvironmentObject var keyboardObserver: KeyboardObserver
+    
+    // 하단 Safe Area 높이 (Home Indicator 영역)
+    // [Keyboard Fix] keyWindow 기준으로 안전하게 safeArea 읽기
+    private var safeAreaBottom: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0
+    }
+    #endif
+    
     // Server Configuration
     // [Target Fix] Updated to 217 Server
     let baseURL = "https://217.142.253.35.nip.io/api"
@@ -37,8 +49,9 @@ struct AppChatView: View {
             // Main Chat UI
             NavigationView {
                 VStack(spacing: 0) {
-                    // [New] Model Loading Indicator
-                    if !llmService.isModelLoaded && llmService.modelLoadingProgress > 0 {
+                    // [Keyboard Fix] SwiftUI 자동 키보드 회피를 차단하고 수동으로만 처리
+                    // [New] Model Loading Indicator (로컬 AI 모드에서만 표시)
+                    if !llmService.useServerAI && !llmService.isModelLoaded && llmService.modelLoadingProgress > 0 {
                         VStack(spacing: 8) {
                             Text(llmService.modelLoadingProgress > 0 ? "AI 모델 준비 중 (\(Int(llmService.modelLoadingProgress * 100))%)" : "AI 모델 다운로드 대기 중...")
                                 .font(.caption)
@@ -110,7 +123,7 @@ struct AppChatView: View {
                                     
                                     // 이미 메시지가 있으면 인사 생략 (단, 텅 빈 경우에만 인사)
                                     if messages.isEmpty {
-                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n오늘 하루는 어떠셨나요?\n기억에 남는 사건이나 감정을 편하게 이야기해 주세요.\n\n제가 꼼꼼히 듣고 마음을 분석해 드릴게요."
+                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n오늘 하루는 어떠셨나요?\n기억에 남는 사건이나 감정을 편하게 이야기해 주세요.\n\n제가 꼼꼼히 듣고 마음을 분석해 드릴게요.\n\n💡 마음온은 감정 기록 보조 도구이며, 전문 의료 서비스를 대체하지 않아요."
                                         
                                         // 약간의 딜레이 후 등장
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -128,6 +141,7 @@ struct AppChatView: View {
                             if !showModeSelection && !llmService.useServerAI && !llmService.isModelLoaded {
                                 Task { await llmService.loadModel() }
                             }
+                            
                         }
                         .onChangeCompat(of: messages.count) { _ in
                             scrollToBottom(proxy: proxy)
@@ -136,9 +150,17 @@ struct AppChatView: View {
                             scrollToBottom(proxy: proxy)
                         }
                         // [UX] Dismiss Keyboard on Drag/Tap
-                        .onTapGesture {
-                            isInputFocused = false
-                        }
+                        // [Keyboard Fix] simultaneousGesture로 변경하여 scrollDismissesKeyboard와 충돌 방지
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                #if os(iOS)
+                                dismissKeyboard()
+                                #endif
+                            }
+                        )
+                        #if os(iOS)
+                        .scrollDismissesKeyboard(.interactively)
+                        #endif
                     }
                     
                     // [New] Crisis Banner (위기 감지 시 노출)
@@ -165,32 +187,15 @@ struct AppChatView: View {
                     
                     // Input Area
                     HStack(spacing: 10) {
-                        // [New] Mode Selection Button (Previous Top-Right Feature)
-                        Button(action: {
-                            withAnimation { showModeSelection = true }
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.gray)
-                                .padding(8)
-                                .background(Color.gray.opacity(0.1))
-                                .clipShape(Circle())
-                        }
-                        .disabled(isTyping || showModeSelection)
-                        
                         TextField("메시지 보내기...", text: $inputText)
-                            .focused($isInputFocused) // [New] Focus Binding
+                            .focused($isInputFocused)
+                            .keyboardType(.default)
+                            .autocorrectionDisabled(false)
+                            .tint(.blue) // [Fix] 커서 색상 명시적 설정 (입력 상태 시각적 피드백)
                             .padding(12)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(20)
-                            .disabled(isTyping || showModeSelection)
-                            .onChange(of: isInputFocused) { focused in
-                                // Notify MainTabView to hide/show TabBar
-                                NotificationCenter.default.post(
-                                    name: NSNotification.Name(focused ? "HideTabBar" : "ShowTabBar"),
-                                    object: nil
-                                )
-                            }
+                            .disabled(showModeSelection)
                         
                         Button(action: sendMessage) {
                             Image(systemName: "paperplane.fill")
@@ -203,19 +208,45 @@ struct AppChatView: View {
                         .disabled(inputText.isEmpty || isTyping || showModeSelection)
                     }
                     .padding()
-                    // [UI Fix] Dynamic Padding: Keyboard Up (0) vs Keyboard Down (60 for TabBar)
-                    // 평소엔 탭바 공간(60) 확보, 키보드 올라오면 0으로 붙임
-                    .padding(.bottom, isInputFocused ? 0 : 60)
+                    // [Keyboard Fix] 키보드가 올라오면 탭바 패딩(60)을 제거하고,
+                    // 키보드 높이만큼 패딩 적용 (SwiftUI 자동 회피는 .ignoresSafeArea로 차단됨)
+                    #if os(iOS)
+                    .padding(.bottom, keyboardObserver.isKeyboardVisible
+                        ? max(keyboardObserver.keyboardHeight - safeAreaBottom, 0)
+                        : 60)
+                    .animation(.easeOut(duration: 0.16), value: keyboardObserver.isKeyboardVisible)
+                    #else
+                    .padding(.bottom, 60)
+                    #endif
                     .background(Color.white)
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
                 }
+                // [Keyboard Fix] SwiftUI 자동 키보드 회피 비활성화 (수동 패딩으로 대체)
                 #if os(iOS)
+                .ignoresSafeArea(.keyboard, edges: .bottom)
+                // [Keyboard Fix] 키보드가 내려가면 FocusState 동기화 (다시 터치 시 키보드 올라오도록)
+                .onChangeCompat(of: keyboardObserver.isKeyboardVisible) { visible in
+                    if !visible {
+                        isInputFocused = false
+                    } else if visible && !isInputFocused {
+                        // [Keyboard Fix] 양방향 동기화: 키보드가 올라왔는데 Focus가 풀린 경우 복원
+                        // (키보드 언어 전환 시 Hide→Show 사이클에서 Focus 유실 방지)
+                        isInputFocused = true
+                    }
+                }
                 .navigationBarTitle("마음 톡(Talk)", displayMode: .inline)
                 .navigationBarItems(
-                    leading: Button(action: { showReport = true }) {
-                        Image(systemName: "chart.pie.fill")
+                    leading: Button(action: {
+                        // [Keyboard Fix] 모드 선택 오버레이 표시 전 키보드 해제
+                        isInputFocused = false
+                        dismissKeyboard()
+                        withAnimation { showModeSelection = true }
+                    }) {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 16, weight: .semibold))
                             .foregroundColor(.black)
-                    },
+                    }
+                    .disabled(isTyping || showModeSelection),
                     trailing: Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
                             .foregroundColor(.black)
@@ -223,13 +254,9 @@ struct AppChatView: View {
                 )
                 #endif
                 .background(Color.white.edgesIgnoringSafeArea(.all))
-                .sheet(isPresented: $showReport) {
-                    ChatReportView(authManager: authManager)
-                        .screenshotProtected(isProtected: true) // 스크린샷 방지
-                }
                 .sheet(isPresented: $showSOSModal) {
                     SOSView()
-                        .screenshotProtected(isProtected: true) // 스크린샷 방지
+                        .screenshotProtected(isProtected: false) // 스크린샷 방지
                 }
                 .sheet(isPresented: $showSettings) {
                     NavigationView {
@@ -238,7 +265,7 @@ struct AppChatView: View {
                                 showSettings = false
                             })
                     }
-                    .screenshotProtected(isProtected: true) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false) // 스크린샷 방지
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background
@@ -257,7 +284,7 @@ struct AppChatView: View {
                         Text("🤖 AI 모드 선택")
                             .font(.title2)
                             .fontWeight(.bold)
-                        Text("원활한 상담을 위해 실행 방식을 선택해주세요.")
+                        Text("원활한 사용을 위해 실행 방식을 선택해주세요.")
                             .font(.caption)
                             .foregroundColor(.gray)
                     }
@@ -395,12 +422,25 @@ struct AppChatView: View {
                 print("🧠 [Context] Sending last \(historyLimit) messages for context.")
             }
             
-            // [New] Crisis Detection (위기 키워드 감지)
-            let crisisKeywords = ["죽고", "자살", "뛰어내", "사라지고", "보건소", "정신과", "상담센터", "약", "수면제"]
-            if crisisKeywords.contains(where: { userText.contains($0) }) {
+            // [Phase 4] 3단계 위기 분류 시스템
+            let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고"]
+            let crisisLevel2 = ["사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝"]
+            let crisisLevel1 = ["힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물"]
+            
+            if crisisLevel3.contains(where: { userText.contains($0) }) {
+                print("🚨 [Crisis] LEVEL 3 detected!")
                 withAnimation {
                     self.isCrisis = true
+                    self.showSOSModal = true // Level 3: 즉시 모달 팝업
                 }
+            } else if crisisLevel2.contains(where: { userText.contains($0) }) {
+                print("⚠️ [Crisis] LEVEL 2 detected!")
+                withAnimation {
+                    self.isCrisis = true // Level 2: SOS 배너 표시
+                }
+            } else if crisisLevel1.contains(where: { userText.contains($0) }) {
+                print("💛 [Crisis] LEVEL 1 detected - empathy mode")
+                // Level 1: 기본 공감 모드 (배너 미노출, AI가 공감 대응)
             }
             
             let recentMessages = messages.suffix(historyLimit)
@@ -530,150 +570,6 @@ struct TypingIndicator: View {
     }
 }
 
-// MARK: - Chat Report View
-struct ChatReportView: View {
-    @ObservedObject var authManager: AuthManager
-    @Environment(\.presentationMode) var presentationMode
-    
-    @State private var reportData: ChatSummary?
-    @State private var isLoading = true
-    
-    // [Target Fix] Updated to 217 Server
-    let baseURL = "https://217.142.253.35.nip.io/api"
-    
-    var body: some View {
-        NavigationView {
-            VStack {
-                if isLoading {
-                    ProgressView("감정 분석 데이터 불러오는 중...")
-                } else if let report = reportData {
-                    if report.has_data {
-                        ScrollView {
-                            VStack(spacing: 24) {
-                                // 1. Summary
-                                VStack(spacing: 10) {
-                                    Text("💬 최근 7일 대화 분석")
-                                        .font(.headline)
-                                        .foregroundColor(.gray)
-                                    Text("\(report.total_chats ?? 0)건")
-                                        .font(.system(size: 40, weight: .bold))
-                                        .foregroundColor(.purple)
-                                    Text("의 대화가 기록되었습니다.")
-                                }
-                                .padding()
-                                
-                                // 2. Emotions
-                                VStack(alignment: .leading, spacing: 16) {
-                                    Text("❤️ 주요 감정")
-                                        .font(.headline)
-                                    
-                                    if let emotions = report.top_emotions {
-                                        ForEach(emotions, id: \.emotion) { item in
-                                            HStack {
-                                                Text(item.emotion)
-                                                    .fontWeight(.bold)
-                                                    .frame(width: 80, alignment: .leading)
-                                                
-                                                GeometryReader { geo in
-                                                    RoundedRectangle(cornerRadius: 10)
-                                                        .fill(Color.purple.opacity(0.8))
-                                                        .frame(width: max(geo.size.width * (CGFloat(item.count) / CGFloat(report.total_chats ?? 1)), 10))
-                                                }
-                                                .frame(height: 20)
-                                                
-                                                Text("\(item.count)")
-                                                    .font(.caption)
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                    }
-                                }
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(16)
-                                .padding(.horizontal)
-                                
-                                // 3. Stress
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("⚡️ 스트레스 지수")
-                                        .font(.headline)
-                                    
-                                    HStack {
-                                        Text("평온").font(.caption)
-                                        Spacer()
-                                        Text("높음").font(.caption)
-                                    }
-                                    
-                                    GeometryReader { geo in
-                                        ZStack(alignment: .leading) {
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(Color.gray.opacity(0.2))
-                                                .frame(height: 20)
-                                            
-                                            RoundedRectangle(cornerRadius: 10)
-                                                .fill(
-                                                    LinearGradient(gradient: Gradient(colors: [.green, .yellow, .red]), startPoint: .leading, endPoint: .trailing)
-                                                )
-                                                .frame(width: geo.size.width * (CGFloat(report.avg_stress ?? 0) / 10.0), height: 20)
-                                        }
-                                    }
-                                    .frame(height: 20)
-                                    
-                                    Text("평균: \(String(format: "%.1f", report.avg_stress ?? 0))점")
-                                        .font(.caption).fontWeight(.bold).padding(.top, 4)
-                                }
-                                .padding()
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(16)
-                                .padding(.horizontal)
-                            }
-                            .padding(.vertical)
-                        }
-                    } else {
-                        VStack(spacing: 20) {
-                            Text("📊").font(.largeTitle)
-                            Text("데이터가 충분하지 않습니다.").font(.headline)
-                            Text("채팅을 더 많이 하시면 분석해드려요!").foregroundColor(.gray)
-                        }
-                    }
-                } else {
-                    Text("데이터를 불러올 수 없습니다.")
-                }
-            }
-            #if os(iOS)
-            .navigationBarTitle("분석 리포트", displayMode: .inline)
-            .navigationBarItems(trailing: Button("닫기") {
-                presentationMode.wrappedValue.dismiss()
-            })
-            #endif
-            .onAppear(perform: fetchReport)
-        }
-    }
-    
-    func fetchReport() {
-        // [Local Mode] Report Mock
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.isLoading = false
-            self.reportData = ChatSummary(has_data: true, total_chats: 42, avg_stress: 4.5, top_emotions: [
-                ChatSummary.EmotionCount(emotion: "행복", count: 15),
-                ChatSummary.EmotionCount(emotion: "불안", count: 10),
-                ChatSummary.EmotionCount(emotion: "평온", count: 17)
-            ])
-        }
-    }
-}
-
-struct ChatSummary: Codable {
-    let has_data: Bool
-    let total_chats: Int?
-    let avg_stress: Double?
-    let top_emotions: [EmotionCount]?
-    
-    struct EmotionCount: Codable {
-        let emotion: String
-        let count: Int
-    }
-}
 
 // MARK: - SOS View (Emergency Contacts)
 struct SOSView: View {

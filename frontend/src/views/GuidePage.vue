@@ -80,7 +80,7 @@
           <section class="guide-section">
             <div class="section-title-box">
               <h3>🤖 AI 감정 분석 & 코멘트</h3>
-              <p class="section-desc">전문 상담사급 AI가 당신의 마음을 읽어드립니다.</p>
+              <p class="section-desc">AI가 당신의 마음을 따뜻하게 읽어드립니다.</p>
             </div>
 
             <div class="feature-cards-stack">
@@ -94,7 +94,7 @@
 
               <div class="feature-layout-card">
                 <div class="feature-text">
-                  <h4>💬 전문 상담사급 AI 코멘트 (Gemma 2)</h4>
+                  <h4>💬 AI 감정 분석 코멘트 (Gemma 2)</h4>
                   <p>구글의 최신 모델 <strong>Gemma 2 (2b)</strong>가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.</p>
                 </div>
                 <div class="feature-icon">💬</div>
@@ -112,7 +112,7 @@
             <div class="feature-cards-stack">
               <div class="feature-layout-card highlighted">
                 <div class="feature-text">
-                  <h4>🔒 철통 보안 AI 상담사</h4>
+                  <h4>🔒 철통 보안 AI 감정 분석</h4>
                   <p>외부 클라우드 전송 NO! <strong>안전한 로컬/개인 서버 AI</strong>가 당신만의 비밀 공간에서 분석합니다.</p>
                 </div>
                 <div class="feature-icon">🛡️</div>
@@ -120,8 +120,8 @@
 
               <div class="feature-layout-card">
                 <div class="feature-text">
-                  <h4>🧠 심층 심리 리포트</h4>
-                  <p>일기가 3개 이상 모이면, <strong>나만의 심리 보고서</strong>를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)</p>
+                  <h4>🧠 심층 감정 리포트</h4>
+                  <p>일기가 3개 이상 모이면, <strong>나만의 감정 분석 보고서</strong>를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 분석)</p>
                 </div>
                 <div class="feature-icon">📑</div>
               </div>

@@ -204,12 +204,12 @@ class EmotionAnalysis:
                 continue
                 
             if category in text:
-                return content.get('default', "힘내세요.")
+                return content.get('default', "마음이 전해집니다.")
                 
             keywords = content.get('emotion_keywords', [])
             for k in keywords:
                 if k in text:
-                    return content.get('default', "힘내세요.")
+                    return content.get('default', "마음이 전해집니다.")
         return None
 
     def load_emotion_bank(self):
@@ -281,7 +281,7 @@ class EmotionAnalysis:
             stats_info = f" (과거 이 날씨에 당신은 주로 {weather_stats} 감정을 느끼셨네요)" if weather_stats else ""
 
             prompt_text = (
-                "당신은 사용자의 지난 일기 기록과 오늘의 날씨, 그리고 '과거 날씨별 감정 패턴'을 분석하여 따뜻한 한 문장의 조언을 건네는 심리 상담사입니다.\n\n"
+                "당신은 사용자의 지난 일기 기록과 오늘의 날씨, 그리고 '과거 날씨별 감정 패턴'을 분석하여 따뜻한 한 문장의 조언을 건네는 감정 케어 도우미입니다.\n\n"
                 f"### {weather_info}{stats_info}\n"
                 "### 사용자의 최근 1주일 흐름\n"
                 f"{diary_context}\n"
@@ -291,7 +291,7 @@ class EmotionAnalysis:
                 "3. 최근 1주일간의 감정 흐름이 좋은지 나쁜지를 반드시 반영하여 개인화된 조언을 하세요.\n"
                 "4. '오늘 하루 응원합니다' 같은 뻔한 말은 금지입니다.\n"
                 "5. 40자~80자 내외로 부드러운 존댓말(해요체)을 사용하세요.\n\n"
-                "상담사 조언(날씨와 감정 흐름이 통합된 한 문장):"
+                "마음온 조언(날씨와 감정 흐름이 통합된 한 문장):"
             )
 
             # Ollama Payload
@@ -353,19 +353,43 @@ class EmotionAnalysis:
             if user_risk_level >= 4: risk_desc = "매우 위험(Severe Risk)"
             elif user_risk_level == 3: risk_desc = "위험(Moderate Risk)"
             
-            # [Hybrid Safeguard] Python-side Keyword Check (Priority 0)
-            print(f"🕵️ [DEBUG] Analyzing Text (Type: {type(text)}): {text}")
-            DANGER_KEYWORDS = ["죽고", "자살", "뛰어", "사라지고", "끝내", "망했", "살기 싫", "칼", "약", "수면제"]
-            found_keywords = [k for k in DANGER_KEYWORDS if k in text]
-            is_urgent_risk = len(found_keywords) > 0
+            # [Phase 4] 3단계 위기 분류 시스템
+            CRISIS_LEVEL_3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고"]
+            CRISIS_LEVEL_2 = ["사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝"]
+            CRISIS_LEVEL_1 = ["힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물"]
+            
+            found_l3 = [k for k in CRISIS_LEVEL_3 if k in text]
+            found_l2 = [k for k in CRISIS_LEVEL_2 if k in text]
+            found_l1 = [k for k in CRISIS_LEVEL_1 if k in text]
+            
+            if found_l3:
+                crisis_level = 3
+                found_keywords = found_l3
+            elif found_l2:
+                crisis_level = 2
+                found_keywords = found_l2
+            elif found_l1:
+                crisis_level = 1
+                found_keywords = found_l1
+            else:
+                crisis_level = 0
+                found_keywords = []
+            
+            is_urgent_risk = crisis_level >= 2
             
             danger_note = ""
-            if is_urgent_risk:
-                print(f"🚨 [Analysis] Danger Keywords Detected: {found_keywords}")
-                danger_note = f"\n[긴급 알림: 내담자가 '{found_keywords}'와 같은 위험한 표현을 직접적으로 사용했습니다. 무조건 Followup을 YES로 하고 안전을 확인하는 질문을 던지세요.]"
+            if crisis_level >= 3:
+                print(f"🚨 [Analysis] LEVEL 3 CRISIS: {found_keywords}")
+                danger_note = f"\n[긴급 위험 Level 3: 내담자가 '{found_keywords}'와 같은 매우 위험한 표현을 사용했습니다. 반드시 안전 확인 질문을 하고 전문 상담 기관(1393) 연결을 안내하세요. '힘내세요', '긍정적으로 생각하세요' 같은 표현은 절대 사용하지 마세요.]"
+            elif crisis_level >= 2:
+                print(f"⚠️ [Analysis] LEVEL 2 RISK: {found_keywords}")
+                danger_note = f"\n[주의 Level 2: 내담자가 '{found_keywords}'와 같은 간접적 위험 표현을 사용했습니다. Followup을 YES로 하고 부드럽게 안전을 확인하세요. 섣부른 조언이나 '힘내세요' 같은 표현은 피하세요.]"
+            elif crisis_level >= 1:
+                print(f"💛 [Analysis] LEVEL 1 CONCERN: {found_keywords}")
+                danger_note = ""  # Level 1은 AI에게 특별 지시 불요, 기본 공감 대응
 
             prompt_text = (
-                f"너는 심리 상담 전문가야. 다음 내담자의 일기를 읽고 분석해줘.\n"
+                f"너는 감정 분석 전문가야. 다음 내담자의 일기를 읽고 분석해줘.\n"
                 f"내담자의 현재 상태: {risk_desc} (Level {user_risk_level})\n"
                 f"{context_section}"
                 f"{danger_note}\n"
@@ -373,7 +397,7 @@ class EmotionAnalysis:
                 f"### [분석 지침]:\n"
                 f"1. 내담자의 '수면 상태'와 '감정'의 연관성을 깊이 있게 분석해줘.\n"
                 f"2. 만약 내담자가 '죽고 싶다' 등 위험한 표현을 했거나({found_keywords}), 감정이 오랫동안 가라앉아 있다면 '추가 질문'을 생성해줘.\n"
-                f"3. 단순히 내용을 요약하지 말고, 전문적인 심리 분석 코멘트를 해줘.\n\n"
+                f"3. 단순히 내용을 요약하지 말고, 전문적인 감정 분석 코멘트를 해줘.\n\n"
                 f"### [필수 답변 형식]:\n"
                 f"Emotion: ('행복', '우울', '분노', '평온', '불안', '당황' 중 하나, 반드시 한국어로)\n"
                 f"Confidence: (0~100 숫자만)\n"
@@ -655,22 +679,23 @@ class EmotionAnalysis:
         
         prompt_text = (
             "## SYSTEM: You represent a thoughtful, empathetic counselor with 20 years of experience. You must ANSWER IN KOREAN ONLY.\n"
-            "당신은 20년 경력의 베테랑 심리 상담사입니다. 아래 내담자(사용자)의 일기 기록과 통계를 자세히 읽고 분석해주세요.\n\n"
+            "당신은 20년 경력의 베테랑 감정 분석 전문가입니다. 아래 내담자(사용자)의 일기 기록과 통계를 자세히 읽고 분석해주세요.\n\n"
             f"### [사용자 데이터]\n{diary_summary}\n\n"
             "### [작성 지침]\n"
             "1. **언어**: 반드시 **한국어(Korean)**로만 작성하세요. 영어는 절대 사용하지 마세요.\n"
-            "2. **형식**: 사용자에게 보내는 '심층 심리 분석 리포트' 형식으로 작성하세요.\n"
-            "3. **분량**: 반드시 **서론-본론(진단)-결론(처방)**의 흐름을 갖춘 **총 10문단 이상의 긴 글**이어야 합니다.\n"
-            "4. **어조**: 전문적인 심리학 용어를 사용하되, 따뜻하고 이해하기 쉬운 언어로 풀어주세요.\n\n"
+            "2. **형식**: 사용자에게 보내는 '심층 감정 분석 리포트' 형식으로 작성하세요.\n"
+            "3. **분량**: 반드시 **서론-본론(분석)-결론(제언)**의 흐름을 갖춘 **총 10문단 이상의 긴 글**이어야 합니다.\n"
+            "4. **어조**: 전문적인 감정 분석 용어를 사용하되, 따뜻하고 이해하기 쉬운 언어로 풀어주세요.\n\n"
             "### [리포트 구조]\n"
-            "1부. **마음의 지도 (현상 진단)** (5문단)\n"
+            "1부. **마음의 지도 (현상 분석)** (5문단)\n"
             "   - 내담자가 주로 사용하는 감정 언어와 내면의 상태 분석\n"
             "   - 반복되는 스트레스 패턴이나 감정의 트리거 파악\n"
             "   - 숨겨진 긍정적인 자원이나 강점 발굴\n\n"
-            "2부. **나아가야 할 길 (미래 처방)** (5문단)\n"
-            "   - 현재 상태에서 실천할 수 있는 구체적인 심리 기법 3가지 (ACT, CBT 등 활용)\n"
+            "2부. **나아가야 할 길 (미래 제언)** (5문단)\n"
+            "   - 현재 상태에서 실천할 수 있는 구체적인 감정 케어 방법 3가지 (마음챙김, 자기 기록 등 활용)\n"
             "   - 감정의 파도를 다스리는 생활 습관 제안\n"
-            "   - 상담사로서 전하는 진심 어린 격려와 희망의 메시지\n\n"
+            "   - 마음온으로서 전하는 진심 어린 격려와 희망의 메시지\n\n"
+            "**주의사항: 이 분석은 참고용이며 전문 의료 서비스를 대체하지 않습니다.**\n"
             "**중요: 모든 답변은 완벽한 한국어로 작성되어야 합니다. 번역투가 아닌 자연스러운 한국어를 사용하세요.**\n"
             "지금 바로 한국어로 리포트 작성을 시작하세요."
         )
@@ -718,8 +743,8 @@ class EmotionAnalysis:
                 
             prompt_text = (
                 "## SYSTEM: You represent a wise psychologist specializing in long-term therapy. Answer in KOREAN ONLY.\n"
-                "당신은 내담자의 '과거 심리 분석 리포트들'을 종합하여 장기적인 변화와 흐름을 분석하는 '메타 분석가'입니다.\n"
-                "아래 제공된 과거 리포트 기록들을 읽고, 내담자의 심리 상태가 시간의 흐름에 따라 어떻게 변화했는지 분석해주세요.\n\n"
+                "당신은 내담자의 '과거 감정 분석 리포트들'을 종합하여 장기적인 변화와 흐름을 분석하는 '메타 분석가'입니다.\n"
+                "아래 제공된 과거 리포트 기록들을 읽고, 내담자의 감정 상태가 시간의 흐름에 따라 어떻게 변화했는지 분석해주세요.\n\n"
                 f"{history_context}\n"
                 "### [작성 지침]\n"
                 "1. **언어**: 반드시 **한국어**로 작성하세요.\n"

@@ -325,7 +325,7 @@ const SCRIPT_RED = [
   },
   {
     field: 'medication_taken',
-    text: "오늘 처방받으신 약은 챙겨 드셨나요? 규칙적인 복용이 중요합니다. 💊",
+    text: "오늘 드시는 약은 챙겨 드셨나요? 규칙적인 복용이 중요합니다. 💊",
     inputType: 'select',
     options: [
       { value: true, label: '네, 복용했습니다' },
@@ -532,6 +532,17 @@ async function handleSend(event) {
     answers.value[field] = answerText;
     currentInput.value = '';
     if(textareaRef.value) textareaRef.value.style.height = 'auto';
+
+    // [Phase 4] 클라이언트 사이드 즉각 위기 감지
+    const CRISIS_L3 = ['죽고', '자살', '뛰어내', '목을', '손목', '유서', '마지막', '끝내고'];
+    const CRISIS_L2 = ['사라지고', '없어지고', '살기 싫', '의미 없', '끝내', '망했', '수면제', '칼', '약 먹', '다 끝'];
+    
+    if (CRISIS_L3.some(k => answerText.includes(k))) {
+        console.warn('🚨 [Crisis] LEVEL 3 detected - immediate safety modal');
+        window.dispatchEvent(new CustomEvent('open-safety-modal'));
+    } else if (CRISIS_L2.some(k => answerText.includes(k))) {
+        console.warn('⚠️ [Crisis] LEVEL 2 detected - awaiting server response');
+    }
 
     // 2. AI Reaction (Empathy or Follow-up Question) - Only for text inputs
     if (questions.value[currentStep.value].inputType === 'text') {

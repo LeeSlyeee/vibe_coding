@@ -63,9 +63,9 @@ struct AppAssessmentView: View {
                 Spacer()
             }
             #if os(iOS)
-            .navigationBarTitle("초기 심리 진단", displayMode: .inline)
+            .navigationBarTitle("초기 감정 체크", displayMode: .inline)
             #else
-            .navigationTitle("초기 심리 진단")
+            .navigationTitle("초기 감정 체크")
             #endif
             .padding()
         }

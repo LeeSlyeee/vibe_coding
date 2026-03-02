@@ -6,10 +6,10 @@ struct AppLoginView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var name = "" // [New] 실명
-    @State private var centerCode = "" // [New] 상담 센터 코드
+    @State private var centerCode = "" // [New] 기관 코드
     @State private var errorMessage = ""
     @State private var isLoading = false
-    @State private var isPasswordVisible = false // [Keyboard Fix] Toggle for custom keyboard usage
+    @State private var isPasswordVisible = false // 비밀번호 기본 숨김 (눈 아이콘으로 토글)
     
     // ✅ 로컬 모드에서는 서버 URL 불필요
     // let baseURL = "http://150.230.7.76"
@@ -38,38 +38,39 @@ struct AppLoginView: View {
                     }
                     .padding(.bottom, 20)
                     
-                    VStack(spacing: 16) {
-                        TextField("아이디 (닉네임)", text: $username)
-                            .padding()
-                            .frame(height: 50)
-                            .padding()
+                    VStack(spacing: 12) {
+                        TextField("이름 (실명)", text: $name)
+                            .keyboardType(.default)
+                            .padding(.horizontal, 16)
+                            .frame(height: 48)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
-                            #if os(iOS)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.default) // [Fix] Allow Custom Keyboards
-                            #endif
+                            .tint(.blue)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                         
-                        TextField("이름 (실명)", text: $name)
-                            .padding()
-                            .frame(height: 50)
-                            .padding()
+                        TextField("아이디 (닉네임)", text: $username)
+                            .keyboardType(.default)
+                            .padding(.horizontal, 16)
+                            .frame(height: 48)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
-                            .keyboardType(.default) // [Fix] Allow Korean
+                            .tint(.blue)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
 
-                        // [Fix] Password Field with Visibility Toggle
-                        // (SecureField forces default keyboard, TextField allows custom keyboard)
+                        // [Fix] SecureField을 완전히 제거 → iOS 로그인 폼 감지 방지 → 서드파티 키보드 유지
+                        // 비밀번호 마스킹은 시각적 오버레이로 처리
                         HStack {
-                            if isPasswordVisible {
+                            ZStack(alignment: .leading) {
                                 TextField("비밀번호", text: $password)
-                                    .keyboardType(.default) // Allow custom keyboard
-                                    .textInputAutocapitalization(.none)
-                            } else {
-                                SecureField("비밀번호", text: $password)
                                     .keyboardType(.default)
+                                    .tint(.blue)
+                                    .foregroundColor(isPasswordVisible ? .primary : .clear)
+                                
+                                if !isPasswordVisible && !password.isEmpty {
+                                    Text(String(repeating: "●", count: password.count))
+                                        .foregroundColor(.primary)
+                                        .allowsHitTesting(false)
+                                }
                             }
                             
                             Button(action: { isPasswordVisible.toggle() }) {
@@ -77,19 +78,19 @@ struct AppLoginView: View {
                                     .foregroundColor(.gray)
                             }
                         }
-                        .padding()
-                        .frame(height: 50)
-                        .padding()
+                        .padding(.horizontal, 16)
+                        .frame(height: 48)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                             
-                        TextField("상담 센터 코드 (선택)", text: $centerCode)
-                            .padding()
-                            .frame(height: 50)
-                            .padding()
-                            .background(Color(hexString: "f0fdf4")) // Light Green hint
+                        TextField("기관 코드 (선택)", text: $centerCode)
+                            .keyboardType(.default)
+                            .padding(.horizontal, 16)
+                            .frame(height: 48)
+                            .background(Color(hexString: "f0fdf4"))
                             .cornerRadius(12)
+                            .tint(.blue)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -127,22 +128,23 @@ struct AppLoginView: View {
                 }
                 .padding(.vertical)
             }
-            .onTapGesture {
-                hideKeyboard()
-            }
+            #if os(iOS)
+            .scrollDismissesKeyboard(.interactively)
+            #endif
         }
+        #if os(iOS)
+        .dismissKeyboardOnTap() // [Cursor Fix] UIKit 기반 키보드 닫기 (TextField 포커스 방해 없음)
+        #endif
     }
     
-    #if os(iOS)
-    func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-    }
-    #else
-    func hideKeyboard() {}
-    #endif
+    // hideKeyboard() is now a global function in ViewExtensions.swift
     
     func performLogin() {
         guard !username.isEmpty, !password.isEmpty, !name.isEmpty else { return }
+        
+        #if os(iOS)
+        dismissKeyboard()
+        #endif
         
         isLoading = true
         errorMessage = ""

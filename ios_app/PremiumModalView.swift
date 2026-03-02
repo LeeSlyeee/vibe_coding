@@ -31,7 +31,7 @@ struct PremiumModalView: View {
             // Features
             VStack(alignment: .leading, spacing: 16) {
                 FeatureRow(icon: "chart.bar.fill", title: "심층 분석 리포트", desc: "나의 감정 패턴과 원인을 깊이 있게 분석해드려요.")
-                FeatureRow(icon: "message.fill", title: "AI 심리 상담사", desc: "24시간 언제든 내 마음을 털어놓고 위로받으세요.")
+                FeatureRow(icon: "message.fill", title: "AI 감정 케어", desc: "24시간 언제든 내 마음을 기록하고 따뜻한 위로를 받으세요.")
                 FeatureRow(icon: "calendar", title: "월간 감정 통계", desc: "한 달간의 감정 변화를 그래프로 확인하세요.")
             }
             .padding(.vertical)
@@ -40,10 +40,10 @@ struct PremiumModalView: View {
             HStack(alignment: .top, spacing: 10) {
                 Text("🏥")
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("보건소/상담센터 안내")
+                    Text("보건소/정신건강복지센터 안내")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(Color(hexString: "15803d"))
-                    Text("관할 보건소나 정신건강복지센터에서 상담을 받으면 무료 업그레이드가 가능합니다.")
+                    Text("관할 보건소나 정신건강복지센터에서 서비스를 받으면 무료 업그레이드가 가능합니다.")
                         .font(.system(size: 13))
                         .foregroundColor(Color(hexString: "15803d"))
                         .fixedSize(horizontal: false, vertical: true)

@@ -403,7 +403,7 @@ onUnmounted(() => {
                             <!-- 2. 일기 본문 -->
                             <p class="text-slate-800 text-lg leading-relaxed mb-6 whitespace-pre-wrap font-book bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">{{ diary.content }}</p>
 
-                            <!-- 3. 추가 심리 데이터 (수면, 혼잣말, 감정) -->
+                            <!-- 3. 추가 감정 데이터 (수면, 혼잣말, 감정) -->
                             <div v-if="diary.display.sleep_condition || diary.display.self_talk || diary.display.emotion_meaning" class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div v-if="diary.display.sleep_condition" class="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     <h5 class="text-sm font-bold text-slate-600 mb-1">💤 수면 상태</h5>

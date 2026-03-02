@@ -94,7 +94,7 @@ struct AppDiaryDetailView: View {
                    
                    VStack(alignment: .leading, spacing: 10) {
                        HStack {
-                           Text("🤖 AI 심리 분석")
+                           Text("🤖 AI 감정 분석")
                                .font(.headline)
                                .foregroundColor(.blue)
                            Spacer()
@@ -133,7 +133,7 @@ struct AppDiaryDetailView: View {
                 } else if let aiAnalysisOnly = diary.ai_analysis, !aiAnalysisOnly.isEmpty {
                      // Fallback for old data without prediction
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("🤖 AI 심리 분석")
+                        Text("🤖 AI 감정 분석")
                             .font(.headline)
                             .foregroundColor(.blue)
                         Text(aiAnalysisOnly)
@@ -158,6 +158,14 @@ struct AppDiaryDetailView: View {
                     .padding(.top)
                 }
                 
+                // AI 면책 고지
+                if diary.ai_prediction != nil || diary.ai_analysis != nil || diary.ai_advice != nil || diary.ai_comment != nil {
+                    Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                        .padding(.top, 4)
+                }
+                
                 Spacer()
             }
             .padding()
@@ -180,7 +188,7 @@ struct AppDiaryDetailView: View {
                 },
                 diaryToEdit: diary
             )
-            .screenshotProtected(isProtected: true) // 스크린샷 방지
+            .screenshotProtected(isProtected: false) // 스크린샷 방지
         }
         .alert(isPresented: $showErrorAlert) {
             Alert(title: Text("삭제 실패"), message: Text(errorMessage), dismissButton: .default(Text("확인")))

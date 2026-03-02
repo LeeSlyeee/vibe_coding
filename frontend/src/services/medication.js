@@ -41,7 +41,7 @@ export const medicationAPI = {
     return response.data
   },
 
-  // 자가진단 (Assessment) 제출
+  // 자가 감정 체크 (Assessment) 제출
   submitAssessment: async (data) => {
     // data structure: { type, score, answers } or direct object
     const payload = data.type ? data : { type: 'PHQ-9', ...data }

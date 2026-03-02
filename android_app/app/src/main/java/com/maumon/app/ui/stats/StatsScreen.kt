@@ -90,6 +90,66 @@ fun StatsScreen(statsViewModel: StatsViewModel = viewModel()) {
             )
         }
 
+        // ── 마음 온도 카드 ──
+        if (uiState.moodTempLoaded) {
+            val tempColor = try {
+                Color(android.graphics.Color.parseColor(uiState.moodTempColor))
+            } catch (e: Exception) {
+                Color.Gray
+            }
+            
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 온도 게이지
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(tempColor.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            String.format("%.1f°", uiState.moodTemperature),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = tempColor
+                        )
+                    }
+                    
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "마음 온도",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                        Text(
+                            uiState.moodTempLabel,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = tempColor
+                        )
+                        Text(
+                            uiState.moodTempDesc,
+                            fontSize = 11.sp,
+                            color = Color.Gray,
+                            maxLines = 2
+                        )
+                    }
+                }
+            }
+        }
+
         // ── 탭 바 (iOS Modern Tab Bar 대응) ──
         Row(
             modifier = Modifier
@@ -668,6 +728,14 @@ fun ReportContent(state: StatsUiState) {
             }) {
                 Text("🔄 다시 분석", color = Color.Gray)
             }
+            
+            // 면책 고지
+            Text(
+                "💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.",
+                fontSize = 11.sp,
+                color = Color.Gray,
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

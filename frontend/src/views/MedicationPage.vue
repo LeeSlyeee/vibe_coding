@@ -3,7 +3,7 @@
     <header class="header">
       <h1>약물 관리</h1>
       <div class="header-buttons">
-        <button class="checkup-btn" @click="$router.push('/assessment')">📋 자가진단</button>
+        <button class="checkup-btn" @click="$router.push('/assessment')">📋 자가 감정 체크</button>
         <!-- 모든 사용자 약물 추가 가능 -->
         <button class="add-btn" @click="showAddModal = true">+ 약 추가</button>
       </div>

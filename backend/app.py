@@ -266,6 +266,9 @@ def get_me():
         elif avg_mood <= 3:
             risk = 'moderate'
 
+    # 마음 온도 계산
+    mood_temp = calculate_mood_temperature(user.id) if 'calculate_mood_temperature' in dir() else None
+
     return jsonify({
         'id': user.id,
         'username': user.username,
@@ -277,7 +280,8 @@ def get_me():
         'linked_center_code': user.center_code,
         'assessment_completed': assessment_done,
         'risk_level': risk,
-        'is_premium': (getattr(user, 'role', 'user') in ['premium', 'admin'])
+        'is_premium': (getattr(user, 'role', 'user') in ['premium', 'admin']),
+        'mood_temperature': mood_temp
     }), 200
     
 #Helper to safely decrypt
@@ -623,6 +627,148 @@ def connect_center():
 
     return jsonify({'msg': '기관 연결이 완료되었습니다.', 'center_code': center.code})
 
+# ─────────────────────────────────────────────
+# [Feature] 마음 온도 (Mood Temperature) API
+# ─────────────────────────────────────────────
+def calculate_mood_temperature(user_id):
+    """
+    마음 온도 산정 로직 (0~100°)
+    - 기분 레벨 (40%): 최근 7일 mood_level 평균 (1~5 → 0~100 매핑)
+    - 기록 빈도 (20%): 최근 7일 중 기록 일수 비율
+    - 수면 상태 (20%): sleep_condition 텍스트 기반 긍정/부정 분석
+    - 안정성 (20%): safety_flag 및 기분 안정도 (분산 기반)
+    """
+    from datetime import datetime, timedelta
+    
+    recent_cutoff = datetime.utcnow() - timedelta(days=7)
+    recent_diaries = Diary.query.filter(
+        Diary.user_id == user_id,
+        Diary.created_at >= recent_cutoff
+    ).order_by(Diary.date.desc()).all()
+    
+    # 데이터가 없으면 기본값 36.5° (건강한 체온 비유)
+    if not recent_diaries:
+        return {
+            "temperature": 36.5,
+            "label": "측정 중",
+            "description": "일기를 작성하면 마음 온도가 측정돼요!",
+            "color": "#86868b",
+            "diary_count": 0,
+            "factors": {
+                "mood_score": 0,
+                "frequency_score": 0,
+                "sleep_score": 0,
+                "stability_score": 0
+            }
+        }
+    
+    # 1. 기분 레벨 점수 (40%)
+    mood_levels = [d.mood_level or 3 for d in recent_diaries]
+    avg_mood = sum(mood_levels) / len(mood_levels)
+    mood_score = ((avg_mood - 1) / 4) * 100  # 1~5 → 0~100
+    
+    # 2. 기록 빈도 점수 (20%)
+    unique_dates = set(d.date for d in recent_diaries if d.date)
+    frequency_score = min((len(unique_dates) / 7) * 100, 100)
+    
+    # 3. 수면 상태 점수 (20%)
+    sleep_positive = ["잘", "충분", "숙면", "편안", "좋"]
+    sleep_negative = ["못", "불면", "뒤척", "힘들", "나쁘", "잠을 못"]
+    sleep_scores = []
+    for d in recent_diaries:
+        sleep_text = safe_decrypt(d.sleep_condition) if d.sleep_condition else ""
+        if not sleep_text:
+            sleep_scores.append(50)  # 기본값
+            continue
+        pos = sum(1 for kw in sleep_positive if kw in sleep_text)
+        neg = sum(1 for kw in sleep_negative if kw in sleep_text)
+        if pos > neg:
+            sleep_scores.append(80)
+        elif neg > pos:
+            sleep_scores.append(30)
+        else:
+            sleep_scores.append(50)
+    sleep_score = sum(sleep_scores) / len(sleep_scores) if sleep_scores else 50
+    
+    # 4. 안정성 점수 (20%) - 기분 분산 + safety_flag
+    if len(mood_levels) > 1:
+        mean = sum(mood_levels) / len(mood_levels)
+        variance = sum((x - mean) ** 2 for x in mood_levels) / len(mood_levels)
+        # 분산이 낮을수록 안정적 (0~4 범위, 2 이상이면 불안정)
+        stability_score = max(0, 100 - (variance * 25))
+    else:
+        stability_score = 50
+    
+    # safety_flag가 있으면 안정성 감점
+    has_safety_flag = any(
+        getattr(d, 'safety_flag', None) in [True, 'need_help', 'danger']
+        for d in recent_diaries
+    )
+    if has_safety_flag:
+        stability_score = max(0, stability_score - 30)
+    
+    # 종합 점수 계산 (가중 평균)
+    raw_score = (
+        mood_score * 0.40 +
+        frequency_score * 0.20 +
+        sleep_score * 0.20 +
+        stability_score * 0.20
+    )
+    
+    # 0~100 → 마음 온도 매핑 (20°~45° 범위, 36.5°가 건강한 중심)
+    # score 50 = 36.5°, score 0 = 20°, score 100 = 45°
+    temperature = 20 + (raw_score / 100) * 25
+    temperature = round(temperature, 1)
+    
+    # 라벨 및 색상 결정
+    if temperature >= 40:
+        label = "뜨거움 🔥"
+        description = "마음이 매우 활발해요! 열정이 가득합니다."
+        color = "#ff6b6b"
+    elif temperature >= 37.5:
+        label = "따뜻함 ☀️"
+        description = "마음이 따뜻하고 안정적이에요."
+        color = "#ffa726"
+    elif temperature >= 35:
+        label = "건강 💚"
+        description = "마음이 균형 잡혀 있어요. 좋은 상태입니다!"
+        color = "#66bb6a"
+    elif temperature >= 30:
+        label = "서늘함 🌤"
+        description = "조금 차분한 상태에요. 따뜻한 활동을 해보세요."
+        color = "#42a5f5"
+    else:
+        label = "차가움 ❄️"
+        description = "마음이 많이 지쳐 있어요. 주변에 도움을 요청해보세요."
+        color = "#7e57c2"
+    
+    return {
+        "temperature": temperature,
+        "label": label,
+        "description": description,
+        "color": color,
+        "diary_count": len(recent_diaries),
+        "factors": {
+            "mood_score": round(mood_score, 1),
+            "frequency_score": round(frequency_score, 1),
+            "sleep_score": round(sleep_score, 1),
+            "stability_score": round(stability_score, 1)
+        }
+    }
+
+@app.route('/api/mood-temperature', methods=['GET'])
+@jwt_required()
+def get_mood_temperature():
+    """마음 온도 조회 API"""
+    user_id = int(get_jwt_identity())
+    user = User.query.filter_by(id=user_id).first()
+    
+    if not user:
+        return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404
+    
+    result = calculate_mood_temperature(user_id)
+    return jsonify(result), 200
+
 # [Health Check]
 @app.route('/api', methods=['GET'])
 def health_check():
@@ -673,26 +819,28 @@ def run_async_analysis(user_id, mode='daily'):
                      return
                      
                 system_prompt = (
-                    "당신은 20년 이상 임상 경험을 가진 저명한 심리 상담가이자 데이터 분석 전문가입니다. "
-                    "내담자의 지난 30일간의 일기 데이터를 정밀 분석하여, 전문적이고 깊이 있는 '월간 심층 심리 분석 보고서'를 작성해야 합니다.\n\n"
+                    "당신은 20년 이상 임상 경험을 가진 저명한 감정 분석 전문가이자 데이터 분석 전문가입니다. "
+                    "내담자의 지난 30일간의 일기 데이터를 정밀 분석하여, 전문적이고 깊이 있는 '월간 심층 감정 분석 보고서'를 작성해야 합니다.\n\n"
                     "### 보고서 작성 지침:\n"
                     "1. **형식**: 줄글이 아닌, 아래의 섹션별로 명확히 구분하여 작성하십시오.\n"
-                    "   - **1. [종합 소견]**: 내담자의 한 달간의 심리 상태를 3~4문장으로 요약하고, 핵심 키워드를 제시하십시오.\n"
+                    "   - **1. [종합 소견]**: 내담자의 한 달간의 감정 상태를 3~4문장으로 요약하고, 핵심 키워드를 제시하십시오.\n"
                     "   - **2. [감정 흐름 및 패턴 분석]**: 감정의 기복, 주된 정서, 그리고 특정한 상황에서의 반응 패턴을 심층적으로 분석하십시오.\n"
                     "   - **3. [내면의 발견]**: 일기 속에 숨겨진 내담자의 무의식적 욕구, 가치관, 혹은 반복되는 갈등 요소를 통찰력 있게 짚어주십시오.\n"
-                    "   - **4. [전문가 제언 및 처방]**: 현재 상태에 가장 필요한 구체적인 심리 기법(예: 인지행동치료, 마음챙김 명상, 작문 치료 등)을 실천 가능한 형태로 처방하십시오.\n"
+                    "   - **4. [전문가 제언]**: 현재 상태에 가장 필요한 구체적인 감정 케어 방법(예: 마음챙김 명상, 자기 기록, 소통 연습 등)을 실천 가능한 형태로 제안하십시오.\n"
                     "2. **톤앤매너**: 매우 전문적이고 권위 있으면서도, 인간적인 따뜻함과 신뢰를 잃지 않는 어조를 유지하십시오.\n"
-                    "3. **분량**: 각 섹션마다 충분한 근거와 상세한 서술을 포함하여 풍부하게 작성하십시오."
+                    "3. **분량**: 각 섹션마다 충분한 근거와 상세한 서술을 포함하여 풍부하게 작성하십시오.\n"
+                    "4. **주의사항**: 이 분석은 참고용이며 전문 의료 서비스를 대체하지 않습니다."
                 )
             else: # Daily / Summary
                 system_prompt = (
-                    "당신은 통찰력 있고 섬세한 AI 심리 상담 전문가입니다. "
-                    "내담자의 최근 일기 기록(최근 10건)을 바탕으로, 현재의 심리 상태를 진단하는 '주간 심리 케어 리포트'를 작성해주세요.\n\n"
+                    "당신은 통찰력 있고 섬세한 AI 감정 분석 전문가입니다. "
+                    "내담자의 최근 일기 기록(최근 10건)을 바탕으로, 현재의 감정 상태를 분석하는 '주간 감정 케어 리포트'를 작성해주세요.\n\n"
                     "### 리포트 구성:\n"
                     "1. **[현재 마음 날씨]**: 최근 내담자의 감정을 날씨에 비유하여 표현하고, 그 이유를 설명하십시오.\n"
-                    "2. **[주요 심리 이슈]**: 최근 반복적으로 나타나는 고민이나 감정의 원인을 분석하십시오.\n"
+                    "2. **[주요 감정 이슈]**: 최근 반복적으로 나타나는 고민이나 감정의 원인을 분석하십시오.\n"
                     "3. **[오늘의 힐링 메시지]**: 내담자에게 가장 필요한 위로와 격려, 그리고 긍정적인 에너지를 주는 메시지를 전하십시오.\n"
-                    "**작성 원칙**: 단순한 요약이 아니라, 내담자가 미처 깨닫지 못한 부분을 짚어주는 **전문적인 통찰**을 제공해야 합니다."
+                    "**작성 원칙**: 단순한 요약이 아니라, 내담자가 미처 깨닫지 못한 부분을 짚어주는 **전문적인 통찰**을 제공해야 합니다.\n"
+                    "**주의사항**: 이 분석은 참고용이며 전문 의료 서비스를 대체하지 않습니다."
                 )
             
             prompt = f"{system_prompt}\n\n[내담자의 최근 일기 데이터]\n{context_text}\n\n[전문가 분석 보고서]"
@@ -923,7 +1071,7 @@ def get_statistics():
         return jsonify({'daily': [], 'timeline': [], 'moods': [], 'weather': []}), 200
 
 # ─────────────────────────────────────────────
-# [Assessment] PHQ-9 초기 심리 진단 결과 수신
+# [Assessment] PHQ-9 초기 감정 체크 결과 수신
 # ─────────────────────────────────────────────
 @app.route('/api/assessment', methods=['POST'])
 @jwt_required()
@@ -953,7 +1101,7 @@ def submit_assessment():
         'status': 'ok',
         'score': score,
         'risk_level': risk,
-        'message': '진단이 완료되었습니다.'
+        'message': '감정 체크가 완료되었습니다.'
     }), 200
 
 if __name__ == '__main__':

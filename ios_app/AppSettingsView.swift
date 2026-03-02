@@ -380,7 +380,7 @@ struct AppSettingsView: View {
                     } else {
                         // 연동 안 된 상태
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("보건소/상담센터 연결하기")
+                            Text("보건소/정신건강복지센터 연결하기")
                                 .font(.headline)
                             Text("담당 선생님께 전달받은 코드를 입력하세요.")
                                 .font(.caption)
@@ -446,7 +446,7 @@ struct AppSettingsView: View {
                                         .font(.headline)
                                         .fontWeight(.bold)
                                         .foregroundColor(.purple)
-                                    Text("더 깊은 분석과 무제한 상담을 받아보세요.")
+                                    Text("더 깊은 분석과 무제한 감정 분석을 받아보세요.")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -494,6 +494,41 @@ struct AppSettingsView: View {
                             .font(.caption)
                             .foregroundColor(.blue)
                     }
+                }
+                
+                // Section 4.5: 법적 고지 (Legal Disclaimer)
+                Section(header: Text("⚖️ 법적 고지")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("마음온은 감정 기록 보조 도구입니다")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        
+                        Text("본 서비스는 의료 행위, 심리 치료, 또는 전문 상담을 대체하지 않습니다. AI가 제공하는 분석과 코멘트는 참고용이며, 의료적 판단으로 간주될 수 없습니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Divider()
+                        
+                        Text("⚠️ 긴급 상황 안내")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.red)
+                        
+                        Text("정신건강 위기 상황에서는 반드시 전문 의료기관 또는 아래 긴급전화를 이용해 주세요.\n• 자살예방 상담전화: 1393\n• 정신건강 위기상담전화: 1577-0199\n• 경찰: 112")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        Divider()
+                        
+                        Text("📋 개인정보 처리")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                        
+                        Text("기본적으로 모든 데이터는 사용자 기기에만 저장됩니다. 기관 연동 시에만 선택한 정보가 암호화되어 전송됩니다.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 4)
                 }
                 
                 // Section 5: 앱 종료 (Safe Exit)
@@ -645,7 +680,7 @@ struct AppSettingsView: View {
                         showPremiumModal = false
                     }
                 })
-                .screenshotProtected(isProtected: true) // 스크린샷 방지
+                .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
             // [New] Birth Date Picker Sheet
             .sheet(isPresented: $showBirthDatePicker) {

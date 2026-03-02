@@ -34,7 +34,7 @@
         <!-- Case A: 연동 안 됨 -->
         <div v-if="!isLinked" class="link-card not-linked">
           <div class="card-header">
-             <h4>보건소/상담센터 연결하기</h4>
+             <h4>보건소/정신건강복지센터 연결하기</h4>
              <p>담당 선생님께 전달받은 코드를 입력하세요.</p>
           </div>
           
@@ -102,7 +102,7 @@
             <div class="card-header" style="display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
                  <div>
                     <h4 style="color: #6b21a8; font-weight: bold; font-size: 1.1rem; margin: 0;">마음챙김 플러스 +</h4>
-                    <p style="color: #9333ea; margin-top: 4px; font-size: 0.9rem;">더 깊은 분석과 무제한 상담을 받아보세요.</p>
+                    <p style="color: #9333ea; margin-top: 4px; font-size: 0.9rem;">더 깊은 분석과 무제한 감정 분석을 받아보세요.</p>
                  </div>
                  <div style="font-size: 1.5rem; color: #a855f7;">✨</div>
             </div>
@@ -120,6 +120,38 @@
         <div class="info-row">
             <span>개발자</span>
             <span class="text-gray">maumON Team</span>
+        </div>
+      </section>
+
+      <!-- Section 3.5: 법적 고지 (Legal Disclaimer) -->
+      <section class="settings-section">
+        <h3 class="section-title">⚖️ 법적 고지</h3>
+        <div style="background: white; padding: 16px; border-radius: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.02);">
+          <p style="font-size: 14px; font-weight: 600; color: #1d1d1f; margin: 0 0 8px 0;">
+            마음온은 감정 기록 보조 도구입니다
+          </p>
+          <p style="font-size: 12px; color: #86868b; line-height: 1.6; margin: 0 0 12px 0;">
+            본 서비스는 의료 행위, 심리 치료, 또는 전문 상담을 대체하지 않습니다.
+            AI가 제공하는 분석과 코멘트는 참고용이며, 의료적 판단으로 간주될 수 없습니다.
+          </p>
+          
+          <div style="border-top: 1px solid #f5f5f7; padding-top: 12px; margin-bottom: 12px;">
+            <p style="font-size: 12px; font-weight: 600; color: #ff3b30; margin: 0 0 6px 0;">⚠️ 긴급 상황 안내</p>
+            <p style="font-size: 12px; color: #86868b; line-height: 1.6; margin: 0;">
+              정신건강 위기 상황에서는 반드시 전문 의료기관 또는 아래 긴급전화를 이용해 주세요.<br/>
+              • 자살예방 상담전화: 1393<br/>
+              • 정신건강 위기상담전화: 1577-0199<br/>
+              • 경찰: 112
+            </p>
+          </div>
+          
+          <div style="border-top: 1px solid #f5f5f7; padding-top: 12px;">
+            <p style="font-size: 12px; font-weight: 600; color: #1d1d1f; margin: 0 0 6px 0;">📋 개인정보 처리</p>
+            <p style="font-size: 12px; color: #86868b; line-height: 1.6; margin: 0;">
+              기본적으로 모든 데이터는 사용자 기기에만 저장됩니다.
+              기관 연동 시에만 사용자가 동의한 정보가 암호화되어 전송됩니다.
+            </p>
+          </div>
         </div>
       </section>
 

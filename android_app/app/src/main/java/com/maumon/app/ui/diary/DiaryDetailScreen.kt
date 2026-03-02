@@ -116,7 +116,7 @@ fun DiaryDetailScreen(
                 DetailCard(title = "💬 나에게 하는 말", content = it)
             }
 
-            // 🤖 AI 심리 분석 (iOS AppDiaryDetailView 대응)
+            // 🤖 AI 감정 분석 (iOS AppDiaryDetailView 대응)
             val aiPredLabel = diary.aiPrediction?.takeIf {
                 it.isNotBlank() && it != "분석 중..."
             }
@@ -131,7 +131,7 @@ fun DiaryDetailScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "🤖 AI 심리 분석",
+                            "🤖 AI 감정 분석",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF1976D2)
@@ -173,6 +173,16 @@ fun DiaryDetailScreen(
                         Text(aiAdviceText, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
+            }
+
+            // AI 면책 고지
+            if (aiPredLabel != null || aiAnalysisText != null || aiAdviceText != null) {
+                Text(
+                    "💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.",
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))

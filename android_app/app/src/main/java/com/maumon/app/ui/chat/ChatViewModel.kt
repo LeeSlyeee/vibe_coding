@@ -13,7 +13,9 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isTyping: Boolean = false,
     val showCrisisBanner: Boolean = false,
-    val useServerAI: Boolean = true, // iOS useServerAI 대응
+    val crisisLevel: Int = 0, // [Phase 4] 0=안전, 1=관심, 2=주의, 3=위험
+    val showSOSDialog: Boolean = false, // [Phase 4] Level 3 즉시 모달
+    val useServerAI: Boolean = true,
     val isModelLoaded: Boolean = false,
 )
 
@@ -24,7 +26,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     private val llmService = LLMService.getInstance()
 
-    private val crisisKeywords = listOf("죽고", "자살", "뛰어내", "사라지고", "수면제")
+    // [Phase 4] 3단계 위기 분류 시스템
+    private val crisisLevel3 = listOf("죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고")
+    private val crisisLevel2 = listOf("사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝")
+    private val crisisLevel1 = listOf("힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물")
 
     init {
         // 로컬 LLM 모델 로드 상태 관찰
@@ -48,18 +53,38 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** [Phase 4] SOS 다이얼로그 닫기 */
+    fun dismissSOSDialog() {
+        _uiState.value = _uiState.value.copy(showSOSDialog = false)
+    }
+
     fun sendMessage(text: String) {
         val userMsg = ChatMessage(text = text, isUser = true)
         val currentMessages = _uiState.value.messages + userMsg
 
-        // 위기 감지
-        val crisis = crisisKeywords.any { text.contains(it) }
+        // [Phase 4] 3단계 위기 감지
+        val detectedLevel = when {
+            crisisLevel3.any { text.contains(it) } -> 3
+            crisisLevel2.any { text.contains(it) } -> 2
+            crisisLevel1.any { text.contains(it) } -> 1
+            else -> 0
+        }
+        
+        val maxLevel = maxOf(_uiState.value.crisisLevel, detectedLevel)
 
         _uiState.value = _uiState.value.copy(
             messages = currentMessages,
             isTyping = true,
-            showCrisisBanner = _uiState.value.showCrisisBanner || crisis
+            crisisLevel = maxLevel,
+            showCrisisBanner = maxLevel >= 2,
+            showSOSDialog = detectedLevel >= 3 // Level 3: 즉시 SOS 다이얼로그
         )
+        
+        if (detectedLevel >= 3) {
+            android.util.Log.w("ChatVM", "🚨 [Crisis] LEVEL 3 detected!")
+        } else if (detectedLevel >= 2) {
+            android.util.Log.w("ChatVM", "⚠️ [Crisis] LEVEL 2 detected!")
+        }
 
         viewModelScope.launch {
             val aiText = if (_uiState.value.useServerAI) {

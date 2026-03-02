@@ -144,7 +144,7 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                         Text("👋", fontSize = 40.sp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.",
+                            "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.\n\n💡 마음온은 감정 기록 보조 도구이며, 전문 의료 서비스를 대체하지 않아요.",
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             color = Color.Gray,
                             lineHeight = 22.sp
@@ -222,6 +222,71 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                 }
             }
         }
+    }
+    
+    // [Phase 4] Level 3 위기 감지 시 즉시 SOS 다이얼로그
+    if (uiState.showSOSDialog) {
+        val context = LocalContext.current
+        AlertDialog(
+            onDismissRequest = { /* 의도적으로 쉽게 닫히지 않음 */ },
+            icon = { Text("🆘", fontSize = 36.sp) },
+            title = { 
+                Text(
+                    "당신은 혼자가 아닙니다",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            },
+            text = {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "지금 힘든 순간도 반드시 지나갑니다.\n전문가의 도움을 받아보세요.",
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        color = Color.Gray
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // 긴급 연락처 버튼들
+                    Button(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:1393"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                    ) {
+                        Text("📞 자살예방 상담전화 1393", fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:15770199"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("🏥 정신건강 상담전화 1577-0199")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:112"))
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("👮 경찰청 긴급신고 112")
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    chatViewModel.dismissSOSDialog()
+                }) {
+                    Text("닫기", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 

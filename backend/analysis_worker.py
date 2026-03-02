@@ -114,10 +114,70 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
                              content = output['text']
                          elif 'response' in output:
                              content = output['response']
+                         elif 'choices' in output:
+                             # vLLM 형식: {"choices": [{"text": "...", "tokens": [...]}]}
+                             choices = output['choices']
+                             if isinstance(choices, list) and len(choices) > 0:
+                                 choice = choices[0]
+                                 if isinstance(choice, dict):
+                                     content = choice.get('text', '')
+                                     if not content and 'tokens' in choice:
+                                         tokens = choice['tokens']
+                                         content = ''.join(str(t) for t in tokens) if isinstance(tokens, list) else str(tokens)
+                                     if not content:
+                                         msg = choice.get('message', {})
+                                         content = msg.get('content', '') if isinstance(msg, dict) else ''
+                                 else:
+                                     content = str(choice)
+                             else:
+                                 content = json.dumps(output, ensure_ascii=False)
+                             content = content.strip()
                          else:
                              content = json.dumps(output, ensure_ascii=False)
+                    elif isinstance(output, list):
+                         # RunPod vLLM 실제 형태: [{'choices': [{'tokens': ['텍스트']}], 'usage': {...}}]
+                         content = ''
+                         if len(output) > 0:
+                             first = output[0]
+                             if isinstance(first, dict) and 'choices' in first:
+                                 choices = first['choices']
+                                 if isinstance(choices, list) and len(choices) > 0:
+                                     choice = choices[0]
+                                     if isinstance(choice, dict):
+                                         if 'tokens' in choice:
+                                             tokens = choice['tokens']
+                                             content = ''.join(str(t) for t in tokens) if isinstance(tokens, list) else str(tokens)
+                                         elif 'text' in choice:
+                                             content = choice['text']
+                             elif isinstance(first, dict) and 'text' in first:
+                                 content = first['text']
+                         if not content:
+                             content = json.dumps(output, ensure_ascii=False)
+                    elif isinstance(output, str):
+                         # output이 문자열인 경우
+                         content = output.strip()
+                         if content.startswith('[{') or content.startswith('{'):
+                             try:
+                                 parsed = ast.literal_eval(content)
+                                 if isinstance(parsed, list) and len(parsed) > 0:
+                                     first = parsed[0]
+                                     if isinstance(first, dict) and 'choices' in first:
+                                         choices = first['choices']
+                                         if isinstance(choices, list) and len(choices) > 0:
+                                             choice = choices[0]
+                                             if isinstance(choice, dict):
+                                                 if 'tokens' in choice:
+                                                     tokens = choice['tokens']
+                                                     content = ''.join(str(t) for t in tokens) if isinstance(tokens, list) else str(tokens)
+                                                 elif 'text' in choice:
+                                                     content = choice['text']
+                             except:
+                                 pass
                     else:
                          content = str(output)
+                    
+                    # 최종 정제: 이스케이프 복원
+                    content = content.replace('\\n', '\n').strip()
                     
                     return content
                     
@@ -159,7 +219,7 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
 
 def generate_ai_analysis(content):
     prompt_text = (
-        f"너는 다정하고 섬세한 심리 상담 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
+        f"너는 다정하고 섬세한 감정 케어 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
         f"{content}\n\n"
         "### 지시사항:\n"
         "1. 'comment': 회원의 감정을 읽고 따뜻하게 위로하는 말 (해요체, 150자 내외)\n"

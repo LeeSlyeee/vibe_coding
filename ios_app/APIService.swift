@@ -464,6 +464,69 @@ class APIService: NSObject {
         }
     }
     
+    // MARK: - AI Analysis Report (RunPod → Ollama 서버 체인)
+    func requestAnalysisReport(diaries: [[String: Any]], mode: String, completion: @escaping (Result<String, Error>) -> Void) {
+        ensureAuth { success in
+            guard success else {
+                completion(.failure(NSError(domain: "Auth", code: 401, userInfo: [NSLocalizedDescriptionKey: "인증 실패"])))
+                return
+            }
+            
+            let endpoint = "/chat/analysis-report"
+            guard let url = URL(string: self.llmServerURL + endpoint) else { return }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.timeoutInterval = 300.0 // RunPod cold start 대비 5분
+            
+            if let token = self.token {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
+            
+            let payload: [String: Any] = [
+                "diaries": diaries,
+                "mode": mode
+            ]
+            
+            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+            
+            print("🚀 [API] Analysis Report Request: mode=\(mode), diaries=\(diaries.count)개")
+            
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    print("❌ [API] Analysis Report Failed: \(error.localizedDescription)")
+                    completion(.failure(error))
+                    return
+                }
+                
+                guard let data = data, let httpResponse = response as? HTTPURLResponse else {
+                    completion(.failure(NSError(domain: "Network", code: -1, userInfo: nil)))
+                    return
+                }
+                
+                if httpResponse.statusCode != 200 {
+                    print("⚠️ [API] Analysis Report Error: \(httpResponse.statusCode)")
+                    completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
+                    return
+                }
+                
+                do {
+                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let report = json["report"] as? String {
+                        let source = json["source"] as? String ?? "unknown"
+                        print("✅ [API] Analysis Report Received (source: \(source))")
+                        completion(.success(report))
+                    } else {
+                        completion(.failure(NSError(domain: "API", code: -1, userInfo: [NSLocalizedDescriptionKey: "report 필드 없음"])))
+                    }
+                } catch {
+                    completion(.failure(error))
+                }
+            }.resume()
+        }
+    }
+    
     // ... (Core Networking needs to support variable baseURL) ...
     
     // MARK: - Core Networking

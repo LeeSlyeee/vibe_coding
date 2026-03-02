@@ -173,9 +173,10 @@
           <div v-else-if="currentDiary.ai_comment" class="ai-letter-box">
             <div class="letter-header">
               <span class="ai-icon">💌</span>
-              <span class="ai-sender">AI 심리 상담사의 편지</span>
+              <span class="ai-sender">마음온의 편지</span>
             </div>
             <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
+            <p style="font-size: 10px; color: #b0b0b0; margin-top: 8px; text-align: right;">💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.</p>
           </div>
         </div>
 

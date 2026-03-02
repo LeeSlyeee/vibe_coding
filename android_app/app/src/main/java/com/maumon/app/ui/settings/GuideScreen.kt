@@ -106,7 +106,7 @@ fun GuideScreen(onBack: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 GuideSectionHeader(
                     title = "🤖 AI 감정 분석 & 코멘트",
-                    desc = "전문 상담사급 AI가 당신의 마음을 읽어드립니다."
+                    desc = "AI가 당신의 마음을 따뜻하게 읽어드립니다."
                 )
                 GuideFeatureCard(
                     icon = "🧠",
@@ -115,7 +115,7 @@ fun GuideScreen(onBack: () -> Unit) {
                 )
                 GuideFeatureCard(
                     icon = "💬",
-                    title = "전문 상담사급 AI 코멘트 (Gemma 2)",
+                    title = "AI 감정 분석 코멘트 (Gemma 2)",
                     desc = "구글의 최신 모델 Gemma 2 (2b)가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다."
                 )
             }
@@ -130,14 +130,14 @@ fun GuideScreen(onBack: () -> Unit) {
                 )
                 GuideFeatureCard(
                     icon = "🛡️",
-                    title = "🔒 철통 보안 AI 상담사",
+                    title = "🔒 철통 보안 AI 감정 분석",
                     desc = "외부 클라우드 전송 NO! 안전한 로컬/개인 서버 AI가 당신만의 비밀 공간에서 분석합니다.",
                     highlight = true
                 )
                 GuideFeatureCard(
                     icon = "📑",
-                    title = "🧠 심층 심리 리포트",
-                    desc = "일기가 3개 이상 모이면, 나만의 심리 보고서를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 진단)"
+                    title = "🧠 심층 감정 리포트",
+                    desc = "일기가 3개 이상 모이면, 나만의 감정 분석 보고서를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 분석)"
                 )
                 GuideFeatureCard(
                     icon = "🔭",

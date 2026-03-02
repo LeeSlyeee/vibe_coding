@@ -33,6 +33,13 @@ struct AppStatsView: View {
     // [New] Settings Modal State
     @State private var showSettings = false
     
+    // [New] 마음 온도 State
+    @State private var moodTemperature: Double = 36.5
+    @State private var moodTempLabel: String = "측정 중"
+    @State private var moodTempDesc: String = ""
+    @State private var moodTempColor: String = "#86868b"
+    @State private var moodTempLoaded = false
+    
     
     
     let tabs = [
@@ -63,13 +70,13 @@ struct AppStatsView: View {
                         
                         if authManager.riskLevel >= 2 {
                             // 중증(위험) 사용자용 메시지
-                            Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/상담센터와 연동해주세요.")
+                            Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/정신건강복지센터와 연동해주세요.")
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.red)
                                 .fontWeight(.semibold)
                         } else {
                             // 경증(일반) 사용자용 메시지
-                            Text("보건소/상담센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
+                            Text("보건소/정신건강복지센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
                                 .multilineTextAlignment(.center)
                                 .foregroundColor(.secondary)
                         }
@@ -100,7 +107,7 @@ struct AppStatsView: View {
                             connectToCenter()
                         }
                     } message: {
-                        Text("보건소나 상담센터에서 발급받은\n코드를 입력해주세요.")
+                        Text("보건소나 정신건강복지센터에서 발급받은\n코드를 입력해주세요.")
                     }
                         
                     Spacer()
@@ -134,8 +141,44 @@ struct AppStatsView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
-                .padding(.bottom, 20)
+                .padding(.bottom, 10)
                 .background(Color.white.opacity(0.8))
+                
+                // 마음 온도 카드
+                if moodTempLoaded {
+                    HStack(spacing: 16) {
+                        // 온도계 아이콘
+                        ZStack {
+                            Circle()
+                                .fill(Color(hexString: moodTempColor).opacity(0.15))
+                                .frame(width: 60, height: 60)
+                            Text(String(format: "%.1f°", moodTemperature))
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(Color(hexString: moodTempColor))
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("마음 온도")
+                                .font(.caption)
+                                .foregroundColor(.secondaryText)
+                            Text(moodTempLabel)
+                                .font(.headline)
+                                .foregroundColor(Color(hexString: moodTempColor))
+                            Text(moodTempDesc)
+                                .font(.caption2)
+                                .foregroundColor(.secondaryText)
+                                .lineLimit(2)
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(16)
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 10)
+                }
                 
                 // Modern Tab Bar
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -197,6 +240,7 @@ struct AppStatsView: View {
         if b2gManager.isLinked {
             fetchExistingReports()
         }
+        fetchMoodTemperature()
     }
     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
         // [UX] 데이터 갱신 알림 수신 시 재계산
@@ -219,10 +263,44 @@ struct AppStatsView: View {
                     .navigationBarItems(trailing: Button("닫기") {
                         showSettings = false
                     })
-                    .screenshotProtected(isProtected: true) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
+    }
+    
+    // [New] 마음 온도 API 호출
+    func fetchMoodTemperature() {
+        guard let token = authManager.token else { return }
+        
+        let baseURL = "https://217.142.253.35.nip.io/api"
+        guard let url = URL(string: "\(baseURL)/mood-temperature") else { return }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                if let temp = json["temperature"] as? Double {
+                    self.moodTemperature = temp
+                }
+                if let label = json["label"] as? String {
+                    self.moodTempLabel = label
+                }
+                if let desc = json["description"] as? String {
+                    self.moodTempDesc = desc
+                }
+                if let color = json["color"] as? String {
+                    self.moodTempColor = color
+                }
+                self.moodTempLoaded = true
+            }
+        }.resume()
     }
     
     // [New] Connect Helper
@@ -313,29 +391,151 @@ struct AppStatsView: View {
 
     func startReport() { 
         isGeneratingReport = true
-        // 로컬 AI 분석 시뮬레이션 (3초 후 완료)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            self.reportContent = """
-            [AI 분석 리포트]
-            최근 작성하신 일기를 분석해보니, 전반적으로 안정적인 기분을 유지하고 계시네요.
-            특히 어제 기록하신 '편안함'이 긍정적인 영향을 주고 있습니다.
-            보건소 연동이 완료되어 담당 선생님도 님의 상태를 파악하고 계시니 안심하세요.
-            """
+        
+        // 로컬 일기 데이터 수집
+        let diaries = LocalDataManager.shared.diaries
+        let diaryPayloads: [[String: Any]] = diaries.prefix(20).map { diary in
+            return [
+                "date": diary.date ?? "",
+                "content": diary.event ?? "",
+                "mood_level": diary.mood_level,
+                "weather": diary.weather ?? ""
+            ]
+        }
+        
+        guard !diaryPayloads.isEmpty else {
+            self.reportContent = "아직 작성된 일기가 없어요. 오늘의 기분을 기록해보시겠어요? 📝"
             self.isGeneratingReport = false
+            return
+        }
+        
+        // [1순위] 서버 API (RunPod → Ollama)
+        APIService.shared.requestAnalysisReport(diaries: diaryPayloads, mode: "short") { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let report):
+                    self.reportContent = report
+                    self.isGeneratingReport = false
+                    print("✅ [Stats] 분석 리포트 수신 (서버)")
+                    
+                case .failure(let error):
+                    print("⚠️ [Stats] 서버 분석 실패: \(error.localizedDescription). 온디바이스 LLM 시도...")
+                    // [2순위] 온디바이스 LLM
+                    self.generateReportOnDevice(diaries: diaries, mode: "short")
+                }
+            }
         }
     }
     
     func startLongTermReport() { 
         isGeneratingLongTerm = true
-        // 로컬 장기 분석 시뮬레이션
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+        
+        let diaries = LocalDataManager.shared.diaries
+        let diaryPayloads: [[String: Any]] = diaries.prefix(30).map { diary in
+            return [
+                "date": diary.date ?? "",
+                "content": diary.event ?? "",
+                "mood_level": diary.mood_level,
+                "weather": diary.weather ?? ""
+            ]
+        }
+        
+        guard !diaryPayloads.isEmpty else {
+            self.longTermContent = "장기 분석을 위해 최소 3일 이상의 일기가 필요해요. 꾸준히 기록해주세요! 💪"
+            self.isGeneratingLongTerm = false
+            return
+        }
+        
+        // [1순위] 서버 API (RunPod → Ollama)
+        APIService.shared.requestAnalysisReport(diaries: diaryPayloads, mode: "long") { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let report):
+                    self.longTermContent = report
+                    self.isGeneratingLongTerm = false
+                    print("✅ [Stats] 메타 분석 수신 (서버)")
+                    
+                case .failure(let error):
+                    print("⚠️ [Stats] 서버 메타 분석 실패: \(error.localizedDescription). 온디바이스 LLM 시도...")
+                    // [2순위] 온디바이스 LLM
+                    self.generateReportOnDevice(diaries: diaries, mode: "long")
+                }
+            }
+        }
+    }
+    
+    // [2순위] 온디바이스 LLM → [3순위] 하드코딩 Fallback
+    private func generateReportOnDevice(diaries: [Diary], mode: String) {
+        let llmService = LLMService.shared
+        
+        // 온디바이스 모델이 로드되어 있는지 확인
+        guard llmService.isModelLoaded else {
+            print("⚠️ [Stats] 온디바이스 모델 미로드. Fallback 텍스트 사용.")
+            applyFallbackReport(mode: mode, diaries: diaries)
+            return
+        }
+        
+        // 일기 요약 텍스트 생성
+        let summaryParts = diaries.prefix(10).compactMap { diary -> String? in
+            guard let content = diary.event, !content.isEmpty else { return nil }
+            return "[\(diary.date ?? "")] 기분:\(diary.mood_level)/5 | \(String(content.prefix(100)))"
+        }
+        let summaryText = summaryParts.joined(separator: "\n")
+        
+        let prompt: String
+        if mode == "long" {
+            prompt = "아래 일기를 보고 장기적인 감정 패턴을 분석하고, 따뜻하게 조언해줘. 300자 내외로.\n\n\(summaryText)\n\n분석:"
+        } else {
+            prompt = "아래 일기를 보고 전반적인 감정 상태를 3줄로 요약하고 격려해줘. 200자 내외로.\n\n\(summaryText)\n\n요약:"
+        }
+        
+        Task {
+            do {
+                let response = try await llmService.generateText(prompt: prompt)
+                await MainActor.run {
+                    if mode == "long" {
+                        self.longTermContent = response
+                        self.isGeneratingLongTerm = false
+                    } else {
+                        self.reportContent = response
+                        self.isGeneratingReport = false
+                    }
+                    print("✅ [Stats] 분석 완료 (온디바이스 LLM)")
+                }
+            } catch {
+                print("⚠️ [Stats] 온디바이스 LLM 실패: \(error.localizedDescription). Fallback 사용.")
+                await MainActor.run {
+                    self.applyFallbackReport(mode: mode, diaries: diaries)
+                }
+            }
+        }
+    }
+    
+    // [3순위] 하드코딩 Fallback (로컬 데이터 기반 통계)
+    private func applyFallbackReport(mode: String, diaries: [Diary]) {
+        let avgMood = diaries.isEmpty ? 3.0 : Double(diaries.reduce(0) { $0 + $1.mood_level }) / Double(diaries.count)
+        let totalDays = diaries.count
+        let moodLabel: String
+        if avgMood >= 4.0 { moodLabel = "긍정적" }
+        else if avgMood >= 3.0 { moodLabel = "안정적" }
+        else { moodLabel = "다소 힘든" }
+        
+        if mode == "long" {
             self.longTermContent = """
-            [장기 패턴 분석]
-            지난 2주간의 감정 흐름을 보면, 월요일마다 다소 스트레스가 높아지는 경향이 있습니다.
-            하지만 주말로 갈수록 회복탄력성이 높게 나타나고 있어요.
-            규칙적인 수면 패턴이 큰 도움이 되고 있는 것으로 보입니다.
+            [로컬 분석] 총 \(totalDays)일간의 기록을 분석했어요.
+            평균 기분 점수는 \(String(format: "%.1f", avgMood))/5로, 전반적으로 \(moodLabel)인 상태예요.
+            꾸준히 기록하고 계신 것만으로도 정말 대단해요. 계속 응원할게요! 💛
+            (서버 연결 시 더 정밀한 AI 분석을 받아보실 수 있어요)
             """
             self.isGeneratingLongTerm = false
+        } else {
+            self.reportContent = """
+            [로컬 분석] \(totalDays)일간의 기록을 살펴봤어요.
+            전반적으로 \(moodLabel)인 기분 흐름이에요.
+            매일 기록하는 습관이 마음 건강에 큰 도움이 된답니다! 🌱
+            (서버 연결 시 더 정밀한 AI 분석을 받아보실 수 있어요)
+            """
+            self.isGeneratingReport = false
         }
     }
     
@@ -567,6 +767,11 @@ struct ReportView: View {
                     }.padding(20).background(Color(hexString: "F0FDF4")).cornerRadius(16)
                 }
                 Button("🔄 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
+                
+                Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                    .padding(.top, 4)
             }
         }
         .modifier(CardModifier())

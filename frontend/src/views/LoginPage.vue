@@ -125,7 +125,7 @@ export default {
                 if (userRes) {
                     if (userRes.risk_level) localStorage.setItem('risk_level', userRes.risk_level);
                     
-                    // [Fix] 프리미엄(is_premium) 유저도 진단 패스
+                    // [Fix] 프리미엄(is_premium) 유저도 감정 체크 패스
                     if (userRes.is_premium) {
                         localStorage.setItem('assessment_completed', 'true');
                         console.log("💎 [Login] Premium User Detected. Bypassing Assessment.");
@@ -148,7 +148,7 @@ export default {
         const finalAssessed = localStorage.getItem('assessment_completed') === 'true';
         
         // 캘린더 페이지로 이동
-        // [Logic] 연동 코드(finalCenterCode)가 있거나, 진단이 완료되었으면 캘린더로 이동
+        // [Logic] 연동 코드(finalCenterCode)가 있거나, 감정 체크가 완료되었으면 캘린더로 이동
         if (finalAssessed || finalCenterCode) {
              router.push('/calendar');
         } else {

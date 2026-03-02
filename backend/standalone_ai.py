@@ -19,7 +19,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
     # 3. Prompt Switching
     # Combined Prompt for continuous conversation
     prompt_text = (
-        f"너는 다정하고 통찰력 있는 심리 상담사 '마음온'이야.\n"
+        f"너는 다정하고 통찰력 있는 감정 케어 도우미 '마음온'이야.\n"
         f"{context_str}"
         f"### [내담자의 현재 말]: \"{sanitized}\"\n\n"
         "### [지시사항]:\n"
@@ -28,7 +28,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
         "3. 딱딱한 분석보다는, 옆에서 이야기하듯 따뜻하고 부드러운 '해요체'를 사용해.\n"
         "4. 혼자 떠들지 말고, 내담자가 이야기를 계속 할 수 있도록 이끌어줘.\n"
         "5. 150자 이내로 간결하게.\n\n"
-        "상담사 답변:"
+        "마음온 답변:"
     )
     
     input_len = len(user_text)
@@ -57,6 +57,14 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
             result = res.json().get('response', '').strip()
             if result.startswith('"') and result.endswith('"'):
                 result = result[1:-1]
+            
+            # [Phase 4] 응답 금지어 필터링
+            BLOCKED_PHRASES = ["힘내세요", "긍정적으로 생각하세요", "긍정적으로 생각해 보세요", "잘 될 거예요", "웃으세요", "힘내요"]
+            for phrase in BLOCKED_PHRASES:
+                if phrase in result:
+                    print(f"🚫 [Filter] Blocked phrase removed: {phrase}")
+                    result = result.replace(phrase, "").strip()
+            
             if result: return result
             
     except Exception as e:
@@ -99,8 +107,8 @@ def analyze_chat_sentiment_background(user_text, ai_reaction):
     prompt_text = (
         f"분석할 발화:\n"
         f"내담자: \"{sanitized}\"\n"
-        f"상담사 반응: \"{ai_reaction[:100]}...\"\n\n"
-        "위 내담자의 발화를 심리학적으로 분석하여 다음 **JSON 형식**으로만 출력하시오.\n"
+        f"마음온 반응: \"{ai_reaction[:100]}...\"\n\n"
+        "위 내담자의 발화를 감정 패턴 관점에서 분석하여 다음 **JSON 형식**으로만 출력하시오.\n"
         "다른 말은 절대 하지 마시오.\n\n"
         "{\n"
         "  \"primary_emotion\": \"(60가지 감정 중 가장 핵심적인 감정 단어 1개, 한국어)\",\n"

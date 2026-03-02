@@ -52,6 +52,19 @@
           </div>
         </transition>
 
+        <!-- 마음 온도 카드 -->
+        <transition name="fade">
+          <div v-if="moodTemp.loaded" class="mood-temp-card" :style="{ borderLeft: '4px solid ' + moodTemp.color }">
+            <div class="mood-temp-gauge" :style="{ backgroundColor: moodTemp.color + '20', color: moodTemp.color }">
+              {{ moodTemp.temperature.toFixed(1) }}°
+            </div>
+            <div class="mood-temp-info">
+              <div class="mood-temp-title">마음 온도 <span :style="{ color: moodTemp.color }">{{ moodTemp.label }}</span></div>
+              <div class="mood-temp-desc">{{ moodTemp.description }}</div>
+            </div>
+          </div>
+        </transition>
+
         <!-- Premium Modal -->
          <div v-if="showPremiumModal" class="modal-overlay">
           <div class="modal-card premium-modal">
@@ -72,8 +85,8 @@
               <div class="feature-item">
                 <span class="icon">💬</span>
                 <div class="text">
-                  <h3>AI 심리 상담사</h3>
-                  <p>24시간 언제든 내 마음을 털어놓고 위로받으세요.</p>
+                  <h3>AI 감정 케어</h3>
+                  <p>24시간 언제든 내 마음을 기록하고 따뜻한 위로를 받으세요.</p>
                 </div>
               </div>
               <div class="feature-item">
@@ -87,8 +100,8 @@
 
             <div class="dobong-notice" style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; border: 1px solid #dcfce7;">
                <p style="margin: 0; color: #15803d; font-size: 13px; line-height: 1.5; font-weight: 500;">
-                 <strong>🏥 보건소/상담센터 안내</strong><br/>
-                 관할 보건소나 정신건강복지센터에서 상담을 받으시면 무료 업그레이드가 가능합니다.
+                 <strong>🏥 보건소/정신건강복지센터 안내</strong><br/>
+                 관할 보건소나 정신건강복지센터에서 서비스를 받으시면 무료 업그레이드가 가능합니다.
                </p>
             </div>
 
@@ -167,6 +180,7 @@ import { useRouter } from "vue-router";
 import CalendarGrid from "../components/CalendarGrid.vue";
 import DiaryModal from "../components/DiaryModal.vue";
 import { diaryAPI, authAPI } from "../services/api";
+import api from "../services/api";
 
 export default {
   name: "CalendarPage",
@@ -189,6 +203,26 @@ export default {
     const isPremium = ref(false);
     const userRiskLevel = ref(1);
     const showPremiumModal = ref(false);
+    
+    // 마음 온도
+    const moodTemp = ref({
+      temperature: 36.5,
+      label: '측정 중',
+      description: '',
+      color: '#86868b',
+      loaded: false
+    });
+    
+    const fetchMoodTemperature = async () => {
+      try {
+        const res = await api.get('/mood-temperature');
+        if (res && res.data) {
+          moodTemp.value = { ...res.data, loaded: true };
+        }
+      } catch(e) {
+        console.error('Mood temperature fetch failed', e);
+      }
+    };
     
     const checkUserStatus = async () => {
         try {
@@ -475,6 +509,7 @@ export default {
     onMounted(() => {
       loadDiaries();
       checkUserStatus();
+      fetchMoodTemperature();
     });
 
 
@@ -508,13 +543,54 @@ export default {
         } else {
           router.push('/diary/chat');
         }
-      }
+      },
+      moodTemp
     };
   },
 };
 </script>
 
 <style>
+/* 마음 온도 카드 */
+.mood-temp-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: white;
+  padding: 14px 18px;
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  margin-bottom: 12px;
+}
+.mood-temp-gauge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.mood-temp-info {
+  flex: 1;
+}
+.mood-temp-title {
+  font-size: 13px;
+  color: #86868b;
+  margin-bottom: 2px;
+}
+.mood-temp-title span {
+  font-weight: 700;
+  font-size: 14px;
+}
+.mood-temp-desc {
+  font-size: 12px;
+  color: #aeaeb2;
+  line-height: 1.4;
+}
+
 /* Global override to ensure no scrollbars */
 html,
 body {

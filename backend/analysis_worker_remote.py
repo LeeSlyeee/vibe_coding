@@ -112,7 +112,7 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
 
 def generate_ai_analysis(content):
     prompt_text = (
-        f"너는 다정하고 섬세한 심리 상담 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
+        f"너는 다정하고 섬세한 감정 케어 AI '마음온'이야. 아래 회원의 일기를 읽고 분석 결과를 JSON 형태로 줘.\n"
         f"{content}\n\n"
         "### 지시사항:\n"
         "1. 'comment': 회원의 감정을 읽고 따뜻하게 위로하는 말 (해요체, 150자 내외)\n"

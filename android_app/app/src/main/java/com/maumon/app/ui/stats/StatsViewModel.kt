@@ -25,6 +25,12 @@ data class StatsUiState(
     val weatherMoods: List<Pair<String, List<Pair<Int, Int>>>> = emptyList(),
     // AI 리포트용 일기 목록
     val diaries: List<Diary> = emptyList(),
+    // 마음 온도
+    val moodTemperature: Double = 36.5,
+    val moodTempLabel: String = "측정 중",
+    val moodTempDesc: String = "",
+    val moodTempColor: String = "#86868b",
+    val moodTempLoaded: Boolean = false
 )
 
 class StatsViewModel : ViewModel() {
@@ -32,7 +38,10 @@ class StatsViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(StatsUiState())
     val uiState: StateFlow<StatsUiState> = _uiState
 
-    init { loadStats() }
+    init {
+        loadStats()
+        loadMoodTemperature()
+    }
 
     private fun loadStats() {
         viewModelScope.launch {
@@ -120,6 +129,30 @@ class StatsViewModel : ViewModel() {
                 .onFailure {
                     _uiState.value = StatsUiState(isLoading = false)
                 }
+        }
+    }
+
+    private fun loadMoodTemperature() {
+        viewModelScope.launch {
+            try {
+                val api = com.maumon.app.data.api.ApiClient.flaskApi
+                val response = api.getMoodTemperature()
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        _uiState.value = _uiState.value.copy(
+                            moodTemperature = (body["temperature"] as? Number)?.toDouble() ?: 36.5,
+                            moodTempLabel = (body["label"] as? String) ?: "측정 중",
+                            moodTempDesc = (body["description"] as? String) ?: "",
+                            moodTempColor = (body["color"] as? String) ?: "#86868b",
+                            moodTempLoaded = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                // 마음 온도 로딩 실패는 조용히 무시 (필수 기능이 아님)
+                e.printStackTrace()
+            }
         }
     }
 }
