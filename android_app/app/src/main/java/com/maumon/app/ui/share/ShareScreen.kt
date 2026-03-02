@@ -266,6 +266,12 @@ private fun ShareTab(
             }
         } else {
             items(myGuardians) { user -> UserCard(user = user) }
+            
+            // [P1-수정4] 보호자 알림 공유 범위 설정
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                AlertScopeSettings()
+            }
         }
     }
 }
@@ -293,5 +299,65 @@ private fun UserCard(user: ShareManager.SharedUser) {
             }
             Icon(Icons.Default.ChevronRight, "상세", tint = Color.Gray)
         }
+    }
+}
+
+// [P1-수정4] 보호자 알림 공유 범위 설정
+@Composable
+private fun AlertScopeSettings() {
+    var shareMood by remember { mutableStateOf(true) }
+    var shareReport by remember { mutableStateOf(true) }
+    var shareCrisis by remember { mutableStateOf(true) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("🔔 보호자에게 공유할 알림", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text("보호자에게 전달되는 정보의 범위를 설정합니다.", fontSize = 12.sp, color = Color.Gray)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AlertToggleRow("🌡️", "기분 온도 알림", "매일의 감정 온도를 공유합니다", shareMood) {
+                shareMood = it
+            }
+            HorizontalDivider(modifier = Modifier.padding(start = 48.dp))
+            AlertToggleRow("📊", "분석 리포트", "주간/월간 감정 분석을 공유합니다", shareReport) {
+                shareReport = it
+            }
+            HorizontalDivider(modifier = Modifier.padding(start = 48.dp))
+            AlertToggleRow("🚨", "위기 감지 알림", "위기 신호 감지 시 즉시 알립니다", shareCrisis) {
+                shareCrisis = it
+            }
+
+            if (!shareCrisis) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️", fontSize = 14.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        "위기 알림이 꺼져 있으면 위급 상황에서 보호자가 알림을 받지 못합니다.",
+                        fontSize = 12.sp, color = Color(0xFFFF9500), lineHeight = 16.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlertToggleRow(icon: String, title: String, subtitle: String, isOn: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, fontSize = 24.sp, modifier = Modifier.width(36.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(subtitle, fontSize = 11.sp, color = Color.Gray)
+        }
+        Switch(checked = isOn, onCheckedChange = onToggle)
     }
 }

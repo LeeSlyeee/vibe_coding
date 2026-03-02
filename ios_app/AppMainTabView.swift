@@ -76,7 +76,7 @@ struct AppMainTabView: View {
                         HStack(spacing: 0) {
                             TabButton(index: 0, title: "캘린더", image: "tab_calendar", systemIcon: "calendar", selection: $selection)
                             TabButton(index: 1, title: "분석", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
-                            TabButton(index: 2, title: "대화", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
+                            TabButton(index: 2, title: "한마디", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
                             TabButton(index: 3, title: "긴급", image: "tab_emergency", systemIcon: "exclamationmark.triangle.fill", selection: $selection)
                         }
                         .padding(.top, 10)

@@ -14,6 +14,11 @@ struct AppShareView: View {
     // Share State
     @State private var generatedCode = ""
     
+    // [P1-수정4] Alert Share Scope
+    @State private var shareMood: Bool = true
+    @State private var shareReport: Bool = true
+    @State private var shareCrisis: Bool = true
+    
     var body: some View {
         VStack(spacing: 0) {
             
@@ -277,6 +282,68 @@ struct AppShareView: View {
                     }
                     .padding(.top)
                     
+                    // [P1-수정4] 보호자 알림 공유 범위 설정
+                    if !shareManager.myGuardians.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("🔔 보호자에게 공유할 알림")
+                                .font(.headline)
+                                .padding(.horizontal)
+                            
+                            Text("보호자에게 전달되는 정보의 범위를 설정합니다.")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .padding(.horizontal)
+                            
+                            VStack(spacing: 0) {
+                                ShareToggleRow(
+                                    icon: "🌡️",
+                                    title: "기분 온도 알림",
+                                    subtitle: "매일의 감정 온도를 공유합니다",
+                                    isOn: $shareMood
+                                ) { newValue in
+                                    updateAllGuardiansScope(shareMood: newValue)
+                                }
+                                
+                                Divider().padding(.leading, 50)
+                                
+                                ShareToggleRow(
+                                    icon: "📊",
+                                    title: "분석 리포트",
+                                    subtitle: "주간/월간 감정 분석을 공유합니다",
+                                    isOn: $shareReport
+                                ) { newValue in
+                                    updateAllGuardiansScope(shareReport: newValue)
+                                }
+                                
+                                Divider().padding(.leading, 50)
+                                
+                                ShareToggleRow(
+                                    icon: "🚨",
+                                    title: "위기 감지 알림",
+                                    subtitle: "위기 신호 감지 시 즉시 알립니다",
+                                    isOn: $shareCrisis
+                                ) { newValue in
+                                    updateAllGuardiansScope(shareCrisis: newValue)
+                                }
+                            }
+                            .background(Color(.systemBackground))
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                            
+                            if !shareCrisis {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .foregroundColor(.orange)
+                                    Text("위기 알림이 꺼져 있으면 위급 상황에서 보호자가 알림을 받지 못합니다.")
+                                        .font(.caption)
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
+                        .padding(.top, 16)
+                    }
+                    
                     Spacer()
                 }
                 .background(Color(.systemGroupedBackground))
@@ -294,5 +361,50 @@ struct AppShareView: View {
     
     func formatConnDate(_ str: String) -> String {
         return String(str.prefix(10))
+    }
+    
+    // [P1-수정4] 모든 보호자에게 공유 범위 일괄 업데이트
+    func updateAllGuardiansScope(shareMood: Bool? = nil, shareReport: Bool? = nil, shareCrisis: Bool? = nil) {
+        for guardian in shareManager.myGuardians {
+            shareManager.updateShareScope(
+                viewerId: guardian.id,
+                shareMood: shareMood,
+                shareReport: shareReport,
+                shareCrisis: shareCrisis
+            ) { _ in }
+        }
+    }
+}
+
+// [P1-수정4] 토글 행 서브컴포넌트
+struct ShareToggleRow: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    @Binding var isOn: Bool
+    let onChange: (Bool) -> Void
+    
+    var body: some View {
+        HStack {
+            Text(icon)
+                .font(.title2)
+                .frame(width: 36)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            Spacer()
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .onChange(of: isOn) { newValue in
+                    onChange(newValue)
+                }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 10)
     }
 }

@@ -60,7 +60,17 @@ BLOCKED_PHRASES = ["힘내세요", "긍정적으로 생각하세요", "긍정적
 
 # [Phase 4] 위기 키워드 (서버 사이드 백업 감지)
 CRISIS_KEYWORDS = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고",
-                    "사라지고", "없어지고", "살기 싫", "의미 없", "수면제"]
+                    "사라지고", "없어지고", "살기 싫", "의미 없", "수면제", "자해", "목숨"]
+
+# [P1-수정6] Level 3 위기 키워드 — 감지 시 AI 자유 생성 차단, 사전 정의 안전 메시지만 반환
+CRISIS_LEVEL3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "끝내고", "자해", "목숨"]
+
+import random
+CRISIS_SAFE_RESPONSES = [
+    "지금 많이 힘드시죠.. 저는 당신 편이에요.\n\n혼자 감당하지 않으셔도 돼요. 지금 바로 전문 상담사와 이야기해 보세요.\n📞 자살예방상담전화: 1393 (24시간)",
+    "그런 생각이 들 정도로 괴로우셨군요..\n당신이 소중하다는 건 꼭 알아주세요.\n\n지금 바로 전문가의 도움을 받을 수 있어요.\n📞 1393 (24시간 무료)",
+    "혼자서 이 마음을 감당하기 너무 힘드셨죠..\n\n전문 상담사가 24시간 기다리고 있어요.\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담: 1577-0199"
+]
 
 # ============================================
 # EXAONE Chat Template 구성
@@ -110,8 +120,17 @@ def handler(job):
     
     # 프롬프트 구성 (위기 감지 시 프롬프트 강화)
     is_crisis = any(kw in user_text for kw in CRISIS_KEYWORDS)
+    is_crisis_level3 = any(kw in user_text for kw in CRISIS_LEVEL3)
+    
     if is_crisis:
         print(f"🚨 [Crisis] 서버 사이드 위기 감지! User: {user_text[:50]}", flush=True)
+    
+    # [P1-수정6] Level 3 위기 시 AI 자유 생성 차단 → 사전 정의 안전 응답 즉시 반환
+    if is_crisis_level3:
+        safe_response = random.choice(CRISIS_SAFE_RESPONSES)
+        print(f"🛡️ [Crisis L3] 안전 폴백 응답 반환 (AI 생성 차단)", flush=True)
+        return {"reaction": safe_response}
+    
     full_prompt = build_prompt(user_text, history, is_crisis=is_crisis)
     
     # 추론 파라미터

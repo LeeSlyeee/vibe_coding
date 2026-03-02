@@ -177,12 +177,18 @@ fun DiaryDetailScreen(
 
             // AI 면책 고지
             if (aiPredLabel != null || aiAnalysisText != null || aiAdviceText != null) {
-                Text(
-                    "💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.",
-                    fontSize = 10.sp,
-                    color = Color.Gray,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
+                Column(modifier = Modifier.padding(top = 4.dp)) {
+                    Text(
+                        "💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.",
+                        fontSize = 10.sp,
+                        color = Color.Gray
+                    )
+                    Text(
+                        "⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.",
+                        fontSize = 10.sp,
+                        color = Color(0xFFFF9500)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

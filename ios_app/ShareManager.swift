@@ -379,4 +379,25 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         
         return upcomingBirthdays.sorted { $0.dDay < $1.dDay }
     }
+    
+    // 7. Update Share Scope (내담자가 보호자에게 공유할 데이터 범위 설정)
+    func updateShareScope(viewerId: String, shareMood: Bool? = nil, shareReport: Bool? = nil, shareCrisis: Bool? = nil, completion: @escaping (Bool) -> Void) {
+        var body: [String: Any] = ["viewer_id": viewerId]
+        if let v = shareMood { body["share_mood"] = v }
+        if let v = shareReport { body["share_report"] = v }
+        if let v = shareCrisis { body["share_crisis"] = v }
+        
+        performShareRequest(endpoint: "/share/share-scope", method: "PUT", body: body) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(_):
+                    print("✅ Share scope updated")
+                    completion(true)
+                case .failure(let err):
+                    print("❌ Share scope update failed: \(err)")
+                    completion(false)
+                }
+            }
+        }
+    }
 }

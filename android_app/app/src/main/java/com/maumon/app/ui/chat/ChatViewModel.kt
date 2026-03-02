@@ -4,9 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.maumon.app.data.api.ApiClient
+import com.maumon.app.data.repository.AuthRepository
 import com.maumon.app.data.llm.LLMService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class ChatUiState(
@@ -25,9 +27,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     val uiState: StateFlow<ChatUiState> = _uiState
 
     private val llmService = LLMService.getInstance()
+    private val authRepo = AuthRepository(application.applicationContext)
 
     // [Phase 4] 3단계 위기 분류 시스템
-    private val crisisLevel3 = listOf("죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고")
+    private val crisisLevel3 = listOf("죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨")
     private val crisisLevel2 = listOf("사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝")
     private val crisisLevel1 = listOf("힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물")
 
@@ -36,6 +39,35 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             llmService.isModelLoaded.collect { loaded ->
                 _uiState.value = _uiState.value.copy(isModelLoaded = loaded)
+            }
+        }
+
+        // [선톡] iOS AppChatView.swift의 welcomeText 대응 — AI가 먼저 인사
+        viewModelScope.launch {
+            // 서버에서 최신 유저 정보 동기화 (iOS syncUserInfo 대응)
+            authRepo.syncUserInfo()
+
+            // 실명 우선, 닉네임 대체, 없으면 "회원" (iOS 로직과 동일)
+            val realName = authRepo.realName.first()
+            val nickname = authRepo.nickname.first()
+            var userName = realName ?: nickname ?: "회원"
+            if (userName.startsWith("User ") || userName.startsWith("user_")) {
+                userName = "회원"
+            }
+
+            val welcomeText = "안녕하세요, ${userName}님! 👋\n\n" +
+                "저는 AI 감정 케어 도우미 '마음온'이에요.\n" +
+                "전문 상담사는 아니지만, 당신의 이야기를 조용히 들을 준비가 되어 있어요.\n\n" +
+                "오늘 하루 중 기억에 남는 순간이 있었나요? 🌡️"
+
+            // 약간의 딜레이 후 메시지 추가 (iOS 0.5초 딜레이 대응)
+            kotlinx.coroutines.delay(500)
+
+            if (_uiState.value.messages.isEmpty()) {
+                val welcomeMsg = ChatMessage(text = welcomeText, isUser = false)
+                _uiState.value = _uiState.value.copy(
+                    messages = listOf(welcomeMsg)
+                )
             }
         }
     }
@@ -147,7 +179,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 로컬 LLM 응답 (iOS generateAnalysis 로컬 모드 대응) */
+    /** 로컬 LLM 응답 (iOS generateAnalysis 로컬 채팅 모드 대응) */
     private suspend fun getLocalResponse(text: String, messages: List<ChatMessage>): String {
         // 모델이 로드되지 않았으면 자동 로드
         if (!llmService.isModelLoaded.value) {
@@ -156,7 +188,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         return if (llmService.isModelLoaded.value) {
             try {
-                llmService.generateAdvice(text)
+                // 대화 히스토리 구성
+                val history = messages.map { Pair(it.isUser, it.text) }
+                llmService.generateChatResponse(text, history)
             } catch (e: Exception) {
                 llmService.getEmergencyEmpathy(text)
             }

@@ -507,6 +507,10 @@ struct AppSettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
+                        Text("⚠️ AI의 위기 감지 기능은 보조적 수단이며, 100% 정확성을 보장하지 않습니다. AI가 감지하지 못하는 위기 상황이 발생할 수 있으므로, 긴급한 상황에서는 즉시 1393 또는 119에 직접 연락해 주세요.")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        
                         Divider()
                         
                         Text("⚠️ 긴급 상황 안내")

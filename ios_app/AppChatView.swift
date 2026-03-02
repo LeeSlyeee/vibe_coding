@@ -17,8 +17,8 @@ struct AppChatView: View {
     @State private var isCrisis: Bool = false
     @State private var showSOSModal: Bool = false
     
-    // [Gatekeeper] Mode Selection State
-    @State private var showModeSelection: Bool = true
+    // [Gatekeeper] Mode Selection — 기본값 서버 AI, 네비게이션바 버튼으로 로컬 전환 가능
+    @State private var showModeSelection: Bool = false
     
     // [New] Settings Modal State
     @State private var showSettings = false
@@ -63,6 +63,23 @@ struct AppChatView: View {
                         .padding(.horizontal)
                         .padding(.top, 8)
                         .transition(.move(edge: .top))
+                    }
+
+                    // On-Device 보안 배지
+                    if !llmService.useServerAI {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.green)
+                            Text("이 대화는 폰 안에서만 처리됩니다")
+                                .font(.system(size: 11))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 12)
+                        .background(Color.green.opacity(0.08))
+                        .cornerRadius(12)
+                        .padding(.top, 4)
                     }
 
                     // Chat List
@@ -123,7 +140,7 @@ struct AppChatView: View {
                                     
                                     // 이미 메시지가 있으면 인사 생략 (단, 텅 빈 경우에만 인사)
                                     if messages.isEmpty {
-                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n오늘 하루는 어떠셨나요?\n기억에 남는 사건이나 감정을 편하게 이야기해 주세요.\n\n제가 꼼꼼히 듣고 마음을 분석해 드릴게요.\n\n💡 마음온은 감정 기록 보조 도구이며, 전문 의료 서비스를 대체하지 않아요."
+                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n저는 AI 감정 케어 도우미 '마음온'이에요.\n전문 상담사는 아니지만, 당신의 이야기를 조용히 들을 준비가 되어 있어요.\n\n오늘 하루 중 기억에 남는 순간이 있었나요? 🌡️"
                                         
                                         // 약간의 딜레이 후 등장
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -234,19 +251,24 @@ struct AppChatView: View {
                         isInputFocused = true
                     }
                 }
-                .navigationBarTitle("마음 톡(Talk)", displayMode: .inline)
+                .navigationBarTitle("한마디", displayMode: .inline)
                 .navigationBarItems(
                     leading: Button(action: {
-                        // [Keyboard Fix] 모드 선택 오버레이 표시 전 키보드 해제
-                        isInputFocused = false
-                        dismissKeyboard()
-                        withAnimation { showModeSelection = true }
+                        llmService.toggleAIMode()
+                        // 로컬 모드 전환 시 모델 로드
+                        if !llmService.useServerAI && !llmService.isModelLoaded {
+                            Task { await llmService.loadModel() }
+                        }
                     }) {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.black)
+                        Text(llmService.useServerAI ? "☁️ 서버 AI" : "📱 로컬 AI")
+                            .font(.system(size: 12, weight: .bold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(llmService.useServerAI ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
+                            .foregroundColor(llmService.useServerAI ? .blue : .green)
+                            .cornerRadius(8)
                     }
-                    .disabled(isTyping || showModeSelection),
+                    .disabled(isTyping),
                     trailing: Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
                             .foregroundColor(.black)
@@ -271,89 +293,8 @@ struct AppChatView: View {
             .blur(radius: showModeSelection ? 5 : 0) // Blur background
             
             // [Gatekeeper] AI Mode Selection Overlay
-            if showModeSelection {
-                Color.black.opacity(0.4)
-                    .edgesIgnoringSafeArea(.all)
-                    .onTapGesture {
-                        // Prevent dismissal by tapping background (Force selection)
-                    }
-                    
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Text("🤖 AI 모드 선택")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("원활한 사용을 위해 실행 방식을 선택해주세요.")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                    
-                    // Option 1: Server (Recommended)
-                    Button(action: {
-                        llmService.useServerAI = true
-                        withAnimation { showModeSelection = false }
-                    }) {
-                        HStack(spacing: 16) {
-                            ZStack {
-                                Circle().fill(Color.blue.opacity(0.1)).frame(width: 50, height: 50)
-                                Image(systemName: "cloud.fill").foregroundColor(.blue).font(.title2)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("서버 연결 (권장)")
-                                    .font(.headline)
-                                    .foregroundColor(.black)
-                                Text("데이터를 사용하여 빠르고 쾌적합니다.\n모든 기기에서 원활하게 작동합니다.")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            Spacer()
-                            Image(systemName: "checkmark.circle.fill").foregroundColor(.blue)
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                    }
-                    
-                    // Option 2: Local (Pro)
-                    Button(action: {
-                        llmService.useServerAI = false
-                        withAnimation { showModeSelection = false }
-                        // Trigger Load
-                        Task { await llmService.loadModel() }
-                    }) {
-                        HStack(spacing: 16) {
-                            ZStack {
-                                Circle().fill(Color.purple.opacity(0.1)).frame(width: 50, height: 50)
-                                Image(systemName: "iphone.gen3").foregroundColor(.purple).font(.title2)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("내 기기에서 실행 (Pro)")
-                                    .font(.headline)
-                                    .foregroundColor(.black)
-                                Text("데이터 없이 오프라인에서 작동합니다.\n*최신 고성능 아이폰 필요 (발열 주의)")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                            }
-                            Spacer()
-                        }
-                        .padding()
-                        .background(Color.white)
-                        .cornerRadius(16)
-                        .shadow(color: Color.black.opacity(0.1), radius: 5, x: 0, y: 2)
-                    }
-                    
-                }
-                .padding(24)
-                .background(Color.white)
-                .cornerRadius(24)
-                .padding(.horizontal, 20)
-                .shadow(radius: 20)
-                .transition(.scale.combined(with: .opacity))
-            }
+            // [Gatekeeper] 서버 AI 전용 — 모드 선택 오버레이 비활성
+            // 로컬 LLM은 일기 분석 전용으로만 사용 (채팅에서는 서버 AI 강제)
         }
     }
     
@@ -423,7 +364,7 @@ struct AppChatView: View {
             }
             
             // [Phase 4] 3단계 위기 분류 시스템
-            let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고"]
+            let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
             let crisisLevel2 = ["사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝"]
             let crisisLevel1 = ["힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물"]
             

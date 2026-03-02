@@ -177,6 +177,7 @@
             </div>
             <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
             <p style="font-size: 10px; color: #b0b0b0; margin-top: 8px; text-align: right;">💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.</p>
+            <p style="font-size: 10px; color: #ff9500; margin-top: 2px; text-align: right;">⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.</p>
           </div>
         </div>
 

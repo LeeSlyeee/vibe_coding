@@ -33,6 +33,15 @@
           </div>
           <span class="action">전화하기</span>
         </a>
+
+        <a href="https://www.mentalhealth.go.kr" target="_blank" class="contact-item" style="background: #ebf5fb;">
+          <span class="icon">🔍</span>
+          <div class="info">
+            <span class="name" style="color: #2196f3;">가까운 정신건강복지센터 찾기</span>
+            <span class="number" style="font-size: 12px; color: #999;">mentalhealth.go.kr</span>
+          </div>
+          <span class="action" style="color: #2196f3;">바로가기</span>
+        </a>
       </div>
 
       <div class="safety-message">

@@ -54,26 +54,35 @@
 
         <!-- 마음 온도 카드 -->
         <transition name="fade">
-          <div v-if="moodTemp.loaded" class="mood-temp-card" :style="{ borderLeft: '4px solid ' + moodTemp.color }">
-            <div class="mood-temp-gauge" :style="{ backgroundColor: moodTemp.color + '20', color: moodTemp.color }">
+          <div
+            v-if="moodTemp.loaded"
+            class="mood-temp-card"
+            :style="{ borderLeft: '4px solid ' + moodTemp.color }"
+          >
+            <div
+              class="mood-temp-gauge"
+              :style="{ backgroundColor: moodTemp.color + '20', color: moodTemp.color }"
+            >
               {{ moodTemp.temperature.toFixed(1) }}°
             </div>
             <div class="mood-temp-info">
-              <div class="mood-temp-title">마음 온도 <span :style="{ color: moodTemp.color }">{{ moodTemp.label }}</span></div>
+              <div class="mood-temp-title">
+                마음 온도 <span :style="{ color: moodTemp.color }">{{ moodTemp.label }}</span>
+              </div>
               <div class="mood-temp-desc">{{ moodTemp.description }}</div>
             </div>
           </div>
         </transition>
 
         <!-- Premium Modal -->
-         <div v-if="showPremiumModal" class="modal-overlay">
+        <div v-if="showPremiumModal" class="modal-overlay">
           <div class="modal-card premium-modal">
             <button class="close-btn" @click="showPremiumModal = false">×</button>
             <div class="premium-header">
               <h1>마음챙김 플러스 +</h1>
               <p>더 깊은 이해와 치유를 위한 선택</p>
             </div>
-            
+
             <div class="premium-features">
               <div class="feature-item">
                 <span class="icon">📊</span>
@@ -98,11 +107,29 @@
               </div>
             </div>
 
-            <div class="dobong-notice" style="background: #f0fdf4; padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: left; border: 1px solid #dcfce7;">
-               <p style="margin: 0; color: #15803d; font-size: 13px; line-height: 1.5; font-weight: 500;">
-                 <strong>🏥 보건소/정신건강복지센터 안내</strong><br/>
-                 관할 보건소나 정신건강복지센터에서 서비스를 받으시면 무료 업그레이드가 가능합니다.
-               </p>
+            <div
+              class="dobong-notice"
+              style="
+                background: #f0fdf4;
+                padding: 15px;
+                border-radius: 12px;
+                margin-bottom: 20px;
+                text-align: left;
+                border: 1px solid #dcfce7;
+              "
+            >
+              <p
+                style="
+                  margin: 0;
+                  color: #15803d;
+                  font-size: 13px;
+                  line-height: 1.5;
+                  font-weight: 500;
+                "
+              >
+                <strong>🏥 보건소/정신건강복지센터 안내</strong><br />
+                관할 보건소나 정신건강복지센터에서 서비스를 받으시면 무료 업그레이드가 가능합니다.
+              </p>
             </div>
 
             <div class="price-section">
@@ -111,9 +138,7 @@
               <span class="badge">런칭 특가 50%</span>
             </div>
 
-            <button class="btn-primary full-width" @click="handleUpgrade">
-              지금 시작하기
-            </button>
+            <button class="btn-primary full-width" @click="handleUpgrade">지금 시작하기</button>
             <p class="terms">언제든 해지 가능합니다.</p>
           </div>
         </div>
@@ -147,8 +172,6 @@
           :selected-date="selectedDate"
           @date-click="handleDateClick"
         />
-
-
       </div>
 
       <!-- 오른쪽: 일기 작성/상세보기 패널 -->
@@ -165,14 +188,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Chat Diary FAB -->
-    <button class="chat-fab" @click="goToChatDiary" title="AI와 대화하며 쓰기">
+    <button class="chat-fab" @click="goToChatDiary" title="한마디 남기기">
       <span class="material-icons">chat</span>
     </button>
   </div>
 </template>
-
 
 <script>
 import { ref, computed, onMounted } from "vue";
@@ -198,54 +220,54 @@ export default {
     const searchQuery = ref("");
     const searchResults = ref([]);
     const isSearching = ref(false);
-    
+
     // Premium Logic
     const isPremium = ref(false);
     const userRiskLevel = ref(1);
     const showPremiumModal = ref(false);
-    
+
     // 마음 온도
     const moodTemp = ref({
       temperature: 36.5,
-      label: '측정 중',
-      description: '',
-      color: '#86868b',
-      loaded: false
+      label: "측정 중",
+      description: "",
+      color: "#86868b",
+      loaded: false,
     });
-    
+
     const fetchMoodTemperature = async () => {
       try {
-        const res = await api.get('/mood-temperature');
+        const res = await api.get("/mood-temperature");
         if (res && res.data) {
           moodTemp.value = { ...res.data, loaded: true };
         }
-      } catch(e) {
-        console.error('Mood temperature fetch failed', e);
+      } catch (e) {
+        console.error("Mood temperature fetch failed", e);
       }
     };
-    
+
     const checkUserStatus = async () => {
-        try {
-            const user = await authAPI.getUserInfo();
-            isPremium.value = user.is_premium || false;
-            userRiskLevel.value = user.risk_level || 1;
-        } catch(e) {
-            console.error("User info check failed", e);
-        }
-    }
-    
+      try {
+        const user = await authAPI.getUserInfo();
+        isPremium.value = user.is_premium || false;
+        userRiskLevel.value = user.risk_level || 1;
+      } catch (e) {
+        console.error("User info check failed", e);
+      }
+    };
+
     const handleUpgrade = async () => {
-        if(confirm("4,900원을 결제하시겠습니까? (테스트)")) {
-            try {
-               await authAPI.upgradeAccount();
-               alert("결제가 완료되었습니다! 이제 프리미엄 기능을 사용하실 수 있습니다.");
-               showPremiumModal.value = false;
-               await checkUserStatus(); // Refresh status
-            } catch(e) {
-                alert("결제 처리에 실패했습니다.");
-            }
+      if (confirm("4,900원을 결제하시겠습니까? (테스트)")) {
+        try {
+          await authAPI.upgradeAccount();
+          alert("결제가 완료되었습니다! 이제 프리미엄 기능을 사용하실 수 있습니다.");
+          showPremiumModal.value = false;
+          await checkUserStatus(); // Refresh status
+        } catch (e) {
+          alert("결제 처리에 실패했습니다.");
         }
-    }
+      }
+    };
 
     const formattedMonth = computed(() => {
       return `${currentYear.value}년 ${currentMonth.value}월`;
@@ -256,16 +278,41 @@ export default {
 
       // Korean Label -> Internal Key Mapping (Expanded)
       const labelToKey = {
-          "행복": "happy", "기쁨": "happy", "사랑": "happy", "설렘": "happy", "즐거움": "happy", "흥분": "happy",
-            "행복해": "happy",
-          "평온": "calm", "편안": "calm", "감사": "calm", "다짐": "calm", "안도": "calm",
-            "평온해": "calm", "편안해": "calm",
-          "평범": "neutral", "무던": "neutral", "보통": "neutral", "지루함": "neutral",
-            "그저그래": "neutral",
-          "우울": "sad", "슬픔": "sad", "지침": "sad", "피곤": "sad", "외로움": "sad", "후회": "sad", "상처": "sad",
-            "우울해": "sad",
-          "분노": "angry", "화남": "angry", "짜증": "angry", "스트레스": "angry", "싫어": "angry", "불안": "angry", "걱정": "angry",
-            "화가나": "angry"
+        행복: "happy",
+        기쁨: "happy",
+        사랑: "happy",
+        설렘: "happy",
+        즐거움: "happy",
+        흥분: "happy",
+        행복해: "happy",
+        평온: "calm",
+        편안: "calm",
+        감사: "calm",
+        다짐: "calm",
+        안도: "calm",
+        평온해: "calm",
+        편안해: "calm",
+        평범: "neutral",
+        무던: "neutral",
+        보통: "neutral",
+        지루함: "neutral",
+        그저그래: "neutral",
+        우울: "sad",
+        슬픔: "sad",
+        지침: "sad",
+        피곤: "sad",
+        외로움: "sad",
+        후회: "sad",
+        상처: "sad",
+        우울해: "sad",
+        분노: "angry",
+        화남: "angry",
+        짜증: "angry",
+        스트레스: "angry",
+        싫어: "angry",
+        불안: "angry",
+        걱정: "angry",
+        화가나: "angry",
       };
 
       const counts = diaries.value.reduce((acc, d) => {
@@ -274,24 +321,27 @@ export default {
         let aiLabel = null;
         // Priority 1: AI Emotion field
         if (d.ai_emotion && d.ai_emotion !== "분석중" && d.ai_emotion !== "대기중") {
-            aiLabel = d.ai_emotion.trim();
-        } 
+          aiLabel = d.ai_emotion.trim();
+        }
         // Priority 2: AI Prediction Parsing
         else if (d.ai_prediction) {
-             let fullText = d.ai_prediction;
-             if ((fullText.startsWith("'") && fullText.endsWith("'")) || (fullText.startsWith('"') && fullText.endsWith('"'))) {
-                fullText = fullText.slice(1, -1);
-             }
-             const parts = fullText.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
-             if (parts) {
-                 aiLabel = parts[1].trim();
-             } else {
-                 aiLabel = fullText.trim();
-             }
+          let fullText = d.ai_prediction;
+          if (
+            (fullText.startsWith("'") && fullText.endsWith("'")) ||
+            (fullText.startsWith('"') && fullText.endsWith('"'))
+          ) {
+            fullText = fullText.slice(1, -1);
+          }
+          const parts = fullText.match(/^([^(]+)(\s\(\d+(\.\d+)?%\))?$/);
+          if (parts) {
+            aiLabel = parts[1].trim();
+          } else {
+            aiLabel = fullText.trim();
+          }
         }
 
         if (aiLabel && labelToKey[aiLabel]) {
-            key = labelToKey[aiLabel];
+          key = labelToKey[aiLabel];
         }
 
         acc[key] = (acc[key] || 0) + 1;
@@ -393,7 +443,9 @@ export default {
         const moodMap = { 1: "angry", 2: "sad", 3: "neutral", 4: "calm", 5: "happy" };
         selectedDiary.value = {
           ...loadedDiary,
-          date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
+          date:
+            loadedDiary.date ||
+            (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
           mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
           question1: loadedDiary.event || "",
           question2: loadedDiary.emotion_desc || "",
@@ -439,7 +491,9 @@ export default {
           // 백엔드 필드명을 프론트엔드 형식으로 변환
           selectedDiary.value = {
             ...loadedDiary,
-            date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
+            date:
+              loadedDiary.date ||
+              (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
             mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
             question1: loadedDiary.event || "",
             sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",
@@ -489,7 +543,9 @@ export default {
             // 최신 데이터로 selectedDiary 업데이트
             selectedDiary.value = {
               ...loadedDiary,
-              date: loadedDiary.date || (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
+              date:
+                loadedDiary.date ||
+                (loadedDiary.created_at ? loadedDiary.created_at.split("T")[0] : null),
               mood: loadedDiary.mood_level ? moodMap[loadedDiary.mood_level] : null,
               question1: loadedDiary.event || "",
               sleep_condition: loadedDiary.sleep_condition || loadedDiary.sleep_desc || "",
@@ -511,8 +567,6 @@ export default {
       checkUserStatus();
       fetchMoodTemperature();
     });
-
-
 
     return {
       currentYear,
@@ -541,10 +595,10 @@ export default {
         if (selectedDate.value) {
           router.push(`/diary/chat/${selectedDate.value}`);
         } else {
-          router.push('/diary/chat');
+          router.push("/diary/chat");
         }
       },
-      moodTemp
+      moodTemp,
     };
   },
 };
@@ -559,7 +613,7 @@ export default {
   background: white;
   padding: 14px 18px;
   border-radius: 14px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   margin-bottom: 12px;
 }
 .mood-temp-gauge {
@@ -639,7 +693,9 @@ body {
   justify-content: center;
   cursor: pointer;
   z-index: 9999 !important; /* Always on top */
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 .chat-fab:hover {
   transform: translateY(-2px) scale(1.05);
@@ -767,14 +823,12 @@ body {
   transition: all 0.3s ease;
 }
 
-
-
 /* Premium Capsule Button (Small Header Style) */
 .premium-capsule-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -795,7 +849,6 @@ body {
   font-size: 13px;
   letter-spacing: 0.5px;
 }
-
 
 /* Modal Styles */
 .modal-overlay {
@@ -892,7 +945,7 @@ body {
 .current-price {
   font-size: 32px;
   font-weight: 800;
-  color: #6366F1;
+  color: #6366f1;
 }
 
 .current-price small {
@@ -902,8 +955,8 @@ body {
 }
 
 .badge {
-  background: #FFE4E6;
-  color: #E11D48;
+  background: #ffe4e6;
+  color: #e11d48;
   font-size: 12px;
   padding: 4px 8px;
   border-radius: 4px;
@@ -935,8 +988,14 @@ body {
 }
 
 @keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .search-btn-v2 {
@@ -956,41 +1015,41 @@ body {
 
 /* 퀵 링크 스타일 */
 .quick-links {
-    display: flex;
-    gap: 12px;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid #f0f0f0;
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .quick-btn {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 12px;
-    border: none;
-    border-radius: 12px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    transition: all 0.2s;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
 }
 
 .guide-btn {
-    background: #eef2ff;
-    color: #4f46e5;
+  background: #eef2ff;
+  color: #4f46e5;
 }
 
 .stats-btn-main {
-    background: #f0fdf4;
-    color: #16a34a;
+  background: #f0fdf4;
+  color: #16a34a;
 }
 
 .quick-btn:hover {
-    transform: translateY(-2px);
-    filter: brightness(0.95);
+  transform: translateY(-2px);
+  filter: brightness(0.95);
 }
 
 .stats-premium-banner {
@@ -1173,9 +1232,6 @@ body {
     gap: 12px;
     padding: 20px;
   }
-
-
-
 
   .stat-divider-v2 {
     display: none;

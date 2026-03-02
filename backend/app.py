@@ -926,7 +926,7 @@ def get_report_status():
         # If no report found, check data
         last_diary = Diary.query.filter_by(user_id=user_id).order_by(Diary.date.desc()).first()
         if not last_diary:
-             response_data = {"status": "completed", "report": "아직 작성된 일기가 없습니다.", "insight": "아직 작성된 일기가 없습니다."}
+             response_data = {"status": "completed", "report": "아직 기록이 없어요. 괜찮아요, 편안할 때 한마디 남겨보세요. 🌿", "insight": "아직 기록이 없어요. 괜찮아요, 편안할 때 한마디 남겨보세요. 🌿"}
         else:
              response_data = {"status": "processing", "report": "분석을 준비하고 있습니다...", "insight": "분석을 준비하고 있습니다..."}
     

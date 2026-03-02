@@ -18,12 +18,12 @@ import com.maumon.app.ui.stats.StatsScreen
 
 /**
  * iOS AppMainTabView 1:1 대응
- * Tab 0: 캘린더 / Tab 1: 분석 / Tab 2: 대화 / Tab 3: 긴급 (빨간색)
+ * Tab 0: 캘린더 / Tab 1: 분석 / Tab 2: 한마디 / Tab 3: 긴급 (빨간색)
  */
 enum class TabItem(val label: String, val icon: ImageVector) {
     Calendar("캘린더", Icons.Default.CalendarMonth),
     Stats("분석", Icons.Default.BarChart),
-    Chat("대화", Icons.Default.Chat),
+    Chat("한마디", Icons.Default.Chat),
     Emergency("긴급", Icons.Default.Warning),
 }
 

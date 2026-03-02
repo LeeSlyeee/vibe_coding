@@ -160,10 +160,15 @@ struct AppDiaryDetailView: View {
                 
                 // AI 면책 고지
                 if diary.ai_prediction != nil || diary.ai_analysis != nil || diary.ai_advice != nil || diary.ai_comment != nil {
-                    Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
-                        .padding(.top, 4)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                        Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    }
+                    .padding(.top, 4)
                 }
                 
                 Spacer()

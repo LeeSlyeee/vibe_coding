@@ -92,6 +92,52 @@
             내 감정 통계와 리포트를 볼 수 있게 됩니다.
           </p>
         </div>
+
+        <!-- [P1-수정4] 보호자 알림 공유 범위 설정 -->
+        <section class="alert-scope-section">
+          <h3>🔔 보호자에게 공유할 알림</h3>
+          <p class="desc">보호자에게 전달되는 정보의 범위를 설정합니다.</p>
+          
+          <div class="toggle-list">
+            <div class="toggle-row">
+              <span class="toggle-icon">🌡️</span>
+              <div class="toggle-info">
+                <span class="toggle-title">기분 온도 알림</span>
+                <span class="toggle-sub">매일의 감정 온도를 공유합니다</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" v-model="shareMood">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-icon">📊</span>
+              <div class="toggle-info">
+                <span class="toggle-title">분석 리포트</span>
+                <span class="toggle-sub">주간/월간 감정 분석을 공유합니다</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" v-model="shareReport">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <span class="toggle-icon">🚨</span>
+              <div class="toggle-info">
+                <span class="toggle-title">위기 감지 알림</span>
+                <span class="toggle-sub">위기 신호 감지 시 즉시 알립니다</span>
+              </div>
+              <label class="switch">
+                <input type="checkbox" v-model="shareCrisis">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+          
+          <div v-if="!shareCrisis" class="crisis-warning">
+            ⚠️ 위기 알림이 꺼져 있으면 위급 상황에서 보호자가 알림을 받지 못합니다.
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -118,6 +164,11 @@ export default {
     const myCode = ref('');
     const timeLeft = ref(0);
     let timerInterval = null;
+
+    // [P1-수정4] Alert Share Scope
+    const shareMood = ref(true);
+    const shareReport = ref(true);
+    const shareCrisis = ref(true);
 
     const formatDate = (isoStr) => {
         if(!isoStr) return '';
@@ -245,7 +296,10 @@ export default {
         connectWithCode,
         generateCode,
         goToStats,
-        getBirthdayBadge
+        getBirthdayBadge,
+        shareMood,
+        shareReport,
+        shareCrisis
     };
   }
 };
@@ -437,6 +491,85 @@ h3 {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* [P1-수정4] Alert Scope Toggle */
+.alert-scope-section {
+  margin-top: 20px;
+}
+.toggle-list {
+  border-top: 1px solid #f0f0f0;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.toggle-icon {
+  font-size: 22px;
+  width: 36px;
+  flex-shrink: 0;
+}
+.toggle-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.toggle-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+.toggle-sub {
+  font-size: 11px;
+  color: #86868b;
+  margin-top: 2px;
+}
+.switch {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  border-radius: 24px;
+  transition: 0.3s;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+.switch input:checked + .slider {
+  background-color: #34c759;
+}
+.switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+.crisis-warning {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #fff3e0;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #ff9500;
+  line-height: 1.4;
 }
 
 .info-box {

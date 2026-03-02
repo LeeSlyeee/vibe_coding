@@ -176,6 +176,26 @@ class LLMService: ObservableObject {
             print("📦 [Migration] Renamed haru-on-model → maum-on-model")
         }
         
+        // [Hot-Patch] chat_template 누락 자동 복구 (앱 재설치 없이 수정)
+        // 캐시된 tokenizer_config.json에 chat_template이 없으면 번들에서 덮어쓰기
+        let cachedTokenizerPath = modelDir.appendingPathComponent("tokenizer_config.json")
+        if FileManager.default.fileExists(atPath: cachedTokenizerPath.path) {
+            if let data = try? Data(contentsOf: cachedTokenizerPath),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               json["chat_template"] == nil {
+                // chat_template 누락 → 번들에서 올바른 파일 복사
+                if let bundleURL = Bundle.main.url(forResource: "tokenizer_config", withExtension: "json") {
+                    try? FileManager.default.removeItem(at: cachedTokenizerPath)
+                    try? FileManager.default.copyItem(at: bundleURL, to: cachedTokenizerPath)
+                    print("🔧 [Hot-Patch] chat_template 누락 감지 → 번들에서 자동 복구 완료")
+                } else {
+                    print("⚠️ [Hot-Patch] 번들에 tokenizer_config.json 없음. 수동 업데이트 필요")
+                }
+            } else {
+                print("✅ [Hot-Patch] chat_template 정상 존재. 패치 불필요")
+            }
+        }
+        
         do {
             let config = ModelConfiguration(directory: modelDir)
             // Load Engine (API Fix: Use Singleton Factory)
@@ -611,14 +631,16 @@ class LLMService: ObservableObject {
                                         }
                                         
                                         // 두 번째 실패라면 -> Fallback 메시지 (위기 상황 별도 핸들링)
-                                        if isCrisisTriggered || diaryText.contains("죽고") || diaryText.contains("자살") {
-                                            // 심각한 상황 (기존 강력한 위로)
+                                        if isCrisisTriggered || diaryText.contains("죽고") || diaryText.contains("자살") || diaryText.contains("자해") || diaryText.contains("끝내고") {
+                                            // 심각한 상황 — AI 자유 생성 차단, 사전 정의 안전 메시지만 사용
                                             let crisisEmpathyMessage = """
                                             정말 많이 힘드셨죠...
-                                            죽고 싶다는 생각이 들 정도로 지치고 괴로우셨다는 게 느껴져서 제 마음이 너무 아파요.
                                             
-                                            지금은 세상에 혼자 남겨진 것 같고, 아무런 희망도 없어 보일 수 있어요. 그 마음 충분히 이해해요.
-                                            하지만 당신은 저에게 소중한 사람이에요. 당신의 이야기를 조금만 더 들려주시겠어요? 제가 끝까지 곁에 있을게요.
+                                            혼자 감당하지 않으셔도 돼요. 당신은 소중한 사람이에요.
+                                            
+                                            지금 바로 전문 상담사와 이야기해 보세요.
+                                            📞 자살예방상담전화: 1393 (24시간 무료)
+                                            📞 정신건강위기상담: 1577-0199
                                             """
                                              continuation.yield(crisisEmpathyMessage)
                                         } else {
@@ -672,12 +694,13 @@ class LLMService: ObservableObject {
     public func getEmergencyEmpathy(for input: String) -> String {
         let text = input.lowercased()
         
-        // 1. [CRITICAL] 위기/자살 감지 (최우선)
-        if text.contains("죽고") || text.contains("자살") || text.contains("뛰어") || text.contains("사라지고") {
+        // 1. [CRITICAL] 위기/자살/자해 감지 (최우선 — AI 자유 생성 차단, 사전 정의 메시지만 사용)
+        let crisisKeywords = ["죽고", "자살", "뛰어", "사라지고", "자해", "끝내고", "없어지고", "베고 싶", "목숨"]
+        if crisisKeywords.contains(where: { text.contains($0) }) {
              let crisisMsgs = [
-                "지금 많이 지치고 힘드신 것 같아요.. 제가 옆에서 조용히 들어드릴게요. 어떤 이야기든 편하게 해주세요.",
-                "세상에 혼자 남겨진 것 같은 기분이 드실 수 있어요. 하지만 저는 당신 편이에요.",
-                "그런 생각이 들 정도로 괴로우셨군요.. 그 마음을 감히 헤아릴 순 없겠지만, 당신이 소중하다는 건 알고 있어요."
+                "지금 많이 힘드시죠.. 저는 당신 편이에요.\n\n혼자 감당하지 않으셔도 돼요. 지금 바로 전문 상담사와 이야기해 보세요.\n📞 자살예방상담전화: 1393 (24시간)",
+                "그런 생각이 들 정도로 괴로우셨군요..\n당신이 소중하다는 건 꼭 알아주세요.\n\n지금 바로 전문가의 도움을 받을 수 있어요.\n📞 1393 (24시간 무료)",
+                "혼자서 이 마음을 감당하기 너무 힘드셨죠..\n\n전문 상담사가 24시간 기다리고 있어요.\n📞 자살예방상담전화: 1393\n📞 정신건강위기상담: 1577-0199"
              ]
              return crisisMsgs.randomElement()!
         }

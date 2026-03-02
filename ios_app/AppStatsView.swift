@@ -404,7 +404,7 @@ struct AppStatsView: View {
         }
         
         guard !diaryPayloads.isEmpty else {
-            self.reportContent = "아직 작성된 일기가 없어요. 오늘의 기분을 기록해보시겠어요? 📝"
+            self.reportContent = "아직 기록이 없어요.\n괜찮아요, 편안할 때 한마디 남겨보세요. 🌿"
             self.isGeneratingReport = false
             return
         }
@@ -768,10 +768,15 @@ struct ReportView: View {
                 }
                 Button("🔄 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
                 
-                Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
-                    .font(.caption2)
-                    .foregroundColor(.gray)
-                    .padding(.top, 4)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                    Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                }
+                .padding(.top, 4)
             }
         }
         .modifier(CardModifier())

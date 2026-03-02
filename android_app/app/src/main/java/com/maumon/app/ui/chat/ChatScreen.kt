@@ -58,32 +58,56 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
     ) {
         // 헤더
         Surface(shadowElevation = 2.dp) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "마음 톡(Talk)",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                // 서버/로컬 전환 버튼 (iOS Toggle 대응)
-                Surface(
-                    onClick = { chatViewModel.toggleAIMode() },
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (uiState.useServerAI) Primary.copy(alpha = 0.15f)
-                            else Color(0xFF34C759).copy(alpha = 0.15f)
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        if (uiState.useServerAI) "☁️ 서버 AI" else "📱 로컬 AI",
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (uiState.useServerAI) Primary else Color(0xFF34C759)
+                        "마음 톡(Talk)",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    // 서버/로컬 전환 버튼 (iOS Toggle 대응)
+                    Surface(
+                        onClick = { chatViewModel.toggleAIMode() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (uiState.useServerAI) Primary.copy(alpha = 0.15f)
+                                else Color(0xFF34C759).copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            if (uiState.useServerAI) "☁️ 서버 AI" else "📱 로컬 AI",
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (uiState.useServerAI) Primary else Color(0xFF34C759)
+                        )
+                    }
+                }
+                // On-Device 보안 배지
+                if (!uiState.useServerAI) {
+                    Surface(
+                        modifier = Modifier
+                            .padding(start = 16.dp, bottom = 8.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF34C759).copy(alpha = 0.08f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🔒", fontSize = 10.sp)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "이 대화는 폰 안에서만 처리됩니다",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -134,24 +158,6 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            // 인트로
-            if (uiState.messages.isEmpty() && !uiState.isTyping) {
-                item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 60.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("👋", fontSize = 40.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.\n\n💡 마음온은 감정 기록 보조 도구이며, 전문 의료 서비스를 대체하지 않아요.",
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            color = Color.Gray,
-                            lineHeight = 22.sp
-                        )
-                    }
-                }
-            }
 
             items(uiState.messages) { msg ->
                 ChatBubble(message = msg)

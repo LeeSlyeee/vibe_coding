@@ -89,6 +89,43 @@ fun EmergencyScreen() {
             )
         }
 
+        // 정신건강복지센터 찾기 링크
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFEBF5FB)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            onClick = {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.mentalhealth.go.kr"))
+                context.startActivity(intent)
+            }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("🔍", fontSize = 24.sp)
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "가까운 정신건강복지센터 찾기",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF2196F3)
+                    )
+                    Text(
+                        "mentalhealth.go.kr",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
 
         // 안내 카드

@@ -199,7 +199,7 @@ def get_shared_insights(target_id):
             "avg_mood": None,
             "mood_trend": [],
             "recent_status": "데이터 없음",
-            "message": "아직 작성된 일기가 없습니다."
+            "message": "아직 기록이 없어요."
         }), 200
 
     moods = [d.mood_level or 3 for d in diaries]
@@ -427,7 +427,12 @@ def get_guardian_alerts():
                         "sharer_name": sharer_name,
                         "message": f"{sharer_name}님에게 위기 신호가 감지되었습니다.",
                         "severity": "high",
-                        "icon": "🚨"
+                        "icon": "🚨",
+                        "action_guide": [
+                            "1. 침착하게 전화 또는 문자로 안부를 확인해 주세요.",
+                            "2. 연락이 되지 않으면 가까운 경찰서(112)에 안전 확인을 요청하세요.",
+                            "3. 자살예방상담전화 1393에서 보호자 상담도 가능합니다."
+                        ]
                     })
         
         # 2. 마음 온도 급락 알림 (alert_mood_drop 설정 시)
@@ -444,7 +449,12 @@ def get_guardian_alerts():
                         "message": f"{sharer_name}님의 마음 온도가 낮은 상태입니다.",
                         "severity": "medium",
                         "icon": "💙",
-                        "avg_mood": round(avg_recent, 1)
+                        "avg_mood": round(avg_recent, 1),
+                        "action_guide": [
+                            "1. 자연스러운 대화로 안부를 물어봐 주세요.",
+                            "2. '힘내'보다는 '네 곁에 있어'라는 메시지가 좋습니다.",
+                            "3. 상태가 지속되면 전문 상담을 권유해 주세요."
+                        ]
                     })
         
         # 3. 장기 미기록 알림 (alert_inactivity 설정 시)
@@ -456,7 +466,12 @@ def get_guardian_alerts():
                     "sharer_name": sharer_name,
                     "message": f"{sharer_name}님이 7일 이상 기록을 남기지 않았습니다.",
                     "severity": "low",
-                    "icon": "📝"
+                    "icon": "📝",
+                    "action_guide": [
+                        "1. 가볍게 안부 연락을 해보세요.",
+                        "2. 기록하지 않은 것 자체가 문제는 아닙니다.",
+                        "3. 편안할 때 다시 사용하면 된다고 알려주세요."
+                    ]
                 })
     
     return jsonify({
