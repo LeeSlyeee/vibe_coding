@@ -59,55 +59,65 @@ KINSHIP_DICT = {
     "선생": "학교", "코치": "학교",
 }
 
+def _extract_people_llm(text):
+    """
+    서버 LLM(Ollama)을 사용하여 텍스트에서 사람 이름만 추출한다.
+    LLM은 문맥을 이해하므로 '강남에서 쇼핑'(지역)과 '강남이랑 노래'(사람)를 구분.
+    
+    Returns:
+        list of str: 추출된 사람 이름 목록
+    """
+    import requests
+    import json
+    
+    prompt = (
+        "아래 텍스트에서 **사람 이름과 호칭**만 추출해줘. "
+        "지역명, 앱이름, 학교명, 프로젝트명은 제외해. "
+        "사람이 없으면 빈 리스트를 반환해.\n"
+        "반드시 JSON 배열 형식으로만 답해. 설명 없이 배열만.\n"
+        "예시: [\"성희\", \"엄마\", \"팀장\"]\n\n"
+        f"텍스트: {text[:500]}\n\n"
+        "추출된 사람:"
+    )
+    
+    try:
+        res = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": "maumON-gemma:latest",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.1, "num_predict": 100}
+            },
+            timeout=10
+        )
+        if res.status_code == 200:
+            response_text = res.json().get('response', '').strip()
+            # JSON 배열 추출
+            import re
+            match = re.search(r'\[.*?\]', response_text, re.DOTALL)
+            if match:
+                names = json.loads(match.group())
+                return [n for n in names if isinstance(n, str) and 1 <= len(n) <= 4]
+    except Exception as e:
+        print(f"⚠️ LLM NER 실패 (호칭 사전으로 fallback): {e}")
+    
+    return []
 
-# ─── 비인물 고유명사 차단 목록 ───
-# Kiwi가 NNP로 태깅하지만 사람이 아닌 것들
-# (오탐 발견 시 여기에 추가)
-NNP_STOPLIST = {
-    # 앱/프로젝트/서비스
-    "마음온", "마은", "마음", "리부트", "그래비티", "인사이트",
-    "카카오", "네이버", "구글", "애플", "삼성", "인스타", "유튜브",
-    # 학교/기관
-    "연세대", "연대", "서울대", "고려대", "한양대", "성균관",
-    "이화여대", "중앙대", "경희대", "건국대", "동국대",
-    # 지역/장소
-    "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
-    "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
-    "강남", "홍대", "신촌", "이태원", "명동", "종로", "잠실",
-    # 일반 명사가 NNP로 잡히는 경우
-    "오늘", "내일", "어제", "요즘", "최근", "매일",
-}
 
 def _extract_people_from_text(text):
     """
     텍스트에서 인물을 추출한다.
-    Kiwi NNP (고유명사) + 호칭 사전 매칭.
     
-    Returns:
-        list of dict: [{"name": "민수", "type": "고유명사", "group": None}, ...]
+    1차: 호칭 사전 매칭 (엄마, 팀장, 친구 등 — 오탐률 0%, 항상 동작)
+    2차: LLM NER 보완 (성희, 혜진 등 실제 이름 — 문맥 기반 정확도)
+    
+    호칭 사전이 핵심. LLM은 보완재. LLM 실패 시 호칭 사전만으로 동작.
     """
-    kiwi = _get_kiwi()
-    tokens = kiwi.tokenize(text)
-    
     people = []
     seen = set()
     
-    # 1. Kiwi NNP (고유명사) — 사람 이름
-    for t in tokens:
-        if t.tag == 'NNP' and t.form not in seen:
-            # 비인물 고유명사 차단
-            if t.form in NNP_STOPLIST:
-                continue
-            # 장소명, 브랜드명 제외 (간단한 휴리스틱)
-            if len(t.form) <= 4 and not any(x in t.form for x in ['시', '구', '동', '점', '역', '대학', '대']):
-                people.append({
-                    "name": t.form,
-                    "type": "고유명사",
-                    "group": None,
-                })
-                seen.add(t.form)
-    
-    # 2. 호칭 사전 매칭
+    # 1차: 호칭 사전 매칭 (항상 안전, 기본 동작)
     for kinship, group in KINSHIP_DICT.items():
         if kinship in text and kinship not in seen:
             people.append({
@@ -116,6 +126,20 @@ def _extract_people_from_text(text):
                 "group": group,
             })
             seen.add(kinship)
+    
+    # 2차: LLM NER 보완 (실제 이름 추가 추출)
+    llm_names = _extract_people_llm(text)
+    for name in llm_names:
+        if name not in seen:
+            # 호칭 사전에 있으면 이미 1차에서 잡았으므로 스킵
+            if name in KINSHIP_DICT:
+                continue
+            people.append({
+                "name": name,
+                "type": "고유명사(LLM)",
+                "group": None,
+            })
+            seen.add(name)
     
     return people
 
