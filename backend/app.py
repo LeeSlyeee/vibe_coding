@@ -436,12 +436,27 @@ def create_diary():
             # ② 위기 감지 알림 (safety_flag=True)
             if safety in [True, 'need_help', 'danger']:
                 notify_guardians_crisis(user)
-            # ③ 킥 시계열 분석 → medium/high 플래그 시 알림
+            # ③ 킥 분석 (Phase 1~3) → medium/high 플래그 시 알림
             try:
+                all_kick_flags = []
+                # Phase 1: 시계열
                 from kick_analysis import analyze_timeseries
-                kick_result = analyze_timeseries(user.id, db.session, Diary)
-                if kick_result['flags']:
-                    notify_guardians_kick_flag(user, kick_result['flags'])
+                ts_result = analyze_timeseries(user.id, db.session, Diary)
+                if ts_result.get('flags'):
+                    all_kick_flags.extend(ts_result['flags'])
+                # Phase 2: 언어 지문
+                from kick_analysis.linguistic import analyze_linguistic
+                ling_result = analyze_linguistic(user.id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if ling_result.get('flags'):
+                    all_kick_flags.extend(ling_result['flags'])
+                # Phase 3: 관계 지형도
+                from kick_analysis.relational import analyze_relational
+                rel_result = analyze_relational(user.id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if rel_result.get('flags'):
+                    all_kick_flags.extend(rel_result['flags'])
+                # 플래그가 있으면 보호자 알림
+                if all_kick_flags:
+                    notify_guardians_kick_flag(user, all_kick_flags)
             except Exception as ke:
                 print(f"⚠️ Kick Analysis Trigger Failed: {ke}")
     except Exception as e:
@@ -931,7 +946,55 @@ def run_async_analysis(user_id, mode='daily'):
                     "**주의사항**: 이 분석은 참고용이며 전문 의료 서비스를 대체하지 않습니다."
                 )
             
-            prompt = f"{system_prompt}\n\n[내담자의 최근 일기 데이터]\n{context_text}\n\n[전문가 분석 보고서]"
+            prompt = f"{system_prompt}\n\n[내담자의 최근 일기 데이터]\n{context_text}\n"
+
+            # [킥 인사이트 주입] 시계열 + 언어 지문 + 관계 지형도
+            try:
+                kick_context = ""
+                # Phase 1: 시계열
+                from kick_analysis import analyze_timeseries
+                ts = analyze_timeseries(user_id, db.session, Diary)
+                if ts.get('flags'):
+                    kick_context += "[시계열 패턴 감지]\n"
+                    for f in ts['flags']:
+                        kick_context += f"- ⚠️ {f['message']} ({f['detail']})\n"
+                # Phase 2: 언어 지문
+                from kick_analysis.linguistic import analyze_linguistic
+                lg = analyze_linguistic(user_id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if lg.get('status') == 'completed' and lg.get('linguistic', {}).get('deviation'):
+                    dev = lg['linguistic']['deviation']
+                    kick_context += "\n[언어 패턴 변화 (Baseline 대비)]\n"
+                    key_labels = {'ttr': '어휘 다양성', 'self_focus': '자기 집중도',
+                                  'negation_ratio': '부정어 비율', 'char_count': '일기 분량'}
+                    for key, label in key_labels.items():
+                        d = dev.get(key, {})
+                        if d.get('change_pct') and abs(d['change_pct']) >= 20:
+                            kick_context += f"- {label}: {d['change_pct']:+.0f}% 변화\n"
+                if lg.get('flags'):
+                    for f in lg['flags']:
+                        kick_context += f"- ⚠️ {f['message']}\n"
+                # Phase 3: 관계 지형도
+                from kick_analysis.relational import analyze_relational
+                rl = analyze_relational(user_id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if rl.get('status') == 'completed':
+                    rel_data = rl.get('relational', {})
+                    total = rel_data.get('total_unique_people', 0)
+                    timeline = rel_data.get('social_density_timeline', [])
+                    if timeline:
+                        recent = timeline[-1]
+                        kick_context += f"\n[관계 지형도]\n"
+                        kick_context += f"- 30일간 등장 인물: 총 {total}명\n"
+                        kick_context += f"- 최근 주 등장 인물: {recent['unique_people']}명 ({', '.join(recent.get('people_names', [])[:5])})\n"
+                if rl.get('flags'):
+                    for f in rl['flags']:
+                        kick_context += f"- ⚠️ {f['message']}\n"
+                
+                if kick_context:
+                    prompt += f"\n[AI 킥 분석 인사이트 (프롬프트 참고용)]\n{kick_context}\n"
+            except Exception as kick_err:
+                print(f"⚠️ Kick Context Injection: {kick_err}")
+
+            prompt += "\n[전문가 분석 보고서]"
             
             # Call LLM
             # options = {"temperature": 0.7, "num_predict": 2000 if mode == 'longterm' else 1000}

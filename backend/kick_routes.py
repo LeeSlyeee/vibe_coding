@@ -24,6 +24,68 @@ def set_decrypt_func(func):
     _decrypt_func = func
 
 
+# ═════════════════════════════════════════════════
+# 온디바이스 AI용: 본인 킥 인사이트 요약 (의료진 권한 불필요)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/my-insights', methods=['GET'])
+@jwt_required()
+def get_my_kick_insights():
+    """
+    로그인한 사용자 본인의 킥 분석 인사이트 요약.
+    온디바이스 AI가 대화 시 context로 사용.
+    의료진 권한 불필요 — 본인 데이터만 반환.
+    """
+    user_id = get_jwt_identity()
+
+    insights = []
+
+    try:
+        # Phase 1: 시계열
+        from kick_analysis import analyze_timeseries
+        ts = analyze_timeseries(user_id, db.session, Diary)
+        for f in ts.get('flags', []):
+            insights.append(f"[시계열] {f['message']}")
+
+        # Phase 2: 언어 지문
+        lg = analyze_linguistic(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+        if lg.get('status') == 'completed':
+            dev = lg.get('linguistic', {}).get('deviation', {})
+            labels = {'ttr': '어휘 다양성', 'self_focus': '자기 집중도',
+                      'char_count': '일기 분량', 'negation_ratio': '부정어 비율'}
+            for key, label in labels.items():
+                d = dev.get(key, {})
+                if d.get('change_pct') and abs(d['change_pct']) >= 20:
+                    insights.append(f"[언어] {label} {d['change_pct']:+.0f}% 변화")
+        for f in lg.get('flags', []):
+            insights.append(f"[언어] ⚠️ {f['message']}")
+
+        # Phase 3: 관계 지형도
+        rl = analyze_relational(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+        if rl.get('status') == 'completed':
+            rel = rl.get('relational', {})
+            timeline = rel.get('social_density_timeline', [])
+            if timeline:
+                recent = timeline[-1]
+                names = recent.get('people_names', [])
+                if names:
+                    insights.append(f"[관계] 최근 일기에 등장한 사람: {', '.join(names[:5])}")
+                else:
+                    insights.append("[관계] 최근 일기에 타인 등장 없음")
+        for f in rl.get('flags', []):
+            insights.append(f"[관계] ⚠️ {f['message']}")
+
+    except Exception as e:
+        print(f"⚠️ My Kick Insights Error: {e}")
+
+    return jsonify({
+        'user_id': user_id,
+        'insights': insights,
+        'insight_count': len(insights),
+        'prompt_hint': '\n'.join(insights) if insights else None,
+    })
+
+
 def _require_staff(current_user_id):
     """의료진/관리자 권한 확인"""
     user = db.session.query(User).filter_by(id=current_user_id).first()
