@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import api from '@/api';
+import axios from 'axios';
 import { useAuthStore } from '@/stores/auth';
 import {
   Chart as ChartJS,
@@ -31,9 +32,47 @@ const generatedCode = ref(null);
 const errorMsg = ref('');
 const centerName = ref('');
 
+// 킥 분석 데이터
+const kickData = ref(null);
+const kickLoading = ref(false);
+
 // Auth Store에서 로그인 사용자 정보
 const authStore = useAuthStore();
 const staffName = computed(() => authStore.user?.username || '담당자');
+
+// 킥 데이터 로드
+const fetchKickData = async () => {
+    kickLoading.value = true;
+    try {
+        const res = await axios.get('/api/kick/dashboard/overview-internal');
+        kickData.value = res.data;
+    } catch (err) {
+        console.warn('킥 분석 데이터 로드 실패:', err);
+    } finally {
+        kickLoading.value = false;
+    }
+};
+
+// 심각도별 색상
+const severityClass = (severity) => {
+    return {
+        'high': 'bg-red-100 text-red-800',
+        'medium': 'bg-orange-100 text-orange-800',
+        'low': 'bg-yellow-100 text-yellow-800',
+    }[severity] || 'bg-slate-100 text-slate-800';
+};
+
+const severityIcon = (severity) => {
+    return { 'high': '🔴', 'medium': '🟠', 'low': '🟡' }[severity] || '⚪';
+};
+
+const phaseIcon = (phase) => {
+    return {
+        'timeseries': '📊',
+        'linguistic': '🔤',
+        'relational': '🧑‍🤝‍🧑',
+    }[phase] || '📌';
+};
 
 // Chart Data Computed Properties
 const flowChartData = computed(() => {
@@ -276,8 +315,9 @@ let intervalId = null;
 
 onMounted(() => {
     fetchDashboardData();
+    fetchKickData();
     // 30초마다 데이터 갱신 (실시간성 확보 + 서버 부하 경감)
-    intervalId = setInterval(fetchDashboardData, 30000);
+    intervalId = setInterval(() => { fetchDashboardData(); fetchKickData(); }, 30000);
 });
 
 import { onUnmounted } from 'vue';
@@ -391,6 +431,110 @@ onUnmounted(() => {
                         <span class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-3"></span>위험 (4점 이하)</span>
                         <span class="font-bold text-red-600 text-lg">{{ riskDistributionData.datasets[0].data[2] || 0 }}건</span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ AI 킥(Kick) 분석 ═══ -->
+        <div class="mb-10" v-if="kickData">
+            <h2 class="text-3xl font-extrabold text-slate-900 mb-6 flex items-center gap-3">
+                ⚡ AI 킥(Kick) 분석
+                <span class="text-base font-normal text-slate-400">자동 위험 감지 시스템</span>
+            </h2>
+            
+            <!-- 킥 요약 카드 3개 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Phase 1: 시계열 -->
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl text-white shadow-lg">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl">📊</span>
+                        <h4 class="text-lg font-bold">시계열 패턴</h4>
+                    </div>
+                    <p class="text-4xl font-extrabold">{{ kickData.by_phase?.timeseries || 0 }}<span class="text-lg font-normal ml-1">건</span></p>
+                    <p class="text-blue-100 text-sm mt-2">침묵, 빈도 감소, 시간대 이상</p>
+                </div>
+                
+                <!-- Phase 2: 언어 지문 -->
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl text-white shadow-lg">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl">🔤</span>
+                        <h4 class="text-lg font-bold">언어 지문</h4>
+                    </div>
+                    <p class="text-4xl font-extrabold">{{ kickData.by_phase?.linguistic || 0 }}<span class="text-lg font-normal ml-1">건</span></p>
+                    <p class="text-purple-100 text-sm mt-2">어휘 다양성, 자기 집중도, 부정어</p>
+                </div>
+                
+                <!-- Phase 3: 관계 지형도 -->
+                <div class="bg-gradient-to-br from-rose-500 to-rose-600 p-6 rounded-2xl text-white shadow-lg">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-2xl">🧑‍🤝‍🧑</span>
+                        <h4 class="text-lg font-bold">관계 지형도</h4>
+                    </div>
+                    <p class="text-4xl font-extrabold">{{ kickData.by_phase?.relational || 0 }}<span class="text-lg font-normal ml-1">건</span></p>
+                    <p class="text-rose-100 text-sm mt-2">사회적 위축, 인물 소멸, 부정 관계</p>
+                </div>
+            </div>
+
+            <!-- 킥 통합 플래그 테이블 -->
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold text-slate-800">⚡ AI 위험 신호 감지 목록</h3>
+                    <div class="flex gap-3">
+                        <span class="px-3 py-1 rounded-full text-sm font-bold bg-red-100 text-red-700">
+                            🔴 긴급 {{ kickData.by_severity?.high || 0 }}
+                        </span>
+                        <span class="px-3 py-1 rounded-full text-sm font-bold bg-orange-100 text-orange-700">
+                            🟠 주의 {{ kickData.by_severity?.medium || 0 }}
+                        </span>
+                        <span class="px-3 py-1 rounded-full text-sm font-bold bg-yellow-100 text-yellow-700">
+                            🟡 관찰 {{ kickData.by_severity?.low || 0 }}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="overflow-x-auto">
+                    <table class="w-full text-base text-left text-slate-500">
+                        <thead class="text-sm text-slate-700 uppercase bg-slate-50">
+                            <tr>
+                                <th class="px-6 py-4">심각도</th>
+                                <th class="px-6 py-4">분석 유형</th>
+                                <th class="px-6 py-4">대상자</th>
+                                <th class="px-6 py-4">위험 신호</th>
+                                <th class="px-6 py-4">상세</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(flag, idx) in kickData.flags" :key="idx" 
+                                class="border-b hover:bg-slate-50 transition"
+                                :class="flag.severity === 'high' ? 'bg-red-50/50' : ''">
+                                <td class="px-6 py-4">
+                                    <span :class="severityClass(flag.severity)" 
+                                          class="text-sm font-bold px-3 py-1 rounded-full">
+                                        {{ severityIcon(flag.severity) }} {{ flag.severity === 'high' ? '긴급' : flag.severity === 'medium' ? '주의' : '관찰' }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="flex items-center gap-2">
+                                        {{ phaseIcon(flag.phase) }}
+                                        <span class="font-medium">{{ flag.phase_label }}</span>
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <div class="flex flex-col">
+                                        <span class="font-bold text-slate-900">{{ flag.real_name || '실명없음' }}</span>
+                                        <span class="text-sm text-slate-400">({{ flag.username }})</span>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 font-medium text-slate-800">{{ flag.message }}</td>
+                                <td class="px-6 py-4 text-sm text-slate-500">{{ flag.detail }}</td>
+                            </tr>
+                            <tr v-if="!kickData.flags || kickData.flags.length === 0">
+                                <td colspan="5" class="px-6 py-8 text-center text-slate-400">
+                                    ✅ 현재 AI가 감지한 위험 신호가 없습니다.
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

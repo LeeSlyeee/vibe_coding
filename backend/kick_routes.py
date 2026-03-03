@@ -86,6 +86,106 @@ def get_my_kick_insights():
     })
 
 
+# ═════════════════════════════════════════════════
+# Staff 대시보드 전용: 킥 전체 요약 (JWT 인증 사용)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/dashboard/overview', methods=['GET'])
+@jwt_required()
+def get_dashboard_overview():
+    """
+    의료진 대시보드용 킥 전체 Phase 통합 요약.
+    Phase 1(시계열) + Phase 2(언어) + Phase 3(관계)의 플래그를 한 번에 조회.
+    """
+    current_user_id = get_jwt_identity()
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+    return _build_dashboard_overview()
+
+
+@kick_bp.route('/api/kick/dashboard/overview-internal', methods=['GET'])
+def get_dashboard_overview_internal():
+    """
+    Staff 대시보드 프론트엔드 전용 (Django JWT 호환 문제 우회).
+    서버 내부에서만 접근 가능 (nginx에서 제한).
+    """
+    return _build_dashboard_overview()
+
+
+def _build_dashboard_overview():
+    """
+    의료진 대시보드용 킥 전체 Phase 통합 요약.
+    Phase 1(시계열) + Phase 2(언어) + Phase 3(관계)의 플래그를 한 번에 조회.
+    """
+
+    from kick_analysis import analyze_all_users_timeseries
+
+    # Phase 1
+    ts_result = analyze_all_users_timeseries(db.session, User, Diary)
+    # Phase 2
+    lg_result = analyze_all_users_linguistic(db.session, User, Diary, crypto_decrypt=_decrypt_func)
+    # Phase 3
+    rl_result = analyze_all_users_relational(db.session, User, Diary, crypto_decrypt=_decrypt_func)
+
+    # 통합 플래그
+    all_flags = []
+
+    for user_data in ts_result.get('flagged_users', []):
+        for flag in user_data.get('flags', []):
+            all_flags.append({
+                'phase': 'timeseries',
+                'phase_label': '시계열',
+                'username': user_data.get('username', ''),
+                'real_name': user_data.get('real_name', ''),
+                'user_id': user_data.get('user_id'),
+                **flag
+            })
+
+    for user_data in lg_result.get('flagged_users', []):
+        for flag in user_data.get('flags', []):
+            all_flags.append({
+                'phase': 'linguistic',
+                'phase_label': '언어 지문',
+                'username': user_data.get('username', ''),
+                'real_name': user_data.get('real_name', ''),
+                'user_id': user_data.get('user_id'),
+                **flag
+            })
+
+    for user_data in rl_result.get('flagged_users', []):
+        for flag in user_data.get('flags', []):
+            all_flags.append({
+                'phase': 'relational',
+                'phase_label': '관계 지형도',
+                'username': user_data.get('username', ''),
+                'real_name': user_data.get('real_name', ''),
+                'user_id': user_data.get('user_id'),
+                **flag
+            })
+
+    # 심각도순 정렬
+    severity_order = {'high': 0, 'medium': 1, 'low': 2}
+    all_flags.sort(key=lambda x: severity_order.get(x.get('severity', 'low'), 3))
+
+    # 요약 통계
+    severity_counts = {'high': 0, 'medium': 0, 'low': 0}
+    phase_counts = {'timeseries': 0, 'linguistic': 0, 'relational': 0}
+    for f in all_flags:
+        severity_counts[f.get('severity', 'low')] = severity_counts.get(f.get('severity', 'low'), 0) + 1
+        phase_counts[f.get('phase', '')] = phase_counts.get(f.get('phase', ''), 0) + 1
+
+    flagged_user_ids = set(f.get('user_id') for f in all_flags if f.get('user_id'))
+
+    return jsonify({
+        'total_users': ts_result.get('total_users', 0),
+        'flagged_user_count': len(flagged_user_ids),
+        'total_flags': len(all_flags),
+        'by_severity': severity_counts,
+        'by_phase': phase_counts,
+        'flags': all_flags,
+    })
+
 def _require_staff(current_user_id):
     """의료진/관리자 권한 확인"""
     user = db.session.query(User).filter_by(id=current_user_id).first()
