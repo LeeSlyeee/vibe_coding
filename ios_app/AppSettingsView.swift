@@ -37,7 +37,6 @@ struct AppSettingsView: View {
     @State private var activeAlert: ActiveAlert?
     
     var body: some View {
-        NavigationView {
             List {
                 // Section 1: 계정 & 프로필
                 Section(header: Text("내 정보")) {
@@ -686,11 +685,9 @@ struct AppSettingsView: View {
                 })
                 .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
-            // [New] Birth Date Picker Sheet
             .sheet(isPresented: $showBirthDatePicker) {
                 BirthDatePickerView(isPresented: $showBirthDatePicker)
             }
-        } // End NavigationView
     }
     
     // 이스터에그 함수

@@ -1,7 +1,12 @@
 package com.maumon.app.ui.chat
 
+import android.Manifest
+import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -12,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.maumon.app.ui.theme.Primary
 import kotlinx.coroutines.launch
@@ -43,6 +50,36 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
     val uiState by chatViewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // === 음성 인식 (STT) ===
+    val context = LocalContext.current
+    val voiceRecorder = remember { VoiceRecorder(context) }
+    val isVoiceRecording by voiceRecorder.isRecording.collectAsState()
+    val transcribedText by voiceRecorder.transcribedText.collectAsState()
+    val voiceError by voiceRecorder.error.collectAsState()
+
+    // 음성 인식 결과 → 입력창에 반영
+    LaunchedEffect(transcribedText) {
+        if (transcribedText.isNotBlank()) {
+            inputText = transcribedText
+        }
+    }
+
+    // 마이크 권한 요청 런처
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            voiceRecorder.startRecording()
+        }
+    }
+
+    // VoiceRecorder 리소스 해제
+    DisposableEffect(Unit) {
+        onDispose {
+            voiceRecorder.destroy()
+        }
+    }
 
     // 새 메시지 시 스크롤
     LaunchedEffect(uiState.messages.size) {
@@ -186,6 +223,20 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
             }
         }
 
+        // 음성 인식 에러 스낵바
+        voiceError?.let { errMsg ->
+            Snackbar(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                action = {
+                    TextButton(onClick = { /* 에러 자동 소멸 */ }) {
+                        Text("확인", color = Color.White)
+                    }
+                }
+            ) {
+                Text(errMsg, fontSize = 13.sp)
+            }
+        }
+
         // 입력 영역
         Surface(shadowElevation = 4.dp) {
             Row(
@@ -195,15 +246,55 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // 🎙️ 마이크 버튼
+                IconButton(
+                    onClick = {
+                        if (isVoiceRecording) {
+                            voiceRecorder.stopRecording()
+                        } else {
+                            // 권한 확인 후 녹음 시작
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPermission) {
+                                voiceRecorder.startRecording()
+                            } else {
+                                micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            }
+                        }
+                    },
+                    enabled = !uiState.isTyping,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isVoiceRecording) Color.Red.copy(alpha = 0.8f)
+                            else Color.Gray.copy(alpha = 0.15f)
+                        )
+                ) {
+                    Icon(
+                        Icons.Default.Mic,
+                        contentDescription = if (isVoiceRecording) "녹음 중지" else "음성 입력",
+                        tint = if (isVoiceRecording) Color.White else Color.Gray
+                    )
+                }
+
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text("메시지 보내기...") },
+                    placeholder = {
+                        Text(
+                            if (isVoiceRecording) "🎤 듣고 있어요..."
+                            else "메시지 보내기..."
+                        )
+                    },
                     shape = RoundedCornerShape(24.dp),
                     singleLine = true,
                     enabled = !uiState.isTyping
                 )
+
+                // 보내기 버튼
                 IconButton(
                     onClick = {
                         if (inputText.isNotBlank()) {

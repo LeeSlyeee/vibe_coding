@@ -118,25 +118,44 @@ def connect_share():
 @share_bp.route('/api/share/list', methods=['GET'])
 @jwt_required()
 def get_shared_list():
-    """조회자(Viewer)의 연결된 사용자 목록 반환"""
+    """role에 따라 연결된 사용자 목록 반환"""
     current_user_id = int(get_jwt_identity())
-
-    relationships = ShareRelationship.query.filter_by(viewer_id=current_user_id).all()
+    role = request.args.get('role', 'viewer')
 
     result = []
-    for rel in relationships:
-        sharer = User.query.get(rel.sharer_id)
-        if sharer:
-            result.append({
-                "sharer_id": sharer.id,
-                "name": sharer.nickname or sharer.username,
-                "birth_date": sharer.birth_date,
-                "connected_at": rel.connected_at.isoformat() if rel.connected_at else None,
-                "role": rel.role or 'viewer',
-                "alert_mood_drop": rel.alert_mood_drop if rel.alert_mood_drop is not None else True,
-                "alert_crisis": rel.alert_crisis if rel.alert_crisis is not None else True,
-                "alert_inactivity": rel.alert_inactivity if rel.alert_inactivity is not None else True
-            })
+    
+    if role == 'sharer':
+        # 내담자(sharer)가 자신에게 연결된 보호자 목록 조회
+        relationships = ShareRelationship.query.filter_by(sharer_id=current_user_id).all()
+        for rel in relationships:
+            viewer = User.query.get(rel.viewer_id)
+            if viewer:
+                result.append({
+                    "id": str(viewer.id),
+                    "name": viewer.nickname or viewer.username,
+                    "role": rel.role or 'viewer',
+                    "birth_date": viewer.birth_date,
+                    "connected_at": rel.connected_at.isoformat() if rel.connected_at else None,
+                    "share_mood": rel.share_mood if rel.share_mood is not None else True,
+                    "share_report": rel.share_report if rel.share_report is not None else False,
+                    "share_crisis": rel.share_crisis if rel.share_crisis is not None else True
+                })
+    else:
+        # 보호자(viewer)가 연결된 내담자 목록 조회
+        relationships = ShareRelationship.query.filter_by(viewer_id=current_user_id).all()
+        for rel in relationships:
+            sharer = User.query.get(rel.sharer_id)
+            if sharer:
+                result.append({
+                    "id": str(sharer.id),
+                    "name": sharer.nickname or sharer.username,
+                    "role": rel.role or 'viewer',
+                    "birth_date": sharer.birth_date,
+                    "connected_at": rel.connected_at.isoformat() if rel.connected_at else None,
+                    "alert_mood_drop": rel.alert_mood_drop if rel.alert_mood_drop is not None else True,
+                    "alert_crisis": rel.alert_crisis if rel.alert_crisis is not None else True,
+                    "alert_inactivity": rel.alert_inactivity if rel.alert_inactivity is not None else True
+                })
 
     return jsonify(result), 200
 

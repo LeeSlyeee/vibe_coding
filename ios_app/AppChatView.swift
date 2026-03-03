@@ -283,11 +283,12 @@ struct AppChatView: View {
                 .sheet(isPresented: $showSettings) {
                     NavigationView {
                         AppSettingsView()
+                            .environmentObject(authManager)
                             .navigationBarItems(trailing: Button("닫기") {
                                 showSettings = false
                             })
                     }
-                    .screenshotProtected(isProtected: false) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false)
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background

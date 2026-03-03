@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -99,6 +100,10 @@ dependencies {
 
     // On-Device LLM (MediaPipe)
     implementation(libs.mediapipe.tasks.genai)
+
+    // Firebase (Push Notification)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
 
     // Testing
     testImplementation(libs.junit)

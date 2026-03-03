@@ -260,10 +260,11 @@ struct AppStatsView: View {
         .sheet(isPresented: $showSettings) {
             NavigationView {
                 AppSettingsView()
+                    .environmentObject(authManager)
                     .navigationBarItems(trailing: Button("닫기") {
                         showSettings = false
                     })
-                    .screenshotProtected(isProtected: false) // 스크린샷 방지
+                    .screenshotProtected(isProtected: false)
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제

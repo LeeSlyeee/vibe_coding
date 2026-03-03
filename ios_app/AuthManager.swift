@@ -48,6 +48,15 @@ class AuthManager: ObservableObject {
         self.isPremium = UserDefaults.standard.bool(forKey: "userIsPremium")
         if self.riskLevel == 0 { self.riskLevel = 1 } // Default to 1
         
+        // [Fix] userId가 없으면 JWT에서 추출 (자동 로그인 시 userId 누락 방지)
+        if isAuthenticated, UserDefaults.standard.string(forKey: "userId") == nil,
+           let savedToken = self.token {
+            if let jwtId = APIService.shared.decodeUserIdFromJWT(token: savedToken) {
+                UserDefaults.standard.set(jwtId, forKey: "userId")
+                print("✅ [Auth] userId 복구 (JWT에서 추출): \(jwtId)")
+            }
+        }
+        
         // [Standard Architecture] 
         // Single Source of Truth: 'authUsername'. No more 'app_username'.
         if isAuthenticated && (self.username == nil || self.username!.isEmpty) {
@@ -177,6 +186,28 @@ class AuthManager: ObservableObject {
             // UI 전환(isAuthenticated=true) 전에 B2G 연동 상태를 먼저 확정지어야 함.
             // 1. 토큰을 조용히 저장 (APIService가 사용할 수 있도록)
             UserDefaults.standard.set(token, forKey: "serverAuthToken")
+            
+            // [Fix] userId 저장 — 서버 응답에서 추출
+            if let user = json["user"] as? [String: Any] {
+                if let uid = user["id"] as? Int {
+                    UserDefaults.standard.set(String(uid), forKey: "userId")
+                } else if let uid = user["id"] as? String {
+                    UserDefaults.standard.set(uid, forKey: "userId")
+                }
+                if let nickname = user["nickname"] as? String {
+                    UserDefaults.standard.set(nickname, forKey: "userNickname")
+                }
+                if let realName = user["real_name"] as? String {
+                    UserDefaults.standard.set(realName, forKey: "realName")
+                }
+            }
+            // JWT fallback — response body에 user 객체가 없는 경우
+            if UserDefaults.standard.string(forKey: "userId") == nil {
+                if let jwtId = APIService.shared.decodeUserIdFromJWT(token: token) {
+                    UserDefaults.standard.set(jwtId, forKey: "userId")
+                    print("✅ [Auth] userId extracted from JWT: \(jwtId)")
+                }
+            }
             
             // 2. 연동 코드 확인 (User Input > Server Response)
             let inputCode = centerCode

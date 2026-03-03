@@ -23,6 +23,11 @@ class User(db.Model):
     birth_date = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, nullable=True) # vibe_db has this
 
+    # [Push Notification] FCM 디바이스 토큰
+    fcm_token = db.Column(db.Text, nullable=True)
+    apns_token = db.Column(db.Text, nullable=True)
+    fcm_updated_at = db.Column(db.DateTime, nullable=True)
+
     # Relationships
     diaries = db.relationship('Diary', backref='author', lazy=True)
 

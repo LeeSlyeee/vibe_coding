@@ -409,6 +409,21 @@ def create_diary():
     except Exception as e:
         print(f"⚠️ Sync Trigger Failed: {e}")
 
+    # [Push Notification] 보호자 알림 트리거
+    try:
+        from push_service import notify_guardians_mood, notify_guardians_crisis, is_push_available
+        if is_push_available():
+            mood = data.get('mood_level', 3)
+            safety = data.get('safety_flag', False)
+            # ① 기분 온도 낮음 알림 (mood ≤ 2)
+            if mood and int(mood) <= 2:
+                notify_guardians_mood(user, int(mood))
+            # ② 위기 감지 알림 (safety_flag=True)
+            if safety in [True, 'need_help', 'danger']:
+                notify_guardians_crisis(user)
+    except Exception as e:
+        print(f"⚠️ Push Notification Trigger Failed: {e}")
+
     response_data['msg'] = '일기가 저장되었습니다.'
     return jsonify(response_data), 201
 
@@ -769,11 +784,61 @@ def get_mood_temperature():
     result = calculate_mood_temperature(user_id)
     return jsonify(result), 200
 
+# ─────────────────────────────────────────────
+# [Push Notification] FCM 디바이스 토큰 등록 API
+# ─────────────────────────────────────────────
+@app.route('/api/device/register', methods=['POST'])
+@jwt_required()
+def register_device_token():
+    """앱 시작 시 FCM 토큰을 서버에 등록"""
+    current_user_id = int(get_jwt_identity())
+    user = User.query.filter_by(id=current_user_id).first()
+
+    if not user:
+        return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404
+
+    data = request.get_json()
+    fcm_token = data.get('fcm_token')
+    platform = data.get('platform', 'unknown')  # 'ios' or 'android'
+    apns_token = data.get('apns_token', '')  # iOS APNs 디바이스 토큰
+
+    if not fcm_token:
+        return jsonify({'msg': 'fcm_token이 필요합니다.'}), 400
+
+    user.fcm_token = fcm_token
+    user.fcm_updated_at = datetime.utcnow()
+    if apns_token:
+        user.apns_token = apns_token
+    db.session.commit()
+
+    print(f"✅ FCM 토큰 등록: user={user.username}, platform={platform}, apns={'있음' if apns_token else '없음'}")
+    return jsonify({'msg': '디바이스 등록 완료'}), 200
+
+
+# [Push] APNs 디바이스 토큰 별도 등록
+@app.route('/api/device/apns', methods=['POST'])
+@jwt_required()
+def register_apns_token():
+    current_user_id = int(get_jwt_identity())
+    user = User.query.filter_by(id=current_user_id).first()
+    if not user:
+        return jsonify({'msg': '사용자 없음'}), 404
+    data = request.get_json()
+    apns_token = data.get('apns_token', '')
+    if apns_token:
+        user.apns_token = apns_token
+        db.session.commit()
+        print(f"✅ APNs 토큰 등록: user={user.username}, token={apns_token[:20]}...")
+    return jsonify({'msg': 'OK'}), 200
+
+
 # [Health Check]
 @app.route('/api', methods=['GET'])
 def health_check():
+    from push_service import is_push_available
+    push_status = "활성화" if is_push_available() else "비활성화"
     status = "암호화" if crypto else "평문"
-    return f"서버가 정상 작동 중입니다! (DB: PostgreSQL 통합, 모드: {status})"
+    return f"서버가 정상 작동 중입니다! (DB: PostgreSQL 통합, 모드: {status}, 푸시: {push_status})"
 
 
 # [Feature] Async AI Analysis (File-based Persistence)

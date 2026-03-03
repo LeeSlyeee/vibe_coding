@@ -48,3 +48,6 @@ android_app/app/release/
 
 # Bug reports
 bugreport-*.zip
+fb/maumon-6ba29-firebase-adminsdk-fbsvc-c444374186.json
+fb/*firebase*.json
+fb/*.p8

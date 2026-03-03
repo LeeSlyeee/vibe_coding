@@ -148,18 +148,18 @@ struct AppShareView: View {
                 
             } else {
                 // Share Tab
-                VStack(spacing: 30) {
-                    Spacer()
+                ScrollView {
+                VStack(spacing: 20) {
                     
                     VStack(spacing: 15) {
                         Text("내 공유 코드")
                             .font(.headline)
                             .foregroundColor(.gray)
                         
-                        Text(shareManager.myCode.isEmpty ? "--------" : shareManager.myCode)
-                            .font(.system(size: 40, weight: .heavy, design: .monospaced))
+                        Text(shareManager.myCode.isEmpty ? "– – – – – – – –" : shareManager.myCode)
+                            .font(.system(size: 28, weight: .heavy, design: .monospaced))
                             .foregroundColor(.blue)
-                            .tracking(5)
+                            .tracking(3)
                         
                         if !shareManager.myCode.isEmpty {
                             Text("10분간 유효합니다.")
@@ -167,7 +167,8 @@ struct AppShareView: View {
                                 .foregroundColor(.red)
                         }
                     }
-                    .padding(40)
+                    .padding(.vertical, 24)
+                    .padding(.horizontal)
                     .background(Color(.systemBackground))
                     .cornerRadius(20)
                     .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
@@ -245,10 +246,7 @@ struct AppShareView: View {
                                         Text(guardian.name)
                                             .font(.subheadline)
                                             .fontWeight(.medium)
-                                        // [DEBUG] Show ID to distinguish
-                                        Text(guardian.id)
-                                            .font(.caption2)
-                                            .foregroundColor(.gray.opacity(0.5))
+
                                             
                                         Text("연결됨: \(formatConnDate(guardian.connectedAt))")
                                             .font(.caption)
@@ -344,7 +342,8 @@ struct AppShareView: View {
                         .padding(.top, 16)
                     }
                     
-                    Spacer()
+                }
+                .padding(.vertical)
                 }
                 .background(Color(.systemGroupedBackground))
                 .onAppear {

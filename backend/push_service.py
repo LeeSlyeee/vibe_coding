@@ -1,0 +1,275 @@
+"""
+보호자 푸시 알림 발송 서비스
+Firebase Admin SDK를 통해 FCM 푸시 알림 전송
+
+[구조]
+- Flask 백엔드에서 import하여 사용
+- Firebase 서비스 계정 키가 없으면 자동으로 비활성화 (서버 중단 없음)
+- send_to_guardians(): 내담자의 보호자들에게 일괄 푸시 발송
+"""
+
+import os
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# Firebase Admin SDK 초기화 (Graceful Degradation)
+_firebase_initialized = False
+
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+
+    # 서비스 계정 키 파일 경로
+    SERVICE_ACCOUNT_PATH = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        'firebase-service-account.json'
+    )
+
+    if os.path.exists(SERVICE_ACCOUNT_PATH):
+        cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
+        firebase_admin.initialize_app(cred)
+        _firebase_initialized = True
+        logger.info("✅ Firebase Admin SDK 초기화 완료")
+    else:
+        logger.warning("⚠️ firebase-service-account.json 없음 → 푸시 알림 비활성화")
+
+except ImportError:
+    logger.warning("⚠️ firebase-admin 미설치 → 푸시 알림 비활성화 (pip install firebase-admin)")
+except Exception as e:
+    logger.warning(f"⚠️ Firebase 초기화 실패: {e}")
+
+
+def is_push_available():
+    """푸시 알림 발송 가능 여부"""
+    return _firebase_initialized
+
+
+def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_token: str = None) -> bool:
+    """
+    단일 기기에 푸시 알림 발송
+    FCM 발송 실패 시 iOS는 직접 APNs로 대체 발송
+
+    Args:
+        fcm_token: 대상 기기의 FCM 토큰
+        title: 알림 제목
+        body: 알림 본문
+        data: 추가 데이터 (딥링크 등)
+        apns_token: iOS APNs 디바이스 토큰 (직접 발송용)
+
+    Returns:
+        성공 여부
+    """
+    if not _firebase_initialized:
+        logger.debug("푸시 비활성화 상태 → 건너뜀")
+        return False
+
+    if not fcm_token:
+        return False
+
+    try:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data=data or {},
+            token=fcm_token,
+            # Android 전용 설정
+            android=messaging.AndroidConfig(
+                priority='high',
+                notification=messaging.AndroidNotification(
+                    channel_id='guardian_alerts',
+                    icon='ic_notification',
+                    color='#7C4DFF',
+                ),
+            ),
+            # iOS 전용 설정
+            apns=messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(
+                        sound='default',
+                        badge=1,
+                    ),
+                ),
+            ),
+        )
+
+        response = messaging.send(message)
+        logger.info(f"✅ 푸시 발송 성공: {response}")
+        return True
+
+    except messaging.UnregisteredError:
+        logger.warning(f"⚠️ 유효하지 않은 FCM 토큰 (앱 삭제됨): {fcm_token[:20]}...")
+        return False
+    except Exception as e:
+        error_name = type(e).__name__
+        logger.error(f"❌ FCM 푸시 발송 실패 ({error_name}): {e}")
+        
+        # FCM 실패 시 직접 APNs로 대체 발송 시도
+        if apns_token and 'ThirdPartyAuth' in error_name:
+            logger.info(f"🔄 직접 APNs 발송 시도...")
+            return _send_apns_direct(apns_token, title, body, data)
+        return False
+
+
+def _send_apns_direct(device_token: str, title: str, body: str, data: dict = None) -> bool:
+    """직접 APNs HTTP/2로 푸시 발송 (.p8 키 사용)"""
+    try:
+        import jwt as pyjwt
+        import time
+        import json
+        import httpx
+
+        TEAM_ID = "NU29S54D23"
+        KEY_ID = "FX46Y248BT"
+        BUNDLE_ID = "com.slyeee.maumon2026"
+        
+        key_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'apns_key_new.p8')
+        if not os.path.exists(key_path):
+            logger.error("❌ APNs .p8 키 파일 없음")
+            return False
+
+        with open(key_path) as f:
+            private_key = f.read()
+
+        token = pyjwt.encode(
+            {"iss": TEAM_ID, "iat": int(time.time())},
+            private_key, algorithm="ES256",
+            headers={"alg": "ES256", "kid": KEY_ID}
+        )
+
+        # sandbox 먼저 시도, 실패 시 production
+        for env, host in [("sandbox", "api.sandbox.push.apple.com"), ("production", "api.push.apple.com")]:
+            url = f"https://{host}/3/device/{device_token}"
+            headers = {
+                "authorization": f"bearer {token}",
+                "apns-topic": BUNDLE_ID,
+                "apns-push-type": "alert",
+                "apns-priority": "10",
+            }
+            payload = {
+                "aps": {"alert": {"title": title, "body": body}, "sound": "default", "badge": 1}
+            }
+            if data:
+                payload.update(data)
+
+            client = httpx.Client(http2=True)
+            r = client.post(url, headers=headers, content=json.dumps(payload), timeout=10)
+            client.close()
+
+            if r.status_code == 200:
+                logger.info(f"✅ APNs 직접 발송 성공 ({env})")
+                return True
+            elif r.status_code == 400 and "BadDeviceToken" in r.text:
+                logger.warning(f"⚠️ APNs {env}: BadDeviceToken, 다음 환경 시도...")
+                continue
+            elif r.status_code == 200 or r.status_code == 410:
+                break
+            else:
+                logger.warning(f"⚠️ APNs {env}: {r.status_code} {r.text}")
+                if "BadEnvironment" not in r.text:
+                    break
+
+        logger.error(f"❌ APNs 직접 발송 실패")
+        return False
+
+    except Exception as e:
+        logger.error(f"❌ APNs 직접 발송 에러: {e}")
+        return False
+
+
+def notify_guardians_mood(sharer_user, mood_level: int):
+    """
+    [트리거 ①] 기분 온도 알림
+    - 일기 저장 시 mood_level ≤ 2이면 보호자에게 알림
+    - share_mood=True인 보호자만 대상
+    """
+    if not _firebase_initialized:
+        return
+
+    from models import db, User, ShareRelationship
+
+    try:
+        # 이 사용자에게 연결된 보호자 목록 조회
+        relationships = ShareRelationship.query.filter_by(
+            sharer_id=sharer_user.id,
+            share_mood=True
+        ).all()
+
+        if not relationships:
+            return
+
+        sharer_name = sharer_user.nickname or sharer_user.real_name or "사용자"
+        mood_emoji = {1: "😢", 2: "😟", 3: "😐", 4: "🙂", 5: "😊"}.get(mood_level, "😐")
+
+        for rel in relationships:
+            viewer = User.query.get(rel.viewer_id)
+            if viewer and viewer.fcm_token:
+                send_push(
+                    fcm_token=viewer.fcm_token,
+                    title=f"🌡️ {sharer_name}님의 마음 온도",
+                    body=f"{sharer_name}님의 오늘 마음 온도가 낮습니다 {mood_emoji} 따뜻한 관심을 보내주세요.",
+                    data={
+                        "type": "mood_alert",
+                        "sharer_id": str(sharer_user.id),
+                        "mood_level": str(mood_level),
+                    },
+                    apns_token=getattr(viewer, 'apns_token', None),
+                )
+
+                # 중복 알림 방지 - 마지막 알림 시각 갱신
+                rel.last_alert_at = datetime.utcnow()
+
+        db.session.commit()
+        logger.info(f"✅ 기분 알림 발송 완료: {sharer_name} (mood={mood_level})")
+
+    except Exception as e:
+        logger.error(f"❌ 기분 알림 발송 실패: {e}")
+
+
+def notify_guardians_crisis(sharer_user):
+    """
+    [트리거 ②] 위기 감지 알림
+    - safety_flag=True 일기 저장 시 보호자에게 긴급 알림
+    - share_crisis=True인 보호자만 대상
+    """
+    if not _firebase_initialized:
+        return
+
+    from models import db, User, ShareRelationship
+
+    try:
+        relationships = ShareRelationship.query.filter_by(
+            sharer_id=sharer_user.id,
+            share_crisis=True
+        ).all()
+
+        if not relationships:
+            return
+
+        sharer_name = sharer_user.nickname or sharer_user.real_name or "사용자"
+
+        for rel in relationships:
+            viewer = User.query.get(rel.viewer_id)
+            if viewer and viewer.fcm_token:
+                send_push(
+                    fcm_token=viewer.fcm_token,
+                    title=f"⚠️ 긴급: {sharer_name}님 위기 신호 감지",
+                    body=f"{sharer_name}님에게서 위기 신호가 감지되었습니다. 지금 바로 확인해 주세요.",
+                    data={
+                        "type": "crisis_alert",
+                        "sharer_id": str(sharer_user.id),
+                        "priority": "high",
+                    },
+                    apns_token=getattr(viewer, 'apns_token', None),
+                )
+
+                rel.last_alert_at = datetime.utcnow()
+
+        db.session.commit()
+        logger.info(f"🚨 위기 알림 발송 완료: {sharer_name}")
+
+    except Exception as e:
+        logger.error(f"❌ 위기 알림 발송 실패: {e}")

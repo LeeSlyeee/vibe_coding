@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "440183126308",
+    "project_id": "maumon-6ba29",
+    "storage_bucket": "maumon-6ba29.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:440183126308:android:2d471e2c0f2a8f66fd9bb1",
+        "android_client_info": {
+          "package_name": "com.maumon.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUGwBOEZJf3v0ldXFvy9FPVzdmxSoljtA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

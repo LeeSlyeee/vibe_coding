@@ -142,9 +142,10 @@ class APIService: NSObject {
             }
             
             // Success Logic
-            if let id = json["id"] as? String {
-                UserDefaults.standard.set(id, forKey: "userId") // [CRITICAL] Store User ID
-                // print("✅ [API-217] User ID Synced: \(id)")
+            if let id = json["id"] as? Int {
+                UserDefaults.standard.set(String(id), forKey: "userId")
+            } else if let id = json["id"] as? String {
+                UserDefaults.standard.set(id, forKey: "userId")
             }
             if let name = json["name"] as? String, !name.isEmpty {
                 UserDefaults.standard.set(name, forKey: "realName")
@@ -713,7 +714,7 @@ class APIService: NSObject {
     }
 
         // MARK: - JWT Helper
-    private func decodeUserIdFromJWT(token: String) -> String? {
+    func decodeUserIdFromJWT(token: String) -> String? {
         let segments = token.components(separatedBy: ".")
         guard segments.count > 1 else { return nil }
         
