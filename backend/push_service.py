@@ -273,3 +273,75 @@ def notify_guardians_crisis(sharer_user):
 
     except Exception as e:
         logger.error(f"❌ 위기 알림 발송 실패: {e}")
+
+
+def notify_guardians_kick_flag(sharer_user, flags: list):
+    """
+    [트리거 ③] 킥 분석 플래그 알림
+    - 시계열 분석에서 medium 또는 high 플래그 발생 시 보호자에게 알림
+    - share_mood=True인 보호자에게 발송 (기분 관련 알림 설정 재활용)
+    - 중복 방지: last_alert_at 기준 24시간 이내 동일 유형 재발송 안 함
+    """
+    if not _firebase_initialized:
+        return
+
+    # medium/high만 필터
+    alert_flags = [f for f in flags if f.get('severity') in ('medium', 'high')]
+    if not alert_flags:
+        return
+
+    from models import db, User, ShareRelationship
+
+    try:
+        relationships = ShareRelationship.query.filter_by(
+            sharer_id=sharer_user.id,
+            share_mood=True
+        ).all()
+
+        if not relationships:
+            return
+
+        sharer_name = sharer_user.nickname or sharer_user.real_name or "사용자"
+
+        # 가장 심각한 플래그를 메인 메시지로
+        has_high = any(f['severity'] == 'high' for f in alert_flags)
+        main_flag = next((f for f in alert_flags if f['severity'] == 'high'), alert_flags[0])
+
+        if has_high:
+            title = f"🔴 {sharer_name}님 주의 필요"
+        else:
+            title = f"🟠 {sharer_name}님 변화 감지"
+
+        body = main_flag['message']
+        if len(alert_flags) > 1:
+            body += f" 외 {len(alert_flags) - 1}건"
+
+        for rel in relationships:
+            # 중복 알림 방지: 24시간 이내 발송 이력 있으면 건너뜀
+            if rel.last_alert_at:
+                hours_since = (datetime.utcnow() - rel.last_alert_at).total_seconds() / 3600
+                if hours_since < 24:
+                    continue
+
+            viewer = User.query.get(rel.viewer_id)
+            if viewer and viewer.fcm_token:
+                send_push(
+                    fcm_token=viewer.fcm_token,
+                    title=title,
+                    body=body,
+                    data={
+                        "type": "kick_flag_alert",
+                        "sharer_id": str(sharer_user.id),
+                        "priority": "high" if has_high else "normal",
+                        "flag_count": str(len(alert_flags)),
+                    },
+                    apns_token=getattr(viewer, 'apns_token', None),
+                )
+
+                rel.last_alert_at = datetime.utcnow()
+
+        db.session.commit()
+        logger.info(f"📊 킥 플래그 알림 발송 완료: {sharer_name} ({len(alert_flags)}건)")
+
+    except Exception as e:
+        logger.error(f"❌ 킥 플래그 알림 발송 실패: {e}")
