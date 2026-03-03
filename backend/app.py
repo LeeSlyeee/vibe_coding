@@ -91,6 +91,14 @@ try:
 except Exception as e:
     print(f"⚠️ Failed to register Chat Routes: {e}")
 
+try:
+    from kick_routes import kick_bp, set_decrypt_func
+    app.register_blueprint(kick_bp)
+    # set_decrypt_func는 safe_decrypt 정의 후 호출 (아래 @app.before_first_request 대체)
+    print("✅ Kick Analysis Routes Registered (Phase 1 + Phase 2)")
+except Exception as e:
+    print(f"⚠️ Failed to register Kick Routes: {e}")
+
 
 @app.before_request
 def log_request_info():
@@ -304,6 +312,13 @@ def safe_encrypt(text):
 def encrypt_data(text):
     return safe_encrypt(text)
 
+# [Kick Phase 2] 복호화 함수를 kick_routes에 주입
+try:
+    from kick_routes import set_decrypt_func
+    set_decrypt_func(safe_decrypt)
+except Exception:
+    pass
+
 # [API Endpoint: Get Diaries]
 @app.route('/api/diaries', methods=['GET'])
 @jwt_required()
@@ -411,7 +426,7 @@ def create_diary():
 
     # [Push Notification] 보호자 알림 트리거
     try:
-        from push_service import notify_guardians_mood, notify_guardians_crisis, is_push_available
+        from push_service import notify_guardians_mood, notify_guardians_crisis, notify_guardians_kick_flag, is_push_available
         if is_push_available():
             mood = data.get('mood_level', 3)
             safety = data.get('safety_flag', False)
@@ -421,6 +436,14 @@ def create_diary():
             # ② 위기 감지 알림 (safety_flag=True)
             if safety in [True, 'need_help', 'danger']:
                 notify_guardians_crisis(user)
+            # ③ 킥 시계열 분석 → medium/high 플래그 시 알림
+            try:
+                from kick_analysis import analyze_timeseries
+                kick_result = analyze_timeseries(user.id, db.session, Diary)
+                if kick_result['flags']:
+                    notify_guardians_kick_flag(user, kick_result['flags'])
+            except Exception as ke:
+                print(f"⚠️ Kick Analysis Trigger Failed: {ke}")
     except Exception as e:
         print(f"⚠️ Push Notification Trigger Failed: {e}")
 
