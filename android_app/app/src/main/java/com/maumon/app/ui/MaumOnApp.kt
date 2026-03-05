@@ -16,6 +16,8 @@ import com.maumon.app.data.model.Diary
 import com.maumon.app.data.repository.AuthRepository
 import com.maumon.app.ui.diary.DiaryDetailScreen
 import com.maumon.app.ui.diary.DiaryWriteScreen
+import com.maumon.app.ui.kick.WeeklyLetterScreen
+import com.maumon.app.ui.kick.RelationalMapScreen
 import com.maumon.app.ui.login.LoginScreen
 import com.maumon.app.ui.main.MainScreen
 import kotlinx.coroutines.launch
@@ -42,6 +44,23 @@ fun MaumOnApp() {
         val hasToken = authRepo.restoreToken()
         startDestination = if (hasToken) "main" else "login"
         isCheckingAuth = false
+    }
+
+    // 딥링크 관찰 (StateFlow) — 푸시 터치 시 자동 네비게이션
+    val pendingRoute by com.maumon.app.DeepLinkRouter.pendingRoute.collectAsState()
+    LaunchedEffect(pendingRoute, isCheckingAuth) {
+        val route = pendingRoute ?: return@LaunchedEffect
+        if (!isCheckingAuth && startDestination == "main") {
+            kotlinx.coroutines.delay(500)
+            try {
+                navController.navigate(route) {
+                    launchSingleTop = true
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MaumOnApp", "딥링크 네비게이션 실패: ${e.message}")
+            }
+            com.maumon.app.DeepLinkRouter.consume()
+        }
     }
 
     if (isCheckingAuth) {
@@ -81,6 +100,12 @@ fun MaumOnApp() {
                     onViewDiary = { diary ->
                         selectedDiary = diary
                         navController.navigate("diary_detail")
+                    },
+                    onNavigateToWeeklyLetter = {
+                        navController.navigate("weekly_letter")
+                    },
+                    onNavigateToRelationalMap = {
+                        navController.navigate("relational_map")
                     }
                 )
             }
@@ -115,11 +140,24 @@ fun MaumOnApp() {
                             }
                         },
                         onDelete = {
-                            // TODO: 삭제 후 뒤로가기
                             navController.popBackStack()
                         }
                     )
                 }
+            }
+
+            // Kick: 주간 편지
+            composable("weekly_letter") {
+                WeeklyLetterScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // Kick: 마음 별자리
+            composable("relational_map") {
+                RelationalMapScreen(
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

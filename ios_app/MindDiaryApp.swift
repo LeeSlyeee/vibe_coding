@@ -4,6 +4,16 @@ import UserNotifications
 import FirebaseCore
 import FirebaseMessaging
 
+// MARK: - DeepLink Manager (푸시 알림 딥링크 처리)
+class DeepLinkManager: ObservableObject {
+    static let shared = DeepLinkManager()
+    @Published var pendingDeepLink: DeepLink?
+    
+    enum DeepLink {
+        case weeklyLetter(letterId: Int?)
+    }
+}
+
 @main
 struct MindDiaryApp: App {
     // [Push Notification] APNs 등록을 위한 AppDelegate 연결
@@ -154,6 +164,16 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     ) {
         let userInfo = response.notification.request.content.userInfo
         print("📩 알림 탭: \(userInfo)")
+        
+        // 딥링크 처리: 주간 편지
+        if let type = userInfo["type"] as? String, type == "weekly_letter" {
+            let letterId = (userInfo["letter_id"] as? String).flatMap { Int($0) }
+            DispatchQueue.main.async {
+                DeepLinkManager.shared.pendingDeepLink = .weeklyLetter(letterId: letterId)
+            }
+            print("📮 딥링크: 주간 편지 열기 (letter_id=\(letterId ?? -1))")
+        }
+        
         completionHandler()
     }
 

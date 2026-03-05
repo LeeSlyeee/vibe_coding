@@ -33,6 +33,10 @@ struct AppStatsView: View {
     // [New] Settings Modal State
     @State private var showSettings = false
     
+    // [New] Kick 기능 전체화면 표시
+    @State private var showWeeklyLetter = false
+    @State private var showRelationalMap = false
+    
     // [New] 마음 온도 State
     @State private var moodTemperature: Double = 36.5
     @State private var moodTempLabel: String = "측정 중"
@@ -227,52 +231,48 @@ struct AppStatsView: View {
                                     )
                                     
                                     // [New] Kick 기능 진입점
-                                    NavigationView {
-                                        VStack(spacing: 16) {
-                                            NavigationLink(destination: WeeklyLetterView()) {
-                                                HStack {
-                                                    Image(systemName: "envelope.badge")
-                                                        .font(.title2)
-                                                        .foregroundColor(.pink)
-                                                    VStack(alignment: .leading, spacing: 4) {
-                                                        Text("마음온 AI 주간 편지")
-                                                            .font(.headline)
-                                                            .foregroundColor(.primaryText)
-                                                        Text("1주일 동안의 기록을 따뜻한 편지로 받아보세요.")
-                                                            .font(.caption)
-                                                            .foregroundColor(.secondaryText)
-                                                    }
-                                                    Spacer()
-                                                    Image(systemName: "chevron.right")
-                                                        .foregroundColor(.gray)
+                                    VStack(spacing: 16) {
+                                        Button(action: { showWeeklyLetter = true }) {
+                                            HStack {
+                                                Image(systemName: "envelope.badge")
+                                                    .font(.title2)
+                                                    .foregroundColor(.pink)
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text("마음온 AI 주간 편지")
+                                                        .font(.headline)
+                                                        .foregroundColor(.primaryText)
+                                                    Text("1주일 동안의 기록을 따뜻한 편지로 받아보세요.")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondaryText)
                                                 }
-                                                .modifier(CardModifier())
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .foregroundColor(.gray)
                                             }
-                                            
-                                            NavigationLink(destination: RelationalMapView()) {
-                                                HStack {
-                                                    Image(systemName: "sparkles")
-                                                        .font(.title2)
-                                                        .foregroundColor(.indigo)
-                                                    VStack(alignment: .leading, spacing: 4) {
-                                                        Text("나의 마음 별자리")
-                                                            .font(.headline)
-                                                            .foregroundColor(.primaryText)
-                                                        Text("나와 내 주변 사람들의 관계와 감정을 확인하세요.")
-                                                            .font(.caption)
-                                                            .foregroundColor(.secondaryText)
-                                                    }
-                                                    Spacer()
-                                                    Image(systemName: "chevron.right")
-                                                        .foregroundColor(.gray)
-                                                }
-                                                .modifier(CardModifier())
-                                            }
+                                            .modifier(CardModifier())
                                         }
-                                        .padding(.vertical, 8)
-                                        .navigationBarHidden(true)
+                                        
+                                        Button(action: { showRelationalMap = true }) {
+                                            HStack {
+                                                Image(systemName: "sparkles")
+                                                    .font(.title2)
+                                                    .foregroundColor(.indigo)
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text("나의 마음 별자리")
+                                                        .font(.headline)
+                                                        .foregroundColor(.primaryText)
+                                                    Text("나와 내 주변 사람들의 관계와 감정을 확인하세요.")
+                                                        .font(.caption)
+                                                        .foregroundColor(.secondaryText)
+                                                }
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .foregroundColor(.gray)
+                                            }
+                                            .modifier(CardModifier())
+                                        }
                                     }
-                                    .frame(height: 250) // NavigationView가 ScrollView 내부에서 공간을 차지하도록
+                                    .padding(.vertical, 8)
                                 }
                             default: EmptyView()
                             }
@@ -292,6 +292,22 @@ struct AppStatsView: View {
             fetchExistingReports()
         }
         fetchMoodTemperature()
+        
+        // 딥링크 체크 (앱이 꺼져있을 때 푸시 터치로 진입한 경우)
+        if case .weeklyLetter = DeepLinkManager.shared.pendingDeepLink {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                showWeeklyLetter = true
+                DeepLinkManager.shared.pendingDeepLink = nil
+            }
+        }
+    }
+    .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
+        // 앱이 떠있는 상태에서 푸시 터치 시 즉시 반응
+        guard let deepLink = deepLink else { return }
+        if case .weeklyLetter = deepLink {
+            showWeeklyLetter = true
+            DeepLinkManager.shared.pendingDeepLink = nil
+        }
     }
     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
         // [UX] 데이터 갱신 알림 수신 시 재계산
@@ -319,6 +335,47 @@ struct AppStatsView: View {
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
+        .fullScreenCover(isPresented: $showWeeklyLetter) {
+            NavigationView {
+                WeeklyLetterView()
+                    .navigationBarItems(leading: Button(action: { showWeeklyLetter = false }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                            Text("돌아가기")
+                        }
+                        .foregroundColor(.blue)
+                    })
+            }
+        }
+        .fullScreenCover(isPresented: $showRelationalMap) {
+            ZStack {
+                RelationalMapView()
+                    .edgesIgnoringSafeArea(.all)
+                
+                // 닫기 버튼 (좌상단)
+                VStack {
+                    HStack {
+                        Button(action: { showRelationalMap = false }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                Text("돌아가기")
+                            }
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.15))
+                            .cornerRadius(20)
+                        }
+                        .padding(.top, 50)
+                        .padding(.leading, 16)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+            }
+            .edgesIgnoringSafeArea(.all)
+        }
     }
     
     // [New] 마음 온도 API 호출

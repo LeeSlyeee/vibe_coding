@@ -3,6 +3,7 @@ package com.maumon.app.ui.stats
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -62,7 +63,11 @@ enum class StatsTab(val label: String) {
 }
 
 @Composable
-fun StatsScreen(statsViewModel: StatsViewModel = viewModel()) {
+fun StatsScreen(
+    statsViewModel: StatsViewModel = viewModel(),
+    onNavigateToWeeklyLetter: () -> Unit = {},
+    onNavigateToRelationalMap: () -> Unit = {},
+) {
     val uiState by statsViewModel.uiState.collectAsState()
     var currentTab by remember { mutableStateOf(StatsTab.Flow) }
 
@@ -190,7 +195,7 @@ fun StatsScreen(statsViewModel: StatsViewModel = viewModel()) {
             ) {
                 CircularProgressIndicator()
             }
-        } else if (uiState.totalDiaries == 0) {
+        } else if (uiState.totalDiaries == 0 && currentTab != StatsTab.Report) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -220,7 +225,31 @@ fun StatsScreen(statsViewModel: StatsViewModel = viewModel()) {
                     StatsTab.Monthly -> MonthlyChartContent(uiState)
                     StatsTab.Mood -> MoodDistributionContent(uiState)
                     StatsTab.Weather -> WeatherStatsContent(uiState)
-                    StatsTab.Report -> ReportContent(uiState)
+                    StatsTab.Report -> {
+                        if (uiState.totalDiaries > 0) {
+                            ReportContent(uiState)
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                        
+                        // Kick 기능 진입 카드 (데이터 유무 무관)
+                        KickEntryCard(
+                            emoji = "💌",
+                            title = "마음온 AI 주간 편지",
+                            description = "1주일 동안의 기록을 따뜻한 편지로 받아보세요.",
+                            accentColor = Color(0xFFFF6B9D),
+                            onClick = onNavigateToWeeklyLetter
+                        )
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        KickEntryCard(
+                            emoji = "✨",
+                            title = "나의 마음 별자리",
+                            description = "나와 내 주변 사람들의 관계와 감정을 확인하세요.",
+                            accentColor = Color(0xFF5B7FFF),
+                            onClick = onNavigateToRelationalMap
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(80.dp))
             }
@@ -760,5 +789,49 @@ fun StatsCard(content: @Composable ColumnScope.() -> Unit) {
             modifier = Modifier.padding(24.dp),
             content = content
         )
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Kick 기능 진입 카드
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@Composable
+fun KickEntryCard(
+    emoji: String,
+    title: String,
+    description: String,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(emoji, fontSize = 28.sp)
+            Spacer(modifier = Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    title,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.Black
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    description,
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+            Text("›", fontSize = 24.sp, color = Color.Gray)
+        }
     }
 }

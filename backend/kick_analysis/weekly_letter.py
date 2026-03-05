@@ -119,6 +119,26 @@ def generate_weekly_letter_for_user(user_id, db_session, User, Diary, crypto_dec
             db_session.add(new_letter)
             db_session.commit()
             
+            # 푸시 알림 발송 (편지 도착 알림)
+            try:
+                from push_service import send_push, is_push_available
+                if is_push_available():
+                    user = db_session.query(User).filter_by(id=user_id).first()
+                    if user and getattr(user, 'fcm_token', None):
+                        send_push(
+                            fcm_token=user.fcm_token,
+                            title="💌 마음온 주간 편지가 도착했어요",
+                            body="이번 한 주의 마음을 담은 편지가 왔어요. 지금 읽어보세요!",
+                            data={
+                                "type": "weekly_letter",
+                                "letter_id": str(new_letter.id),
+                            },
+                            apns_token=getattr(user, 'apns_token', None),
+                        )
+                        print(f"📮 주간 편지 푸시 발송 완료: user={user_id}, letter={new_letter.id}")
+            except Exception as push_err:
+                print(f"⚠️ 주간 편지 푸시 발송 실패 (편지 생성은 정상): {push_err}")
+            
             return {"status": "success", "letter_id": new_letter.id}
         else:
             return {"status": "error", "message": f"LLM error: {res.status_code}"}

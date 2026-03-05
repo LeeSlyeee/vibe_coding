@@ -32,6 +32,8 @@ fun MainScreen(
     onLogout: () -> Unit,
     onWriteDiary: (dateStr: String) -> Unit = {},
     onViewDiary: (Diary) -> Unit = {},
+    onNavigateToWeeklyLetter: () -> Unit = {},
+    onNavigateToRelationalMap: () -> Unit = {},
 ) {
     var selectedTab by remember { mutableStateOf(TabItem.Calendar) }
 
@@ -85,7 +87,10 @@ fun MainScreen(
                     onViewDiary = onViewDiary,
                     onLogout = onLogout
                 )
-                TabItem.Stats -> StatsScreen()
+                TabItem.Stats -> StatsScreen(
+                    onNavigateToWeeklyLetter = onNavigateToWeeklyLetter,
+                    onNavigateToRelationalMap = onNavigateToRelationalMap
+                )
                 TabItem.Chat -> ChatScreen()
                 TabItem.Emergency -> EmergencyScreen()
             }

@@ -24,6 +24,16 @@ struct RelationalNode: Codable, Identifiable {
     let group: Int
     let size: Int
     let color: String
+    let mentionCount: Int?    // 언급 횟수
+    let lastSeen: String?     // 마지막 언급일
+    let summary: String?      // 인물별 고유 한 줄 요약
+    
+    enum CodingKeys: String, CodingKey {
+        case id, group, size, color
+        case mentionCount = "mention_count"
+        case lastSeen = "last_seen"
+        case summary
+    }
 }
 
 // Relational Map link structure
