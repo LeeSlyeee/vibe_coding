@@ -82,3 +82,23 @@ def run_ai_analysis_task(self, diary_id, full_text):
             )
         except: pass
         return {'status': 'failed', 'error': str(e)}
+
+@celery_app.task(bind=True)
+def generate_weekly_letters_batch(self):
+    """
+    Celery Task for batch generating weekly letters for all users.
+    This can be scheduled to run every Sunday night.
+    """
+    import os
+    import sys
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from kick_analysis.weekly_letter import process_all_users_weekly_letter
+    
+    print(f"💌 [Celery] Starting Weekly Letter Batch Processing (Task ID: {self.request.id})")
+    try:
+        results = process_all_users_weekly_letter()
+        print(f"💌 [Celery] Weekly Letter Batch Finished. Results: {results}")
+        return {'status': 'success', 'results': results}
+    except Exception as e:
+        print(f"💌 [Celery] Error in Weekly Letter Batch: {e}")
+        return {'status': 'failed', 'error': str(e)}
