@@ -4,6 +4,8 @@
 의료진 대시보드 전용 엔드포인트.
 Phase 1: 시계열 분석 (timeseries)
 Phase 2: 언어 지문 분석 (linguistic)
+Phase 3: 관계 지형도 분석 (relational)
+마음 컨디션: Phase 1~3 교차 분석 → 케어 가이드
 """
 
 from flask import Blueprint, jsonify
@@ -12,6 +14,7 @@ from models import db, User, Diary
 from kick_analysis import analyze_timeseries, analyze_all_users_timeseries
 from kick_analysis.linguistic import analyze_linguistic, analyze_all_users_linguistic
 from kick_analysis.relational import analyze_relational, analyze_all_users_relational
+from kick_analysis.condition import generate_condition, generate_all_users_condition
 
 kick_bp = Blueprint('kick', __name__)
 
@@ -87,6 +90,46 @@ def get_my_kick_insights():
 
 
 # ═════════════════════════════════════════════════
+# 본인용: 마음 컨디션 (Mind Condition)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/my-condition', methods=['GET'])
+@jwt_required()
+def get_my_condition():
+    """
+    로그인한 사용자 본인의 마음 컨디션 조회.
+    Phase 1~3 교차 분석 → 컨디션 등급 + 케어 가이드.
+    의료진 권한 불필요.
+    """
+    user_id = int(get_jwt_identity())
+
+    try:
+        result = generate_condition(
+            user_id, db.session, Diary,
+            crypto_decrypt=_decrypt_func,
+            skip_phase3=True  # LLM NER은 Ollama 타임아웃으로 2분+ 소요 → 앱 타임아웃 방지
+        )
+        return jsonify(result)
+    except Exception as e:
+        print(f"⚠️ My Condition Error: {e}")
+        # 에러 시에도 기본 응답 (사용자 경험 파괴 방지)
+        return jsonify({
+            'user_id': user_id,
+            'condition': {
+                'score': 100,
+                'grade': 'sunny',
+                'icon': '☀️',
+                'label': '활기',
+                'message': '오늘도 일기를 쓰고 있는 것만으로 충분히 잘하고 있어요 ✨',
+                'care_tip': '좋아하는 음악과 함께 여유로운 시간을 보내보세요 🎵',
+            },
+            'breakdown': {},
+            'signals': ['분석 데이터 준비 중'],
+            'signal_count': 0,
+        })
+
+
+# ═════════════════════════════════════════════════
 # Staff 대시보드 전용: 킥 전체 요약 (JWT 인증 사용)
 # ═════════════════════════════════════════════════
 
@@ -111,6 +154,64 @@ def get_dashboard_overview_internal():
     서버 내부에서만 접근 가능 (nginx에서 제한).
     """
     return _build_dashboard_overview()
+
+
+import threading
+
+_condition_lock = threading.Lock()
+_condition_computing = False
+
+@kick_bp.route('/api/kick/dashboard/condition-overview', methods=['GET'])
+def get_condition_overview_internal():
+    """
+    전체 사용자의 마음 컨디션 분포 + 관심 필요 사용자 목록.
+    의료진 대시보드 프론트엔드 전용.
+    
+    [성능] 동시 호출 방지 — 이미 계산 중이면 캐시 또는 202 반환.
+    """
+    global _condition_computing
+    
+    from kick_analysis.condition import _condition_cache, _CACHE_TTL_SECONDS
+    import time
+    
+    # 1) 캐시가 유효하면 즉시 반환
+    now = time.time()
+    if (_condition_cache['data'] is not None
+            and _condition_cache['timestamp'] is not None
+            and (now - _condition_cache['timestamp']) < _CACHE_TTL_SECONDS):
+        return jsonify(_condition_cache['data'])
+    
+    # 2) 이미 다른 요청이 계산 중이면 즉시 202 반환
+    if _condition_computing:
+        return jsonify({
+            'status': 'computing',
+            'message': '컨디션 분석 중입니다. 잠시 후 다시 시도해주세요.'
+        }), 202
+    
+    # 3) 계산 시작
+    acquired = _condition_lock.acquire(blocking=False)
+    if not acquired:
+        return jsonify({
+            'status': 'computing',
+            'message': '컨디션 분석 중입니다.'
+        }), 202
+    
+    try:
+        _condition_computing = True
+        result = generate_all_users_condition(
+            db.session, User, Diary,
+            crypto_decrypt=_decrypt_func
+        )
+        return jsonify(result)
+    except Exception as e:
+        print(f"⚠️ Condition Overview Error: {e}")
+        return jsonify({
+            'error': '컨디션 분석 중 오류 발생',
+            'detail': str(e)
+        }), 500
+    finally:
+        _condition_computing = False
+        _condition_lock.release()
 
 
 def _build_dashboard_overview():
@@ -420,3 +521,91 @@ def get_relational_summary():
         'by_type': type_counts,
         'by_severity': severity_counts
     })
+
+
+# ═════════════════════════════════════════════════
+# [앱 사용자용] 주간 편지 및 관계 지형도 조회 (킥 확장)
+# ═════════════════════════════════════════════════
+from models import WeeklyLetter
+
+@kick_bp.route('/api/kick/my-weekly-letters', methods=['GET'])
+@jwt_required()
+def get_my_weekly_letters():
+    """로그인한 사용자의 주간 편지 목록 조회 (봉투 목록 뷰)"""
+    user_id = int(get_jwt_identity())
+    
+    letters = db.session.query(WeeklyLetter).filter_by(user_id=user_id).order_by(WeeklyLetter.created_at.desc()).all()
+    
+    result = []
+    for l in letters:
+        result.append({
+            'id': l.id,
+            'title': l.title,
+            'start_date': l.start_date,
+            'end_date': l.end_date,
+            'is_read': l.is_read,
+            'created_at': l.created_at.isoformat() if l.created_at else None
+        })
+        
+    return jsonify(result), 200
+
+@kick_bp.route('/api/kick/my-weekly-letters/<int:letter_id>', methods=['GET'])
+@jwt_required()
+def get_my_weekly_letter_detail(letter_id):
+    """주간 편지 개봉 (내용 조회 및 읽음 처리)"""
+    user_id = int(get_jwt_identity())
+    
+    letter = db.session.query(WeeklyLetter).filter_by(id=letter_id, user_id=user_id).first()
+    if not letter:
+        return jsonify({'error': '편지를 찾을 수 없습니다.'}), 404
+        
+    # 첫 열람 시 읽음 처리
+    if not letter.is_read:
+        letter.is_read = True
+        db.session.commit()
+        
+    return jsonify({
+        'id': letter.id,
+        'title': letter.title,
+        'content': letter.content,
+        'start_date': letter.start_date,
+        'end_date': letter.end_date,
+        'created_at': letter.created_at.isoformat() if letter.created_at else None
+    }), 200
+
+@kick_bp.route('/api/kick/relational/my-map', methods=['GET'])
+@jwt_required()
+def get_my_relational_map():
+    """사용자 본인의 관계 지형도 데이터(UI 렌더링용 JSON)"""
+    user_id = int(get_jwt_identity())
+    
+    # 30일 간의 데이터 모으기
+    result = analyze_relational(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+    
+    if result.get('status') != 'completed':
+        return jsonify({'nodes': [], 'links': []}), 200
+        
+    rel = result.get('relational', {})
+    timeline = rel.get('social_density_timeline', [])
+    
+    nodes = []
+    links = []
+    
+    if timeline:
+        # 가장 최근 주차의 감정 데이터 사용
+        recent_week = timeline[-1]
+        people_emotions = recent_week.get('people_emotions', {})
+        
+        # '나(Me)' 중심 노드
+        nodes.append({"id": "Me", "group": 0, "size": 30, "color": "#6366f1"})
+        
+        for person, emo_info in people_emotions.items():
+            valence = emo_info.get('valence')
+            # 색상 매핑 (긍정=녹색/노랑, 부정=빨강/보라, 중립=파랑/회색)
+            color = "#a855f7" if valence == 'negative' else "#22c55e" if valence == 'positive' else "#9ca3af"
+            # 노드 크기 = 10 고정 (나중에 언급 빈도에 따라 가중치 가능)
+            nodes.append({"id": person, "group": 1, "size": 15, "color": color})
+            # 나와의 연결
+            links.append({"source": "Me", "target": person, "value": 1})
+            
+    return jsonify({'nodes': nodes, 'links': links}), 200

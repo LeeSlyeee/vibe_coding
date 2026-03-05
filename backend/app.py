@@ -30,6 +30,9 @@ if not os.environ.get('ENCRYPTION_KEY'):
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_POOL_SIZE'] = 20
+app.config['SQLALCHEMY_MAX_OVERFLOW'] = 30
+app.config['SQLALCHEMY_POOL_TIMEOUT'] = 60
 
 # [JWT Secret]
 jwt_key = os.environ.get('JWT_SECRET_KEY')
@@ -989,6 +992,15 @@ def run_async_analysis(user_id, mode='daily'):
                     for f in rl['flags']:
                         kick_context += f"- ⚠️ {f['message']}\n"
                 
+                # 마음 컨디션 (Phase 1~3 교차 분석 종합)
+                from kick_analysis.condition import generate_condition
+                cond = generate_condition(user_id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                cond_data = cond.get('condition', {})
+                kick_context += f"\n[마음 컨디션] {cond_data.get('icon', '')} {cond_data.get('label', '')} ({cond_data.get('score', '?')}/100)\n"
+                signals = cond.get('signals', [])
+                if signals and signals[0] != '현재 특이사항 없음':
+                    kick_context += f"- 근거: {', '.join(signals)}\n"
+
                 if kick_context:
                     prompt += f"\n[AI 킥 분석 인사이트 (프롬프트 참고용)]\n{kick_context}\n"
             except Exception as kick_err:

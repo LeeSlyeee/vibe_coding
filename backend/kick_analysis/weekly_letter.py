@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from sqlalchemy import desc
 
-from kick_analysis.timeseries import analyze_timeseries
+from kick_analysis import analyze_timeseries
 from kick_analysis.linguistic import analyze_linguistic
 from kick_analysis.relational import analyze_relational
 from models import WeeklyLetter
@@ -146,126 +146,54 @@ def process_all_users_weekly_letter():
     Fetches all distinct user_ids from diaries (over last 7 days) and generates weekly letters for them.
     Returns dict of success/failures.
     """
-    from pymongo import MongoClient
-    from config import Config
+    from app import create_app, db
+    from models import User, Diary
     from datetime import datetime, timedelta
     
-    client = MongoClient(Config.MONGO_URI)
-    db = client.get_database()
-    
-    # Get users who wrote diaries in the last 7 days
-    end_date_time = datetime.now()
-    start_date_time = end_date_time - timedelta(days=7)
-    
-    start_str = start_date_time.strftime('%Y-%m-%d')
-    end_str = end_date_time.strftime('%Y-%m-%d')
-    
-    # Find distinct user_ids
-    users = db.diaries.find({"date": {"$gte": start_str, "$lte": end_str}}).distinct("user_id")
-    
-    results = {"success": 0, "failed": 0, "errors": []}
-    
-    for user_id in users:
-        print(f"🔄 Processing letter for user {user_id}...")
-        try:
-            # Generate the letter
-            result = generate_weekly_letter(user_id, start_str, end_str)
-            if "error" in result:
-                 results["failed"] += 1
-                 results["errors"].append({"user_id": user_id, "error": result["error"]})
-                 print(f"❌ User {user_id} failed: {result['error']}")
-            else:
-                 results["success"] += 1
-                 print(f"✅ User {user_id} success.")
-        except Exception as e:
-            results["failed"] += 1
-            results["errors"].append({"user_id": user_id, "error": str(e)})
-            print(f"❌ User {user_id} exception: {e}")
-            
-    return results
+    app = create_app()
+    with app.app_context():
+        end_date_time = datetime.utcnow()
+        start_date_time = end_date_time - timedelta(days=7)
+        
+        start_str = start_date_time.strftime('%Y-%m-%d')
+        end_str = end_date_time.strftime('%Y-%m-%d')
+        
+        # SQL에서 7일 내 일기를 쓴 유저 ID 조회
+        recent_diaries = db.session.query(Diary.user_id).filter(
+            Diary.date >= start_str, Diary.date <= end_str
+        ).distinct().all()
+        
+        user_ids = [d[0] for d in recent_diaries]
+        
+        results = {"success": 0, "failed": 0, "errors": []}
+        
+        for user_id in user_ids:
+            print(f"🔄 Processing letter for user {user_id}...")
+            try:
+                # 앱이 crypto_manager를 주입한다고 가정하거나 그대로 패스.
+                # (여기서는 기본 복호화 없이 실행하거나 app.crypto_manager 사용)
+                from crypto_utils import crypto_manager
+                result = generate_weekly_letter_for_user(
+                    user_id=user_id, 
+                    db_session=db.session, 
+                    User=User, 
+                    Diary=Diary, 
+                    crypto_decrypt=crypto_manager.decrypt if hasattr(crypto_manager, 'decrypt') else None,
+                    target_date=end_date_time.date()
+                )
+                
+                if result.get("status") == "error":
+                     results["failed"] += 1
+                     results["errors"].append({"user_id": user_id, "error": result["message"]})
+                     print(f"❌ User {user_id} failed: {result['message']}")
+                else:
+                     results["success"] += 1
+                     print(f"✅ User {user_id} success: {result.get('status')}")
+                     
+            except Exception as e:
+                results["failed"] += 1
+                results["errors"].append({"user_id": user_id, "error": str(e)})
+                print(f"❌ User {user_id} exception: {e}")
+                
+        return results
 
-def process_all_users_weekly_letter():
-    """
-    Fetches all distinct user_ids from diaries (over last 7 days) and generates weekly letters for them.
-    Returns dict of success/failures.
-    """
-    from pymongo import MongoClient
-    from config import Config
-    from datetime import datetime, timedelta
-    
-    client = MongoClient(Config.MONGO_URI)
-    db = client.get_database()
-    
-    # Get users who wrote diaries in the last 7 days
-    end_date_time = datetime.now()
-    start_date_time = end_date_time - timedelta(days=7)
-    
-    start_str = start_date_time.strftime('%Y-%m-%d')
-    end_str = end_date_time.strftime('%Y-%m-%d')
-    
-    # Find distinct user_ids
-    users = db.diaries.find({"date": {"$gte": start_str, "$lte": end_str}}).distinct("user_id")
-    
-    results = {"success": 0, "failed": 0, "errors": []}
-    
-    for user_id in users:
-        print(f"🔄 Processing letter for user {user_id}...")
-        try:
-            # Generate the letter
-            result = generate_weekly_letter(user_id, start_str, end_str)
-            if "error" in result:
-                 results["failed"] += 1
-                 results["errors"].append({"user_id": user_id, "error": result["error"]})
-                 print(f"❌ User {user_id} failed: {result['error']}")
-            else:
-                 results["success"] += 1
-                 print(f"✅ User {user_id} success.")
-        except Exception as e:
-            results["failed"] += 1
-            results["errors"].append({"user_id": user_id, "error": str(e)})
-            print(f"❌ User {user_id} exception: {e}")
-            
-    return results
-
-def process_all_users_weekly_letter():
-    """
-    Fetches all distinct user_ids from diaries (over last 7 days) and generates weekly letters for them.
-    Returns dict of success/failures.
-    """
-    from pymongo import MongoClient
-    from config import Config
-    from datetime import datetime, timedelta
-    
-    client = MongoClient(Config.MONGO_URI)
-    db = client.get_database()
-    
-    # Get users who wrote diaries in the last 7 days
-    end_date_time = datetime.now()
-    start_date_time = end_date_time - timedelta(days=7)
-    
-    start_str = start_date_time.strftime('%Y-%m-%d')
-    end_str = end_date_time.strftime('%Y-%m-%d')
-    
-    # Find distinct user_ids
-    users = db.diaries.find({"date": {"$gte": start_str, "$lte": end_str}}).distinct("user_id")
-    
-    results = {"success": 0, "failed": 0, "errors": []}
-    
-    for user_id in users:
-        print(f"🔄 Processing letter for user {user_id}...")
-        try:
-            # Generate the letter
-            result = generate_weekly_letter(user_id, start_str, end_str)
-            if "error" in result:
-                 results["failed"] += 1
-                 results["errors"].append({"user_id": user_id, "error": result["error"]})
-                 print(f"❌ User {user_id} failed: {result['error']}")
-            else:
-                 results["success"] += 1
-                 print(f"✅ User {user_id} success.")
-        except Exception as e:
-            results["failed"] += 1
-            results["errors"].append({"user_id": user_id, "error": str(e)})
-            print(f"❌ User {user_id} exception: {e}")
-            
-    return results

@@ -150,3 +150,22 @@ class ShareRelationship(db.Model):
     sharer = db.relationship('User', foreign_keys=[sharer_id], backref='shared_to')
     viewer = db.relationship('User', foreign_keys=[viewer_id], backref='shared_from')
 
+class WeeklyLetter(db.Model):
+    """
+    [AI 주간 편지]
+    매주 사용자의 일기 데이터를 바탕으로 OCI 서버가 백그라운드에서 작성하는 개인화된 편지.
+    """
+    __tablename__ = 'weekly_letters'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    start_date = db.Column(db.String(10), nullable=False) # 'YYYY-MM-DD'
+    end_date = db.Column(db.String(10), nullable=False)   # 'YYYY-MM-DD'
+    
+    title = db.Column(db.String(255), nullable=True) # 편지 제목 또는 요약
+    content = db.Column(db.Text, nullable=False) # 편지 본문
+    
+    is_read = db.Column(db.Boolean, default=False) # 사용자의 열람 여부
+    created_at = db.Column(db.DateTime, default=datetime.utcnow) # 생성 시간
+
+    user = db.relationship('User', backref=db.backref('weekly_letters', lazy=True, cascade='all, delete-orphan'))
