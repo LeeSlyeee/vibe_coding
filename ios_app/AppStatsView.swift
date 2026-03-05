@@ -202,7 +202,6 @@ struct AppStatsView: View {
                     .padding(.bottom, 15)
                 }
                 
-                // Content
                 if isLoading {
                     Spacer()
                     ProgressView().scaleEffect(1.2)
@@ -215,14 +214,66 @@ struct AppStatsView: View {
                             case "monthly": MonthlyChartView(data: stats.daily ?? [])
                             case "mood": MoodDistributionView(data: stats.moods ?? [])
                             case "weather": WeatherStatsView(data: stats.weather ?? [])
-                            case "report": ReportView(
-                                isGenerating: $isGeneratingReport,
-                                content: $reportContent,
-                                isGeneratingLong: $isGeneratingLongTerm,
-                                longContent: $longTermContent,
-                                startReport: startReport,
-                                startLongTerm: startLongTermReport
-                            )
+                            case "report": 
+                                VStack(spacing: 16) {
+                                    // 기존 일일 AI 리포트 영역
+                                    ReportView(
+                                        isGenerating: $isGeneratingReport,
+                                        content: $reportContent,
+                                        isGeneratingLong: $isGeneratingLongTerm,
+                                        longContent: $longTermContent,
+                                        startReport: startReport,
+                                        startLongTerm: startLongTermReport
+                                    )
+                                    
+                                    // [New] Kick 기능 진입점
+                                    NavigationView {
+                                        VStack(spacing: 16) {
+                                            NavigationLink(destination: WeeklyLetterView()) {
+                                                HStack {
+                                                    Image(systemName: "envelope.badge")
+                                                        .font(.title2)
+                                                        .foregroundColor(.pink)
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text("마음온 AI 주간 편지")
+                                                            .font(.headline)
+                                                            .foregroundColor(.primaryText)
+                                                        Text("1주일 동안의 기록을 따뜻한 편지로 받아보세요.")
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondaryText)
+                                                    }
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                        .foregroundColor(.gray)
+                                                }
+                                                .modifier(CardModifier())
+                                            }
+                                            
+                                            NavigationLink(destination: RelationalMapView()) {
+                                                HStack {
+                                                    Image(systemName: "sparkles")
+                                                        .font(.title2)
+                                                        .foregroundColor(.indigo)
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text("나의 마음 별자리")
+                                                            .font(.headline)
+                                                            .foregroundColor(.primaryText)
+                                                        Text("나와 내 주변 사람들의 관계와 감정을 확인하세요.")
+                                                            .font(.caption)
+                                                            .foregroundColor(.secondaryText)
+                                                    }
+                                                    Spacer()
+                                                    Image(systemName: "chevron.right")
+                                                        .foregroundColor(.gray)
+                                                }
+                                                .modifier(CardModifier())
+                                            }
+                                        }
+                                        .padding(.vertical, 8)
+                                        .navigationBarHidden(true)
+                                    }
+                                    .frame(height: 250) // NavigationView가 ScrollView 내부에서 공간을 차지하도록
+                                }
                             default: EmptyView()
                             }
                         }

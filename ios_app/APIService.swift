@@ -359,6 +359,24 @@ class APIService: NSObject {
         }
     }
     
+    // MARK: - Mind Condition (Kick 교차 분석)
+    func fetchMyCondition(completion: @escaping ([String: Any]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            
+            // Flask Endpoint: /api/kick/my-condition (JWT Required)
+            self.performRequest(baseURL: self.baseURL, endpoint: "/kick/my-condition", method: "GET") { result in
+                switch result {
+                case .success(let data):
+                    completion(data)
+                case .failure(let error):
+                    print("⚠️ [API] Fetch Condition Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
     func fetchDiaries(completion: @escaping ([[String: Any]]?) -> Void) {
         ensureAuth { success in
             guard success else { completion(nil); return }
@@ -764,5 +782,82 @@ class APIService: NSObject {
             }
         }
         */
+    }
+    // MARK: - Kick Extensions (AI Weekly Letter & Relational Map)
+    
+    func fetchMyWeeklyLetters(completion: @escaping ([WeeklyLetter]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            
+            self.performRequest(baseURL: self.baseURL, endpoint: "/kick/my-weekly-letters", method: "GET") { result in
+                switch result {
+                case .success(let data):
+                    // 'data' might be wrapped or an array directly based on your `performRequest` logic.
+                    // If it's a flat json dictionary, check for "data" key, or if it comes as dict with list.
+                    // Our performRequest wraps lists in {"data": [...]} if the raw response was an array.
+                    if let list = data["data"] as? [[String: Any]] {
+                        do {
+                            let jsonData = try JSONSerialization.data(withJSONObject: list)
+                            let letters = try JSONDecoder().decode([WeeklyLetter].self, from: jsonData)
+                            completion(letters)
+                        } catch {
+                            print("❌ [API] Decode error: \(error)")
+                            completion(nil)
+                        }
+                    } else {
+                        completion(nil)
+                    }
+                case .failure(let error):
+                    print("⚠️ [API] Fetch Weekly Letters Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    func fetchWeeklyLetterDetail(letterId: Int, completion: @escaping (WeeklyLetter?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            
+            self.performRequest(baseURL: self.baseURL, endpoint: "/kick/my-weekly-letters/\(letterId)", method: "GET") { result in
+                switch result {
+                case .success(let dict):
+                    do {
+                        let jsonData = try JSONSerialization.data(withJSONObject: dict)
+                        let letter = try JSONDecoder().decode(WeeklyLetter.self, from: jsonData)
+                        completion(letter)
+                    } catch {
+                        print("❌ [API] Decode error: \(error)")
+                        completion(nil)
+                    }
+                case .failure(let error):
+                    print("⚠️ [API] Fetch Weekly Letter Detail Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    func fetchMyRelationalMap(completion: @escaping (RelationalMapResponse?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            
+            self.performRequest(baseURL: self.baseURL, endpoint: "/kick/relational/my-map", method: "GET") { result in
+                switch result {
+                case .success(let dict):
+                    do {
+                        let jsonData = try JSONSerialization.data(withJSONObject: dict)
+                        let mapData = try JSONDecoder().decode(RelationalMapResponse.self, from: jsonData)
+                        completion(mapData)
+                    } catch {
+                        print("❌ [API] Decode error: \(error)")
+                        completion(nil)
+                    }
+                case .failure(let error):
+                    print("⚠️ [API] Fetch Relational Map Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
     }
 }
