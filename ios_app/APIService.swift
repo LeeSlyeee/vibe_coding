@@ -860,4 +860,173 @@ class APIService: NSObject {
             }
         }
     }
+    
+    // MARK: - Mind Bridge API (Phase 3/4/5)
+    
+    /// 서버에서 수신자 목록 조회
+    func fetchBridgeRecipients(completion: @escaping ([String: Any]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/recipients", method: "GET") { result in
+                switch result {
+                case .success(let data): completion(data)
+                case .failure(let error):
+                    print("⚠️ [Bridge] Fetch Recipients Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// 서버에 수신자 추가
+    func addBridgeRecipient(name: String, type: String, schedule: String, pin: String? = nil, completion: @escaping (Int?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            var body: [String: Any] = [
+                "name": name,
+                "type": type,
+                "share_schedule": schedule
+            ]
+            if let pin = pin { body["pin"] = pin }
+            
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/recipients", method: "POST", body: body) { result in
+                switch result {
+                case .success(let data):
+                    if let recipientData = data["recipient"] as? [String: Any],
+                       let serverId = recipientData["id"] as? Int {
+                        completion(serverId)
+                    } else {
+                        completion(nil)
+                    }
+                case .failure(let error):
+                    print("⚠️ [Bridge] Add Recipient Failed: \(error.localizedDescription)")
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// 서버에서 수신자 수정
+    func updateBridgeRecipient(serverId: Int, updates: [String: Any], completion: @escaping (Bool) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(false); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/recipients/\(serverId)", method: "PUT", body: updates) { result in
+                switch result {
+                case .success: completion(true)
+                case .failure: completion(false)
+                }
+            }
+        }
+    }
+    
+    /// 서버에서 수신자 삭제
+    func deleteBridgeRecipient(serverId: Int, completion: @escaping (Bool) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(false); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/recipients/\(serverId)", method: "DELETE") { result in
+                switch result {
+                case .success: completion(true)
+                case .failure: completion(false)
+                }
+            }
+        }
+    }
+    
+    /// 서버에 공유 깊이 설정 업데이트
+    func updateBridgeDepth(serverId: Int, settings: [String: Bool], completion: @escaping (Bool) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(false); return }
+            let body: [String: Any] = ["depth_settings": settings]
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/recipients/\(serverId)/depth", method: "PUT", body: body) { result in
+                switch result {
+                case .success: completion(true)
+                case .failure: completion(false)
+                }
+            }
+        }
+    }
+    
+    /// 서버에서 공유 이력 조회
+    func fetchBridgeShares(completion: @escaping ([[String: Any]]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/shares", method: "GET") { result in
+                switch result {
+                case .success(let data):
+                    if let shares = data["shares"] as? [[String: Any]] {
+                        completion(shares)
+                    } else {
+                        completion(nil)
+                    }
+                case .failure:
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// 서버에서 공유 미리보기 데이터 조회
+    func prepareBridgeShare(recipientServerId: Int, completion: @escaping ([String: Any]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/prepare-share/\(recipientServerId)", method: "GET") { result in
+                switch result {
+                case .success(let data): completion(data)
+                case .failure: completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// 서버에 감정 데이터 공유 생성
+    func createBridgeShare(recipientId: Int, startDate: String, endDate: String, data: [String: Any], sharedItems: String, completion: @escaping (Bool) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(false); return }
+            let body: [String: Any] = [
+                "recipient_id": recipientId,
+                "start_date": startDate,
+                "end_date": endDate,
+                "data": data,
+                "shared_items": sharedItems
+            ]
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/share", method: "POST", body: body) { result in
+                switch result {
+                case .success: completion(true)
+                case .failure: completion(false)
+                }
+            }
+        }
+    }
+    
+    /// 서버에서 열람 로그 조회
+    func fetchBridgeViewLogs(completion: @escaping ([[String: Any]]?) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(nil); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/view-logs", method: "GET") { result in
+                switch result {
+                case .success(let data):
+                    if let logs = data["logs"] as? [[String: Any]] {
+                        completion(logs)
+                    } else {
+                        completion(nil)
+                    }
+                case .failure:
+                    completion(nil)
+                }
+            }
+        }
+    }
+    
+    /// 서버 브릿지 데이터 전체 삭제 (회원 탈퇴)
+    func deleteAllBridgeData(completion: @escaping (Bool) -> Void) {
+        ensureAuth { success in
+            guard success else { completion(false); return }
+            self.performRequest(baseURL: self.baseURL, endpoint: "/bridge/delete-all", method: "DELETE") { result in
+                switch result {
+                case .success: completion(true)
+                case .failure: completion(false)
+                }
+            }
+        }
+    }
 }

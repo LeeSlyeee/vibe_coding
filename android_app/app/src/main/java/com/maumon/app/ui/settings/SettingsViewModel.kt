@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.maumon.app.data.repository.AuthRepository
 import com.maumon.app.data.repository.B2GRepository
+import com.maumon.app.data.billing.SubscriptionManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -79,6 +80,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         b2gLastSync = pair.second,
                     )
                 }
+                // SubscriptionManager의 static B2G 상태 동기화
+                SubscriptionManager.updateB2GStatus(getApplication(), linked)
             }
         }
     }

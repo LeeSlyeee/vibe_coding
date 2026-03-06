@@ -19,6 +19,10 @@ struct AppShareView: View {
     @State private var shareReport: Bool = true
     @State private var shareCrisis: Bool = true
     
+    // [Phase 2] 마음 브릿지 리포트 Export
+    @State private var showExportView = false
+    @State private var showPaywallForExport = false
+    
     var body: some View {
         VStack(spacing: 0) {
             
@@ -342,6 +346,64 @@ struct AppShareView: View {
                         .padding(.top, 16)
                     }
                     
+                    // [Phase 2] 마음 브릿지 리포트 공유 카드
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            let hasAccess = SubscriptionManager.shared.hasMindBridgeAccess
+                            if hasAccess {
+                                showExportView = true
+                            } else {
+                                showPaywallForExport = true
+                            }
+                        }) {
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 44, height: 44)
+                                    Image(systemName: "square.and.arrow.up")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 18))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text("🌉 감정 리포트 공유")
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(Color(hexString: "6366f1"))
+                                        if !SubscriptionManager.shared.hasMindBridgeAccess {
+                                            Text("PRO")
+                                                .font(.system(size: 9, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color(hexString: "6366f1"))
+                                                .cornerRadius(4)
+                                        }
+                                    }
+                                    Text("카카오톡·메시지로 감정 상태 이미지 전송")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    
                 }
                 .padding(.vertical)
                 }
@@ -355,6 +417,12 @@ struct AppShareView: View {
         .navigationTitle("공유 및 연결")
         .alert(isPresented: $showAlert) {
             Alert(title: Text("알림"), message: Text(alertMsg), dismissButton: .default(Text("확인")))
+        }
+        .sheet(isPresented: $showExportView) {
+            MindBridgeExportView()
+        }
+        .sheet(isPresented: $showPaywallForExport) {
+            MindBridgePaywallView(isPresented: $showPaywallForExport)
         }
     }
     

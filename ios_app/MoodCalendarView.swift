@@ -34,6 +34,10 @@ struct MoodCalendarView: View {
     // [New] Settings Modal State
     @State private var showSettings = false
     
+    // [Step 4] Soft Nudge State
+    @State private var showNudgeBanner = true
+    @State private var showPremiumFromNudge = false
+    
     // Write Modal State (Identifiable Item for Safe Presentation)
     @State private var writeTarget: WriteTargetDate?
     
@@ -179,6 +183,85 @@ struct MoodCalendarView: View {
                         await refreshData()
                     }
                     
+                    // [Step 4] Soft Nudge Banner (마음 브릿지 자연스러운 유도)
+                    if shouldShowNudge && showNudgeBanner {
+                        Button(action: {
+                            showPremiumFromNudge = true
+                        }) {
+                            HStack(spacing: 12) {
+                                // 아이콘
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hexString: "6366f1").opacity(0.15), Color(hexString: "8b5cf6").opacity(0.15)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 40, height: 40)
+                                    Text("🌉")
+                                        .font(.system(size: 20))
+                                }
+                                
+                                // 텍스트
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("가족에게 내 마음을 전해보세요")
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.primary)
+                                    Text("마음 브릿지로 감정 리포트를 안전하게 공유")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                // 닫기 버튼
+                                Button(action: {
+                                    withAnimation(.easeOut(duration: 0.3)) {
+                                        showNudgeBanner = false
+                                    }
+                                    // 오늘 하루 다시 표시하지 않음
+                                    let formatter = DateFormatter()
+                                    formatter.dateFormat = "yyyy-MM-dd"
+                                    UserDefaults.standard.set(formatter.string(from: Date()), forKey: "nudge_dismissed_date")
+                                }) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundColor(.gray)
+                                        .padding(6)
+                                        .background(Color.gray.opacity(0.1))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(BorderlessButtonStyle())
+                            }
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(.systemBackground))
+                                    .shadow(color: Color(hexString: "6366f1").opacity(0.1), radius: 8, x: 0, y: 2)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [Color(hexString: "6366f1").opacity(0.3), Color(hexString: "8b5cf6").opacity(0.15)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .bottom).combined(with: .opacity),
+                            removal: .opacity
+                        ))
+                    }
+                    
                     // [New] Bottom Manual Sync Button
                     Button(action: {
                         print("🔄 [UI] Manual Sync Triggered (Bottom)")
@@ -251,6 +334,11 @@ struct MoodCalendarView: View {
                     }
                     .screenshotProtected(isProtected: false)
                 }
+                // [Step 4] Nudge → Paywall Sheet
+                .sheet(isPresented: $showPremiumFromNudge) {
+                    MindBridgePaywallView(isPresented: $showPremiumFromNudge)
+                        .screenshotProtected(isProtected: false)
+                }
             }
             
             
@@ -272,6 +360,25 @@ struct MoodCalendarView: View {
                     }
                 }
         )
+    }
+    
+    // MARK: - Soft Nudge Logic
+    
+    /// 소프트 넛지 표시 조건: 일기 7개 이상 + 구독/B2G 미가입 + 오늘 닫지 않음
+    private var shouldShowNudge: Bool {
+        // 1. 이미 프리미엄 접근 가능하면 표시하지 않음
+        if SubscriptionManager.shared.hasMindBridgeAccess { return false }
+        
+        // 2. 일기가 7개 미만이면 아직 이름
+        if diaries.count < 7 { return false }
+        
+        // 3. 오늘 이미 닫았으면 표시하지 않음
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let today = formatter.string(from: Date())
+        if UserDefaults.standard.string(forKey: "nudge_dismissed_date") == today { return false }
+        
+        return true
     }
     
     // MARK: - Logic

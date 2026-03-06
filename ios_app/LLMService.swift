@@ -903,8 +903,8 @@ class LLMService: ObservableObject {
         }
         
         let prompt = """
-        당신은 사용자의 일기를 분석하는 감정 케어 도우미 '마음온'입니다.
-        아래 일기를 읽고, 정확히 세 가지 항목을 [구분자]로 나누어 답하세요.
+        당신은 임상 심리 전문가 수준의 감정 분석 AI '마음온'입니다.
+        사용자의 일기를 읽고 전문적이면서도 따뜻한 심층 분석을 제공하세요.
         
         [사용자의 일기]:
         \(diaryText)
@@ -912,8 +912,15 @@ class LLMService: ObservableObject {
         [지시사항]
         1. 감정 분류: 아래 감정 중 하나를 골라 "감정명 (확률%)" 형식으로 답하세요.
            [Happy, Sad, Angry, Fear, Surprise, Neutral, Disgust, Anxiety, Depression, Stress, Joy, Love, Confusion, Excitement, Tired]
-        2. 따뜻한 조언: 80자 이내 한국어 해요체로 행동 가능한 작은 제안을 포함하세요.
-        3. 심층 분석: 40~80자 내외 한국어 해요체로 감정의 원인과 패턴을 분석하세요.
+        2. 따뜻한 조언: 100자 이내 한국어 해요체로 구체적이고 실천 가능한 제안을 하세요.
+        3. 심층 분석: 400~600자의 한국어 해요체로 아래 7가지 항목을 반드시 모두 포함하여 분석하세요.
+           ① 감정의 핵심 원인: 오늘 이 감정을 촉발한 구체적인 사건이나 상황을 짚어주세요.
+           ② 감정의 깊이: 표면적 감정 아래에 숨겨진 더 깊은 욕구나 두려움이 있는지 분석하세요.
+           ③ 반복 패턴 탐지: 이런 감정이 특정 상황/시간/관계에서 반복되는 경향이 있는지 살펴보세요.
+           ④ 신체적 영향: 이 감정이 수면, 식욕, 에너지 등 신체에 미칠 수 있는 영향을 언급하세요.
+           ⑤ 대인 관계 영향: 이 감정이 주변 사람들과의 관계에 어떤 영향을 줄 수 있는지 분석하세요.
+           ⑥ 자기 인식 포인트: 사용자가 미처 인식하지 못했을 수 있는 감정의 이면을 알려주세요.
+           ⑦ 향후 전망: 이 감정의 자연스러운 흐름과 앞으로 주의할 점을 제시하세요.
         
         [출력 형식] (반드시 이 형식을 지키세요):
         [EMOTION] 감정명 (확률%)
@@ -925,11 +932,11 @@ class LLMService: ObservableObject {
         do {
             var session = ChatSession(container, instructions: "")
             session.generateParameters = GenerateParameters(
-                maxTokens: 256,
-                temperature: 0.5,
-                topP: 0.9,
-                repetitionPenalty: 1.1,
-                repetitionContextSize: 5
+                maxTokens: 700,
+                temperature: 0.65,
+                topP: 0.92,
+                repetitionPenalty: 1.15,
+                repetitionContextSize: 8
             )
             
             var result = ""
@@ -991,7 +998,11 @@ class LLMService: ObservableObject {
             
             if let analysisRange = clean.range(of: "[ANALYSIS]") {
                 let afterAnalysis = String(clean[analysisRange.upperBound...])
-                analysis = afterAnalysis.components(separatedBy: "\n").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                // 전체 분석 텍스트를 가져옴 (첫 줄만 아니라 모든 줄 연결)
+                let analysisLines = afterAnalysis.components(separatedBy: "\n")
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty && !$0.hasPrefix("[") }
+                analysis = analysisLines.joined(separator: "\n")
             }
         }
         

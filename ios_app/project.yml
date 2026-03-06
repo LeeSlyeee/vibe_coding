@@ -23,6 +23,10 @@ targets:
           - .agent
     info:
       path: Info.plist
+    entitlements:
+      path: MindDiaryApp.entitlements
+    scheme:
+      storeKitConfiguration: MindBridgeSubscription.storekit
       properties:
         CFBundleDisplayName: "maumON"
         CFBundleName: "maumON"

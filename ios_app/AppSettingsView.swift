@@ -21,6 +21,7 @@ struct AppSettingsView: View {
     @State private var isPwVisible = false // Password Reveal Only
     @State private var useCustomLogin = false // Toggle between Auto-Account and Custom Login
     @State private var showBirthDatePicker = false // [New] Birth Date Picker
+    @State private var showMindBridgeMain = false // [Phase 3] 마음 브릿지 메인
     
     // Unified Alert System [Fix]
     enum ActiveAlert: Identifiable {
@@ -435,17 +436,118 @@ struct AppSettingsView: View {
                         }
                         .padding(.vertical, 4)
                         
-                    } else {
-                        // Case B: 일반 사용자 (업그레이드 유도)
-                        // 프리미엄 결제 여부와 상관없이 연동이 안되어 있으면 무조건 노출
-                        Button(action: { showPremiumModal = true }) {
-                            HStack {
+                    } else if SubscriptionManager.shared.isSubscribed {
+                        // Case B: 마음 브릿지 구독 중
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: "heart.text.clipboard")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 18))
+                                }
+                                
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("마음챙김 플러스 +")
+                                    HStack {
+                                        Text("🌉 마음 브릿지")
+                                            .font(.headline)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(Color(hexString: "6366f1"))
+                                        
+                                        Text(SubscriptionManager.shared.isInTrialPeriod ? "체험 중" : "구독 중")
+                                            .font(.caption2)
+                                            .fontWeight(.bold)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(Color(hexString: "6366f1").opacity(0.1))
+                                            .foregroundColor(Color(hexString: "6366f1"))
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    if let days = SubscriptionManager.shared.daysUntilExpiry {
+                                        Text("다음 갱신까지 \(days)일")
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                            }
+                            .padding(.vertical, 4)
+                            
+                            // [Phase 3] 마음 브릿지 메인 진입
+                            Button(action: { showMindBridgeMain = true }) {
+                                HStack {
+                                    Image(systemName: "heart.text.clipboard")
+                                        .font(.caption)
+                                    Text("마음 브릿지 열기")
+                                        .font(.subheadline)
+                                        .fontWeight(.bold)
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(10)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            
+                            // 구독 관리 링크
+                            Button(action: {
+                                if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                    UIApplication.shared.open(url)
+                                }
+                            }) {
+                                HStack {
+                                    Image(systemName: "gear")
+                                        .font(.caption)
+                                    Text("구독 관리 (App Store)")
+                                        .font(.caption)
+                                }
+                                .foregroundColor(.gray)
+                            }
+                        }
+                        
+                    } else {
+                        // Case C: 일반 사용자 (마음 브릿지 업그레이드 유도)
+                        Button(action: { showPremiumModal = true }) {
+                            HStack(spacing: 15) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 40, height: 40)
+                                    Image(systemName: "heart.text.clipboard")
+                                        .foregroundColor(.white)
+                                        .font(.system(size: 18))
+                                }
+                                
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("🌉 마음 브릿지")
                                         .font(.headline)
                                         .fontWeight(.bold)
-                                        .foregroundColor(.purple)
-                                    Text("더 깊은 분석과 무제한 감정 분석을 받아보세요.")
+                                        .foregroundColor(Color(hexString: "6366f1"))
+                                    Text("가족·상담사에게 내 마음을 안전하게 전해보세요")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
@@ -676,17 +778,14 @@ struct AppSettingsView: View {
                 }
             }
             .sheet(isPresented: $showPremiumModal) {
-                PremiumModalView(isPresented: $showPremiumModal, onUpgrade: {
-                    // Simple Mock Upgrade
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        authManager.setPremium(true)
-                        showPremiumModal = false
-                    }
-                })
-                .screenshotProtected(isProtected: false) // 스크린샷 방지
+                MindBridgePaywallView(isPresented: $showPremiumModal)
+                    .screenshotProtected(isProtected: false)
             }
             .sheet(isPresented: $showBirthDatePicker) {
                 BirthDatePickerView(isPresented: $showBirthDatePicker)
+            }
+            .sheet(isPresented: $showMindBridgeMain) {
+                MindBridgeMainView()
             }
     }
     

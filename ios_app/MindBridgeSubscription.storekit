@@ -1,0 +1,111 @@
+{
+  "identifier" : "com.maumon.mindbridge",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_locale" : "ko_KR",
+    "_storefront" : "KOR",
+    "_storeKitRecurringPurchasesEnabled" : true
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "mindbridge_group",
+      "localizations" : [
+        {
+          "description" : "마음 브릿지 구독",
+          "displayName" : "마음 브릿지",
+          "locale" : "ko"
+        }
+      ],
+      "name" : "마음 브릿지",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "5500",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "mindbridge_monthly_001",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "mindbridge_freetrial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "가족·상담사에게 내 마음을 안전하게 전해보세요",
+              "displayName" : "마음 브릿지 월간 구독",
+              "locale" : "ko"
+            }
+          ],
+          "productID" : "com.maumon.mindbridge.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "마음 브릿지 월간",
+          "subscriptionGroupID" : "mindbridge_group",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

@@ -1,5 +1,6 @@
 package com.maumon.app.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -21,6 +23,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.maumon.app.ui.theme.Primary
 import com.maumon.app.ui.share.ShareScreen
+import com.maumon.app.data.billing.SubscriptionManager
+import com.maumon.app.ui.subscription.MindBridgePaywallScreen
+import com.maumon.app.ui.bridge.MindBridgeMainScreen
 
 /**
  * 설정 화면 - iOS AppSettingsView 1:1 대응
@@ -44,6 +49,12 @@ fun SettingsScreen(
     var showTermsDialog by remember { mutableStateOf(false) }
     var showB2GCodeDialog by remember { mutableStateOf(false) }
     var showB2GDisconnectDialog by remember { mutableStateOf(false) }
+    var showPaywallScreen by remember { mutableStateOf(false) }
+    var showBridgeMainScreen by remember { mutableStateOf(false) }
+
+    // 구독 상태 구독
+    val subscriptionManager = remember { SubscriptionManager.getInstance(context) }
+    val isSubscribed by subscriptionManager.instanceIsSubscribed.collectAsState()
 
     // 서버에서 최신 유저 정보 가져오기
     LaunchedEffect(Unit) {
@@ -68,6 +79,18 @@ fun SettingsScreen(
     // GuideScreen 전체 화면 표시
     if (showGuideScreen) {
         GuideScreen(onBack = { showGuideScreen = false })
+        return
+    }
+
+    // MindBridge 페이월 전체 화면 표시
+    if (showPaywallScreen) {
+        MindBridgePaywallScreen(onDismiss = { showPaywallScreen = false })
+        return
+    }
+
+    // MindBridge 메인 화면 표시 (Phase 3: 구독 중일 때 접근)
+    if (showBridgeMainScreen) {
+        MindBridgeMainScreen(onDismiss = { showBridgeMainScreen = false })
         return
     }
 
@@ -207,6 +230,173 @@ fun SettingsScreen(
                         subtitle = "기관 코드를 입력하여 연동하세요",
                         onClick = { showB2GCodeDialog = true }
                     )
+                }
+            }
+
+            // ═══════════════════════════════════════════
+            // 멤버십 — iOS Section 3 "멤버십" 대응
+            // ═══════════════════════════════════════════
+            SettingsSection(title = "멤버십") {
+                if (uiState.b2gIsLinked) {
+                    // Case A: B2G 연동 → 무료 프리미엄
+                    SettingsItem(
+                        icon = Icons.Default.Business,
+                        title = "기관 연동 멤버십",
+                        subtitle = "보건소 연동으로 프리미엄 혜택이 적용됩니다",
+                        onClick = { }
+                    )
+                } else if (isSubscribed) {
+                    // Case B: 마음 브릿지 구독 중
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 그라데이션 아이콘
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                                        ),
+                                        shape = CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.HealthAndSafety,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "🌉 마음 브릿지",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6366F1)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF6366F1).copy(alpha = 0.1f)
+                                    ) {
+                                        Text(
+                                            "구독 중",
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF6366F1)
+                                        )
+                                    }
+                                }
+                            }
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF22C55E)
+                            )
+                        }
+
+                        // [Phase 3] 마음 브릿지 메인 진입 버튼 (iOS 동일)
+                        Button(
+                            onClick = { showBridgeMainScreen = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .padding(bottom = 12.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color.Transparent
+                            ),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                                        ),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.HealthAndSafety,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        "마음 브릿지 열기",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Case C: 미구독 → 페이월 진입
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showPaywallScreen = true }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                                    ),
+                                    shape = CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.HealthAndSafety,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "🌉 마음 브릿지",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF6366F1)
+                            )
+                            Text(
+                                "가족·상담사에게 내 마음을 안전하게 전해보세요",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = Color.Gray.copy(alpha = 0.5f)
+                        )
+                    }
                 }
             }
 

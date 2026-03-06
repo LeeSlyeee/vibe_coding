@@ -1,6 +1,8 @@
 package com.maumon.app.ui.share
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.maumon.app.ui.theme.Primary
+import com.maumon.app.data.billing.SubscriptionManager
+import com.maumon.app.ui.subscription.MindBridgeExportScreen
+import com.maumon.app.ui.subscription.MindBridgePaywallScreen
 import kotlinx.coroutines.launch
 
 /**
@@ -35,6 +40,10 @@ fun ShareScreen(onBack: () -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
+    // [Phase 2] Export / Paywall 화면
+    var showExportScreen by remember { mutableStateOf(false) }
+    var showPaywallScreen by remember { mutableStateOf(false) }
+
     val connectedUsers by ShareManager.connectedUsers.collectAsState()
     val myGuardians by ShareManager.myGuardians.collectAsState()
     val myCode by ShareManager.myCode.collectAsState()
@@ -43,6 +52,17 @@ fun ShareScreen(onBack: () -> Unit = {}) {
     LaunchedEffect(Unit) {
         ShareManager.fetchList("viewer")
         ShareManager.fetchList("sharer")
+    }
+
+    // [Phase 2] Export 전체 화면
+    if (showExportScreen) {
+        MindBridgeExportScreen(onDismiss = { showExportScreen = false })
+        return
+    }
+    // [Phase 2] Paywall 전체 화면
+    if (showPaywallScreen) {
+        MindBridgePaywallScreen(onDismiss = { showPaywallScreen = false })
+        return
     }
 
     Scaffold(
@@ -273,6 +293,15 @@ private fun ShareTab(
                 AlertScopeSettings()
             }
         }
+
+        // [Phase 2] 마음 브릿지 리포트 공유 카드
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
+            MindBridgeExportCard(
+                onExport = { showExportScreen = true },
+                onPaywall = { showPaywallScreen = true }
+            )
+        }
     }
 }
 
@@ -359,5 +388,73 @@ private fun AlertToggleRow(icon: String, title: String, subtitle: String, isOn: 
             Text(subtitle, fontSize = 11.sp, color = Color.Gray)
         }
         Switch(checked = isOn, onCheckedChange = onToggle)
+    }
+}
+
+@Composable
+private fun MindBridgeExportCard(onExport: () -> Unit, onPaywall: () -> Unit) {
+    val hasAccess by SubscriptionManager.isSubscribed.collectAsState()
+    val isB2GLinked by SubscriptionManager.isB2GLinked.collectAsState()
+    
+    val canExport = hasAccess || isB2GLinked
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(1.dp),
+        modifier = Modifier.clickable {
+            if (canExport) onExport() else onPaywall()
+        }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(
+                        brush = androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
+                        ),
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "🌉 감정 리포트 공유",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFF6366F1)
+                    )
+                    if (!canExport) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "PRO",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(Color(0xFF6366F1), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "카카오톡·메시지로 감정 상태 이미지 전송",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
+        }
     }
 }

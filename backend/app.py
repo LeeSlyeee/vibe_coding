@@ -102,6 +102,13 @@ try:
 except Exception as e:
     print(f"⚠️ Failed to register Kick Routes: {e}")
 
+try:
+    from mindbridge_routes import bridge_bp
+    app.register_blueprint(bridge_bp)
+    print("✅ Mind Bridge Routes Registered (Phase 3/4/5)")
+except Exception as e:
+    print(f"⚠️ Failed to register Mind Bridge Routes: {e}")
+
 
 @app.before_request
 def log_request_info():

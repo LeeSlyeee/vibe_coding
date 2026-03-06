@@ -169,3 +169,114 @@ class WeeklyLetter(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow) # 생성 시간
 
     user = db.relationship('User', backref=db.backref('weekly_letters', lazy=True, cascade='all, delete-orphan'))
+
+
+# ═══════════════════════════════════════════
+# [Mind Bridge] Phase 3/4/5 — 마음 브릿지 SaaS
+# ═══════════════════════════════════════════
+
+class BridgeRecipient(db.Model):
+    """
+    마음 브릿지 수신자 (가족 또는 상담사)
+    사용자가 자신의 감정 데이터를 공유할 대상을 등록
+    """
+    __tablename__ = 'bridge_recipients'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    name = db.Column(db.String(100), nullable=False)         # 수신자 이름
+    type = db.Column(db.String(20), nullable=False)           # 'family' or 'counselor'
+    is_active = db.Column(db.Boolean, default=True)
+    share_schedule = db.Column(db.String(20), default='weekly')  # daily/weekly/biweekly/manual
+    pin_hash = db.Column(db.String(200), nullable=True)       # [Phase 5] 상담사 열람 PIN (hashed)
+    
+    # [Phase 4] 공유 깊이 설정 (기본 전부 OFF)
+    depth_mood_status = db.Column(db.Boolean, default=False)        # 주간 감정 상태 (🟢🟡🔴)
+    depth_mood_graph = db.Column(db.Boolean, default=False)         # 감정 변화 그래프
+    depth_ai_summary = db.Column(db.Boolean, default=False)         # AI 분석 요약
+    depth_detailed_analysis = db.Column(db.Boolean, default=False)  # 7개 항목 상세
+    depth_trigger_keywords = db.Column(db.Boolean, default=False)   # 트리거 키워드
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('bridge_recipients', lazy=True, cascade='all, delete-orphan'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'type': self.type,
+            'is_active': self.is_active,
+            'share_schedule': self.share_schedule,
+            'has_pin': self.pin_hash is not None,
+            'depth_settings': {
+                'mood_status': self.depth_mood_status,
+                'mood_graph': self.depth_mood_graph,
+                'ai_summary': self.depth_ai_summary,
+                'detailed_analysis': self.depth_detailed_analysis,
+                'trigger_keywords': self.depth_trigger_keywords,
+            },
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class BridgeShare(db.Model):
+    """
+    마음 브릿지 공유 데이터
+    사용자가 수신자에게 공유한 감정 분석 결과 (암호화 저장)
+    """
+    __tablename__ = 'bridge_shares'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('bridge_recipients.id'), nullable=False)
+    
+    # 공유 기간
+    start_date = db.Column(db.String(10), nullable=False)  # 'YYYY-MM-DD'
+    end_date = db.Column(db.String(10), nullable=False)
+    
+    # [Phase 4] 공유 데이터 (Fernet 암호화)
+    encrypted_data = db.Column(db.Text, nullable=False)     # JSON → AES 암호화
+    shared_items = db.Column(db.String(255), nullable=True)  # "감정상태,AI요약" 등 공유 항목 요약
+    
+    # [Phase 5] 열람 상태
+    is_viewed = db.Column(db.Boolean, default=False)
+    viewed_at = db.Column(db.DateTime, nullable=True)
+    view_count = db.Column(db.Integer, default=0)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=True)       # 열람 만료 (30일)
+    
+    # Relationships
+    user = db.relationship('User', backref=db.backref('bridge_shares_sent', lazy=True))
+    recipient = db.relationship('BridgeRecipient', backref=db.backref('shares', lazy=True))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'recipient_id': self.recipient_id,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
+            'shared_items': self.shared_items,
+            'is_viewed': self.is_viewed,
+            'viewed_at': self.viewed_at.isoformat() if self.viewed_at else None,
+            'view_count': self.view_count,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class BridgeViewLog(db.Model):
+    """
+    [Phase 5] 마음 브릿지 열람 로그
+    상담사/가족이 공유 데이터를 열람할 때마다 기록
+    """
+    __tablename__ = 'bridge_view_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    share_id = db.Column(db.Integer, db.ForeignKey('bridge_shares.id'), nullable=False)
+    viewer_name = db.Column(db.String(100), nullable=True)
+    viewer_ip = db.Column(db.String(45), nullable=True)       # IPv6 대응
+    viewed_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relationship
+    share = db.relationship('BridgeShare', backref=db.backref('view_logs', lazy=True))

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -20,15 +21,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.maumon.app.data.model.Diary
+import com.maumon.app.data.billing.SubscriptionManager
+import com.maumon.app.ui.subscription.MindBridgePaywallScreen
 import com.maumon.app.ui.theme.*
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +48,13 @@ fun CalendarScreen(
     val today = LocalDate.now()
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showFutureDateAlert by remember { mutableStateOf(false) }
+    
+    // [Step 4] Soft Nudge State
+    var showNudgeBanner by remember { mutableStateOf(true) }
+    var showPaywallFromNudge by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val isSubscribed by SubscriptionManager.isSubscribed.collectAsState()
+    val isB2GLinked by SubscriptionManager.isB2GLinked.collectAsState()
 
     Column(
         modifier = Modifier
@@ -120,6 +132,100 @@ fun CalendarScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
+        // [Step 4] Soft Nudge Banner (마음 브릿지 자연스러운 유도)
+        val diaryCount = uiState.diaries.size
+        val nudgeDismissedDate = remember {
+            val prefs = context.getSharedPreferences("maum_on_prefs", android.content.Context.MODE_PRIVATE)
+            prefs.getString("nudge_dismissed_date", "") ?: ""
+        }
+        val todayStr = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        val shouldShowNudge = !isSubscribed && !isB2GLinked && diaryCount >= 7 && nudgeDismissedDate != todayStr
+
+        if (shouldShowNudge && showNudgeBanner) {
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showNudgeBanner,
+                exit = androidx.compose.animation.fadeOut()
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clickable { showPaywallFromNudge = true },
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        1.dp,
+                        androidx.compose.ui.graphics.Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF6366f1).copy(alpha = 0.3f),
+                                Color(0xFF8b5cf6).copy(alpha = 0.15f)
+                            )
+                        )
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // 아이콘
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(
+                                    androidx.compose.ui.graphics.Brush.linearGradient(
+                                        colors = listOf(
+                                            Color(0xFF6366f1).copy(alpha = 0.15f),
+                                            Color(0xFF8b5cf6).copy(alpha = 0.15f)
+                                        )
+                                    )
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("\uD83C\uDF09", fontSize = 20.sp) // 🌉
+                        }
+
+                        // 텍스트
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "가족에게 내 마음을 전해보세요",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                "마음 브릿지로 감정 리포트를 안전하게 공유",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        // 닫기 버튼
+                        IconButton(
+                            onClick = {
+                                showNudgeBanner = false
+                                // 오늘 하루 다시 표시하지 않음
+                                context.getSharedPreferences("maum_on_prefs", android.content.Context.MODE_PRIVATE)
+                                    .edit()
+                                    .putString("nudge_dismissed_date", todayStr)
+                                    .apply()
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "닫기",
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // 오늘 일기 쓰기 버튼
         Button(
             onClick = { onWriteDiary(today.toString()) },
@@ -169,6 +275,11 @@ fun CalendarScreen(
                 }
             )
         }
+    }
+
+    // [Step 4] Paywall from Nudge → Full Paywall Screen
+    if (showPaywallFromNudge) {
+        MindBridgePaywallScreen(onDismiss = { showPaywallFromNudge = false })
     }
 }
 

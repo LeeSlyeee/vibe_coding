@@ -16,6 +16,7 @@ vico = "1.15.0"
 mediapipe-genai = "0.10.32"
 firebaseBom = "33.7.0"
 googleServices = "4.4.2"
+billing = "7.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -53,6 +54,8 @@ androidx-junit = { group = "androidx.test.ext", name = "junit", version = "1.2.1
 # Firebase (Push Notification)
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+# Google Play Billing (In-App Subscription)
+billing = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
