@@ -145,17 +145,18 @@ class MindBridgeManager: ObservableObject {
     // 수신자 관리 (로컬 + 서버)
     // ═══════════════════════════════════════════
     
-    func addRecipient(name: String, type: RecipientType, schedule: ShareSchedule?) {
+    func addRecipient(name: String, type: RecipientType, schedule: ShareSchedule?, pin: String? = nil) {
         var recipient = BridgeRecipient(name: name, type: type, schedule: schedule)
         recipients.append(recipient)
         depthSettingsMap[recipient.id] = .default
         saveLocal()
         
-        // 서버 동기화
+        // 서버 동기화 (PIN 포함)
         APIService.shared.addBridgeRecipient(
             name: name,
             type: type.rawValue,
-            schedule: schedule?.rawValue ?? "weekly"
+            schedule: schedule?.rawValue ?? "weekly",
+            pin: pin
         ) { [weak self] serverId in
             guard let self = self, let serverId = serverId else { return }
             DispatchQueue.main.async {
@@ -217,6 +218,77 @@ class MindBridgeManager: ObservableObject {
         if let recipient = recipients.first(where: { $0.id == recipientId }),
            let serverId = recipient.serverId {
             APIService.shared.updateBridgeDepth(serverId: serverId, settings: settings.toServerDict) { _ in }
+        }
+    }
+    
+    // ═══════════════════════════════════════════
+    // Phase 3/4: 서버 공유 실행 (prepare → create)
+    // ═══════════════════════════════════════════
+    
+    @Published var isSharing = false
+    @Published var shareError: String?
+    @Published var shareSuccess = false
+    
+    /// 수신자에게 서버 API를 통해 감정 데이터를 공유
+    func shareToRecipient(_ recipient: BridgeRecipient, completion: @escaping (Bool, String?) -> Void) {
+        guard let serverId = recipient.serverId else {
+            completion(false, "서버에 동기화되지 않은 수신자입니다")
+            return
+        }
+        guard recipient.isActive else {
+            completion(false, "비활성화된 수신자입니다")
+            return
+        }
+        
+        let depth = getDepthSettings(for: recipient.id)
+        guard depth.enabledCount > 0 else {
+            completion(false, "공유할 항목을 하나 이상 켜주세요")
+            return
+        }
+        
+        DispatchQueue.main.async { self.isSharing = true }
+        
+        // Step 1: 서버에서 깊이 설정 기반 데이터 수집
+        APIService.shared.prepareBridgeShare(recipientServerId: serverId) { [weak self] preview in
+            guard let self = self else { return }
+            guard let preview = preview,
+                  let previewData = preview["preview"] as? [String: Any],
+                  let sharedItems = preview["shared_items"] as? String else {
+                DispatchQueue.main.async {
+                    self.isSharing = false
+                    completion(false, "공유 데이터 준비에 실패했습니다")
+                }
+                return
+            }
+            
+            // Step 2: 서버에 암호화 공유 생성
+            let period = previewData["period"] as? [String: Any]
+            let startDate = period?["start"] as? String ?? ""
+            let endDate = period?["end"] as? String ?? ""
+            
+            APIService.shared.createBridgeShare(
+                recipientId: serverId,
+                startDate: startDate,
+                endDate: endDate,
+                data: previewData,
+                sharedItems: sharedItems
+            ) { success in
+                DispatchQueue.main.async {
+                    self.isSharing = false
+                    if success {
+                        // 로컬 이력에도 추가
+                        self.addShareHistoryEntry(
+                            recipientName: recipient.name,
+                            sharedItems: sharedItems
+                        )
+                        self.shareSuccess = true
+                        print("🌉 [MindBridge] 공유 완료: \(recipient.name) → \(sharedItems)")
+                        completion(true, nil)
+                    } else {
+                        completion(false, "공유 전송에 실패했습니다")
+                    }
+                }
+            }
         }
     }
     

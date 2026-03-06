@@ -14,6 +14,12 @@ struct MindBridgeMainView: View {
     @State private var showDepthSettings = false
     @State private var showShareHistory = false
     
+    // 공유 실행 상태
+    @State private var shareTargetRecipient: BridgeRecipient?
+    @State private var showShareConfirm = false
+    @State private var shareResultMessage = ""
+    @State private var showShareResult = false
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -66,6 +72,29 @@ struct MindBridgeMainView: View {
             }
             .sheet(isPresented: $showShareHistory) {
                 ShareHistoryView(bridgeManager: bridgeManager)
+            }
+            .alert("지금 공유할까요?", isPresented: $showShareConfirm) {
+                Button("공유", role: .none) {
+                    if let recipient = shareTargetRecipient {
+                        bridgeManager.shareToRecipient(recipient) { success, error in
+                            if success {
+                                shareResultMessage = "\(recipient.name)에게 공유가 완료되었습니다"
+                            } else {
+                                shareResultMessage = error ?? "공유에 실패했습니다"
+                            }
+                            showShareResult = true
+                        }
+                    }
+                }
+                Button("취소", role: .cancel) {}
+            } message: {
+                if let r = shareTargetRecipient {
+                    let depth = bridgeManager.getDepthSettings(for: r.id)
+                    Text("\(r.name)에게 설정된 \(depth.enabledCount)개 항목을 서버로 공유합니다.")
+                }
+            }
+            .alert(shareResultMessage, isPresented: $showShareResult) {
+                Button("확인", role: .cancel) {}
             }
         }
     }
@@ -186,6 +215,25 @@ struct MindBridgeMainView: View {
                     .background(Color(hexString: "6366f1").opacity(0.1))
                     .cornerRadius(8)
             }
+            
+            // 공유 실행 버튼
+            Button(action: {
+                shareTargetRecipient = recipient
+                showShareConfirm = true
+            }) {
+                Image(systemName: "paperplane.fill")
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(
+                        LinearGradient(
+                            colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .clipShape(Circle())
+            }
         }
         .padding()
         .background(Color(.systemBackground))
@@ -260,6 +308,7 @@ struct AddRecipientSheet: View {
     @State private var recipientName = ""
     @State private var recipientType: RecipientType = .family
     @State private var shareSchedule: ShareSchedule = .weekly
+    @State private var pinCode = ""    // 상담사용 PIN
     
     var body: some View {
         NavigationView {
@@ -284,6 +333,15 @@ struct AddRecipientSheet: View {
                     }
                 }
                 
+                // Phase 5: 상담사 PIN 보안 설정
+                if recipientType == .counselor {
+                    Section(header: Text("보안 설정"),
+                            footer: Text("상담사가 공유 데이터를 열람할 때 이 PIN을 입력해야 합니다.\n4~6자리 숫자를 설정하세요.")) {
+                        SecureField("PIN 코드 (4~6자리)", text: $pinCode)
+                            .keyboardType(.numberPad)
+                    }
+                }
+                
                 Section(header: Text("안내"), footer: Text("모든 공유 항목은 기본 OFF 상태로 시작됩니다.\n수신자별로 공유할 항목을 직접 선택해주세요.")) {
                     HStack {
                         Image(systemName: "checkmark.shield.fill")
@@ -301,14 +359,16 @@ struct AddRecipientSheet: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("추가") {
+                        let pin: String? = (recipientType == .counselor && pinCode.count >= 4) ? pinCode : nil
                         bridgeManager.addRecipient(
                             name: recipientName,
                             type: recipientType,
-                            schedule: recipientType == .family ? shareSchedule : nil
+                            schedule: recipientType == .family ? shareSchedule : nil,
+                            pin: pin
                         )
                         dismiss()
                     }
-                    .disabled(recipientName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(recipientName.trimmingCharacters(in: .whitespaces).isEmpty || (recipientType == .counselor && pinCode.count >= 1 && pinCode.count < 4))
                     .fontWeight(.bold)
                 }
             }
@@ -430,16 +490,28 @@ struct RecipientDepthSettingsView: View {
                     
                     // MARK: - 즉시 공유 버튼 (가족)
                     Section {
-                        Button(action: { showExportView = true }) {
+                        Button(action: {
+                            bridgeManager.shareToRecipient(recipient) { success, error in
+                                if success {
+                                    showExportView = false
+                                }
+                            }
+                        }) {
                             HStack {
-                                Image(systemName: "square.and.arrow.up")
-                                Text("지금 바로 공유하기")
+                                if bridgeManager.isSharing {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Image(systemName: "paperplane.fill")
+                                }
+                                Text(bridgeManager.isSharing ? "공유 중..." : "지금 바로 서버에 공유")
                                     .fontWeight(.bold)
                             }
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 8)
                         }
+                        .disabled(bridgeManager.isSharing)
                         .listRowBackground(
                             LinearGradient(
                                 colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],

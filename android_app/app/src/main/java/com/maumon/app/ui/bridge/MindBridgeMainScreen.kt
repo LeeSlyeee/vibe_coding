@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,6 +21,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +47,13 @@ fun MindBridgeMainScreen(onDismiss: () -> Unit) {
     var showAddRecipient by remember { mutableStateOf(false) }
     var selectedRecipient by remember { mutableStateOf<BridgeRecipient?>(null) }
     var showShareHistory by remember { mutableStateOf(false) }
+
+    // 공유 실행 상태
+    var shareTargetRecipient by remember { mutableStateOf<BridgeRecipient?>(null) }
+    var showShareConfirm by remember { mutableStateOf(false) }
+    var shareResultMessage by remember { mutableStateOf("") }
+    var showShareResult by remember { mutableStateOf(false) }
+    val isSharing by bridgeManager.isSharing.collectAsState()
 
     val familyRecipients = recipients.filter { it.type == RecipientType.FAMILY }
     val counselorRecipients = recipients.filter { it.type == RecipientType.COUNSELOR }
@@ -97,7 +107,11 @@ fun MindBridgeMainScreen(onDismiss: () -> Unit) {
                 type = RecipientType.FAMILY,
                 recipients = familyRecipients,
                 onAdd = { showAddRecipient = true },
-                onManage = { selectedRecipient = it }
+                onManage = { selectedRecipient = it },
+                onShare = { recipient ->
+                    shareTargetRecipient = recipient
+                    showShareConfirm = true
+                }
             )
 
             // 상담사/의료진 섹션
@@ -106,7 +120,11 @@ fun MindBridgeMainScreen(onDismiss: () -> Unit) {
                 type = RecipientType.COUNSELOR,
                 recipients = counselorRecipients,
                 onAdd = { showAddRecipient = true },
-                onManage = { selectedRecipient = it }
+                onManage = { selectedRecipient = it },
+                onShare = { recipient ->
+                    shareTargetRecipient = recipient
+                    showShareConfirm = true
+                }
             )
 
             // 수신자 추가 버튼
@@ -200,12 +218,61 @@ fun MindBridgeMainScreen(onDismiss: () -> Unit) {
         }
     }
 
+    // 공유 확인 다이얼로그
+    if (showShareConfirm && shareTargetRecipient != null) {
+        val target = shareTargetRecipient!!
+        val depth = bridgeManager.getDepthSettings(target.id)
+        AlertDialog(
+            onDismissRequest = { showShareConfirm = false },
+            title = { Text("지금 공유할까요?") },
+            text = {
+                Text("${target.name}에게 설정된 ${depth.enabledCount}개 항목을 서버로 공유합니다.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showShareConfirm = false
+                        bridgeManager.shareToRecipient(target) { success, error ->
+                            shareResultMessage = if (success) {
+                                "${target.name}에게 공유가 완료되었습니다"
+                            } else {
+                                error ?: "공유에 실패했습니다"
+                            }
+                            showShareResult = true
+                        }
+                    },
+                    enabled = !isSharing
+                ) {
+                    if (isSharing) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                    } else {
+                        Text("공유", fontWeight = FontWeight.Bold, color = BridgePurple)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showShareConfirm = false }) { Text("취소") }
+            }
+        )
+    }
+
+    // 공유 결과 다이얼로그
+    if (showShareResult) {
+        AlertDialog(
+            onDismissRequest = { showShareResult = false },
+            title = { Text(shareResultMessage) },
+            confirmButton = {
+                TextButton(onClick = { showShareResult = false }) { Text("확인") }
+            }
+        )
+    }
+
     // 수신자 추가 다이얼로그
     if (showAddRecipient) {
         AddRecipientDialog(
             onDismiss = { showAddRecipient = false },
-            onAdd = { name, type, schedule ->
-                bridgeManager.addRecipient(name, type, schedule)
+            onAdd = { name, type, schedule, pin ->
+                bridgeManager.addRecipient(name, type, schedule, pin)
                 showAddRecipient = false
             }
         )
@@ -235,7 +302,8 @@ private fun RecipientSection(
     type: RecipientType,
     recipients: List<BridgeRecipient>,
     onAdd: () -> Unit,
-    onManage: (BridgeRecipient) -> Unit
+    onManage: (BridgeRecipient) -> Unit,
+    onShare: (BridgeRecipient) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -336,6 +404,24 @@ private fun RecipientSection(
                             }
                         }
 
+                        // 공유 실행 버튼
+                        IconButton(
+                            onClick = { onShare(recipient) },
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(listOf(BridgePurple, BridgeViolet))
+                                )
+                        ) {
+                            Icon(
+                                Icons.Default.Send,
+                                contentDescription = "공유",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+
                         // 관리 버튼
                         TextButton(
                             onClick = { onManage(recipient) },
@@ -351,11 +437,12 @@ private fun RecipientSection(
 @Composable
 private fun AddRecipientDialog(
     onDismiss: () -> Unit,
-    onAdd: (String, RecipientType, ShareSchedule?) -> Unit
+    onAdd: (String, RecipientType, ShareSchedule?, String?) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var type by remember { mutableStateOf(RecipientType.FAMILY) }
     var schedule by remember { mutableStateOf(ShareSchedule.WEEKLY) }
+    var pinCode by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -398,6 +485,26 @@ private fun AddRecipientDialog(
                     }
                 }
 
+                // Phase 5: 상담사 PIN 보안 설정
+                if (type == RecipientType.COUNSELOR) {
+                    Text("보안 설정", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    OutlinedTextField(
+                        value = pinCode,
+                        onValueChange = { if (it.length <= 6) pinCode = it.filter { c -> c.isDigit() } },
+                        label = { Text("PIN 코드 (4~6자리)") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier.fillMaxWidth(),
+                        supportingText = {
+                            Text(
+                                "상담사가 공유 데이터를 열람할 때 이 PIN을 입력해야 합니다.",
+                                fontSize = 10.sp
+                            )
+                        }
+                    )
+                }
+
                 // 안내
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = BridgeGreen, modifier = Modifier.size(16.dp))
@@ -406,9 +513,11 @@ private fun AddRecipientDialog(
             }
         },
         confirmButton = {
+            val pin: String? = if (type == RecipientType.COUNSELOR && pinCode.length >= 4) pinCode else null
+            val isValid = name.isNotBlank() && !(type == RecipientType.COUNSELOR && pinCode.isNotEmpty() && pinCode.length < 4)
             TextButton(
-                onClick = { onAdd(name, type, if (type == RecipientType.FAMILY) schedule else null) },
-                enabled = name.isNotBlank()
+                onClick = { onAdd(name, type, if (type == RecipientType.FAMILY) schedule else null, pin) },
+                enabled = isValid
             ) { Text("추가", fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
@@ -500,6 +609,50 @@ private fun RecipientDepthSettingsDialog(
                             )
                         }
                     }
+                }
+
+                Divider()
+
+                // 즉시 서버 공유 버튼
+                val isShareLoading by bridgeManager.isSharing.collectAsState()
+                var localShareResult by remember { mutableStateOf<String?>(null) }
+
+                Button(
+                    onClick = {
+                        bridgeManager.shareToRecipient(recipient) { success, error ->
+                            localShareResult = if (success) "공유 완료!" else (error ?: "공유 실패")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isShareLoading && settings.value.enabledCount > 0,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = BridgePurple
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    if (isShareLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("공유 중...", color = Color.White)
+                    } else {
+                        Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("지금 바로 서버에 공유", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                localShareResult?.let { msg ->
+                    Text(
+                        msg,
+                        fontSize = 12.sp,
+                        color = if (msg.contains("완료")) BridgeGreen else Color.Red,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
 
                 Divider()
