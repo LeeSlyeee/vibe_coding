@@ -779,7 +779,6 @@ struct AppSettingsView: View {
             }
             .sheet(isPresented: $showPremiumModal) {
                 MindBridgePaywallView(isPresented: $showPremiumModal)
-                    .screenshotProtected(isProtected: false)
             }
             .sheet(isPresented: $showBirthDatePicker) {
                 BirthDatePickerView(isPresented: $showBirthDatePicker)

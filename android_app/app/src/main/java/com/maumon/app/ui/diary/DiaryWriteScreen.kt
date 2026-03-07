@@ -436,6 +436,80 @@ private fun DiaryFormView(
                 )
             }
 
+            // [Crisis Detection] 위기감지 SOS 다이얼로그
+            if (uiState.showCrisisSOSDialog) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                AlertDialog(
+                    onDismissRequest = { /* 의도적으로 쉽게 닫히지 않음 */ },
+                    icon = { Text("🆘", fontSize = 36.sp) },
+                    title = {
+                        Text(
+                            "당신은 혼자가 아닙니다",
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                    },
+                    text = {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                "지금 힘든 순간도 반드시 지나갑니다.\n전문가의 도움을 받아보세요.",
+                                textAlign = TextAlign.Center,
+                                color = Color.Gray
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // 긴급 연락처 버튼들
+                            Button(
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_DIAL,
+                                        android.net.Uri.parse("tel:1393")
+                                    )
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                            ) {
+                                Text("📞 자살예방 상담전화 1393", fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_DIAL,
+                                        android.net.Uri.parse("tel:15770199")
+                                    )
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🏥 정신건강 상담전화 1577-0199")
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = android.content.Intent(
+                                        android.content.Intent.ACTION_DIAL,
+                                        android.net.Uri.parse("tel:112")
+                                    )
+                                    context.startActivity(intent)
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("👮 경찰청 긴급신고 112")
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            viewModel.dismissCrisisSOSDialog()
+                        }) {
+                            Text("닫기", color = Color.Gray)
+                        }
+                    }
+                )
+            }
+
             // 3. 질문 카드들
             QuestionCard(
                 title = "잠은 잘 주무셨나요?",

@@ -11,6 +11,8 @@ class DeepLinkManager: ObservableObject {
     
     enum DeepLink {
         case weeklyLetter(letterId: Int?)
+        case moodAlert(sharerId: Int?)
+        case kickFlagAlert(sharerId: Int?)
     }
 }
 
@@ -25,19 +27,20 @@ struct MindDiaryApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
+                Color.white.ignoresSafeArea(.all)
+                
                 if showSplash {
                     AppSplashView()
                         .transition(AnyTransition.opacity)
                         .zIndex(1)
                 } else {
                     AppMainTabView()
+                        .deepLinkHandledBody
                         .environmentObject(authManager)
                         .transition(AnyTransition.opacity)
                         .zIndex(0)
                 }
             }
-            .screenshotProtected(isProtected: false) // 스크린샷 방지 적용 (검은 화면 처리)
-            .ignoresSafeArea() // [Fix] 전체 화면 꽉 차게 (스플래시 상하 여백 제거)
             .preferredColorScheme(.light) // Force Light Mode
             .onAppear {
                 // 2. 스플래시 화면 제어 (최소 2초)
@@ -165,13 +168,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         let userInfo = response.notification.request.content.userInfo
         print("📩 알림 탭: \(userInfo)")
         
-        // 딥링크 처리: 주간 편지
-        if let type = userInfo["type"] as? String, type == "weekly_letter" {
-            let letterId = (userInfo["letter_id"] as? String).flatMap { Int($0) }
-            DispatchQueue.main.async {
-                DeepLinkManager.shared.pendingDeepLink = .weeklyLetter(letterId: letterId)
+        if let type = userInfo["type"] as? String {
+            if type == "weekly_letter" {
+                let letterId = (userInfo["letter_id"] as? String).flatMap { Int($0) }
+                DispatchQueue.main.async {
+                    DeepLinkManager.shared.pendingDeepLink = .weeklyLetter(letterId: letterId)
+                }
+                print("📮 딥링크: 주간 편지 열기 (letter_id=\(letterId ?? -1))")
+            } else if type == "mood_alert" {
+                let sharerId = (userInfo["sharer_id"] as? String).flatMap { Int($0) }
+                DispatchQueue.main.async {
+                    DeepLinkManager.shared.pendingDeepLink = .moodAlert(sharerId: sharerId)
+                }
+                print("📮 딥링크: 감정 알림 (sharer_id=\(sharerId ?? -1))")
+            } else if type == "kick_flag_alert" {
+                let sharerId = (userInfo["sharer_id"] as? String).flatMap { Int($0) }
+                DispatchQueue.main.async {
+                    DeepLinkManager.shared.pendingDeepLink = .kickFlagAlert(sharerId: sharerId)
+                }
+                print("📮 딥링크: 킥 플래그 알림 (sharer_id=\(sharerId ?? -1))")
             }
-            print("📮 딥링크: 주간 편지 열기 (letter_id=\(letterId ?? -1))")
         }
         
         completionHandler()

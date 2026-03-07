@@ -322,7 +322,6 @@ struct MoodCalendarView: View {
                         date: target.date,
                         onSave: fetchDiaries
                      )
-                     .screenshotProtected(isProtected: false) // 스크린샷 방지
                 }
                 .sheet(isPresented: $showSettings) {
                     NavigationView {
@@ -332,12 +331,10 @@ struct MoodCalendarView: View {
                                 showSettings = false
                             })
                     }
-                    .screenshotProtected(isProtected: false)
                 }
                 // [Step 4] Nudge → Paywall Sheet
                 .sheet(isPresented: $showPremiumFromNudge) {
                     MindBridgePaywallView(isPresented: $showPremiumFromNudge)
-                        .screenshotProtected(isProtected: false)
                 }
             }
             

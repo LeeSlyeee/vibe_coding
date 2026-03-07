@@ -49,7 +49,7 @@ fun MindBridgePaywallScreen(
 
     val isLoading by subscriptionManager.isLoading.collectAsState()
     val purchaseError by subscriptionManager.purchaseError.collectAsState()
-    val isSubscribed by subscriptionManager.isSubscribed.collectAsState()
+    val isSubscribed by subscriptionManager.instanceIsSubscribed.collectAsState()
 
     // 구독 완료 시 자동 닫기
     LaunchedEffect(isSubscribed) {

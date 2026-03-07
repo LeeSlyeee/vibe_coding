@@ -36,6 +36,7 @@ struct AppStatsView: View {
     // [New] Kick 기능 전체화면 표시
     @State private var showWeeklyLetter = false
     @State private var showRelationalMap = false
+    @State private var targetLetterId: Int? // [DeepLink] Support
     
     // [New] 마음 온도 State
     @State private var moodTemperature: Double = 36.5
@@ -294,8 +295,9 @@ struct AppStatsView: View {
         fetchMoodTemperature()
         
         // 딥링크 체크 (앱이 꺼져있을 때 푸시 터치로 진입한 경우)
-        if case .weeklyLetter = DeepLinkManager.shared.pendingDeepLink {
+        if case .weeklyLetter(let letterId) = DeepLinkManager.shared.pendingDeepLink {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.targetLetterId = letterId
                 showWeeklyLetter = true
                 DeepLinkManager.shared.pendingDeepLink = nil
             }
@@ -304,7 +306,8 @@ struct AppStatsView: View {
     .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
         // 앱이 떠있는 상태에서 푸시 터치 시 즉시 반응
         guard let deepLink = deepLink else { return }
-        if case .weeklyLetter = deepLink {
+        if case .weeklyLetter(let letterId) = deepLink {
+            self.targetLetterId = letterId
             showWeeklyLetter = true
             DeepLinkManager.shared.pendingDeepLink = nil
         }
@@ -331,13 +334,13 @@ struct AppStatsView: View {
                     .navigationBarItems(trailing: Button("닫기") {
                         showSettings = false
                     })
-                    .screenshotProtected(isProtected: false)
             }
         }
         .preferredColorScheme(.light) // ⭐️ 화이트 테마 강제
         .fullScreenCover(isPresented: $showWeeklyLetter) {
             NavigationView {
-                WeeklyLetterView()
+                WeeklyLetterView(targetLetterId: targetLetterId)
+                    .onDisappear { self.targetLetterId = nil } // Reset
                     .navigationBarItems(leading: Button(action: { showWeeklyLetter = false }) {
                         HStack(spacing: 4) {
                             Image(systemName: "chevron.left")

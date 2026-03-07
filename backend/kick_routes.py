@@ -570,6 +570,7 @@ def get_my_weekly_letter_detail(letter_id):
         'content': letter.content,
         'start_date': letter.start_date,
         'end_date': letter.end_date,
+        'is_read': letter.is_read,
         'created_at': letter.created_at.isoformat() if letter.created_at else None
     }), 200
 

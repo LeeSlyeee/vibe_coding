@@ -34,6 +34,9 @@ struct AppDiaryWriteView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
+    // [Crisis Detection] 위기감지 SOS 팝업
+    @State private var showCrisisSOSModal = false
+    
     // Weather & Medication State
     @State private var weatherDesc: String = "맑음"
     @State private var temp: Double = 20.0
@@ -356,7 +359,10 @@ struct AppDiaryWriteView: View {
         // [New] 약물 설정 시트
         .sheet(isPresented: $showingMedSetting, onDismiss: loadMedications) {
             MedicationSettingView()
-                .screenshotProtected(isProtected: false) // 스크린샷 방지
+        }
+        // [Crisis Detection] 일기 작성 중 위기 감지 시 SOS 팝업
+        .sheet(isPresented: $showCrisisSOSModal) {
+            SOSView()
         }
         // 음성 인식 텍스트 반영
         .onChangeCompat(of: voiceRecorder.transcribedText) { newText in
@@ -466,6 +472,20 @@ struct AppDiaryWriteView: View {
     
     // Logic: 저장 (Local + LLM)
     func saveDiary() {
+        // [Crisis Detection] 저장 전 위기 키워드 검사
+        let allText = [q1, q2, q3, q4, qs].joined(separator: " ")
+        let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
+        let crisisLevel2 = ["사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝"]
+        
+        let hasLevel3 = crisisLevel3.contains(where: { allText.contains($0) })
+        let hasLevel2 = crisisLevel2.contains(where: { allText.contains($0) })
+        
+        if hasLevel3 || hasLevel2 {
+            print("🚨 [Crisis] 일기 작성 폼에서 위기 키워드 감지! 저장 중단, SOS 팝업 표시")
+            showCrisisSOSModal = true
+            return // 저장하지 않고 즉시 반환
+        }
+        
         isSaving = true
         
         // [New] 약물 데이터 병합

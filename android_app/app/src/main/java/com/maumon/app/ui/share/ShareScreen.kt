@@ -120,7 +120,9 @@ fun ShareScreen(onBack: () -> Unit = {}) {
                     },
                     onRefresh = {
                         scope.launch { ShareManager.fetchList("sharer") }
-                    }
+                    },
+                    onExport = { showExportScreen = true },
+                    onPaywall = { showPaywallScreen = true }
                 )
             }
         }
@@ -214,7 +216,9 @@ private fun ShareTab(
     myCode: String,
     myGuardians: List<ShareManager.SharedUser>,
     onGenerateCode: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onExport: () -> Unit,
+    onPaywall: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -298,8 +302,8 @@ private fun ShareTab(
         item {
             Spacer(modifier = Modifier.height(24.dp))
             MindBridgeExportCard(
-                onExport = { showExportScreen = true },
-                onPaywall = { showPaywallScreen = true }
+                onExport = onExport,
+                onPaywall = onPaywall
             )
         }
     }

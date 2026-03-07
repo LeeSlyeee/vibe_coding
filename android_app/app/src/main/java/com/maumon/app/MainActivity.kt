@@ -58,9 +58,14 @@ class MainActivity : ComponentActivity() {
         // 방법 2: FCM 시스템 알림 (백그라운드) → data payload의 type 키가 직접 들어옴
         val fcmType = intent.getStringExtra("type")
 
+        val letterId = intent.getStringExtra("letter_id")
+
         val route = when {
-            deepLink == "weekly_letter" -> "weekly_letter"
-            fcmType == "weekly_letter" -> "weekly_letter"
+            deepLink == "weekly_letter" || fcmType == "weekly_letter" -> {
+                if (letterId != null) "weekly_letter?letterId=$letterId" else "weekly_letter"
+            }
+            fcmType == "mood_alert" || deepLink == "mood_alert" -> "share"
+            fcmType == "kick_flag_alert" || deepLink == "kick_flag_alert" -> "share"
             else -> null
         }
 

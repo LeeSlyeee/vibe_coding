@@ -3,9 +3,9 @@ import SwiftUI
 struct WeeklyLetterView: View {
     @State private var letters: [WeeklyLetter] = WeeklyLetterView.demoLetters
     @State private var selectedLetter: WeeklyLetter?
-    @State private var showingDetail = false
     @State private var isLoading = false
     @State private var isUsingDemo = true
+    var targetLetterId: Int? // [Deep Link] Auto-open Support
     
     var body: some View {
         VStack {
@@ -59,8 +59,19 @@ struct WeeklyLetterView: View {
                 if let result = result, !result.isEmpty {
                     self.letters = result
                     self.isUsingDemo = false
+                    
+                    // [Deep Link] Auto-open the specific letter if provided
+                    if let targetId = self.targetLetterId,
+                       let matchingLetter = result.first(where: { $0.id == targetId }) {
+                        self.selectedLetter = matchingLetter
+                    }
+                } else {
+                    // API 실패 시 이미 로드된 데모 데이터 유지
+                    if let targetId = self.targetLetterId,
+                       let matchingLetter = self.letters.first(where: { $0.id == targetId }) {
+                        self.selectedLetter = matchingLetter
+                    }
                 }
-                // API 실패 시 이미 로드된 데모 데이터 유지
             }
         }
     }

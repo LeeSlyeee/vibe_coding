@@ -62,7 +62,10 @@ private val demoLetters = listOf(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WeeklyLetterScreen(onBack: () -> Unit) {
+fun WeeklyLetterScreen(
+    targetLetterId: Int? = null,
+    onBack: () -> Unit
+) {
     var letters by remember { mutableStateOf(demoLetters) }
     var selectedLetter by remember { mutableStateOf<WeeklyLetter?>(null) }
     val scope = rememberCoroutineScope()
@@ -73,9 +76,24 @@ fun WeeklyLetterScreen(onBack: () -> Unit) {
             val response = ApiClient.flaskApi.getMyWeeklyLetters()
             if (response.isSuccessful) {
                 val data = response.body()
-                if (!data.isNullOrEmpty()) letters = data
+                if (!data.isNullOrEmpty()) {
+                    letters = data
+                    
+                    // [DeepLink] Auto-open the specific letter if provided
+                    if (targetLetterId != null) {
+                        selectedLetter = data.find { it.id == targetLetterId }
+                    }
+                }
+            } else if (targetLetterId != null) {
+                // API 실패 시 이미 호딩된 데이터에서 시도 (데모용)
+                selectedLetter = letters.find { it.id == targetLetterId }
             }
-        } catch (_: Exception) { /* 데모 유지 */ }
+        } catch (_: Exception) { 
+            // 데모 유지
+            if (targetLetterId != null) {
+                selectedLetter = letters.find { it.id == targetLetterId }
+            }
+        }
     }
 
     // 상세 보기 다이얼로그

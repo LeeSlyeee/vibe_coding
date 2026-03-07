@@ -11,7 +11,8 @@ class SubscriptionManager: ObservableObject {
     static let mindBridgeProductID = "com.maumon.mindbridge.monthly"
     
     // MARK: - Published State
-    @Published var isSubscribed: Bool = false
+    // ⚠️ [BETA] 베타 기간 무료 사용: 정식 출시 시 false로 원복 필수! (오픈전_필독.md 참고)
+    @Published var isSubscribed: Bool = true
     @Published var product: Product?
     @Published var purchaseError: String?
     @Published var isLoading: Bool = false
@@ -112,6 +113,13 @@ class SubscriptionManager: ObservableObject {
     
     // MARK: - 구독 상태 업데이트
     func updateSubscriptionStatus() async {
+        // ⚠️ [BETA] 베타 기간 무료 사용: 아래 블록 전체를 원복 필수! (오픈전_필독.md 참고)
+        // 베타 기간에는 항상 구독 상태를 true로 유지
+        isSubscribed = true
+        UserDefaults.standard.set(true, forKey: "mindBridge_subscribed")
+        print("📊 [Subscription] 상태 업데이트: 베타 모드 (항상 구독 중)")
+        
+        /* ── 정식 출시 시 아래 코드로 교체 ──
         var hasActiveSubscription = false
         
         for await result in Transaction.currentEntitlements {
@@ -119,12 +127,10 @@ class SubscriptionManager: ObservableObject {
                 let transaction = try checkVerified(result)
                 
                 if transaction.productID == Self.mindBridgeProductID {
-                    // 구독이 취소되지 않았고, 만료되지 않았는지 확인
                     if transaction.revocationDate == nil {
                         hasActiveSubscription = true
                         expirationDate = transaction.expirationDate
                         
-                        // 체험 기간 여부 확인
                         if let offerType = transaction.offerType {
                             isInTrialPeriod = (offerType == .introductory)
                         }
@@ -136,11 +142,9 @@ class SubscriptionManager: ObservableObject {
         }
         
         isSubscribed = hasActiveSubscription
-        
-        // UserDefaults에도 캐싱 (오프라인 대비)
         UserDefaults.standard.set(hasActiveSubscription, forKey: "mindBridge_subscribed")
-        
         print("📊 [Subscription] 상태 업데이트: \(isSubscribed ? "구독 중" : "미구독")")
+        ── 여기까지 교체 ── */
     }
     
     // MARK: - 트랜잭션 리스너

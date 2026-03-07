@@ -183,8 +183,9 @@ def _send_apns_direct(device_token: str, title: str, body: str, data: dict = Non
 def notify_guardians_mood(sharer_user, mood_level: int):
     """
     [트리거 ①] 기분 온도 알림
-    - 일기 저장 시 mood_level ≤ 2이면 보호자에게 알림
+    - 일기 저장 시 모든 mood_level에 대해 보호자에게 알림
     - share_mood=True인 보호자만 대상
+    - mood_level에 따라 메시지 내용이 동적으로 변경됨
     """
     if not _firebase_initialized:
         return
@@ -202,7 +203,14 @@ def notify_guardians_mood(sharer_user, mood_level: int):
             return
 
         sharer_name = sharer_user.nickname or sharer_user.real_name or "사용자"
-        mood_emoji = {1: "😢", 2: "😟", 3: "😐", 4: "🙂", 5: "😊"}.get(mood_level, "😐")
+        messages = {
+            1: f"{sharer_name}님의 오늘 마음 온도가 많이 낮아요. 따뜻한 위로가 필요해 보입니다 😢",
+            2: f"{sharer_name}님의 오늘 마음 온도가 조금 낮아요. 가벼운 안부를 전해보세요 😟",
+            3: f"{sharer_name}님의 오늘 마음 온도는 평온합니다. 오늘도 응원해주세요 😐",
+            4: f"{sharer_name}님의 오늘 마음 온도가 좋아요! 함께 기뻐해주세요 🙂",
+            5: f"{sharer_name}님의 오늘 마음 온도가 아주 높아요! 행복한 하루를 공유해주세요 😊"
+        }
+        body_msg = messages.get(mood_level, f"{sharer_name}님이 일기를 기록했습니다.")
 
         for rel in relationships:
             viewer = User.query.get(rel.viewer_id)
@@ -210,7 +218,7 @@ def notify_guardians_mood(sharer_user, mood_level: int):
                 send_push(
                     fcm_token=viewer.fcm_token,
                     title=f"🌡️ {sharer_name}님의 마음 온도",
-                    body=f"{sharer_name}님의 오늘 마음 온도가 낮습니다 {mood_emoji} 따뜻한 관심을 보내주세요.",
+                    body=body_msg,
                     data={
                         "type": "mood_alert",
                         "sharer_id": str(sharer_user.id),

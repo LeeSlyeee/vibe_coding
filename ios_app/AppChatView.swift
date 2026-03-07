@@ -278,7 +278,6 @@ struct AppChatView: View {
                 .background(Color.white.edgesIgnoringSafeArea(.all))
                 .sheet(isPresented: $showSOSModal) {
                     SOSView()
-                        .screenshotProtected(isProtected: false) // 스크린샷 방지
                 }
                 .sheet(isPresented: $showSettings) {
                     NavigationView {
@@ -288,7 +287,6 @@ struct AppChatView: View {
                                 showSettings = false
                             })
                     }
-                    .screenshotProtected(isProtected: false)
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background

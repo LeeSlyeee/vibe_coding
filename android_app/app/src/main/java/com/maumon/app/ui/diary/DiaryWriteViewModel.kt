@@ -38,6 +38,8 @@ data class DiaryWriteUiState(
     val savedMedications: List<String> = emptyList(),  // 등록된 약 목록
     val takenMedications: Set<String> = emptySet(),    // 오늘 복용한 약
     val showMedSettings: Boolean = false,               // 약물 설정 다이얼로그 표시
+    // [Crisis Detection] 위기감지 SOS 다이얼로그
+    val showCrisisSOSDialog: Boolean = false,
 ) {
     val isEditMode: Boolean get() = editDiaryId != null
     val canSave: Boolean get() = emotionDesc.isNotBlank()
@@ -264,9 +266,28 @@ class DiaryWriteViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // [Crisis Detection] SOS 다이얼로그 닫기
+    fun dismissCrisisSOSDialog() {
+        _uiState.update { it.copy(showCrisisSOSDialog = false) }
+    }
+
     fun saveDiary(dateStr: String) {
         val state = _uiState.value
         if (!state.canSave) return
+
+        // [Crisis Detection] 저장 전 위기 키워드 검사
+        val allText = listOf(state.event, state.emotionDesc, state.emotionMeaning, state.selfTalk, state.sleepDesc)
+            .joinToString(" ")
+        val crisisLevel3 = listOf("죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨")
+        val crisisLevel2 = listOf("사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝")
+
+        val hasLevel3 = crisisLevel3.any { allText.contains(it) }
+        val hasLevel2 = crisisLevel2.any { allText.contains(it) }
+
+        if (hasLevel3 || hasLevel2) {
+            _uiState.update { it.copy(showCrisisSOSDialog = true) }
+            return // 저장하지 않고 즉시 반환
+        }
 
         _uiState.update { it.copy(isSaving = true, errorMessage = null) }
 

@@ -373,65 +373,12 @@ class ExportViewModel: ObservableObject {
         // APIService를 통해 최근 7일 데이터 조회
         let api = APIService.shared
         
-        api.fetchDiaryList { [weak self] result in
+        api.fetchDiaries { [weak self] diaries in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
-                switch result {
-                case .success(let diaries):
-                    let sortedDiaries = diaries.sorted { ($0["date"] as? String ?? "") > ($1["date"] as? String ?? "") }
-                    
-                    // 오늘 일기
-                    if let latest = sortedDiaries.first {
-                        self.todayEmoji = (latest["emoji"] as? String) ?? "😊"
-                        self.todayMoodLabel = (latest["mood_label"] as? String) ?? "보통"
-                        
-                        // score 처리 (Int 또는 Double)
-                        if let score = latest["score"] as? Int {
-                            self.moodScore = score
-                        } else if let score = latest["score"] as? Double {
-                            self.moodScore = Int(score)
-                        }
-                        
-                        // AI 분석 요약
-                        if let aiResult = latest["ai_analysis"] as? [String: Any],
-                           let comment = aiResult["comment"] as? String {
-                            self.aiSummary = comment
-                        } else if let comment = latest["ai_comment"] as? String {
-                            self.aiSummary = comment
-                        } else {
-                            self.aiSummary = "아직 AI 분석 결과가 없습니다."
-                        }
-                    }
-                    
-                    // 주간 데이터
-                    let dayFormatter = DateFormatter()
-                    dayFormatter.dateFormat = "yyyy-MM-dd"
-                    let shortFormatter = DateFormatter()
-                    shortFormatter.locale = Locale(identifier: "ko_KR")
-                    shortFormatter.dateFormat = "E"
-                    
-                    let calendar = Calendar.current
-                    var weekData: [WeeklyMood] = []
-                    
-                    for i in (0..<7).reversed() {
-                        let date = calendar.date(byAdding: .day, value: -i, to: Date())!
-                        let dateStr = dayFormatter.string(from: date)
-                        let dayLabel = shortFormatter.string(from: date)
-                        
-                        if let diary = sortedDiaries.first(where: { ($0["date"] as? String)?.prefix(10) == dateStr.prefix(10) }) {
-                            var score = 50
-                            if let s = diary["score"] as? Int { score = s }
-                            else if let s = diary["score"] as? Double { score = Int(s) }
-                            weekData.append(WeeklyMood(day: dayLabel, score: score))
-                        } else {
-                            weekData.append(WeeklyMood(day: dayLabel, score: 0))
-                        }
-                    }
-                    self.weeklyMoods = weekData
-                    
-                case .failure(let error):
-                    print("❌ [Export] 일기 데이터 로드 실패: \(error)")
+                guard let diaries = diaries, !diaries.isEmpty else {
+                    print("❌ [Export] 일기 데이터 로드 실패 또는 비어있음")
                     self.aiSummary = "데이터를 불러올 수 없습니다."
                     // 빈 주간 데이터
                     let shortFormatter = DateFormatter()
@@ -441,7 +388,59 @@ class ExportViewModel: ObservableObject {
                         let date = Calendar.current.date(byAdding: .day, value: -i, to: Date())!
                         return WeeklyMood(day: shortFormatter.string(from: date), score: 0)
                     }
+                    return
                 }
+                
+                let sortedDiaries = diaries.sorted { ($0["date"] as? String ?? "") > ($1["date"] as? String ?? "") }
+                
+                // 오늘 일기
+                if let latest = sortedDiaries.first {
+                    self.todayEmoji = (latest["emoji"] as? String) ?? "😊"
+                    self.todayMoodLabel = (latest["mood_label"] as? String) ?? "보통"
+                    
+                    // score 처리 (Int 또는 Double)
+                    if let score = latest["score"] as? Int {
+                        self.moodScore = score
+                    } else if let score = latest["score"] as? Double {
+                        self.moodScore = Int(score)
+                    }
+                    
+                    // AI 분석 요약
+                    if let aiResult = latest["ai_analysis"] as? [String: Any],
+                       let comment = aiResult["comment"] as? String {
+                        self.aiSummary = comment
+                    } else if let comment = latest["ai_comment"] as? String {
+                        self.aiSummary = comment
+                    } else {
+                        self.aiSummary = "아직 AI 분석 결과가 없습니다."
+                    }
+                }
+                
+                // 주간 데이터
+                let dayFormatter = DateFormatter()
+                dayFormatter.dateFormat = "yyyy-MM-dd"
+                let shortFormatter = DateFormatter()
+                shortFormatter.locale = Locale(identifier: "ko_KR")
+                shortFormatter.dateFormat = "E"
+                
+                let calendar = Calendar.current
+                var weekData: [WeeklyMood] = []
+                
+                for i in (0..<7).reversed() {
+                    let date = calendar.date(byAdding: .day, value: -i, to: Date())!
+                    let dateStr = dayFormatter.string(from: date)
+                    let dayLabel = shortFormatter.string(from: date)
+                    
+                    if let diary = sortedDiaries.first(where: { ($0["date"] as? String)?.prefix(10) == dateStr.prefix(10) }) {
+                        var score = 50
+                        if let s = diary["score"] as? Int { score = s }
+                        else if let s = diary["score"] as? Double { score = Int(s) }
+                        weekData.append(WeeklyMood(day: dayLabel, score: score))
+                    } else {
+                        weekData.append(WeeklyMood(day: dayLabel, score: 0))
+                    }
+                }
+                self.weeklyMoods = weekData
             }
         }
     }

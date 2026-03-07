@@ -16,6 +16,28 @@ struct WeeklyLetter: Codable, Identifiable {
         case isRead = "is_read"
         case createdAt = "created_at"
     }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(Int.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        content = try container.decodeIfPresent(String.self, forKey: .content)
+        startDate = try container.decodeIfPresent(String.self, forKey: .startDate)
+        endDate = try container.decodeIfPresent(String.self, forKey: .endDate)
+        isRead = try container.decodeIfPresent(Bool.self, forKey: .isRead) ?? true
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+    }
+    
+    // 데모 데이터용 직접 초기화
+    init(id: Int, title: String, content: String?, startDate: String?, endDate: String?, isRead: Bool, createdAt: String?) {
+        self.id = id
+        self.title = title
+        self.content = content
+        self.startDate = startDate
+        self.endDate = endDate
+        self.isRead = isRead
+        self.createdAt = createdAt
+    }
 }
 
 // Relational Map node structure

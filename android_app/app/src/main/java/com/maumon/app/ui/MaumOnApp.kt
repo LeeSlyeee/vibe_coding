@@ -147,8 +147,18 @@ fun MaumOnApp() {
             }
 
             // Kick: 주간 편지
-            composable("weekly_letter") {
+            composable(
+                route = "weekly_letter?letterId={letterId}",
+                arguments = listOf(navArgument("letterId") { 
+                    type = NavType.StringType
+                    nullable = true
+                })
+            ) { backStackEntry ->
+                val letterIdStr = backStackEntry.arguments?.getString("letterId")
+                val targetLetterId = letterIdStr?.toIntOrNull()
+                
                 WeeklyLetterScreen(
+                    targetLetterId = targetLetterId,
                     onBack = { navController.popBackStack() }
                 )
             }
@@ -156,6 +166,13 @@ fun MaumOnApp() {
             // Kick: 마음 별자리
             composable("relational_map") {
                 RelationalMapScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // 보호자 연동 (Deep Link 용)
+            composable("share") {
+                com.maumon.app.ui.share.ShareScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

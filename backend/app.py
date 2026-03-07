@@ -440,8 +440,8 @@ def create_diary():
         if is_push_available():
             mood = data.get('mood_level', 3)
             safety = data.get('safety_flag', False)
-            # ① 기분 온도 낮음 알림 (mood ≤ 2)
-            if mood and int(mood) <= 2:
+            # ① 기분 온도 알림 (모든 기분에 대해 발송)
+            if mood:
                 notify_guardians_mood(user, int(mood))
             # ② 위기 감지 알림 (safety_flag=True)
             if safety in [True, 'need_help', 'danger']:

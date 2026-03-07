@@ -239,7 +239,6 @@ struct AppMainTabView: View {
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
-                    .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
             #else
             .sheet(isPresented: $showAssessment) {
@@ -247,7 +246,6 @@ struct AppMainTabView: View {
                     .onDisappear {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
-                    .screenshotProtected(isProtected: false) // 스크린샷 방지
             }
             #endif
             .onAppear {
@@ -427,40 +425,36 @@ struct AppMainTabView: View {
         }
     }
     
+    // [New] Profile Image Cache
+    private var profileImageCache: [String: UIImage] = [:]
+    
+    // [DeepLink] Share Screen State
+    @State private var showShareScreenFromDeepLink = false
+    
+    init() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .white
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+    
+    private func fetchAIStatus() {
+        APIService.shared.fetchDiaries { diaries in
+            DispatchQueue.main.async {
+                if let diaries = diaries, !diaries.isEmpty {
+                    self.showToast = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                        withAnimation { self.showToast = false }
+                    }
+                }
+            }
+        }
+    }
+    
     func checkAssessmentStatus() {
-        // [Hotfix] Disable Automatic PHQ-9 Popup unconditionally based on user feedback.
-        // 사용자가 원할 때만 감정 체크를 수행하도록 UX 변경 예정.
         print("🛑 [App] Automatic Assessment disabled by User Request.")
         return
-        
-        /*
-        // 로그인된 상태에서만 감정 체크 여부를 체크해야 함.
-        guard authManager.isAuthenticated else { return }
-        
-        // [Fix] B2G 연동 유저는 PHQ-9 감정 체크 건너뛰기 (이미 기관 관리 대상임)
-        if B2GManager.shared.isLinked {
-            print("🏥 [App] B2G Linked. Skipping Initial Assessment.")
-            UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
-            return
-        }
-        
-        // [Fix] PHQ-9 팝업 타이밍 조절 (앱 로딩 안정화 대기)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            // 1. Re-check B2G Link Status (Most Critical)
-            if B2GManager.shared.isLinked {
-                print("🏥 [App] B2G Check Passed (Late). Skipping Assessment.")
-                UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
-                return
-            }
-            
-            // 2. Re-check Completion Status
-            let hasDone = UserDefaults.standard.bool(forKey: "hasCompletedAssessment")
-            if !hasDone {
-                 print("📋 [App] Initial Assessment Required. Showing Sheet.")
-                 self.showAssessment = true
-            }
-        }
-        */
     }
     
     func callNumber(_ number: String) {
@@ -470,6 +464,29 @@ struct AppMainTabView: View {
         #elseif os(macOS)
         NSWorkspace.shared.open(url)
         #endif
+    }
+}
+
+// [DeepLink] Modifier for AppMainTabView to keep body clean
+extension AppMainTabView {
+    var deepLinkHandledBody: some View {
+        self.body
+            .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
+                guard let deepLink = deepLink else { return }
+                switch deepLink {
+                case .moodAlert(_), .kickFlagAlert(_):
+                    showShareScreenFromDeepLink = true
+                    DeepLinkManager.shared.pendingDeepLink = nil
+                default:
+                    break
+                }
+            }
+            .fullScreenCover(isPresented: $showShareScreenFromDeepLink) {
+                NavigationView {
+                    MindBridgeShareView(onBack: { showShareScreenFromDeepLink = false })
+                        .navigationBarItems(leading: Button("닫기") { showShareScreenFromDeepLink = false })
+                }
+            }
     }
 }
 
