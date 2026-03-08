@@ -25,7 +25,7 @@ bridge_bp = Blueprint('bridge_bp', __name__, url_prefix='/api/bridge')
 @jwt_required()
 def get_recipients():
     """내 수신자 목록 조회"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3] str→int 캐스팅
     recipients = BridgeRecipient.query.filter_by(user_id=user_id).order_by(BridgeRecipient.created_at.desc()).all()
     return jsonify({
         'status': 'ok',
@@ -39,7 +39,7 @@ def get_recipients():
 @jwt_required()
 def add_recipient():
     """수신자 추가"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3] str→int 캐스팅
     data = request.get_json()
     
     # Whitelist 파라미터 검증
@@ -80,7 +80,7 @@ def add_recipient():
 @jwt_required()
 def update_recipient(recipient_id):
     """수신자 정보 수정 (활성화/비활성화, 스케줄 변경)"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     recipient = BridgeRecipient.query.filter_by(id=recipient_id, user_id=user_id).first()
     
     if not recipient:
@@ -106,7 +106,7 @@ def update_recipient(recipient_id):
 @jwt_required()
 def delete_recipient(recipient_id):
     """수신자 삭제 (관련 공유 데이터도 함께 삭제)"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     recipient = BridgeRecipient.query.filter_by(id=recipient_id, user_id=user_id).first()
     
     if not recipient:
@@ -128,7 +128,7 @@ def delete_recipient(recipient_id):
 @jwt_required()
 def update_depth_settings(recipient_id):
     """수신자별 공유 깊이 설정 변경"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     recipient = BridgeRecipient.query.filter_by(id=recipient_id, user_id=user_id).first()
     
     if not recipient:
@@ -168,7 +168,7 @@ def create_share():
     - 서버에서 Fernet 암호화 후 저장
     - 30일 후 자동 만료
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     data = request.get_json()
     
     recipient_id = data.get('recipient_id')
@@ -222,7 +222,7 @@ def create_share():
 @jwt_required()
 def get_share_history():
     """내 공유 이력 조회 (최근 100건)"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     shares = BridgeShare.query.filter_by(user_id=user_id)\
         .order_by(BridgeShare.created_at.desc())\
         .limit(100)\
@@ -311,7 +311,7 @@ def view_shared_data(share_id):
 @jwt_required()
 def get_view_logs():
     """내 공유 데이터의 열람 로그 조회"""
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     
     # 내 공유 데이터에 대한 열람 로그
     logs = db.session.query(BridgeViewLog)\
@@ -344,7 +344,7 @@ def prepare_share_data(recipient_id):
     수신자의 공유 깊이 설정에 따라 공유할 데이터를 미리 생성
     실제 공유 전 미리보기로 사용
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     recipient = BridgeRecipient.query.filter_by(id=recipient_id, user_id=user_id).first()
     
     if not recipient:
@@ -375,9 +375,10 @@ def prepare_share_data(recipient_id):
     if recipient.depth_mood_status:
         mood_levels = [d.mood_level for d in diaries if d.mood_level is not None]
         avg_mood = sum(mood_levels) / len(mood_levels) if mood_levels else 0
-        if avg_mood >= 7:
+        # [Fix#6] mood_level은 1~5 스케일 (1=매우나쁨, 5=매우좋음)
+        if avg_mood >= 4:
             status = '🟢 안정'
-        elif avg_mood >= 4:
+        elif avg_mood >= 3:
             status = '🟡 보통'
         else:
             status = '🔴 주의'
@@ -477,7 +478,7 @@ def delete_all_bridge_data():
     회원 탈퇴 시 마음 브릿지 데이터 전체 삭제
     수신자, 공유 데이터, 열람 로그 모두 삭제
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix#3]
     
     # 1) 열람 로그 삭제 (FK 순서)
     share_ids = [s.id for s in BridgeShare.query.filter_by(user_id=user_id).all()]
@@ -525,15 +526,16 @@ def _send_view_notification(user_id, viewer_name):
             except Exception as e:
                 print(f"⚠️ [MindBridge] FCM 전송 실패: {e}")
         
-        # APNs 알림 (iOS) — 기존 APNs 유틸리티 사용
-        if user.apns_token:
+        # [Fix#8] APNs 알림 (iOS) — push_service.send_push()로 통합 (push_utils 모듈 존재하지 않음)
+        if user.apns_token and not user.fcm_token:
             try:
-                from push_utils import send_apns_push
-                send_apns_push(
-                    device_token=user.apns_token,
+                from push_service import send_push
+                send_push(
+                    fcm_token='',  # FCM 토큰 없음
                     title=title,
                     body=body,
                     data={'type': 'bridge_view', 'viewer': viewer_name},
+                    apns_token=user.apns_token,
                 )
                 print(f"🍎 [MindBridge] APNs 알림 전송: user={user_id}")
             except Exception as e:

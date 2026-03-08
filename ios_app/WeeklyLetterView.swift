@@ -31,7 +31,6 @@ struct WeeklyLetterView: View {
                             LetterRowView(letter: letter)
                                 .onTapGesture {
                                     self.selectedLetter = letter
-                                    self.showingDetail = true
                                 }
                         }
                     }

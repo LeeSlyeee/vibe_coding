@@ -16,3 +16,6 @@ gunicorn
 flask-sqlalchemy
 psycopg2-binary
 firebase-admin
+pgvector
+sentence-transformers
+tf-keras

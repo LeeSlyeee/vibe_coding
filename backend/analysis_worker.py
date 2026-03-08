@@ -11,11 +11,15 @@ from crypto_utils import EncryptionManager
 
 load_dotenv()
 
-# PG Config
-DB_NAME = "vibe_db"
-DB_USER = "vibe_user"
-DB_PASS = "vibe1234"
-DB_HOST = "127.0.0.1"
+# [Task Version Lock] 동시 수정으로 인한 과거 데이터의 덮어쓰기 현상(Race Condition) 방어 로직
+_active_tasks = {}
+_task_lock = threading.Lock()
+
+# PG Config — [Fix#11] 환경변수 필수, 기본값에서 비밀번호 하드코딩 제거
+DB_NAME = os.environ.get("DB_NAME", "vibe_db")
+DB_USER = os.environ.get("DB_USER", "vibe_user")
+DB_PASS = os.environ.get("DB_PASS", "")  # [Fix#11] 비밀번호 하드코딩 제거 (환경변수 필수)
+DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
 
 
 crypto = EncryptionManager(os.environ.get('ENCRYPTION_KEY'))
@@ -239,12 +243,22 @@ def generate_ai_analysis(content):
         raw = call_llm_hybrid(prompt_text, options=options)
         
         if raw:
+             # Make sure markdown wrappers are stripped
+             clean_raw = raw.strip()
+             if clean_raw.startswith('```'):
+                 clean_raw = re.sub(r'^```(?:json)?\s*|\s*```$', '', clean_raw, flags=re.MULTILINE).strip()
+                 
              # Try parse JSON
              try:
-                 data = json.loads(raw)
+                 data = json.loads(clean_raw)
                  comment = data.get('comment', '')
                  emotion = data.get('emotion', '')
-                 score = data.get('score', 5)
+                 raw_score = data.get('score', 5)
+                 
+                 try:
+                     score = int(raw_score)
+                 except (ValueError, TypeError):
+                     score = 5
 
                  # [Fix] Fallback for empty emotion
                  if not emotion:
@@ -256,11 +270,11 @@ def generate_ai_analysis(content):
                  
                  return comment, emotion, score
              except Exception as e:
-                 print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {raw}")
+                 print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {clean_raw}")
                  # Try to salvage raw text if it looks like a comment
-                 if len(raw) > 10 and "{" not in raw:
-                     return raw, "분석중", 5
-                 return raw, "분석중", 5
+                 if len(clean_raw) > 10 and "{" not in clean_raw:
+                     return clean_raw, "분석중", 5
+                 return clean_raw, "분석중", 5
     except Exception as e:
         print(f"❌ AI Gen Error: {e}")
     return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5
@@ -273,15 +287,66 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk):
+def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk, task_version=None):
     logging.info(f"🧵 [Thread] Starting Analysis for Diary {diary_id}...")
     print(f"🧵 [Thread] Starting Analysis for Diary {diary_id}...")
     
     # 1. Generate Comment & Emotion & Score
     full_text = f"날짜: {date}\n수면: {sleep}\n사건: {event}\n감정: {emotion_desc}\n의미: {emotion_meaning}\n스스로에게: {self_talk}"
-    # Remove None or empty strings from formatting if needed, but simple string interpolation is fine
     
-    comment, emotion, score = generate_ai_analysis(full_text)
+    # [NativeRAG] 과거 기억 검색하여 프롬프트에 주입
+    user_id = None
+    mood_level = 3
+    try:
+        # diary_id로 user_id와 mood_level을 찾아야 함
+        db_url = os.environ.get('DATABASE_URL')
+        if db_url:
+            tmp_conn = psycopg2.connect(db_url)
+        else:
+            tmp_conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST)
+        try:
+            tmp_cur = tmp_conn.cursor()
+            tmp_cur.execute("SELECT user_id, mood_level FROM diaries WHERE id = %s", (diary_id,))
+            row = tmp_cur.fetchone()
+            tmp_cur.close()
+        finally:
+            tmp_conn.close()
+        
+        if row:
+            user_id = row[0]
+            mood_level = row[1] if row[1] is not None else 3
+            
+            # [Fix] RAG 검색 시 event뿐만 아니라 전체 내용을 통합 검색하여 사각지대(Blind Spot) 방지
+            search_query = " ".join(filter(None, [event, emotion_desc, emotion_meaning, self_talk]))
+            if not search_query.strip():
+                search_query = "일기 내용 없음"
+                
+            from memory_manager import recall_memories
+            past_context = recall_memories(user_id, search_query, limit=5, exclude_diary_id=diary_id)
+            if past_context:
+                full_text = f"{past_context}\n\n【오늘의 일기】\n{full_text}"
+                print(f"🧠 [NativeRAG] 유저 {user_id}의 과거 기억 주입 완료")
+    except Exception as mem_err:
+        print(f"⚠️ [NativeRAG] 기억 검색 스킵: {mem_err}")
+    
+    comment = "분석 중 오류가 발생했습니다."
+    emotion = "기타"
+    score = 5
+    
+    try:
+        result = generate_ai_analysis(full_text)
+        if isinstance(result, tuple) and len(result) >= 3:
+            # 안전하게 None 방어
+            comment = str(result[0] or "분석 중 오류가 발생했습니다.")
+            emotion = str(result[1] or "기타")
+            raw_score = result[2]
+            try:
+                score = int(raw_score)
+                score = max(1, min(10, score))
+            except:
+                pass
+    except Exception as ai_err:
+        print(f"❌ [Thread] AI Analysis failed, using fallback: {ai_err}")
     
     # ... (rest is same, but let's include it to be safe or use Context)
     print(f"🤖 AI Result - Score: {score}, Emotion: {emotion}, Comment: {comment[:20]}...")
@@ -298,57 +363,105 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
             conn = psycopg2.connect(db_url)
         else:
             conn = psycopg2.connect(dbname=DB_NAME, user=DB_USER, password=DB_PASS, host=DB_HOST)
-        # conn.autocommit = True # [Fix] Use manual commit for rollback safety
-        cur = conn.cursor()
-        
-        # Ensure score is integer and within range
-        try:
-            score = int(score)
-            score = max(1, min(10, score))
-        except:
-            score = 5
-
-        # [Resilient Update Strategy]
-        # Try 'mood_score' first (Legacy/Current Schema?)
-        try:
-            cur.execute(
-                "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
-                (enc_comment, enc_emotion, score, diary_id)
-            )
-            conn.commit()
-            print(f"✅ [Thread] Database Updated (mood_score)")
-        except Exception as e:
-            conn.rollback()
-            print(f"⚠️ [Thread] 'mood_score' update failed, trying 'mood_intensity': {e}")
             
-            # Try 'mood_intensity' (Models.py Schema)
+        try:
+            cur = conn.cursor()
+            
+            # [Race Condition Prevention] 현재 쓰레드가 가장 최신의 태스크인지 확인
+            if task_version is not None:
+                with _task_lock:
+                    if _active_tasks.get(diary_id) != task_version:
+                        print(f"🚫 [Thread] 일기 {diary_id}에 대해 더 최신 수정(Task)이 감지되었습니다. 이전 AI 분석 덮어쓰기를 중단합니다.")
+                        return
+                    else:
+                        # DB 업데이트가 안전하므로 락 리스트에서 비웁니다
+                        del _active_tasks[diary_id]
+                        
+            # Ensure score is integer and within range
+            try:
+                score = int(score)
+                score = max(1, min(10, score))
+            except (ValueError, TypeError):
+                score = 5
+
+            # [Resilient Update Strategy]
+            affected_rows = 0
             try:
                 cur.execute(
-                    "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_intensity = %s WHERE id = %s", 
+                    "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_score = %s WHERE id = %s", 
                     (enc_comment, enc_emotion, score, diary_id)
                 )
+                affected_rows = cur.rowcount
                 conn.commit()
-                print(f"✅ [Thread] Database Updated (mood_intensity)")
-            except Exception as e2:
+                print(f"✅ [Thread] Database Updated (mood_score)")
+            except Exception as e:
                 conn.rollback()
-                print(f"⚠️ [Thread] 'mood_intensity' update failed, fallback to basic update: {e2}")
+                print(f"⚠️ [Thread] 'mood_score' update failed, trying 'mood_intensity': {e}")
                 
-                # Fallback: Update only AI fields
-                cur.execute(
-                    "UPDATE diaries SET ai_comment = %s, ai_emotion = %s WHERE id = %s", 
-                    (enc_comment, enc_emotion, diary_id)
-                )
-                conn.commit()
-                print(f"✅ [Thread] Database Updated (Basic)")
+                try:
+                    cur.execute(
+                        "UPDATE diaries SET ai_comment = %s, ai_emotion = %s, mood_intensity = %s WHERE id = %s", 
+                        (enc_comment, enc_emotion, score, diary_id)
+                    )
+                    affected_rows = cur.rowcount
+                    conn.commit()
+                    print(f"✅ [Thread] Database Updated (mood_intensity)")
+                except Exception as e2:
+                    conn.rollback()
+                    print(f"⚠️ [Thread] 'mood_intensity' update failed, fallback to basic update: {e2}")
+                    
+                    cur.execute(
+                        "UPDATE diaries SET ai_comment = %s, ai_emotion = %s WHERE id = %s", 
+                        (enc_comment, enc_emotion, diary_id)
+                    )
+                    affected_rows = cur.rowcount
+                    conn.commit()
+                    print(f"✅ [Thread] Database Updated (Basic)")
+            
+            if affected_rows == 0:
+                print(f"🚫 [Thread] 일기 {diary_id}가 이미 삭제되었거나 존재하지 않습니다. RAG 저장을 취소합니다. (Zombie Resurrection 방지)")
+                cur.close()
+                return
+
+            print(f"✅ [Thread] Analysis Complete for Diary {diary_id}")
+            cur.close()
+        finally:
+            conn.close()
         
-        print(f"✅ [Thread] Analysis Complete for Diary {diary_id}")
-        cur.close()
-        conn.close()
+        # [NativeRAG] AI 분석 코멘트까지 포함하여 장기 기억에 저장
+        if user_id is not None:
+            if "오류가 발생" in comment or emotion in ["기타", "대기중"]:
+                print("⚠️ [NativeRAG] Fallback(오류) 응답 발생으로 인해, RAG 저장(기억 오염 방지)을 생략합니다.")
+            else:
+                try:
+                    from memory_manager import store_diary_memory
+                    combined_emotion = f"사용자입력감정:{emotion_desc} / AI진단감정:{emotion}" if emotion_desc else emotion
+                    
+                    # [Fix] RAG 저장 시에도 event뿐만 아니라 모든 사용자 입력 맥락을 보존
+                    integrated_text = " ".join(filter(None, [event, emotion_meaning, self_talk]))
+                    
+                    store_diary_memory(
+                        diary_id=diary_id,
+                        user_id=user_id,
+                        diary_text=integrated_text,
+                        mood_level=mood_level,
+                        emotion_desc=combined_emotion,
+                        ai_comment=comment,
+                        diary_date=date
+                    )
+                except Exception as store_err:
+                    print(f"⚠️ [NativeRAG] 메모리 저장 실패: {store_err}")
+                
     except Exception as e:
         print(f"❌ [Thread] Final DB Update Failed: {e}")
 
 def start_analysis_thread(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk):
-    print(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id}")
-    logging.info(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id}")
-    t = threading.Thread(target=run_analysis_process, args=(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk))
+    # 동일한 일기에 대한 중복/지연 업데이트 방지 체계 (Task Versioning)
+    with _task_lock:
+        task_version = _active_tasks.get(diary_id, 0) + 1
+        _active_tasks[diary_id] = task_version
+
+    print(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id} (v{task_version})")
+    logging.info(f"🧵 [Main] Spawning Analysis Thread for Diary {diary_id} (v{task_version})")
+    t = threading.Thread(target=run_analysis_process, args=(diary_id, date, event, sleep, emotion_desc, emotion_meaning, self_talk, task_version))
     t.start()

@@ -7,12 +7,12 @@ from models import db, User, Diary, ShareCode, ShareRelationship
 
 share_bp = Blueprint('share', __name__)
 
-CODE_LENGTH = 8
+CODE_LENGTH = 6
 CODE_EXPIRY_MINUTES = 10
 
 
 def _generate_unique_code():
-    """암호학적으로 안전한 6자리 영숫자 코드 생성 (중복 방지)"""
+    """암호학적으로 안전한 6자리 영숫자 코드 생성 (중복 방지, CODE_LENGTH 기준)"""
     chars = string.ascii_uppercase + string.digits
     for _ in range(20):  # 최대 20회 시도
         code = ''.join(secrets.choice(chars) for _ in range(CODE_LENGTH))
@@ -171,9 +171,12 @@ def disconnect_share():
     if not target_id:
         return jsonify({"message": "대상 ID가 필요합니다."}), 400
 
-    rel = ShareRelationship.query.filter_by(
-        sharer_id=int(target_id),
-        viewer_id=current_user_id
+    # 내담자(sharer)가 보호자(viewer)를 끊거나, 반대이거나 쌍방향 모두 가능해야 함
+    rel = ShareRelationship.query.filter(
+        db.or_(
+            db.and_(ShareRelationship.sharer_id == int(target_id), ShareRelationship.viewer_id == current_user_id),
+            db.and_(ShareRelationship.sharer_id == current_user_id, ShareRelationship.viewer_id == int(target_id))
+        )
     ).first()
 
     if not rel:
@@ -268,7 +271,133 @@ def get_shared_insights(target_id):
     if share_crisis is None or share_crisis:
         response_data["has_safety_concern"] = has_safety
     
+    # === 문장 형태 감정 요약 보고서 ===
+    share_report = getattr(rel, 'share_report', False)
+    if share_report:
+        narrative = _build_narrative_summary(diaries, sharer, avg_mood, has_safety, share_mood, share_crisis)
+        response_data["narrative_summary"] = narrative
+    else:
+        response_data["narrative_summary"] = ["🔒 내담자의 프라이버시 설정('주간 리포트 공유 비활성화')에 의해 상세 감정 보고서가 블라인드 처리되었습니다."]
+    
     return jsonify(response_data), 200
+
+
+def _build_narrative_summary(diaries, sharer, avg_mood, has_safety, share_mood=True, share_crisis=True):
+    """최근 일기 데이터를 바탕으로 보호자용 문장 형태 감정 보고서를 생성"""
+    name = sharer.nickname or sharer.username if sharer else "내담자"
+    recent = diaries[:7]  # 최근 7개 일기
+    
+    paragraphs = []
+    
+    # 1. 전체 개요 (기분 온도 비공개 설정 시 수치 노출 방지)
+    if share_mood:
+        mood_label = "매우 낮은" if avg_mood <= 1.5 else "낮은" if avg_mood <= 2.5 else "보통 수준의" if avg_mood <= 3.5 else "양호한" if avg_mood <= 4.5 else "좋은"
+        paragraphs.append(f"📋 {name}님은 최근 30일간 총 {len(diaries)}회 일기를 작성했으며, 평균 마음 온도는 {avg_mood}점({mood_label} 상태)입니다.")
+    else:
+        paragraphs.append(f"📋 {name}님은 최근 30일간 총 {len(diaries)}회 일기를 작성했습니다. (마음 온도 수치는 비공개 상태입니다)")
+    
+    # 2. 위기 신호 (위기 신호 비공개 설정 시 노출 방지)
+    if has_safety and share_crisis:
+        paragraphs.append(f"🚨 최근 기록에서 위기 신호가 감지되었습니다. {name}님의 안부를 직접 확인해주시길 권합니다.")
+    
+    # 3. 최근 감정 서술 요약 (감정 키워드 추출)
+    emotions = []
+    for d in recent:
+        try:
+            from crypto_utils import crypto_manager
+            raw = d.emotion_desc or ""
+            # [Fix#10] crypto_manager가 None일 수 있으므로 검증
+            if raw.startswith('gAAAA') and crypto_manager is not None:
+                raw = crypto_manager.decrypt(raw)
+            if raw and len(raw.strip()) > 0 and not raw.startswith('gAAAA'):
+                emotions.append(raw.strip())
+        except Exception:
+            if d.emotion_desc and not d.emotion_desc.startswith('gAAAA'):
+                emotions.append(d.emotion_desc.strip())
+    
+    if emotions:
+        emotion_text = ', '.join(emotions[:3])
+        paragraphs.append(f"💭 최근 표현한 감정: {emotion_text}")
+    
+    # 4. 자기 대화 (내면의 목소리) 요약
+    self_talks = []
+    for d in recent:
+        try:
+            from crypto_utils import crypto_manager
+            raw = d.self_talk or ""
+            # [Fix#10] crypto_manager None 검증
+            if raw.startswith('gAAAA') and crypto_manager is not None:
+                raw = crypto_manager.decrypt(raw)
+            if raw and len(raw.strip()) > 0 and not raw.startswith('gAAAA'):
+                self_talks.append(raw.strip())
+        except Exception:
+            if d.self_talk and not d.self_talk.startswith('gAAAA'):
+                self_talks.append(d.self_talk.strip())
+    
+    if self_talks:
+        paragraphs.append(f"🗣️ 내면의 자기 대화: \"{self_talks[0]}\"")
+    
+    # 5. AI 코멘트 요약
+    ai_comments = []
+    for d in recent:
+        try:
+            from crypto_utils import crypto_manager
+            raw = d.ai_comment or ""
+            # [Fix#10] crypto_manager None 검증
+            if raw.startswith('gAAAA') and crypto_manager is not None:
+                raw = crypto_manager.decrypt(raw)
+            if raw and len(raw.strip()) > 0 and not raw.startswith('gAAAA'):
+                ai_comments.append(raw.strip())
+        except Exception:
+            if d.ai_comment and not d.ai_comment.startswith('gAAAA'):
+                ai_comments.append(d.ai_comment.strip())
+    
+    if ai_comments:
+        # AI 코멘트가 JSON 형태일 수 있으므로 파싱 시도
+        comment_text = ai_comments[0]
+        try:
+            import json
+            # "예)\n{...}" 형태 처리 - { 이전 텍스트 제거
+            json_start = comment_text.find('{')
+            if json_start >= 0:
+                json_str = comment_text[json_start:]
+                parsed = json.loads(json_str)
+                if isinstance(parsed, dict):
+                    # comment 필드 추출
+                    readable = parsed.get('comment', '') or parsed.get('analysis', '') or parsed.get('message', '')
+                    emotion = parsed.get('emotion', '')
+                    if readable:
+                        if emotion:
+                            comment_text = f"감정: {emotion} — {readable}"
+                        else:
+                            comment_text = readable
+        except (json.JSONDecodeError, Exception):
+            pass  # 파싱 실패 시 원본 그대로 사용
+        
+        paragraphs.append(f"🤖 AI 분석 의견: {comment_text}")
+    
+    # 6. 기분 추세 해석 (마음 온도 공유 시에만)
+    if share_mood and len(recent) >= 2:
+        recent_moods = [d.mood_level or 3 for d in recent]
+        first_half = recent_moods[len(recent_moods)//2:]
+        second_half = recent_moods[:len(recent_moods)//2]
+        avg_first = sum(first_half) / max(len(first_half), 1)
+        avg_second = sum(second_half) / max(len(second_half), 1)
+        
+        if avg_second - avg_first >= 1:
+            paragraphs.append("📈 기분 추세: 최근 마음 온도가 호전되고 있는 추세입니다.")
+        elif avg_first - avg_second >= 1:
+            paragraphs.append("📉 기분 추세: 최근 마음 온도가 하락하고 있는 추세입니다. 관심이 필요합니다.")
+        else:
+            paragraphs.append("➡️ 기분 추세: 기분 변동이 비교적 안정적입니다.")
+    
+    # 7. 마무리
+    if avg_mood <= 2:
+        paragraphs.append("💡 지금 따뜻한 한마디와 관심이 큰 힘이 될 수 있습니다.")
+    elif avg_mood <= 3:
+        paragraphs.append("💡 꾸준한 관심과 대화가 도움이 됩니다.")
+    
+    return paragraphs
 
 
 def _calc_streak(diaries):

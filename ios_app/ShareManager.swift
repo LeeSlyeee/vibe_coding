@@ -41,25 +41,32 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     }
     
     struct SharedStats: Codable {
-        let userName: String
-        let riskLevel: Int
-        let latestReport: String
-        let recentMoods: [DailyMood]
-        let lastSync: String
+        let sharerName: String
+        let avgMood: Double?
+        let hasSafetyConcern: Bool?
+        let moodTrend: [DailyMood]
+        let recentStatus: String
+        let totalEntries: Int
+        let writingStreak: Int
+        let moodRestricted: Bool?
+        let narrativeSummary: [String]?
         
         enum CodingKeys: String, CodingKey {
-            case userName = "user_name"
-            case riskLevel = "risk_level"
-            case latestReport = "latest_report"
-            case recentMoods = "recent_moods"
-            case lastSync = "last_sync"
+            case sharerName = "sharer_name"
+            case avgMood = "avg_mood"
+            case hasSafetyConcern = "has_safety_concern"
+            case moodTrend = "mood_trend"
+            case recentStatus = "recent_status"
+            case totalEntries = "total_entries"
+            case writingStreak = "writing_streak"
+            case moodRestricted = "mood_restricted"
+            case narrativeSummary = "narrative_summary"
         }
     }
     
     struct DailyMood: Codable {
         let date: String
         let mood: Int
-        let label: String
     }
     
     private func performShareRequest(endpoint: String, method: String, body: [String: Any]? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
@@ -79,7 +86,10 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             components?.queryItems = items
         }
         
-        guard let url = components?.url else { return }
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: -1)))
+            return
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -221,8 +231,9 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         self.lastErrorMessage = "" // Reset Error
         
         // GET Request with Explicit ID & Role
-        // [Fix] Include username query param for robustness. Remove trailing slash
-        let endpoint = "/share/list?user_id=\(userId)&username=\(username)&role=\(role)"
+        // [Fix] Include username query param for robustness. Use percent encoding for safe URL.
+        let encodedUsername = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
+        let endpoint = "/share/list?user_id=\(userId)&username=\(encodedUsername)&role=\(role)"
         print("🚀 Fetching List: \(endpoint)")
         
         performShareRequest(endpoint: endpoint, method: "GET") { result in
@@ -378,6 +389,55 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         }
         
         return upcomingBirthdays.sorted { $0.dDay < $1.dDay }
+    }
+    
+    // MARK: - Guardian Alert Model
+    struct GuardianAlert: Identifiable, Codable {
+        var id: String { "\(type)_\(sharerId)" }
+        let type: String           // "crisis", "mood_drop", "inactivity"
+        let sharerId: Int
+        let sharerName: String
+        let message: String
+        let severity: String       // "high", "medium", "low"
+        let icon: String
+        let actionGuide: [String]?
+        let avgMood: Double?
+        
+        enum CodingKeys: String, CodingKey {
+            case type
+            case sharerId = "sharer_id"
+            case sharerName = "sharer_name"
+            case message
+            case severity
+            case icon
+            case actionGuide = "action_guide"
+            case avgMood = "avg_mood"
+        }
+    }
+    
+    @Published var guardianAlerts: [GuardianAlert] = []
+    
+    // 8. Fetch Guardian Alerts (보호자 알림 이력 조회)
+    func fetchGuardianAlerts() {
+        performShareRequest(endpoint: "/share/guardian-alerts", method: "GET") { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let json):
+                    if let alertsArray = json["alerts"] as? [[String: Any]] {
+                        do {
+                            let data = try JSONSerialization.data(withJSONObject: alertsArray)
+                            let alerts = try JSONDecoder().decode([GuardianAlert].self, from: data)
+                            self.guardianAlerts = alerts
+                            print("✅ Guardian Alerts: \(alerts.count)건")
+                        } catch {
+                            print("❌ Parse Alerts Failed: \(error)")
+                        }
+                    }
+                case .failure(let err):
+                    print("❌ Fetch Alerts Failed: \(err)")
+                }
+            }
+        }
     }
     
     // 7. Update Share Scope (내담자가 보호자에게 공유할 데이터 범위 설정)

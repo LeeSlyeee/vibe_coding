@@ -20,11 +20,7 @@ class EncryptionManager:
             try:
                 # If already encrypted (starts with gAAAA), return as is (Idempotency)
                 if text.startswith('gAAAA') and len(text) > 20: 
-                    # Try decrypting to verify? No, too expensive.
-                    # Just assume if it looks like Fernet token, it is.
-                    # But user input might start with gAAAA. 
-                    # Better to just encrypt everything. But migration needs care.
-                    pass
+                    return text  # 이미 암호화된 데이터는 재암호화하지 않음
                 return self.fernet.encrypt(text.encode()).decode()
             except Exception as e:
                 print(f"Encryption error: {e}")

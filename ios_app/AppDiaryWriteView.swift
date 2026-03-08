@@ -45,6 +45,9 @@ struct AppDiaryWriteView: View {
     @State private var showingMedSetting = false
     @State private var savedMeds: [String] = []
     
+    // [Crash Recovery]
+    @State private var recoveredDiary: Diary? = nil
+    
     var body: some View {
         NavigationView {
             ZStack {
@@ -336,6 +339,9 @@ struct AppDiaryWriteView: View {
                             self.isMedicationTaken = snapshot.medication ?? false
                         }
                         
+                        // [Fix] 기존 다이어리의 ID, _id, date 등을 보존하기 위해 snapshot 저장
+                        self.recoveredDiary = snapshot
+                        
                         // 복구 알림을 위해 폼 즉시 노출
                         self.showForm = true
                         self.isLoadingInsight = false
@@ -503,7 +509,7 @@ struct AppDiaryWriteView: View {
         }
 
         var newDiary: Diary
-        if let existing = diaryToEdit {
+        if let existing = diaryToEdit ?? recoveredDiary {
             newDiary = existing
         } else {
             newDiary = Diary(
@@ -532,7 +538,6 @@ struct AppDiaryWriteView: View {
         newDiary.emotion_meaning = q3
         newDiary.self_talk = q4
         newDiary.weather = weatherDesc
-        newDiary.medication = finalMedication
         newDiary.medication = finalMedication
         newDiary.medication_desc = finalMedDesc // [New]
         

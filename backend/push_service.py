@@ -69,12 +69,14 @@ def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_tok
         return False
 
     try:
+        # [Fix#4] FCM data payload의 모든 값은 반드시 str이어야 함
+        safe_data = {str(k): str(v) for k, v in (data or {}).items()}
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
                 body=body,
             ),
-            data=data or {},
+            data=safe_data,
             token=fcm_token,
             # Android 전용 설정
             android=messaging.AndroidConfig(
@@ -165,7 +167,7 @@ def _send_apns_direct(device_token: str, title: str, body: str, data: dict = Non
             elif r.status_code == 400 and "BadDeviceToken" in r.text:
                 logger.warning(f"⚠️ APNs {env}: BadDeviceToken, 다음 환경 시도...")
                 continue
-            elif r.status_code == 200 or r.status_code == 410:
+            elif r.status_code == 410:  # Gone: 토큰 만료, 재시도 불필요
                 break
             else:
                 logger.warning(f"⚠️ APNs {env}: {r.status_code} {r.text}")

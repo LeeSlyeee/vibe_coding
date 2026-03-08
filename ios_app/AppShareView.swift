@@ -143,11 +143,15 @@ struct AppShareView: View {
                                 }
                             }
                         }
+                        
+                        // ⚠️ 알림 이력 섹션
+                        guardianAlertsSection
                     }
                     .padding()
                 }
                 .onAppear {
                     shareManager.fetchList()
+                    shareManager.fetchGuardianAlerts()
                 }
                 
             } else {
@@ -439,6 +443,104 @@ struct AppShareView: View {
                 shareReport: shareReport,
                 shareCrisis: shareCrisis
             ) { _ in }
+        }
+    }
+    
+    @ViewBuilder
+    private var guardianAlertsSection: some View {
+        if !shareManager.guardianAlerts.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("⚠️ 알림 이력")
+                        .font(.headline)
+                    Spacer()
+                    Text("\(shareManager.guardianAlerts.count)건")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+                
+                ForEach(shareManager.guardianAlerts) { alert in
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text(alert.icon)
+                                .font(.title2)
+                            VStack(alignment: .leading) {
+                                Text(alert.message)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                Text(alertText(for: alert.severity))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(alertBadgeColor(for: alert.severity))
+                                    .foregroundColor(alertTextColor(for: alert.severity))
+                                    .cornerRadius(6)
+                            }
+                        }
+                        
+                        if let guides = alert.actionGuide, !guides.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("💡 대응 가이드")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                ForEach(guides, id: \.self) { guide in
+                                    Text(guide)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.top, 4)
+                        }
+                    }
+                    .padding()
+                    .background(alertBackgroundColor(for: alert.severity))
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(alertStrokeColor(for: alert.severity), lineWidth: 1)
+                    )
+                }
+            }
+        }
+    }
+
+    private func alertBackgroundColor(for severity: String) -> Color {
+        switch severity {
+        case "high": return Color.red.opacity(0.05)
+        case "medium": return Color.orange.opacity(0.05)
+        default: return Color.blue.opacity(0.05)
+        }
+    }
+    
+    private func alertStrokeColor(for severity: String) -> Color {
+        switch severity {
+        case "high": return Color.red.opacity(0.3)
+        case "medium": return Color.orange.opacity(0.3)
+        default: return Color.blue.opacity(0.3)
+        }
+    }
+
+    private func alertBadgeColor(for severity: String) -> Color {
+        switch severity {
+        case "high": return Color.red.opacity(0.2)
+        case "medium": return Color.orange.opacity(0.2)
+        default: return Color.blue.opacity(0.2)
+        }
+    }
+
+    private func alertTextColor(for severity: String) -> Color {
+        switch severity {
+        case "high": return .red
+        case "medium": return .orange
+        default: return .blue
+        }
+    }
+    
+    private func alertText(for severity: String) -> String {
+        switch severity {
+        case "high": return "긴급"
+        case "medium": return "주의"
+        default: return "참고"
         }
     }
 }

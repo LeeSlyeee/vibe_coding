@@ -1,5 +1,6 @@
 package com.maumon.app.ui.share
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,8 +10,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,97 +37,115 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ShareScreen(onBack: () -> Unit = {}) {
-    var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("연결하기 (보호자)", "공유하기")
-
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-
-    // [Phase 2] Export / Paywall 화면
-    var showExportScreen by remember { mutableStateOf(false) }
-    var showPaywallScreen by remember { mutableStateOf(false) }
 
     val connectedUsers by ShareManager.connectedUsers.collectAsState()
     val myGuardians by ShareManager.myGuardians.collectAsState()
     val myCode by ShareManager.myCode.collectAsState()
+    val guardianAlerts by ShareManager.guardianAlerts.collectAsState()
     val isLoading by ShareManager.isLoading.collectAsState()
+    val errorMessage by ShareManager.errorMessage.collectAsState()
 
+    var selectedTab by remember { mutableIntStateOf(0) }
+    var showExportView by remember { mutableStateOf(false) }
+    var selectedUserForStats by remember { mutableStateOf<ShareManager.SharedUser?>(null) }
+
+    // 초기 데이터 로드
     LaunchedEffect(Unit) {
         ShareManager.fetchList("viewer")
         ShareManager.fetchList("sharer")
+        ShareManager.fetchGuardianAlerts()
+        ShareManager.generateCode(context)
     }
 
-    // [Phase 2] Export 전체 화면
-    if (showExportScreen) {
-        MindBridgeExportScreen(onDismiss = { showExportScreen = false })
-        return
-    }
-    // [Phase 2] Paywall 전체 화면
-    if (showPaywallScreen) {
-        MindBridgePaywallScreen(onDismiss = { showPaywallScreen = false })
+    if (showExportView) {
+        MindBridgeExportScreen(
+            onDismiss = { showExportView = false }
+        )
         return
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("보호자/친구 연결", fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, "뒤로")
-                    }
-                }
+    if (selectedUserForStats != null) {
+        SharedStatsScreen(
+            targetId = selectedUserForStats!!.id,
+            targetName = selectedUserForStats!!.name,
+            onBack = { selectedUserForStats = null }
+        )
+        return
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Box(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기")
+            }
+            Text("공유 관리", fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Center))
+        }
+
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = MaterialTheme.colorScheme.surface,
+            indicator = { tabPositions ->
+                TabRowDefaults.Indicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = Primary
+                )
+            }
+        ) {
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                Text("연결하기 (보호자)", modifier = Modifier.padding(16.dp),
+                     color = if (selectedTab == 0) Primary else Color.Gray, fontWeight = FontWeight.Bold)
+            }
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                Text("공유하기", modifier = Modifier.padding(16.dp),
+                     color = if (selectedTab == 1) Primary else Color.Gray, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (errorMessage.isNotEmpty()) {
+            Text(
+                text = errorMessage,
+                color = Color.Red,
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                textAlign = TextAlign.Center
             )
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            TabRow(
-                selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surface
-            ) {
-                tabs.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = {
-                            Text(
-                                title,
-                                fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 14.sp
-                            )
-                        }
-                    )
-                }
-            }
 
-            when (selectedTab) {
-                0 -> ConnectTab(
-                    connectedUsers = connectedUsers,
-                    isLoading = isLoading,
-                    onConnect = { code ->
-                        scope.launch { ShareManager.connectWithCode(code) }
-                    },
-                    onRefresh = {
-                        scope.launch { ShareManager.fetchList("viewer") }
+        when (selectedTab) {
+            0 -> ConnectTab(
+                connectedUsers = connectedUsers,
+                guardianAlerts = guardianAlerts,
+                isLoading = isLoading,
+                onConnect = { code ->
+                    scope.launch {
+                        val (success, msg) = ShareManager.connectWithCode(code)
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                     }
-                )
-                1 -> ShareTab(
-                    myCode = myCode,
-                    myGuardians = myGuardians,
-                    onGenerateCode = {
-                        scope.launch { ShareManager.generateCode(context) }
-                    },
-                    onRefresh = {
-                        scope.launch { ShareManager.fetchList("sharer") }
-                    },
-                    onExport = { showExportScreen = true },
-                    onPaywall = { showPaywallScreen = true }
-                )
-            }
+                },
+                onRefresh = {
+                    scope.launch {
+                        ShareManager.fetchList("viewer")
+                        ShareManager.fetchGuardianAlerts()
+                    }
+                },
+                onUserClick = { user -> selectedUserForStats = user }
+            )
+            1 -> ShareTab(
+                myCode = myCode,
+                myGuardians = myGuardians,
+                onGenerateCode = {
+                    scope.launch { ShareManager.generateCode(context) }
+                },
+                onRefresh = {
+                    scope.launch { ShareManager.fetchList("sharer") }
+                },
+                onExport = { showExportView = true },
+                onPaywall = {
+                    Toast.makeText(context, "프리미엄 기능입니다.", Toast.LENGTH_SHORT).show()
+                },
+                onUserClick = { user -> selectedUserForStats = user }
+            )
         }
     }
 }
@@ -132,9 +153,11 @@ fun ShareScreen(onBack: () -> Unit = {}) {
 @Composable
 private fun ConnectTab(
     connectedUsers: List<ShareManager.SharedUser>,
+    guardianAlerts: List<ShareManager.GuardianAlert>,
     isLoading: Boolean,
     onConnect: (String) -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onUserClick: (ShareManager.SharedUser) -> Unit
 ) {
     var inputCode by remember { mutableStateOf("") }
 
@@ -206,7 +229,86 @@ private fun ConnectTab(
                 )
             }
         } else {
-            items(connectedUsers) { user -> UserCard(user = user) }
+            items(connectedUsers) { user -> UserCard(user = user, onClick = { onUserClick(user) }) }
+        }
+
+        // ⚠️ 알림 이력 섹션
+        if (guardianAlerts.isNotEmpty()) {
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("⚠️ 알림 이력", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text("${guardianAlerts.size}건", color = Color.Gray, fontSize = 12.sp)
+                }
+            }
+
+            items(guardianAlerts) { alert ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = when(alert.severity) {
+                            "high" -> Color.Red.copy(alpha = 0.05f)
+                            "medium" -> Color(0xFFFFA500).copy(alpha = 0.05f)
+                            else -> Color.Blue.copy(alpha = 0.05f)
+                        }
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = when(alert.severity) {
+                            "high" -> Color.Red.copy(alpha = 0.3f)
+                            "medium" -> Color(0xFFFFA500).copy(alpha = 0.3f)
+                            else -> Color.Blue.copy(alpha = 0.3f)
+                        }
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Text(alert.icon, fontSize = 24.sp, modifier = Modifier.padding(end = 12.dp))
+                            Column {
+                                Text(alert.message, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color = when(alert.severity) {
+                                                "high" -> Color.Red.copy(alpha = 0.2f)
+                                                "medium" -> Color(0xFFFFA500).copy(alpha = 0.2f)
+                                                else -> Color.Blue.copy(alpha = 0.2f)
+                                            },
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = when(alert.severity) {
+                                            "high" -> "긴급"
+                                            "medium" -> "주의"
+                                            else -> "참고"
+                                        },
+                                        fontSize = 10.sp,
+                                        color = when(alert.severity) {
+                                            "high" -> Color.Red
+                                            "medium" -> Color(0xFFFFA500)
+                                            else -> Color.Blue
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!alert.actionGuide.isNullOrEmpty()) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text("💡 대응 가이드", fontSize = 12.sp, color = Color.Gray, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            alert.actionGuide.forEach { guide ->
+                                Text(guide, fontSize = 12.sp, color = Color.Gray, lineHeight = 16.sp)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -218,7 +320,8 @@ private fun ShareTab(
     onGenerateCode: () -> Unit,
     onRefresh: () -> Unit,
     onExport: () -> Unit,
-    onPaywall: () -> Unit
+    onPaywall: () -> Unit,
+    onUserClick: (ShareManager.SharedUser) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -289,7 +392,7 @@ private fun ShareTab(
                     modifier = Modifier.fillMaxWidth().padding(16.dp))
             }
         } else {
-            items(myGuardians) { user -> UserCard(user = user) }
+            items(myGuardians) { user -> UserCard(user = user, onClick = { onUserClick(user) }) }
             
             // [P1-수정4] 보호자 알림 공유 범위 설정
             item {
@@ -310,8 +413,9 @@ private fun ShareTab(
 }
 
 @Composable
-private fun UserCard(user: ShareManager.SharedUser) {
+private fun UserCard(user: ShareManager.SharedUser, onClick: () -> Unit = {}) {
     Card(
+        modifier = Modifier.fillMaxWidth().clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(1.dp)

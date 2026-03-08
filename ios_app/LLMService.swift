@@ -967,7 +967,25 @@ class LLMService: ObservableObject {
     // Stage 3: 키워드 기반 공감 (getEmergencyEmpathy)
     // Stage 4: 최종 기본값
     private func parseUnifiedResponse(_ raw: String, originalText: String) -> (String, String, String) {
-        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 마크다운 코드블록, **예시 답변** 등의 잔여물 제거
+        var clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // ```json ... ``` 코드블록 제거
+        if let jsonBlockRange = clean.range(of: "```json", options: .caseInsensitive) {
+            let afterBlock = String(clean[jsonBlockRange.upperBound...])
+            if let endBlock = afterBlock.range(of: "```") {
+                let jsonContent = String(afterBlock[..<endBlock.lowerBound])
+                clean = jsonContent.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        // ``` 만 있는 경우도 제거
+        clean = clean.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        // **예시 답변** 같은 프리픽스 제거
+        if let starRange = clean.range(of: "**예시 답변**") {
+            clean = String(clean[starRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let starRange = clean.range(of: "**답변**") {
+            clean = String(clean[starRange.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         
         var emotion = ""
         var advice = ""
@@ -1003,6 +1021,42 @@ class LLMService: ObservableObject {
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty && !$0.hasPrefix("[") }
                 analysis = analysisLines.joined(separator: "\n")
+            }
+        }
+        
+        // === Stage 1.5: JSON 응답 파싱 (LLM이 JSON으로 답한 경우) ===
+        if emotion.isEmpty && advice.isEmpty && analysis.isEmpty {
+            // JSON 객체 감지 (중괄호로 시작)
+            if clean.hasPrefix("{") || clean.contains("\"emotion\"") || clean.contains("\"comment\"") {
+                print("📋 [Parser] Stage 1.5: JSON format detected.")
+                if let jsonData = clean.data(using: .utf8) {
+                    do {
+                        if let jsonObj = try JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                            // emotion 필드 추출
+                            if let emo = jsonObj["emotion"] as? String, !emo.isEmpty {
+                                // score가 있으면 퍼센트 형식으로 변환
+                                if let score = jsonObj["score"] as? Int {
+                                    let confidence = min(score * 10, 100)
+                                    emotion = "\(emo) (\(confidence)%)"
+                                } else if let score = jsonObj["confidence"] as? Int {
+                                    emotion = "\(emo) (\(score)%)"
+                                } else {
+                                    emotion = emo
+                                }
+                            }
+                            // comment 필드 → advice로 사용
+                            if let comment = jsonObj["comment"] as? String, !comment.isEmpty {
+                                advice = comment
+                            }
+                            // analysis 필드가 있으면 사용
+                            if let analysisField = jsonObj["analysis"] as? String, !analysisField.isEmpty {
+                                analysis = analysisField
+                            }
+                        }
+                    } catch {
+                        print("📋 [Parser] Stage 1.5: JSON parsing failed: \(error). Continuing to Stage 2.")
+                    }
+                }
             }
         }
         

@@ -39,7 +39,7 @@ def get_my_kick_insights():
     온디바이스 AI가 대화 시 context로 사용.
     의료진 권한 불필요 — 본인 데이터만 반환.
     """
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
 
     insights = []
 
@@ -140,7 +140,7 @@ def get_dashboard_overview():
     의료진 대시보드용 킥 전체 Phase 통합 요약.
     Phase 1(시계열) + Phase 2(언어) + Phase 3(관계)의 플래그를 한 번에 조회.
     """
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -299,7 +299,7 @@ def _require_staff(current_user_id):
 @jwt_required()
 def get_user_timeseries(user_id):
     """특정 사용자의 시계열 분석 결과 조회 (의료진 전용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -319,7 +319,7 @@ def get_user_timeseries(user_id):
 @jwt_required()
 def get_all_flags():
     """전체 사용자 중 플래그 발생자 목록 조회 (의료진 대시보드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -333,7 +333,7 @@ def get_all_flags():
 @jwt_required()
 def get_flags_summary():
     """플래그 요약 통계 (대시보드 상단 카드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -371,7 +371,7 @@ def get_flags_summary():
 @jwt_required()
 def get_user_linguistic(user_id):
     """특정 사용자의 언어 지문 분석 결과 조회 (의료진 전용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -394,7 +394,7 @@ def get_user_linguistic(user_id):
 @jwt_required()
 def get_linguistic_flags():
     """전체 사용자 중 언어 지문 플래그 발생자 목록 (의료진 대시보드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -411,7 +411,7 @@ def get_linguistic_flags():
 @jwt_required()
 def get_linguistic_summary():
     """언어 지문 플래그 요약 통계 (대시보드 상단 카드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -451,7 +451,7 @@ def get_linguistic_summary():
 @jwt_required()
 def get_user_relational(user_id):
     """특정 사용자의 관계 지형도 분석 결과 조회 (의료진 전용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -474,7 +474,7 @@ def get_user_relational(user_id):
 @jwt_required()
 def get_relational_flags():
     """전체 사용자 중 관계 지형도 플래그 발생자 목록 (의료진 대시보드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403
@@ -491,7 +491,7 @@ def get_relational_flags():
 @jwt_required()
 def get_relational_summary():
     """관계 지형도 플래그 요약 통계 (대시보드 상단 카드용)"""
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())  # [Fix] Gemini 버그 헌팅: int 캐스팅 누락
     staff = _require_staff(current_user_id)
     if not staff:
         return jsonify({'error': '의료진 권한이 필요합니다'}), 403

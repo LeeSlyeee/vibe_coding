@@ -16,93 +16,149 @@ struct SharedStatsView: View {
                     ProgressView("데이터 동기화 중...")
                         .padding(.top, 50)
                 } else if let stats = shareManager.currentSharedStats {
-                    // 1. Sync Time
-                    HStack {
-                        Spacer()
-                        Text("마지막 업데이트: \(formatDate(stats.lastSync))")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+                    // 1. 요약 정보
+                    HStack(spacing: 15) {
+                        VStack {
+                            Text("총 기록일")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text("\(stats.totalEntries)일")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        }
+                        
+                        Divider().frame(height: 40)
+                        
+                        VStack {
+                            Text("연속 기록")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text("\(stats.writingStreak)일")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                        }
+                        
+                        Divider().frame(height: 40)
+                        
+                        VStack {
+                            Text("현재 상태")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                            Text(stats.recentStatus)
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                        }
+                        .layoutPriority(1)
                     }
+                    .padding()
+                    .frame(maxWidth: .infinity)
+                    .background(Color(.systemBackground))
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
                     .padding(.horizontal)
                     
                     // 2. Chart
-                    VStack(alignment: .leading) {
-                        Text("📊 최근 7일 기분 흐름")
-                            .font(.headline)
-                        
-                        Chart {
-                            ForEach(stats.recentMoods.reversed(), id: \.date) { item in
-                                LineMark(
-                                    x: .value("날짜", formatShortDate(item.date)),
-                                    y: .value("기분", item.mood)
-                                )
-                                .interpolationMethod(.catmullRom)
-                                .symbol(Circle())
-                                .foregroundStyle(Color.blue)
-                                
-                                AreaMark(
-                                    x: .value("날짜", formatShortDate(item.date)),
-                                    y: .value("기분", item.mood)
-                                )
-                                .interpolationMethod(.catmullRom)
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.blue.opacity(0.3), .clear],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                            }
+                    if let moodRestricted = stats.moodRestricted, moodRestricted {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("🔒 감정 통계 비공개")
+                                .font(.headline)
+                            Text("내담자가 마음 온도 통계를 비공개로 설정했습니다.")
+                                .font(.caption)
+                                .foregroundColor(.gray)
                         }
-                        .frame(height: 200)
-                        .chartYScale(domain: 0...6)
-                        .chartYAxis {
-                            AxisMarks(values: [1, 2, 3, 4, 5]) { value in
-                                AxisValueLabel {
-                                    if let intVal = value.as(Int.self) {
-                                        Text(moodEmoji(intVal))
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
+                    } else if !stats.moodTrend.isEmpty {
+                        VStack(alignment: .leading) {
+                            HStack {
+                                Text("📊 최근 7일 기분 흐름")
+                                    .font(.headline)
+                                Spacer()
+                                if let avgInt = stats.avgMood {
+                                    Text("평균 \(String(format: "%.1f", avgInt))도")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                            }
+                            
+                            Chart {
+                                ForEach(stats.moodTrend.reversed(), id: \.date) { item in
+                                    LineMark(
+                                        x: .value("날짜", formatShortDate(item.date)),
+                                        y: .value("기분", item.mood)
+                                    )
+                                    .interpolationMethod(.catmullRom)
+                                    .symbol(Circle())
+                                    .foregroundStyle(Color.blue)
+                                    
+                                    AreaMark(
+                                        x: .value("날짜", formatShortDate(item.date)),
+                                        y: .value("기분", item.mood)
+                                    )
+                                    .interpolationMethod(.catmullRom)
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.3), .clear],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                }
+                            }
+                            .frame(height: 200)
+                            .chartYScale(domain: 0...6)
+                            .chartYAxis {
+                                AxisMarks(values: [1, 2, 3, 4, 5]) { value in
+                                    AxisValueLabel {
+                                        if let intVal = value.as(Int.self) {
+                                            Text(moodEmoji(intVal))
+                                        }
                                     }
                                 }
                             }
                         }
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-                    .padding(.horizontal)
                     
-                    // 3. AI Report
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("💌 최근 AI 리포트")
-                            .font(.headline)
-                        
-                        if stats.latestReport.isEmpty || stats.latestReport.contains("없습니다") {
-                            Text("아직 생성된 리포트가 없습니다.")
-                                .foregroundColor(.gray)
-                                .padding()
-                        } else {
-                            Text(stats.latestReport)
-                                .font(.body)
-                                .lineSpacing(4)
+                    // 3. 감정 분석 보고서 (문장 형태)
+                    if let narrative = stats.narrativeSummary, !narrative.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("📝 감정 분석 보고서")
+                                .font(.headline)
+                            
+                            ForEach(narrative, id: \.self) { line in
+                                Text(line)
+                                    .font(.subheadline)
+                                    .lineSpacing(4)
+                                    .foregroundColor(.primary)
+                            }
                         }
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(16)
+                        .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal)
                     }
-                    .padding()
-                    .background(Color(.systemBackground))
-                    .cornerRadius(16)
-                    .shadow(color: .black.opacity(0.05), radius: 5, x: 0, y: 2)
-                    .padding(.horizontal)
                     
                     // 4. Risk Alert
-                    if stats.riskLevel >= 3 {
+                    if let hasConcern = stats.hasSafetyConcern, hasConcern {
                         HStack {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.red)
                             VStack(alignment: .leading) {
-                                Text("주의 필요")
+                                Text("위기 신호 감지됨")
                                     .font(.headline)
                                     .foregroundColor(.red)
-                                Text("최근 감정 상태가 불안정할 수 있습니다.")
+                                Text("최근 기록에서 위험할 수 있는 감정이 파악되었습니다. 내담자의 안부를 확인해주세요.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

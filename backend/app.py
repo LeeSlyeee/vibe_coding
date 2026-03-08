@@ -59,7 +59,7 @@ db.init_app(app)
 
 # Initialize Encryption
 try:
-    crypto = EncryptionManager(app.config.get('ENCRYPTION_KEY'))
+    crypto = EncryptionManager()  # [Fix#1] os.environ에서 자동 로드 (app.config에는 ENCRYPTION_KEY가 없음)
     print("🔐 Encryption Manager Initialized")
 except Exception as e:
     print(f"⚠️ Encryption Init Failed: {e}")
@@ -375,6 +375,8 @@ def get_diaries():
 def create_diary():
     current_user_id = int(get_jwt_identity())
     user = User.query.filter_by(id=current_user_id).first()
+    if not user:
+        return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404  # [Fix#7] NoneType 방어
     data = request.get_json()
 
     # [Strict Date Validation] Prevent retroactive diary misdating
@@ -414,6 +416,8 @@ def create_diary():
     
     db.session.add(new_diary)
     db.session.commit()
+
+
 
     start_analysis_thread(
         new_diary.id,
@@ -495,7 +499,6 @@ def serialize_diary(d):
         'mood_intensity': 0, # Not in DB
         'safety_flag': d.safety_flag if hasattr(d, 'safety_flag') else False,
         'created_at': d.created_at.isoformat() if d.created_at else None,
-        'ai_prediction': safe_decrypt(d.ai_emotion), # Mapped
         'medication': False,
         'symptoms': []
     }
@@ -585,6 +588,8 @@ def get_diary(diary_id):
 def update_diary(diary_id):
     current_user_id = int(get_jwt_identity())
     user = User.query.filter_by(id=current_user_id).first()
+    if not user:
+        return jsonify({'msg': '사용자를 찾을 수 없습니다.'}), 404  # [Fix#7] NoneType 방어
     diary = Diary.query.filter_by(id=diary_id, user_id=user.id).first()
 
     if not diary:
@@ -643,6 +648,14 @@ def delete_diary(diary_id):
         return jsonify({'msg': '일기를 찾을 수 없습니다.'}), 404
 
     target_date = diary.date
+    
+    # [NativeRAG] Security Fix - Delete associated vector memory
+    try:
+        from memory_manager import delete_diary_memory
+        delete_diary_memory(diary_id)
+    except Exception as e:
+        print(f"⚠️ [NativeRAG] RAG 메모리 완전 파기 실패: {e}")
+        
     db.session.delete(diary)
     db.session.commit()
     
@@ -920,7 +933,7 @@ def run_async_analysis(user_id, mode='daily'):
             # Prepare Context
             context_text = ""
             for d in reversed(diaries): # Chronological order
-                content = safe_decrypt(d.content)
+                content = safe_decrypt(d.event)  # [Fix#2] d.content는 @property 이중복호화 → d.event 직접 사용
                 emotion = safe_decrypt(d.emotion_desc)
                 context_text += f"- {d.date}: {content} (감정: {emotion})\n"
             
@@ -1203,9 +1216,7 @@ def get_statistics():
         for d in diaries:
             if d.mood_level and 1 <= d.mood_level <= 5:
                 mood_map[d.mood_level] = mood_map.get(d.mood_level, 0) + 1
-        formatted_moods = [{' _id': k, 'count': v} for k, v in mood_map.items()]
-        # Fix: key should be '_id' without space
-        formatted_moods = [{'_id': k, 'count': v} for k, v in mood_map.items()]
+        formatted_moods = [{'_id': k, 'count': v} for k, v in mood_map.items()]  # [Fix#5] 공백 키 데드코드 제거
 
         # 4. Weather Distribution (Nested Moods)
         weather_map = {} # { 'Sunny': {1:0, 2:0...} }

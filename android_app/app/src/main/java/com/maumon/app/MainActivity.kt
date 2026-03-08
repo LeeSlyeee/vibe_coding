@@ -64,8 +64,8 @@ class MainActivity : ComponentActivity() {
             deepLink == "weekly_letter" || fcmType == "weekly_letter" -> {
                 if (letterId != null) "weekly_letter?letterId=$letterId" else "weekly_letter"
             }
-            fcmType == "mood_alert" || deepLink == "mood_alert" -> "share"
-            fcmType == "kick_flag_alert" || deepLink == "kick_flag_alert" -> "share"
+            fcmType == "mood_alert" || deepLink == "mood_alert" -> "main" // 임시로 메인화면으로 이동 (보호자 뷰 구현 전)
+            fcmType == "kick_flag_alert" || deepLink == "kick_flag_alert" -> "main"
             else -> null
         }
 

@@ -27,17 +27,20 @@ object ShareManager {
     )
 
     data class SharedStats(
-        @SerializedName("user_name") val userName: String = "",
-        @SerializedName("risk_level") val riskLevel: Int = 0,
-        @SerializedName("latest_report") val latestReport: String = "",
-        @SerializedName("recent_moods") val recentMoods: List<DailyMood> = emptyList(),
-        @SerializedName("last_sync") val lastSync: String = ""
+        @SerializedName("sharer_name") val sharerName: String = "",
+        @SerializedName("avg_mood") val avgMood: Double? = null,
+        @SerializedName("has_safety_concern") val hasSafetyConcern: Boolean? = null,
+        @SerializedName("mood_trend") val moodTrend: List<DailyMood> = emptyList(),
+        @SerializedName("recent_status") val recentStatus: String = "",
+        @SerializedName("total_entries") val totalEntries: Int = 0,
+        @SerializedName("writing_streak") val writingStreak: Int = 0,
+        @SerializedName("mood_restricted") val moodRestricted: Boolean? = null,
+        @SerializedName("narrative_summary") val narrativeSummary: List<String>? = null
     )
 
     data class DailyMood(
         val date: String = "",
-        val mood: Int = 3,
-        val label: String = ""
+        val mood: Int = 3
     )
 
     // State
@@ -56,6 +59,23 @@ object ShareManager {
     private val _errorMessage = MutableStateFlow("")
     val errorMessage: StateFlow<String> = _errorMessage.asStateFlow()
 
+    // MARK: - Guardian Alert Model
+    data class GuardianAlert(
+        val type: String = "",
+        @SerializedName("sharer_id") val sharerId: Int = 0,
+        @SerializedName("sharer_name") val sharerName: String = "",
+        val message: String = "",
+        val severity: String = "", // "high", "medium", "low"
+        val icon: String = "",
+        @SerializedName("action_guide") val actionGuide: List<String>? = null,
+        @SerializedName("avg_mood") val avgMood: Double? = null
+    ) {
+        val id: String get() = "${type}_$sharerId"
+    }
+
+    private val _guardianAlerts = MutableStateFlow<List<GuardianAlert>>(emptyList())
+    val guardianAlerts: StateFlow<List<GuardianAlert>> = _guardianAlerts.asStateFlow()
+
     /** 1. 공유 코드 발급 (iOS generateCode 대응) */
     suspend fun generateCode(context: Context): String? {
         return withContext(Dispatchers.IO) {
@@ -72,8 +92,9 @@ object ShareManager {
                 )
 
                 val response = ApiClient.flaskApi.generateShareCode(body)
-                if (response.isSuccessful && response.body() != null) {
-                    val code = response.body()!!["code"]?.toString() ?: ""
+                val responseBody = response.body()
+                if (response.isSuccessful && responseBody != null) {
+                    val code = responseBody["code"]?.toString() ?: ""
                     _myCode.value = code
                     Log.d(TAG, "✅ 코드 발급 성공: $code")
                     code
@@ -115,10 +136,10 @@ object ShareManager {
                 _errorMessage.value = ""
 
                 val response = ApiClient.flaskApi.getShareList(role)
-                if (response.isSuccessful && response.body() != null) {
-                    val data = response.body()!!
+                val responseBody = response.body()
+                if (response.isSuccessful && responseBody != null) {
                     @Suppress("UNCHECKED_CAST")
-                    val list = (data["data"] as? List<Map<String, Any>>)?.map { item ->
+                    val list = (responseBody["data"] as? List<Map<String, Any>>)?.map { item ->
                         SharedUser(
                             id = item["id"]?.toString() ?: "",
                             name = item["name"]?.toString() ?: "",
@@ -146,7 +167,30 @@ object ShareManager {
         }
     }
 
-    /** 4. 연결 해제 (iOS disconnect 대응) */
+    /** 4. 보호자 알림 이력 조회 (iOS fetchGuardianAlerts 대응) */
+    suspend fun fetchGuardianAlerts() {
+        withContext(Dispatchers.IO) {
+            try {
+                val response = ApiClient.flaskApi.getGuardianAlerts()
+                val responseBody = response.body()
+                if (response.isSuccessful && responseBody != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    val alertsArray = responseBody["alerts"] as? List<Map<String, Any>>
+                    if (alertsArray != null) {
+                        val gson = com.google.gson.Gson()
+                        val jsonElement = gson.toJsonTree(alertsArray)
+                        val alerts = gson.fromJson(jsonElement, Array<GuardianAlert>::class.java).toList()
+                        _guardianAlerts.value = alerts
+                        Log.d(TAG, "✅ 알림 이력 조회 성공: ${alerts.size}건")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ 알림 이력 조회 실패: ${e.message}")
+            }
+        }
+    }
+
+    /** 5. 연결 해제 (iOS disconnect 대응) */
     suspend fun disconnect(targetId: String, context: Context): Boolean {
         return withContext(Dispatchers.IO) {
             try {

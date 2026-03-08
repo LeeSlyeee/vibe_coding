@@ -21,9 +21,8 @@ class Config:
     # Default to localhost:27017 if MONGO_URI not provided
     MONGO_URI = os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/mood_diary_db'
 
-    # [CRITICAL FIX] Hardcode Secret Key to match Main Server (150 & 217)
-    # Environment variable loading via SystemD is failing, so we enforce it here.
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'django-insecure-key-for-dev'
+    # [Fix#9] JWT 시크릿 키 — insecure fallback 제거 (환경변수 필수)
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')  # None이면 app.py에서 sys.exit(1)으로 보호됨
     # JWT 토큰 만료 시간 설정 (24시간)
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
     

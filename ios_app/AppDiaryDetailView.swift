@@ -146,16 +146,19 @@ struct AppDiaryDetailView: View {
                 
                 // AI 조언 영역
                 if let advice = (diary.ai_advice?.isEmpty == false ? diary.ai_advice : diary.ai_comment), !advice.isEmpty {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("💡 AI 조언")
-                            .font(.headline)
-                            .foregroundColor(.green)
-                        Text(advice)
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(10)
+                    let cleanedAdvice = cleanAIText(advice)
+                    if !cleanedAdvice.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("💡 AI 조언")
+                                .font(.headline)
+                                .foregroundColor(.green)
+                            Text(cleanedAdvice)
+                                .padding()
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(10)
+                        }
+                        .padding(.top)
                     }
-                    .padding(.top)
                 }
                 
                 // AI 면책 고지
@@ -203,6 +206,46 @@ struct AppDiaryDetailView: View {
         Text(text)
             .font(.headline)
             .foregroundColor(.gray)
+    }
+    
+    /// AI 응답에서 JSON 원문, 마크다운 코드블록, **예시 답변** 등의 잔여물을 제거
+    func cleanAIText(_ text: String) -> String {
+        var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1. **예시 답변** 같은 프리픽스 제거
+        let prefixes = ["**예시 답변**", "**답변**", "예시 답변"]
+        for prefix in prefixes {
+            if let range = result.range(of: prefix) {
+                result = String(result[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        
+        // 2. ```json ... ``` 코드블록 내부 추출
+        if result.contains("```json") || result.contains("```") {
+            if let jsonBlockRange = result.range(of: "```json", options: .caseInsensitive) {
+                let afterBlock = String(result[jsonBlockRange.upperBound...])
+                if let endBlock = afterBlock.range(of: "```") {
+                    result = String(afterBlock[..<endBlock.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+            result = result.replacingOccurrences(of: "```", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
+        // 3. JSON 객체인 경우 comment 필드만 추출
+        if result.hasPrefix("{") {
+            if let jsonData = result.data(using: .utf8),
+               let jsonObj = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any] {
+                // comment 필드 우선, 없으면 advice 필드
+                if let comment = jsonObj["comment"] as? String, !comment.isEmpty {
+                    return comment
+                }
+                if let advice = jsonObj["advice"] as? String, !advice.isEmpty {
+                    return advice
+                }
+            }
+        }
+        
+        return result
     }
     
     func deleteDiary() {

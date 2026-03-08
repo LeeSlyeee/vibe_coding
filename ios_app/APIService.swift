@@ -425,7 +425,10 @@ class APIService: NSObject {
             let llmBaseURL = self.llmServerURL
             let endpoint = "/chat/reaction"
             
-            guard let url = URL(string: llmBaseURL + endpoint) else { return }
+            guard let url = URL(string: llmBaseURL + endpoint) else {
+                completion(.failure(NSError(domain: "Invalid URL", code: -1, userInfo: nil)))
+                return 
+            }
             
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -492,7 +495,10 @@ class APIService: NSObject {
             }
             
             let endpoint = "/chat/analysis-report"
-            guard let url = URL(string: self.llmServerURL + endpoint) else { return }
+            guard let url = URL(string: self.llmServerURL + endpoint) else {
+                completion(.failure(NSError(domain: "Invalid URL", code: -1, userInfo: nil)))
+                return 
+            }
             
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
@@ -666,7 +672,10 @@ class APIService: NSObject {
             components?.queryItems = items
         }
         
-        guard let url = components?.url else { return }
+        guard let url = components?.url else {
+            completion(.failure(NSError(domain: "Invalid URL", code: -1, userInfo: nil)))
+            return 
+        }
         
         var request = URLRequest(url: url)
         request.httpMethod = method

@@ -458,7 +458,8 @@ struct AppMainTabView: View {
     }
     
     func callNumber(_ number: String) {
-        guard let url = URL(string: "tel://\(number)") else { return }
+        let cleanNumber = number.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        guard let url = URL(string: "tel://\(cleanNumber)") else { return }
         #if os(iOS)
         UIApplication.shared.open(url)
         #elseif os(macOS)
@@ -470,7 +471,7 @@ struct AppMainTabView: View {
 // [DeepLink] Modifier for AppMainTabView to keep body clean
 extension AppMainTabView {
     var deepLinkHandledBody: some View {
-        self.body
+        self
             .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
                 guard let deepLink = deepLink else { return }
                 switch deepLink {
@@ -483,7 +484,7 @@ extension AppMainTabView {
             }
             .fullScreenCover(isPresented: $showShareScreenFromDeepLink) {
                 NavigationView {
-                    MindBridgeShareView(onBack: { showShareScreenFromDeepLink = false })
+                    AppShareView()
                         .navigationBarItems(leading: Button("닫기") { showShareScreenFromDeepLink = false })
                 }
             }
@@ -648,7 +649,10 @@ struct GuideFeatureCard: View {
     }
     
     func parseBold(_ text: String) -> AttributedString {
-        try! AttributedString(markdown: text)
+        if let attrStr = try? AttributedString(markdown: text) {
+            return attrStr
+        }
+        return AttributedString(stringLiteral: text) // 파싱 실패 시 원본 문자열 반환
     }
 }
 
