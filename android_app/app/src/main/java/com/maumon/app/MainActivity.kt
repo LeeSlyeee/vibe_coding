@@ -81,6 +81,12 @@ class MainActivity : ComponentActivity() {
         if (route != null) {
             Log.d("MainActivity", "📮 딥링크 감지: $route (deepLink=$deepLink, fcmType=$fcmType)")
             DeepLinkRouter.navigate(route)
+            
+            // Consume intents to prevent re-triggering on activity recreate
+            intent.removeExtra("deep_link")
+            intent.removeExtra("type")
+            intent.removeExtra("letter_id")
+            intent.removeExtra("sharer_id")
         }
     }
 

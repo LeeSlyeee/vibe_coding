@@ -55,12 +55,17 @@ fun MaumOnApp() {
             var retryCount = 0
             while (!success && retryCount < 10) {
                 try {
-                    navController.navigate(route) {
-                        launchSingleTop = true
+                    // StartDestination 또는 현재 뷰가 존재할 때만 안전하게 이동
+                    if (navController.currentBackStackEntry != null) {
+                        navController.navigate(route) {
+                            launchSingleTop = true
+                        }
+                        success = true
+                        com.maumon.app.DeepLinkRouter.consume()
+                        android.util.Log.d("MaumOnApp", "✅ 딥링크 네비게이션 성공: $route")
+                    } else {
+                        throw IllegalStateException("NavHost is not fully initialized yet")
                     }
-                    success = true
-                    com.maumon.app.DeepLinkRouter.consume()
-                    android.util.Log.d("MaumOnApp", "✅ 딥링크 네비게이션 성공: $route")
                 } catch (e: Exception) {
                     retryCount++
                     android.util.Log.w("MaumOnApp", "⏳ 딥링크 네비게이션 대기 중 (${retryCount}/10): ${e.message}")

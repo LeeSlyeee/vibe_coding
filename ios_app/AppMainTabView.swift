@@ -339,6 +339,10 @@ struct AppMainTabView: View {
                 // [DeepLink] 앱 실행 후 (Splash 이후) 쌓여있는 초기 딥링크 라우팅 실행
                 if let pending = DeepLinkManager.shared.activeScreen {
                     print("⏳ [DeepLink] AppMainTabView.onAppear - 콜드스타트 대기 라우팅 실행: \(pending)")
+                    
+                    // 콜드 스타트 시에도 안전하게 이전 상태 청소 후 라우팅
+                    self.showAssessment = false
+                    
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         self.activeFullScreen = pending
                     }
