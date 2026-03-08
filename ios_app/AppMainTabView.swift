@@ -14,6 +14,7 @@ struct AppMainTabView: View {
     @State private var showToast = false // [New] AI Loaded Toast
     @State private var showBirthdayToast = false // [New] Birthday Toast State (Me)
     @State private var showFriendBirthdayToast = false // [New] Friend Birthday Toast (Others)
+    @State private var activeFullScreen: DeepLinkManager.ActiveScreen? // [DeepLink] Route Anchor
     
     // [New] Friends List with D-Day
     // struct because Tuple is not Equatable for @State strictly without wrappers, 
@@ -49,6 +50,7 @@ struct AppMainTabView: View {
                         }
                         #endif
                     }
+
                 // Main Content Area
                 MoodCalendarView()
                     .opacity(selection == 0 ? 1 : 0)
@@ -232,6 +234,7 @@ struct AppMainTabView: View {
                 }
             }
             .edgesIgnoringSafeArea(.bottom)
+
             #if os(iOS)
             .environmentObject(keyboardObserver) // [Keyboard Fix] 하위 뷰에 단일 인스턴스 공유
             .fullScreenCover(isPresented: $showAssessment) {
@@ -240,6 +243,39 @@ struct AppMainTabView: View {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
             }
+            .fullScreenCover(item: $activeFullScreen) { item in
+                switch item {
+                case .shareAuth:
+                    NavigationView {
+                        AppShareView()
+                            .navigationBarItems(leading: Button("닫기") {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            })
+                    }
+                case .sharedStats(let targetId, let targetName):
+                    NavigationView {
+                        SharedStatsView(targetId: targetId, targetName: targetName)
+                            .navigationBarItems(leading: Button("닫기") {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            })
+                    }
+                case .weeklyLetter(let targetId):
+                    NavigationView {
+                        WeeklyLetterView(targetLetterId: targetId)
+                            .navigationBarItems(leading: Button(action: {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                    Text("닫기")
+                                }.foregroundColor(.blue)
+                            })
+                    }
+                }
+            }
             #else
             .sheet(isPresented: $showAssessment) {
                 AppAssessmentView()
@@ -247,7 +283,50 @@ struct AppMainTabView: View {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
             }
+            .sheet(item: $activeFullScreen) { item in
+                switch item {
+                case .shareAuth:
+                    NavigationView {
+                        AppShareView()
+                            .navigationBarItems(leading: Button("닫기") {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            })
+                    }
+                case .sharedStats(let targetId, let targetName):
+                    NavigationView {
+                        SharedStatsView(targetId: targetId, targetName: targetName)
+                            .navigationBarItems(leading: Button("닫기") {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            })
+                    }
+                case .weeklyLetter(let targetId):
+                    NavigationView {
+                        WeeklyLetterView(targetLetterId: targetId)
+                            .navigationBarItems(leading: Button(action: {
+                                self.activeFullScreen = nil
+                                DeepLinkManager.shared.activeScreen = nil
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "chevron.left")
+                                    Text("닫기")
+                                }.foregroundColor(.blue)
+                            })
+                    }
+                }
+            }
             #endif
+            .onReceive(DeepLinkManager.shared.$activeScreen) { screen in
+                // 화면이 전환된 상태에서 바로 반영
+                if screen != nil {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.activeFullScreen = screen
+                    }
+                } else {
+                    self.activeFullScreen = nil
+                }
+            }
             .onAppear {
                 checkAssessmentStatus()
                 
@@ -428,9 +507,6 @@ struct AppMainTabView: View {
     // [New] Profile Image Cache
     private var profileImageCache: [String: UIImage] = [:]
     
-    // [DeepLink] Share Screen State
-    @State private var showShareScreenFromDeepLink = false
-    
     init() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -467,30 +543,6 @@ struct AppMainTabView: View {
         #endif
     }
 }
-
-// [DeepLink] Modifier for AppMainTabView to keep body clean
-extension AppMainTabView {
-    var deepLinkHandledBody: some View {
-        self
-            .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
-                guard let deepLink = deepLink else { return }
-                switch deepLink {
-                case .moodAlert(_), .kickFlagAlert(_):
-                    showShareScreenFromDeepLink = true
-                    DeepLinkManager.shared.pendingDeepLink = nil
-                default:
-                    break
-                }
-            }
-            .fullScreenCover(isPresented: $showShareScreenFromDeepLink) {
-                NavigationView {
-                    AppShareView()
-                        .navigationBarItems(leading: Button("닫기") { showShareScreenFromDeepLink = false })
-                }
-            }
-    }
-}
-
 // MARK: - App Guide View (Included here to avoid file referencing issues)
 
 struct AppGuideView: View {

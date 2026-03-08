@@ -37,10 +37,6 @@ struct MindDiaryApp: App {
     @StateObject private var authManager = AuthManager()
     @State private var showSplash = true
     
-    // [DeepLink] 뷰 렌더링에 직접 쓰일 안전한 로컬 상태
-    @State private var activeFullScreen: DeepLinkManager.ActiveScreen?
-    @State private var pendingFullScreen: DeepLinkManager.ActiveScreen?
-    
     // 🔥 앱의 현재 상태(백그라운드/포그라운드) 추적
     @Environment(\.scenePhase) private var scenePhase
     
@@ -59,95 +55,8 @@ struct MindDiaryApp: App {
                         .transition(AnyTransition.opacity)
                         .zIndex(0)
                 }
-                
-                // [DeepLink Routing Anchor] 완전히 격리된 투명 뷰 위에서 라우팅 수행 (트리 충돌 방지)
-                Color.clear
-                    .frame(width: 0, height: 0)
-                    .zIndex(999)
-                    .fullScreenCover(item: Binding(
-                        get: { self.activeFullScreen },
-                        set: { newValue in
-                            self.activeFullScreen = newValue
-                            DeepLinkManager.shared.activeScreen = newValue
-                        }
-                    )) { item in
-                        switch item {
-                        case .shareAuth:
-                            NavigationView {
-                                AppShareView()
-                                    .navigationBarItems(leading: Button("닫기") {
-                                        self.activeFullScreen = nil
-                                        DeepLinkManager.shared.activeScreen = nil
-                                    })
-                            }
-                        case .sharedStats(let targetId, let targetName):
-                            NavigationView {
-                                SharedStatsView(targetId: targetId, targetName: targetName)
-                                    .navigationBarItems(leading: Button("닫기") {
-                                        self.activeFullScreen = nil
-                                        DeepLinkManager.shared.activeScreen = nil
-                                    })
-                            }
-                        case .weeklyLetter(let targetId):
-                            NavigationView {
-                                WeeklyLetterView(targetLetterId: targetId)
-                                    .navigationBarItems(leading: Button(action: {
-                                        self.activeFullScreen = nil
-                                        DeepLinkManager.shared.activeScreen = nil
-                                    }) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "chevron.left")
-                                            Text("닫기")
-                                        }.foregroundColor(.blue)
-                                    })
-                            }
-                        }
-                    }
             }
             .preferredColorScheme(.light) // Force Light Mode
-            .onReceive(DeepLinkManager.shared.$activeScreen) { newScreen in
-                print("🔄 [DeepLink] 전역 상태 변경 감지: \(String(describing: newScreen))")
-                guard let newScreen = newScreen else {
-                    self.activeFullScreen = nil
-                    return
-                }
-                
-                // 앱이 스플래시 중이거나 백그라운드일 때는 즉시 띄우지 않고 예약만 함
-                if showSplash || scenePhase != .active {
-                    print("🔄 [DeepLink] 화면 준비 안 됨 (splash: \(showSplash), phase: \(scenePhase)). 대기열에 등록")
-                    self.pendingFullScreen = newScreen
-                } else {
-                    print("🔄 [DeepLink] 포그라운드 상태. 0.3초 대기 후 호출 (렌더 무시 방어)")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        self.activeFullScreen = newScreen
-                    }
-                }
-            }
-            .onChange(of: scenePhase) { newPhase in
-                if newPhase == .active && !showSplash {
-                    if let pending = self.pendingFullScreen {
-                        print("⏳ [DeepLink] 앱 활성화(Active)됨. 대기중인 라우팅 실행: \(pending)")
-                        // 화면 전환 애니메이션 및 iOS 렌더링 큐 안정화 고려해 0.6초 딜레이
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                            self.activeFullScreen = pending
-                            self.pendingFullScreen = nil
-                        }
-                    }
-                }
-            }
-            .onChange(of: showSplash) { isSplash in
-                if !isSplash {
-                    // 콜드스타트: 스플래시 종료 직후 딥링크가 대기 중이라면 애니메이션 후 라우팅
-                    if let pending = self.pendingFullScreen ?? DeepLinkManager.shared.activeScreen {
-                        print("⏳ [DeepLink] 스플래시 종료, 대기중인 라우팅 실행: \(pending)")
-                        // 스플래시 종료 애니메이션(0.5초) 후 충분한 여유(1.0초) 확보
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            self.activeFullScreen = pending
-                            self.pendingFullScreen = nil
-                        }
-                    }
-                }
-            }
             .onAppear {
                 // 2. 스플래시 화면 제어 (최소 2초)
                 Task {
