@@ -176,6 +176,19 @@ fun MaumOnApp() {
                     onBack = { navController.popBackStack() }
                 )
             }
+
+            // 공유 통계 보기 (Deep Link 용)
+            composable(
+                route = "shared_stats/{targetId}",
+                arguments = listOf(navArgument("targetId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val targetId = backStackEntry.arguments?.getString("targetId") ?: ""
+                com.maumon.app.ui.share.SharedStatsScreen(
+                    targetId = targetId,
+                    targetName = "내담자", // 기본값 (API에서 가져오거나 목록에서 추출 권장)
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }

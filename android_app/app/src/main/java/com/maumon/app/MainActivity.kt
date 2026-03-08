@@ -64,8 +64,17 @@ class MainActivity : ComponentActivity() {
             deepLink == "weekly_letter" || fcmType == "weekly_letter" -> {
                 if (letterId != null) "weekly_letter?letterId=$letterId" else "weekly_letter"
             }
-            fcmType == "mood_alert" || deepLink == "mood_alert" -> "main" // 임시로 메인화면으로 이동 (보호자 뷰 구현 전)
-            fcmType == "kick_flag_alert" || deepLink == "kick_flag_alert" -> "main"
+            fcmType == "mood_alert" || deepLink == "mood_alert" ||
+            fcmType == "kick_flag_alert" || deepLink == "kick_flag_alert" ||
+            fcmType == "ai_report_alert" || deepLink == "ai_report_alert" ||
+            fcmType == "crisis_alert" || deepLink == "crisis_alert" -> {
+                val sharerId = intent.getStringExtra("sharer_id")
+                if (sharerId != null) {
+                    "shared_stats/$sharerId" // iOS의 SharedStatsView에 해당
+                } else {
+                    "share" // iOS의 AppShareView에 해당
+                }
+            }
             else -> null
         }
 
