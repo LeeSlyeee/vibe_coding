@@ -408,9 +408,9 @@ class ExportViewModel: ObservableObject {
                     // AI 분석 요약
                     if let aiResult = latest["ai_analysis"] as? [String: Any],
                        let comment = aiResult["comment"] as? String {
-                        self.aiSummary = comment
+                        self.aiSummary = self.extractComment(from: comment)
                     } else if let comment = latest["ai_comment"] as? String {
-                        self.aiSummary = comment
+                        self.aiSummary = self.extractComment(from: comment)
                     } else {
                         self.aiSummary = "아직 AI 분석 결과가 없습니다."
                     }
@@ -443,6 +443,26 @@ class ExportViewModel: ObservableObject {
                 self.weeklyMoods = weekData
             }
         }
+    }
+    
+    private func extractComment(from text: String) -> String {
+        let cleanText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if cleanText.contains("{") && cleanText.contains("}") {
+            guard let startRange = cleanText.range(of: "{"),
+                  let endRange = cleanText.range(of: "}", options: .backwards) else {
+                return text
+            }
+            
+            let jsonString = String(cleanText[startRange.lowerBound...endRange.upperBound])
+            if let data = jsonString.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                if let c = json["comment"] as? String { return c }
+                if let c = json["ai_comment"] as? String { return c }
+                if let c = json["analysis"] as? String { return c }
+                if let c = json["message"] as? String { return c }
+            }
+        }
+        return text
     }
 }
 

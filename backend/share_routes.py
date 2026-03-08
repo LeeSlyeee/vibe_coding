@@ -357,15 +357,17 @@ def _build_narrative_summary(diaries, sharer, avg_mood, has_safety, share_mood=T
         comment_text = ai_comments[0]
         try:
             import json
-            # "예)\n{...}" 형태 처리 - { 이전 텍스트 제거
+            # "예)\n{...}\n```" 와 같이 앞뒤 휴지심 텍스트 제거 - 첫 '{' 부터 마지막 '}' 까지만 추출
             json_start = comment_text.find('{')
-            if json_start >= 0:
-                json_str = comment_text[json_start:]
+            json_end = comment_text.rfind('}')
+            
+            if json_start >= 0 and json_end > json_start:
+                json_str = comment_text[json_start:json_end+1]
                 parsed = json.loads(json_str)
                 if isinstance(parsed, dict):
-                    # comment 필드 추출
-                    readable = parsed.get('comment', '') or parsed.get('analysis', '') or parsed.get('message', '')
-                    emotion = parsed.get('emotion', '')
+                    # comment 필드 추출 (다양한 키 변형 대비 포함)
+                    readable = parsed.get('comment', '') or parsed.get('ai_comment', '') or parsed.get('analysis', '') or parsed.get('message', '')
+                    emotion = parsed.get('emotion', '') or parsed.get('ai_emotion', '') or parsed.get('prediction', '')
                     if readable:
                         if emotion:
                             comment_text = f"감정: {emotion} — {readable}"
