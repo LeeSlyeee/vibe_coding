@@ -243,7 +243,7 @@ struct AppMainTabView: View {
                         UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
                     }
             }
-            .fullScreenCover(item: $activeFullScreen) { item in
+            .sheet(item: $activeFullScreen) { item in
                 switch item {
                 case .shareAuth:
                     NavigationView {
@@ -274,6 +274,11 @@ struct AppMainTabView: View {
                                 }.foregroundColor(.blue)
                             })
                     }
+                }
+            } // Close sheet block
+            .onChange(of: activeFullScreen) { newValue in
+                if newValue == nil {
+                    DeepLinkManager.shared.activeScreen = nil
                 }
             }
             #else
@@ -320,7 +325,7 @@ struct AppMainTabView: View {
             .onReceive(DeepLinkManager.shared.$activeScreen) { screen in
                 // 화면이 전환된 상태에서 바로 반영
                 if screen != nil {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                         self.activeFullScreen = screen
                     }
                 } else {
@@ -328,6 +333,14 @@ struct AppMainTabView: View {
                 }
             }
             .onAppear {
+                // [DeepLink] 앱 실행 후 (Splash 이후) 쌓여있는 초기 딥링크 라우팅 실행
+                if let pending = DeepLinkManager.shared.activeScreen {
+                    print("⏳ [DeepLink] AppMainTabView.onAppear - 콜드스타트 대기 라우팅 실행: \(pending)")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.activeFullScreen = pending
+                    }
+                }
+                
                 checkAssessmentStatus()
                 
                 if authManager.isAuthenticated {
@@ -420,6 +433,13 @@ struct AppMainTabView: View {
                         print("✅ [App] Auth Valid (User: \(username)). Triggering Sync.")
                         LocalDataManager.shared.syncWithServer()
                         
+                        // [DeepLink] 백그라운드에서 포그라운드로 복귀 시 쌓여있는 딥링크 즉시 꺼내기
+                        if let pending = DeepLinkManager.shared.activeScreen {
+                            print("⏳ [DeepLink] Scene Active - 백그라운드 대기 딥링크 꺼내기: \(pending)")
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                                self.activeFullScreen = pending
+                            }
+                        }
                     } else {
                         // [Step 1-Fail] Zombie State -> Recover First, Then Sync
                         print("🚑 [App] Auth Incomplete (Zombie State). Recovering User Info...")

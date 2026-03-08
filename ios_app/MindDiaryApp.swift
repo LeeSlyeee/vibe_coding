@@ -194,21 +194,27 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             if type == "weekly_letter" {
                 let letterId = extractInt("letter_id")
                 DispatchQueue.main.async {
-                    DeepLinkManager.shared.activeScreen = .weeklyLetter(letterId: letterId)
+                    DeepLinkManager.shared.activeScreen = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        DeepLinkManager.shared.activeScreen = .weeklyLetter(letterId: letterId)
+                    }
                 }
                 print("📮 딥링크: 주간 편지 열기 (letter_id=\(letterId ?? -1))")
             } else if type == "mood_alert" || type == "kick_flag_alert" || type == "ai_report_alert" || type == "crisis_alert" {
                 let sharerId = extractInt("sharer_id")
                 DispatchQueue.main.async {
-                    if let sid = sharerId {
-                        let sidStr = String(sid)
-                        var sName = "내담자"
-                        if let user = ShareManager.shared.connectedUsers.first(where: { $0.id == sidStr }) {
-                            sName = user.name
+                    DeepLinkManager.shared.activeScreen = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        if let sid = sharerId {
+                            let sidStr = String(sid)
+                            var sName = "내담자"
+                            if let user = ShareManager.shared.connectedUsers.first(where: { $0.id == sidStr }) {
+                                sName = user.name
+                            }
+                            DeepLinkManager.shared.activeScreen = .sharedStats(targetId: sidStr, targetName: sName)
+                        } else {
+                            DeepLinkManager.shared.activeScreen = .shareAuth
                         }
-                        DeepLinkManager.shared.activeScreen = .sharedStats(targetId: sidStr, targetName: sName)
-                    } else {
-                        DeepLinkManager.shared.activeScreen = .shareAuth
                     }
                 }
                 print("📮 딥링크: 알림 (type=\(type), sharer_id=\(sharerId ?? -1))")
