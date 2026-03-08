@@ -32,6 +32,7 @@ fun MaumOnApp() {
     val authRepo = remember { AuthRepository(context) }
     var isCheckingAuth by remember { mutableStateOf(true) }
     var startDestination by remember { mutableStateOf("login") }
+    var isLoggedIn by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     // 선택된 일기 (상세 화면용)
@@ -41,25 +42,35 @@ fun MaumOnApp() {
 
     // 앱 시작 시 저장된 토큰 확인
     LaunchedEffect(Unit) {
-        val hasToken = authRepo.restoreToken()
-        startDestination = if (hasToken) "main" else "login"
+        isLoggedIn = authRepo.restoreToken()
+        startDestination = if (isLoggedIn) "main" else "login"
         isCheckingAuth = false
     }
 
-    // 딥링크 관찰 (StateFlow) — 푸시 터치 시 자동 네비게이션
     val pendingRoute by com.maumon.app.DeepLinkRouter.pendingRoute.collectAsState()
-    LaunchedEffect(pendingRoute, isCheckingAuth) {
+    LaunchedEffect(pendingRoute, isCheckingAuth, isLoggedIn) {
         val route = pendingRoute ?: return@LaunchedEffect
-        if (!isCheckingAuth && startDestination == "main") {
-            kotlinx.coroutines.delay(500)
-            try {
-                navController.navigate(route) {
-                    launchSingleTop = true
+        if (!isCheckingAuth && isLoggedIn) {
+            var success = false
+            var retryCount = 0
+            while (!success && retryCount < 10) {
+                try {
+                    navController.navigate(route) {
+                        launchSingleTop = true
+                    }
+                    success = true
+                    com.maumon.app.DeepLinkRouter.consume()
+                    android.util.Log.d("MaumOnApp", "✅ 딥링크 네비게이션 성공: $route")
+                } catch (e: Exception) {
+                    retryCount++
+                    android.util.Log.w("MaumOnApp", "⏳ 딥링크 네비게이션 대기 중 (${retryCount}/10): ${e.message}")
+                    kotlinx.coroutines.delay(300)
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("MaumOnApp", "딥링크 네비게이션 실패: ${e.message}")
             }
-            com.maumon.app.DeepLinkRouter.consume()
+            if (!success) {
+                android.util.Log.e("MaumOnApp", "❌ 딥링크 네비게이션 최종 실패")
+                com.maumon.app.DeepLinkRouter.consume() // 너무 오래 실패하면 어쩔 수 없이 버림
+            }
         }
     }
 
@@ -76,6 +87,7 @@ fun MaumOnApp() {
             composable("login") {
                 LoginScreen(
                     onLoginSuccess = {
+                        isLoggedIn = true
                         navController.navigate("main") {
                             popUpTo("login") { inclusive = true }
                         }
@@ -89,6 +101,7 @@ fun MaumOnApp() {
                     onLogout = {
                         scope.launch {
                             authRepo.logout()
+                            isLoggedIn = false
                             navController.navigate("login") {
                                 popUpTo("main") { inclusive = true }
                             }

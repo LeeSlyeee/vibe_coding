@@ -427,6 +427,17 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
             cur.close()
         finally:
             conn.close()
+            
+        # [KILLER FEATURE] AI 분석 완료 푸시 전송 (보호자에게 리포트 전송)
+        if user_id is not None and comment and "오류가 발생" not in comment and emotion not in ["기타", "대기중"]:
+            try:
+                from push_service import notify_guardians_ai_report
+                from app import app
+                print(f"💌 [Push] 트리거: 보호자에게 AI 분석 결과 전송 (User: {user_id})")
+                with app.app_context():
+                    notify_guardians_ai_report(user_id, comment)
+            except Exception as pe:
+                print(f"⚠️ [Push] AI 리포트 푸시 알림 발송 중 에러: {pe}")
         
         # [NativeRAG] AI 분석 코멘트까지 포함하여 장기 기억에 저장
         if user_id is not None:

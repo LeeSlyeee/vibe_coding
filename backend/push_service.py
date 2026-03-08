@@ -49,71 +49,66 @@ def is_push_available():
 def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_token: str = None) -> bool:
     """
     단일 기기에 푸시 알림 발송
-    FCM 발송 실패 시 iOS는 직접 APNs로 대체 발송
-
-    Args:
-        fcm_token: 대상 기기의 FCM 토큰
-        title: 알림 제목
-        body: 알림 본문
-        data: 추가 데이터 (딥링크 등)
-        apns_token: iOS APNs 디바이스 토큰 (직접 발송용)
-
-    Returns:
-        성공 여부
+    iOS 사용자의 경우 APNs 직접 발송을 최우선으로 하고, FCM은 선택적으로(또는 안드로이드용으로) 발송합니다.
     """
-    if not _firebase_initialized:
+    if not _firebase_initialized and not apns_token:
         logger.debug("푸시 비활성화 상태 → 건너뜀")
         return False
 
-    if not fcm_token:
-        return False
+    success = False
+    
+    # 1. iOS인 경우 APNs 직접 발송 우선 실행! (Firebase FCM의 iOS Silent Fail 문제 방어)
+    if apns_token:
+        logger.info("🍏 APNs 직접 발송 우선 시도...")
+        success = _send_apns_direct(apns_token, title, body, data)
 
-    try:
-        # [Fix#4] FCM data payload의 모든 값은 반드시 str이어야 함
-        safe_data = {str(k): str(v) for k, v in (data or {}).items()}
-        message = messaging.Message(
-            notification=messaging.Notification(
-                title=title,
-                body=body,
-            ),
-            data=safe_data,
-            token=fcm_token,
-            # Android 전용 설정
-            android=messaging.AndroidConfig(
-                priority='high',
-                notification=messaging.AndroidNotification(
-                    channel_id='guardian_alerts',
-                    icon='ic_notification',
-                    color='#7C4DFF',
+    # 2. FCM 발송 (Android 이거나 APNs 실패 시 백업)
+    if _firebase_initialized and fcm_token:
+        try:
+            safe_data = {str(k): str(v) for k, v in (data or {}).items()}
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
                 ),
-            ),
-            # iOS 전용 설정
-            apns=messaging.APNSConfig(
-                payload=messaging.APNSPayload(
-                    aps=messaging.Aps(
-                        sound='default',
-                        badge=1,
+                data=safe_data,
+                token=fcm_token,
+                # Android 전용 설정
+                android=messaging.AndroidConfig(
+                    priority='high',
+                    notification=messaging.AndroidNotification(
+                        channel_id='guardian_alerts',
+                        icon='ic_notification',
+                        color='#7C4DFF',
                     ),
                 ),
-            ),
-        )
+                # iOS 전용 설정 (FCM 경유)
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound='default',
+                            badge=1,
+                        ),
+                    ),
+                ),
+            )
 
-        response = messaging.send(message)
-        logger.info(f"✅ 푸시 발송 성공: {response}")
-        return True
+            response = messaging.send(message)
+            logger.info(f"✅ FCM 푸시 발송 성공: {response}")
+            success = True
 
-    except messaging.UnregisteredError:
-        logger.warning(f"⚠️ 유효하지 않은 FCM 토큰 (앱 삭제됨): {fcm_token[:20]}...")
-        return False
-    except Exception as e:
-        error_name = type(e).__name__
-        logger.error(f"❌ FCM 푸시 발송 실패 ({error_name}): {e}")
-        
-        # FCM 실패 시 직접 APNs로 대체 발송 시도
-        if apns_token and 'ThirdPartyAuth' in error_name:
-            logger.info(f"🔄 직접 APNs 발송 시도...")
-            return _send_apns_direct(apns_token, title, body, data)
-        return False
+        except messaging.UnregisteredError:
+            logger.warning(f"⚠️ 유효하지 않은 FCM 토큰 (앱 삭제됨): {fcm_token[:20]}...")
+        except Exception as e:
+            error_name = type(e).__name__
+            logger.error(f"❌ FCM 푸시 발송 실패 ({error_name}): {e}")
+            
+            # APNs 발송을 시도하지 않았던 iOS 기기라면 여기서 시도
+            if apns_token and not success and 'ThirdPartyAuth' in error_name:
+                logger.info(f"🔄 직접 APNs 발송 시도...")
+                success = _send_apns_direct(apns_token, title, body, data)
+
+    return success
 
 
 def _send_apns_direct(device_token: str, title: str, body: str, data: dict = None) -> bool:
@@ -247,6 +242,95 @@ def notify_guardians_crisis(sharer_user):
     """
     if not _firebase_initialized:
         return
+    
+    from models import db, User, ShareRelationship
+    
+    try:
+        relationships = ShareRelationship.query.filter_by(
+            sharer_id=sharer_user.id,
+            share_crisis=True
+        ).all()
+        
+        if not relationships:
+            return
+            
+        sharer_name = sharer_user.nickname or sharer_user.real_name or "사용자"
+        body_msg = f"🚨 {sharer_name}님의 최근 기록에서 위기 신호가 감지되었습니다. 직접 안부를 확인해주세요."
+        
+        for rel in relationships:
+            viewer = User.query.get(rel.viewer_id)
+            if viewer and viewer.fcm_token:
+                send_push(
+                    fcm_token=viewer.fcm_token,
+                    title="⚠️ 긴급: 위기 신호 감지",
+                    body=body_msg,
+                    data={
+                        "type": "crisis_alert",
+                        "sharer_id": str(sharer_user.id)
+                    },
+                    apns_token=getattr(viewer, 'apns_token', None),
+                )
+                rel.last_alert_at = datetime.utcnow()
+                
+        db.session.commit()
+    except Exception as e:
+        logger.error(f"❌ 위기 신호 알림 발송 실패: {e}")
+
+def notify_guardians_ai_report(sharer_id: int, ai_comment: str):
+    """
+    [트리거 ③] AI 분석 리포트 완료 알림 (킬러 콘텐츠)
+    - 일기 AI 분석 완료 시, 보호자(공유 설정된)에게 AI 요약 한 줄 코멘트와 함께 푸시 알림 발송
+    - share_report=True (또는 share_mood=True) 인 보호자 대상
+    """
+    if not _firebase_initialized:
+        return
+        
+    from models import db, User, ShareRelationship
+    import json
+    
+    try:
+        # JSON 예외 처리하여 순수 텍스트만 추출
+        clean_comment = ai_comment
+        json_start = ai_comment.find('{')
+        json_end = ai_comment.rfind('}')
+        if json_start >= 0 and json_end > json_start:
+            try:
+                parsed = json.loads(ai_comment[json_start:json_end+1])
+                clean_comment = parsed.get('comment') or parsed.get('ai_comment') or parsed.get('analysis') or parsed.get('message') or clean_comment
+            except Exception:
+                pass
+                
+        sharer_user = User.query.get(sharer_id)
+        if not sharer_user:
+            return
+            
+        relationships = ShareRelationship.query.filter_by(
+            sharer_id=sharer_id
+        ).all()
+        
+        sharer_name = sharer_user.nickname or sharer_user.username or "사용자"
+        
+        for rel in relationships:
+            # 리포트 공유 권한이 없으면 제외
+            if rel.share_report is False:
+                continue
+                
+            viewer = User.query.get(rel.viewer_id)
+            if viewer and viewer.fcm_token:
+                send_push(
+                    fcm_token=viewer.fcm_token,
+                    title=f"✨ {sharer_name}님의 AI 마음 분석이 도착했어요",
+                    body=f"{clean_comment}",
+                    data={
+                        "type": "ai_report_alert",
+                        "sharer_id": str(sharer_id)
+                    },
+                    apns_token=getattr(viewer, 'apns_token', None),
+                )
+        
+        logger.info(f"✅ AI 리포트 자동 알림 발송 완료: {sharer_name}")
+    except Exception as e:
+        logger.error(f"❌ AI 리포트 알림 발송 실패: {e}")
 
     from models import db, User, ShareRelationship
 

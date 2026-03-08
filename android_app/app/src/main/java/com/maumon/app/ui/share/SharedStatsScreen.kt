@@ -30,8 +30,9 @@ fun SharedStatsScreen(
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
     var stats by remember { mutableStateOf<ShareManager.SharedStats?>(null) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
-    LaunchedEffect(targetId) {
+    val fetchData = {
         scope.launch {
             withContext(Dispatchers.IO) {
                 try {
@@ -46,6 +47,22 @@ fun SharedStatsScreen(
                 }
             }
             isLoading = false
+        }
+    }
+
+    LaunchedEffect(targetId) {
+        fetchData()
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                fetchData()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

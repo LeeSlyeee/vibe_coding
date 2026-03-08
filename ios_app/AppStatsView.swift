@@ -293,24 +293,6 @@ struct AppStatsView: View {
             fetchExistingReports()
         }
         fetchMoodTemperature()
-        
-        // 딥링크 체크 (앱이 꺼져있을 때 푸시 터치로 진입한 경우)
-        if case .weeklyLetter(let letterId) = DeepLinkManager.shared.pendingDeepLink {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.targetLetterId = letterId
-                showWeeklyLetter = true
-                DeepLinkManager.shared.pendingDeepLink = nil
-            }
-        }
-    }
-    .onReceive(DeepLinkManager.shared.$pendingDeepLink) { deepLink in
-        // 앱이 떠있는 상태에서 푸시 터치 시 즉시 반응
-        guard let deepLink = deepLink else { return }
-        if case .weeklyLetter(let letterId) = deepLink {
-            self.targetLetterId = letterId
-            showWeeklyLetter = true
-            DeepLinkManager.shared.pendingDeepLink = nil
-        }
     }
     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
         // [UX] 데이터 갱신 알림 수신 시 재계산
