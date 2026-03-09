@@ -5,6 +5,8 @@ import sys
 # 상위 디렉토리를 sys.path에 추가하여 app.py import 보장
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
+
 from app import app
 from models import db
 

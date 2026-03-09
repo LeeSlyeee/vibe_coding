@@ -19,3 +19,4 @@ firebase-admin
 pgvector
 sentence-transformers
 tf-keras
+pytest

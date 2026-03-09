@@ -197,7 +197,7 @@ def register():
 
     new_user = User(
         username=username,
-        password=generate_password_hash(password), 
+        password=generate_password_hash(password, method='pbkdf2:sha256'), 
         nickname=nickname,
         role=role
     )
