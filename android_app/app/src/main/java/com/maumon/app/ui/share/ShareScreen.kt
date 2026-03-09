@@ -397,7 +397,7 @@ private fun ShareTab(
             // [P1-수정4] 보호자 알림 공유 범위 설정
             item {
                 Spacer(modifier = Modifier.height(24.dp))
-                AlertScopeSettings()
+                AlertScopeSettings(myGuardians)
             }
         }
 
@@ -441,10 +441,24 @@ private fun UserCard(user: ShareManager.SharedUser, onClick: () -> Unit = {}) {
 
 // [P1-수정4] 보호자 알림 공유 범위 설정
 @Composable
-private fun AlertScopeSettings() {
-    var shareMood by remember { mutableStateOf(true) }
-    var shareReport by remember { mutableStateOf(true) }
-    var shareCrisis by remember { mutableStateOf(true) }
+private fun AlertScopeSettings(myGuardians: List<ShareManager.SharedUser>) {
+    val scope = rememberCoroutineScope()
+    // 첫 번째 보호자의 설정을 기준으로 초기화
+    val initialMood = myGuardians.firstOrNull()?.shareMood ?: true
+    val initialReport = myGuardians.firstOrNull()?.shareReport ?: false
+    val initialCrisis = myGuardians.firstOrNull()?.shareCrisis ?: true
+
+    var shareMood by remember(initialMood) { mutableStateOf(initialMood) }
+    var shareReport by remember(initialReport) { mutableStateOf(initialReport) }
+    var shareCrisis by remember(initialCrisis) { mutableStateOf(initialCrisis) }
+
+    fun updateAllGuardians(mood: Boolean = shareMood, report: Boolean = shareReport, crisis: Boolean = shareCrisis) {
+        scope.launch {
+            myGuardians.forEach { guardian ->
+                ShareManager.updateShareScope(guardian.id, mood, report, crisis)
+            }
+        }
+    }
 
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -459,14 +473,17 @@ private fun AlertScopeSettings() {
 
             AlertToggleRow("🌡️", "기분 온도 알림", "매일의 감정 온도를 공유합니다", shareMood) {
                 shareMood = it
+                updateAllGuardians(mood = it)
             }
             HorizontalDivider(modifier = Modifier.padding(start = 48.dp))
             AlertToggleRow("📊", "분석 리포트", "주간/월간 감정 분석을 공유합니다", shareReport) {
                 shareReport = it
+                updateAllGuardians(report = it)
             }
             HorizontalDivider(modifier = Modifier.padding(start = 48.dp))
             AlertToggleRow("🚨", "위기 감지 알림", "위기 신호 감지 시 즉시 알립니다", shareCrisis) {
                 shareCrisis = it
+                updateAllGuardians(crisis = it)
             }
 
             if (!shareCrisis) {

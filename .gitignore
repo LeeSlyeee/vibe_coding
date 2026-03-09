@@ -53,3 +53,7 @@ fb/*firebase*.json
 fb/*.p8
 
 fb/push_dev.key
+
+# Firebase service account keys (all locations)
+firebase-service-account.json
+**/firebase-service-account.json

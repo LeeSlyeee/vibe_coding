@@ -23,7 +23,10 @@ object ShareManager {
         val name: String,
         val role: String? = null,
         @SerializedName("birth_date") val birthDate: String? = null,
-        @SerializedName("connected_at") val connectedAt: String? = null
+        @SerializedName("connected_at") val connectedAt: String? = null,
+        @SerializedName("share_mood") val shareMood: Boolean? = true,
+        @SerializedName("share_report") val shareReport: Boolean? = false,
+        @SerializedName("share_crisis") val shareCrisis: Boolean? = true
     )
 
     data class SharedStats(
@@ -145,7 +148,10 @@ object ShareManager {
                             name = item["name"]?.toString() ?: "",
                             role = item["role"]?.toString(),
                             birthDate = item["birth_date"]?.toString(),
-                            connectedAt = item["connected_at"]?.toString()
+                            connectedAt = item["connected_at"]?.toString(),
+                            shareMood = item["share_mood"] as? Boolean ?: true,
+                            shareReport = item["share_report"] as? Boolean ?: false,
+                            shareCrisis = item["share_crisis"] as? Boolean ?: true
                         )
                     } ?: emptyList()
 
@@ -212,6 +218,76 @@ object ShareManager {
                 } else false
             } catch (e: Exception) {
                 Log.e(TAG, "❌ 연결 해제 에러: ${e.message}")
+                false
+            }
+        }
+    }
+
+    /** 6. 공유 범위 설정 (Phase 6) */
+    suspend fun updateShareScope(viewerId: String, shareMood: Boolean, shareReport: Boolean, shareCrisis: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val body = mapOf(
+                    "viewer_id" to viewerId.toInt(),
+                    "share_mood" to shareMood,
+                    "share_report" to shareReport,
+                    "share_crisis" to shareCrisis
+                )
+                val response = ApiClient.flaskApi.updateShareScope(body)
+                if (response.isSuccessful) {
+                    fetchList("sharer") // 갱신
+                    true
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ 공유 범위 설정 에러: ${e.message}")
+                false
+            }
+        }
+    }
+
+    /** 7. 알림 설정 (Phase 5) */
+    suspend fun updateAlertSettings(sharerId: String, alertMoodDrop: Boolean, alertCrisis: Boolean, alertInactivity: Boolean): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val body = mapOf(
+                    "sharer_id" to sharerId.toInt(),
+                    "alert_mood_drop" to alertMoodDrop,
+                    "alert_crisis" to alertCrisis,
+                    "alert_inactivity" to alertInactivity
+                )
+                val response = ApiClient.flaskApi.updateAlertSettings(body)
+                if (response.isSuccessful) {
+                    fetchList("viewer")
+                    true
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ 알림 설정 에러: ${e.message}")
+                false
+            }
+        }
+    }
+
+    /** 8. 역할 변경 */
+    suspend fun updateRole(sharerId: String, role: String): Boolean {
+        return withContext(Dispatchers.IO) {
+            try {
+                val body = mapOf(
+                    "sharer_id" to sharerId.toInt(),
+                    "role" to role
+                )
+                val response = ApiClient.flaskApi.updateRole(body)
+                if (response.isSuccessful) {
+                    fetchList("viewer")
+                    true
+                } else {
+                    false
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ 역할 변경 에러: ${e.message}")
                 false
             }
         }

@@ -307,7 +307,7 @@ def safe_decrypt(text):
     if not crypto: return text
     try:
         return crypto.decrypt(text)
-    except:
+    except Exception:
         return text
 
 #Helper to safely encrypt
@@ -315,7 +315,7 @@ def safe_encrypt(text):
     if not crypto: return text
     try:
         return crypto.encrypt(text)
-    except:
+    except Exception:
         return text
 
 # Alias for external usage (e.g. b2g_routes)
@@ -1076,7 +1076,7 @@ def load_report(user_id, mode):
                 if 'report' in data and 'insight' not in data:
                     data['insight'] = data['report']
                 return data
-        except:
+        except Exception:
             return None
     return None
 

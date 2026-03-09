@@ -98,10 +98,10 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
                              
                              try:
                                  inner = json.loads(clean_str)
-                             except:
+                             except Exception:
                                  try:
                                      inner = ast.literal_eval(clean_str)
-                                 except:
+                                 except Exception:
                                      # Regex Fallback
                                      emo_match = re.search(r'["\']emotion["\']\s*:\s*["\']((?:[^"\\]|\\.)*)["\']', clean_str)
                                      com_match = re.search(r'["\']comment["\']\s*:\s*["\']((?:[^"\\]|\\.)*)["\']', clean_str)
@@ -175,7 +175,7 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
                                                      content = ''.join(str(t) for t in tokens) if isinstance(tokens, list) else str(tokens)
                                                  elif 'text' in choice:
                                                      content = choice['text']
-                             except:
+                             except Exception:
                                  pass
                     else:
                          content = str(output)
@@ -343,7 +343,7 @@ def run_analysis_process(diary_id, date, event, sleep, emotion_desc, emotion_mea
             try:
                 score = int(raw_score)
                 score = max(1, min(10, score))
-            except:
+            except (ValueError, TypeError):
                 pass
     except Exception as ai_err:
         print(f"❌ [Thread] AI Analysis failed, using fallback: {ai_err}")
