@@ -26,9 +26,9 @@ struct AppEmergencyView: View {
                         
                         // Contacts List
                         VStack(spacing: 16) {
-                            ContactRow(icon: "📞", name: "자살예방 상담전화", number: "1393", isHighlight: true)
-                            ContactRow(icon: "🏥", name: "정신건강 상담전화", number: "1577-0199")
-                            ContactRow(icon: "👮", name: "경찰청 (긴급신고)", number: "112")
+                            ContactRow(icon: "", name: "자살예방 상담전화", number: "1393", isHighlight: true)
+                            ContactRow(icon: "", name: "정신건강 상담전화", number: "1577-0199")
+                            ContactRow(icon: "", name: "경찰청 (긴급신고)", number: "112")
                             
                             // 정신건강복지센터 찾기 링크
                             Button(action: {
@@ -39,7 +39,7 @@ struct AppEmergencyView: View {
                                 }
                             }) {
                                 HStack {
-                                    Text("🔍")
+                                    Image(systemName: "magnifyingglass")
                                         .font(.title2)
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("가까운 정신건강복지센터 찾기")
@@ -66,7 +66,7 @@ struct AppEmergencyView: View {
                     .padding(.bottom, 30)
                 }
             }
-            .navigationTitle("🚨 긴급 도움")
+            .navigationTitle("긴급 도움")
             .navigationBarTitleDisplayMode(.inline)
         }
     }

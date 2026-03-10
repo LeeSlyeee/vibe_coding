@@ -220,11 +220,11 @@ struct SharedStatsView: View {
     
     func moodEmoji(_ level: Int) -> String {
         switch level {
-        case 1: return "🤬"
-        case 2: return "😢"
-        case 3: return "😐"
-        case 4: return "😌"
-        case 5: return "🥰"
+        case 1: return "최악"
+        case 2: return "나쁨"
+        case 3: return "보통"
+        case 4: return "좋음"
+        case 5: return "최고"
         default: return ""
         }
     }

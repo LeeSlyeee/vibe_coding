@@ -11,8 +11,9 @@ struct AppSplashView: View {
                 
                 // Logo Area
                 VStack(spacing: 16) {
-                    Text("🌙")
+                    Image(systemName: "moon.fill")
                         .font(.system(size: 100))
+                        .foregroundColor(.yellow)
                         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 10)
                     
                     VStack(spacing: 8) {

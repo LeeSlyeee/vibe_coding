@@ -94,7 +94,7 @@ struct AppDiaryDetailView: View {
                    
                    VStack(alignment: .leading, spacing: 10) {
                        HStack {
-                           Text("🤖 AI 감정 분석")
+                           Text("AI 감정 분석")
                                .font(.headline)
                                .foregroundColor(.blue)
                            Spacer()
@@ -133,7 +133,7 @@ struct AppDiaryDetailView: View {
                 } else if let aiAnalysisOnly = diary.ai_analysis, !aiAnalysisOnly.isEmpty {
                      // Fallback for old data without prediction
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("🤖 AI 감정 분석")
+                        Text("AI 감정 분석")
                             .font(.headline)
                             .foregroundColor(.blue)
                         Text(aiAnalysisOnly)
@@ -149,7 +149,7 @@ struct AppDiaryDetailView: View {
                     let cleanedAdvice = cleanAIText(advice)
                     if !cleanedAdvice.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("💡 AI 조언")
+                            Text("AI 조언")
                                 .font(.headline)
                                 .foregroundColor(.green)
                             Text(cleanedAdvice)
@@ -164,7 +164,7 @@ struct AppDiaryDetailView: View {
                 // AI 면책 고지
                 if diary.ai_prediction != nil || diary.ai_analysis != nil || diary.ai_advice != nil || diary.ai_comment != nil {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                        Text("AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
                             .font(.caption2)
                             .foregroundColor(.gray)
                         Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")
@@ -182,6 +182,7 @@ struct AppDiaryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .preferredColorScheme(.light)
+        .screenshotProtected(isProtected: true) // [보안 Fix] 민감한 일기 화면 캡처 방지
         // 수정 시트 연결 (+수정 완료 시 닫기 & 새로고침)
         .sheet(isPresented: $showingEditSheet) {
             // 날짜 파싱 (임시, WriteView 내부에서 다시 계산함)

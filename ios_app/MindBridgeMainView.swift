@@ -30,14 +30,14 @@ struct MindBridgeMainView: View {
                     
                     // MARK: - 가족/보호자 섹션
                     recipientSection(
-                        title: "👨‍👩‍👧 가족 / 보호자",
+                        title: "가족 / 보호자",
                         type: .family,
                         recipients: bridgeManager.familyRecipients
                     )
                     
                     // MARK: - 상담사/의료진 섹션
                     recipientSection(
-                        title: "🩺 상담사 / 의료진",
+                        title: "상담사 / 의료진",
                         type: .counselor,
                         recipients: bridgeManager.counselorRecipients
                     )
@@ -54,7 +54,7 @@ struct MindBridgeMainView: View {
                 .padding()
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle("🌉 마음 브릿지")
+            .navigationTitle("마음 브릿지")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -119,8 +119,12 @@ struct MindBridgeMainView: View {
     // MARK: - 수신자 섹션
     func recipientSection(title: String, type: RecipientType, recipients: [BridgeRecipient]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+            HStack {
+                Image(systemName: type == .family ? "person.2.fill" : "stethoscope")
+                    .foregroundColor(type == .family ? Color(hexString: "6366f1") : Color(hexString: "10b981"))
+                Text(title)
+            }
+            .font(.headline)
             
             if recipients.isEmpty {
                 emptyRecipientCard(type: type)
@@ -317,8 +321,8 @@ struct AddRecipientSheet: View {
                     TextField("이름 (예: 엄마, 김OO 상담사)", text: $recipientName)
                     
                     Picker("유형", selection: $recipientType) {
-                        Text("👨‍👩‍👧 가족 / 보호자").tag(RecipientType.family)
-                        Text("🩺 상담사 / 의료진").tag(RecipientType.counselor)
+                        Text("가족 / 보호자").tag(RecipientType.family)
+                        Text("상담사 / 의료진").tag(RecipientType.counselor)
                     }
                 }
                 
@@ -368,6 +372,7 @@ struct AddRecipientSheet: View {
                         )
                         dismiss()
                     }
+                    .accessibilityIdentifier("SaveRecipientButton")
                     .disabled(recipientName.trimmingCharacters(in: .whitespaces).isEmpty || (recipientType == .counselor && pinCode.count >= 1 && pinCode.count < 4))
                     .fontWeight(.bold)
                 }
@@ -442,35 +447,40 @@ struct RecipientDepthSettingsView: View {
                         footer: Text("기본 OFF — 사용자가 직접 켜야 공유됩니다")) {
                     
                     depthToggle(
-                        icon: "🟢",
+                        systemIcon: "circle.fill",
+                        iconColor: .green,
                         title: "주간 감정 상태",
                         description: "안정/주의/위험 신호등",
                         isOn: $shareMoodStatus
                     )
                     
                     depthToggle(
-                        icon: "📊",
+                        systemIcon: "chart.bar.fill",
+                        iconColor: Color(hexString: "6366f1"),
                         title: "감정 변화 그래프",
                         description: "7일간 감정 추이 차트",
                         isOn: $shareMoodGraph
                     )
                     
                     depthToggle(
-                        icon: "✨",
+                        systemIcon: "sparkles",
+                        iconColor: .yellow,
                         title: "AI 분석 요약 (한 줄)",
                         description: "오늘의 감정을 AI가 요약",
                         isOn: $shareAISummary
                     )
                     
                     depthToggle(
-                        icon: "📋",
+                        systemIcon: "doc.text.fill",
+                        iconColor: .orange,
                         title: "7개 항목 상세 분석",
                         description: "원인, 깊이, 패턴, 신체, 관계, 자각, 전망",
                         isOn: $shareDetailedAnalysis
                     )
                     
                     depthToggle(
-                        icon: "🔑",
+                        systemIcon: "key.fill",
+                        iconColor: .purple,
                         title: "감정 트리거 키워드",
                         description: "감정 변화를 유발한 키워드",
                         isOn: $shareTriggerKeywords
@@ -594,10 +604,11 @@ struct RecipientDepthSettingsView: View {
         }
     }
     
-    func depthToggle(icon: String, title: String, description: String, isOn: Binding<Bool>) -> some View {
+    func depthToggle(systemIcon: String, iconColor: Color, title: String, description: String, isOn: Binding<Bool>) -> some View {
         HStack {
-            Text(icon)
+            Image(systemName: systemIcon)
                 .font(.title2)
+                .foregroundColor(iconColor)
                 .frame(width: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
@@ -654,7 +665,7 @@ struct RecipientPreviewView: View {
                 VStack(spacing: 20) {
                     // 헤더
                     VStack(spacing: 8) {
-                        Text("🌉 마음온 마음 브릿지")
+                        Text("마음온 마음 브릿지")
                             .font(.headline)
                             .foregroundColor(Color(hexString: "6366f1"))
                         

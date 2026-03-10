@@ -255,7 +255,7 @@ struct AppDiaryWriteView: View {
                             VStack(spacing: 30) {
                                 Spacer()
                                 Circle().fill(Color.purple.opacity(0.1)).frame(width: 80, height: 80)
-                                    .overlay(Text("🧘‍♀️").font(.largeTitle))
+                                    .overlay(Image(systemName: "figure.mind.and.body").font(.largeTitle).foregroundColor(.blue))
                                 Text("오늘의 마음 가이드").font(.title3).fontWeight(.bold).foregroundColor(.purple)
                                 Text(insightMessage.isEmpty ? "오늘 하루도 수고 많으셨어요." : insightMessage)
                                     .font(.body).multilineTextAlignment(.center).padding()
@@ -287,7 +287,6 @@ struct AppDiaryWriteView: View {
             if let edit = diaryToEdit {
                 // [강제 업데이트] 약간의 딜레이를 주어 State 반영 보장
                 DispatchQueue.main.async {
-                    print("🛠️ [DEBUG] 수정 데이터 로드: \(edit)")
                     self.q1 = edit.event ?? ""
                     self.q2 = edit.emotion_desc ?? ""
                     self.q3 = edit.emotion_meaning ?? ""
@@ -319,7 +318,6 @@ struct AppDiaryWriteView: View {
                 if let data = UserDefaults.standard.data(forKey: "diary_crash_snapshot"),
                    let snapshot = try? JSONDecoder().decode(Diary.self, from: data) {
                     
-                    print("🚑 [Recovery] Restoring crash snapshot...")
                     DispatchQueue.main.async {
                         self.q1 = snapshot.event ?? ""
                         self.q2 = snapshot.emotion_desc ?? ""
@@ -434,7 +432,7 @@ struct AppDiaryWriteView: View {
                    let current = wJson["current_weather"] as? [String: Any] {
                     let code = current["weathercode"] as? Int ?? 0
                     let temp = current["temperature"] as? Double ?? 20.0
-                    let map: [Int: String] = [0: "맑음 ☀️", 1: "대체로 맑음 🌤️", 2: "구름 조금 ⛅", 3: "흐림 ☁️", 4: "안개 🌫️", 45: "안개 🌫️", 48: "안개 🌫️", 51: "이슬비 🌧️", 53: "이슬비 🌧️", 55: "이슬비 🌧️", 61: "비 ☔", 63: "비 ☔", 65: "비 ☔", 80: "소나기 ☔", 95: "뇌우 ⚡"]
+                    let map: [Int: String] = [0: "맑음", 1: "대체로 맑음", 2: "구름 조금", 3: "흐림", 4: "안개", 45: "안개", 48: "안개", 51: "이슬비", 53: "이슬비", 55: "이슬비", 61: "비", 63: "비", 65: "비", 80: "소나기", 95: "뇌우"]
                     DispatchQueue.main.async {
                         self.weatherDesc = map[code] ?? "흐림 ☁️"
                         self.temp = temp
@@ -448,7 +446,6 @@ struct AppDiaryWriteView: View {
     func fetchInsight() {
         // [OOM Prevention] Disable Auto-Inference on View Load
         // Writing Screen should be lightweight. Inference happens only AFTER save.
-        print("🧠 [Insight] Skipped for Performance.")
         
         isLoadingInsight = false
         
@@ -487,7 +484,6 @@ struct AppDiaryWriteView: View {
         let hasLevel2 = crisisLevel2.contains(where: { allText.contains($0) })
         
         if hasLevel3 || hasLevel2 {
-            print("🚨 [Crisis] 일기 작성 폼에서 위기 키워드 감지! 저장 중단, SOS 팝업 표시")
             showCrisisSOSModal = true
             return // 저장하지 않고 즉시 반환
         }
@@ -544,7 +540,6 @@ struct AppDiaryWriteView: View {
         // [Crash Prevention] Safety Snapshot (저장 전 백업)
         if let encoded = try? JSONEncoder().encode(newDiary) {
             UserDefaults.standard.set(encoded, forKey: "diary_crash_snapshot")
-            print("🛡️ [Safety] Diary Snapshot saved for crash recovery.")
         }
         
         // [UX] 재분석 중임을 표시 (캘린더 즉시 반영)
@@ -562,7 +557,6 @@ struct AppDiaryWriteView: View {
                 DispatchQueue.main.async {
                     // [B2G] 저장 즉시 센터로 데이터 동기화
                     if B2GManager.shared.isLinked {
-                        print("📤 [AutoSync] Triggering B2G Sync after save...")
                         B2GManager.shared.syncData()
                     }
                     
@@ -575,11 +569,9 @@ struct AppDiaryWriteView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     let accepted = LLMService.shared.tryEnqueueDiaryAnalysis(newDiary)
                     if accepted {
-                        print("📤 [AI] Analysis enqueued successfully.")
                     } else {
                         // AI 분석이 거절되어도 일기는 이미 저장됨
                         // "재분석 중..." 상태를 해제하여 캘린더에서 정상 표시
-                        print("⚠️ [AI] Analysis busy. Clearing '재분석 중...' placeholder.")
                         if let index = LocalDataManager.shared.diaries.firstIndex(where: { $0.id == newDiary.id }) {
                             LocalDataManager.shared.diaries[index].ai_prediction = nil
                             LocalDataManager.shared.diaries[index].ai_analysis = nil
@@ -608,7 +600,7 @@ struct AppDiaryWriteView: View {
     }
     
     func moodEmoji(_ l: Int) -> String {
-        ["", "😠", "😢", "😐", "😌", "😊"][min(l, 5)]
+        ["", "매우나쁨", "나쁨", "보통", "좋음", "매우좋음"][min(l, 5)]
     }
     
     // [New] 약물 목록 로드

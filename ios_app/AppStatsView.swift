@@ -296,7 +296,6 @@ struct AppStatsView: View {
     }
     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
         // [UX] 데이터 갱신 알림 수신 시 재계산
-        print("🔄 [Stats] Refreshing stats due to data change...")
         fetchStats()
     }
     // 연동 상태가 바뀌면 즉시 감지하여 데이터 로드
@@ -498,7 +497,7 @@ struct AppStatsView: View {
         }
         
         guard !diaryPayloads.isEmpty else {
-            self.reportContent = "아직 기록이 없어요.\n괜찮아요, 편안할 때 한마디 남겨보세요. 🌿"
+            self.reportContent = "아직 기록이 없어요.\n괜찮아요, 편안할 때 한마디 남겨보세요."
             self.isGeneratingReport = false
             return
         }
@@ -510,10 +509,8 @@ struct AppStatsView: View {
                 case .success(let report):
                     self.reportContent = report
                     self.isGeneratingReport = false
-                    print("✅ [Stats] 분석 리포트 수신 (서버)")
                     
                 case .failure(let error):
-                    print("⚠️ [Stats] 서버 분석 실패: \(error.localizedDescription). 온디바이스 LLM 시도...")
                     // [2순위] 온디바이스 LLM
                     self.generateReportOnDevice(diaries: diaries, mode: "short")
                 }
@@ -535,7 +532,7 @@ struct AppStatsView: View {
         }
         
         guard !diaryPayloads.isEmpty else {
-            self.longTermContent = "장기 분석을 위해 최소 3일 이상의 일기가 필요해요. 꾸준히 기록해주세요! 💪"
+            self.longTermContent = "장기 분석을 위해 최소 3일 이상의 일기가 필요해요. 꾸준히 기록해주세요!"
             self.isGeneratingLongTerm = false
             return
         }
@@ -547,10 +544,8 @@ struct AppStatsView: View {
                 case .success(let report):
                     self.longTermContent = report
                     self.isGeneratingLongTerm = false
-                    print("✅ [Stats] 메타 분석 수신 (서버)")
                     
                 case .failure(let error):
-                    print("⚠️ [Stats] 서버 메타 분석 실패: \(error.localizedDescription). 온디바이스 LLM 시도...")
                     // [2순위] 온디바이스 LLM
                     self.generateReportOnDevice(diaries: diaries, mode: "long")
                 }
@@ -564,7 +559,6 @@ struct AppStatsView: View {
         
         // 온디바이스 모델이 로드되어 있는지 확인
         guard llmService.isModelLoaded else {
-            print("⚠️ [Stats] 온디바이스 모델 미로드. Fallback 텍스트 사용.")
             applyFallbackReport(mode: mode, diaries: diaries)
             return
         }
@@ -594,10 +588,8 @@ struct AppStatsView: View {
                         self.reportContent = response
                         self.isGeneratingReport = false
                     }
-                    print("✅ [Stats] 분석 완료 (온디바이스 LLM)")
                 }
             } catch {
-                print("⚠️ [Stats] 온디바이스 LLM 실패: \(error.localizedDescription). Fallback 사용.")
                 await MainActor.run {
                     self.applyFallbackReport(mode: mode, diaries: diaries)
                 }
@@ -618,7 +610,7 @@ struct AppStatsView: View {
             self.longTermContent = """
             [로컬 분석] 총 \(totalDays)일간의 기록을 분석했어요.
             평균 기분 점수는 \(String(format: "%.1f", avgMood))/5로, 전반적으로 \(moodLabel)인 상태예요.
-            꾸준히 기록하고 계신 것만으로도 정말 대단해요. 계속 응원할게요! 💛
+            꾸준히 기록하고 계신 것만으로도 정말 대단해요. 계속 응원할게요!
             (서버 연결 시 더 정밀한 AI 분석을 받아보실 수 있어요)
             """
             self.isGeneratingLongTerm = false
@@ -626,7 +618,7 @@ struct AppStatsView: View {
             self.reportContent = """
             [로컬 분석] \(totalDays)일간의 기록을 살펴봤어요.
             전반적으로 \(moodLabel)인 기분 흐름이에요.
-            매일 기록하는 습관이 마음 건강에 큰 도움이 된답니다! 🌱
+            매일 기록하는 습관이 마음 건강에 큰 도움이 된답니다! 
             (서버 연결 시 더 정밀한 AI 분석을 받아보실 수 있어요)
             """
             self.isGeneratingReport = false
@@ -688,7 +680,7 @@ struct FlowChartView: View {
         }
         .modifier(CardModifier())
     }
-    func moodEmoji(_ l: Int) -> String { ["", "🤬", "😢", "😐", "😌", "🥰"][l] }
+    func moodEmoji(_ l: Int) -> String { ["", "매우나쁨", "나쁨", "보통", "좋음", "매우좋음"][l] }
     func moodColor(_ l: Int) -> Color { [Color.gray, .mood1, .mood2, .mood3, .mood4, .mood5][min(l, 5)] }
 }
 
@@ -842,28 +834,28 @@ struct ReportView: View {
                 }.frame(height: 150)
             } else {
                 VStack(alignment: .leading, spacing: 10) {
-                    HStack { Text("💬 3줄 요약").font(.headline); Spacer() }
+                    HStack { Text("3줄 요약").font(.headline); Spacer() }
                     Text(content).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
                 }
                 .padding(20).background(Color(hexString: "F8F9FE")).cornerRadius(16)
                 
                 if longContent.isEmpty && !isGeneratingLong {
                     Button(action: startLongTerm) {
-                        Text("🧠 장기 기억 패턴 분석하기").fontWeight(.semibold).foregroundColor(.white).padding()
+                        Text("장기 기억 패턴 분석하기").fontWeight(.semibold).foregroundColor(.white).padding()
                             .frame(maxWidth: .infinity).background(Color.green).cornerRadius(16)
                     }
                 } else if isGeneratingLong {
                     ProgressView("장기 패턴 분석 중...")
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("🧠 메타 분석").font(.headline).foregroundColor(.green)
+                        Text("메타 분석").font(.headline).foregroundColor(.green)
                         Text(longContent).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
                     }.padding(20).background(Color(hexString: "F0FDF4")).cornerRadius(16)
                 }
-                Button("🔄 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
+                Button(" 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
+                    Text("AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
                         .font(.caption2)
                         .foregroundColor(.gray)
                     Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")

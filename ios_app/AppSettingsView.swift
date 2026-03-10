@@ -117,7 +117,7 @@ struct AppSettingsView: View {
                                         .foregroundColor(.gray)
                                     Spacer()
                                     if isPwVisible {
-                                        Text(UserDefaults.standard.string(forKey: "app_password") ?? "****")
+                                        Text(KeychainHelper.standard.readString(account: "app_password") ?? "****")
                                             .fontWeight(.bold)
                                             .foregroundColor(.orange)
                                     } else {
@@ -182,7 +182,7 @@ struct AppSettingsView: View {
                                     isLoggingIn = true
                                     // 1. Overwrite Credentials
                                     UserDefaults.standard.set(loginId, forKey: "app_username")
-                                    UserDefaults.standard.set(loginPw, forKey: "app_password")
+                                    KeychainHelper.standard.saveString(loginPw, account: "app_password")
                                     UserDefaults.standard.set(loginId, forKey: "userNickname") // Display Name
                                     // [Fix] authUsername도 함께 설정 (Single Source of Truth)
                                     UserDefaults.standard.set(loginId, forKey: "authUsername")
@@ -457,7 +457,7 @@ struct AppSettingsView: View {
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
-                                        Text("🌉 마음 브릿지")
+                                        Text("마음 브릿지")
                                             .font(.headline)
                                             .fontWeight(.bold)
                                             .foregroundColor(Color(hexString: "6366f1"))
@@ -543,7 +543,7 @@ struct AppSettingsView: View {
                                 }
                                 
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text("🌉 마음 브릿지")
+                                    Text("마음 브릿지")
                                         .font(.headline)
                                         .fontWeight(.bold)
                                         .foregroundColor(Color(hexString: "6366f1"))
@@ -598,7 +598,10 @@ struct AppSettingsView: View {
                 }
                 
                 // Section 4.5: 법적 고지 (Legal Disclaimer)
-                Section(header: Text("⚖️ 법적 고지")) {
+                Section(header: HStack {
+                    Image(systemName: "building.columns.fill")
+                    Text("법적 고지")
+                }) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("마음온은 감정 기록 보조 도구입니다")
                             .font(.subheadline)
@@ -608,16 +611,22 @@ struct AppSettingsView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        Text("⚠️ AI의 위기 감지 기능은 보조적 수단이며, 100% 정확성을 보장하지 않습니다. AI가 감지하지 못하는 위기 상황이 발생할 수 있으므로, 긴급한 상황에서는 즉시 1393 또는 119에 직접 연락해 주세요.")
-                            .font(.caption)
-                            .foregroundColor(.orange)
+                        HStack(alignment: .top, spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text("AI의 위기 감지 기능은 보조적 수단이며, 100% 정확성을 보장하지 않습니다. AI가 감지하지 못하는 위기 상황이 발생할 수 있으므로, 긴급한 상황에서는 즉시 1393 또는 119에 직접 연락해 주세요.")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
                         
                         Divider()
                         
-                        Text("⚠️ 긴급 상황 안내")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.red)
+                        HStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text("긴급 상황 안내")
+                        }
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.red)
                         
                         Text("정신건강 위기 상황에서는 반드시 전문 의료기관 또는 아래 긴급전화를 이용해 주세요.\n• 자살예방 상담전화: 1393\n• 정신건강 위기상담전화: 1577-0199\n• 경찰: 112")
                             .font(.caption)
@@ -625,9 +634,12 @@ struct AppSettingsView: View {
                         
                         Divider()
                         
-                        Text("📋 개인정보 처리")
-                            .font(.caption)
-                            .fontWeight(.semibold)
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.text.fill")
+                            Text("개인정보 처리")
+                        }
+                        .font(.caption)
+                        .fontWeight(.semibold)
                         
                         Text("기본적으로 모든 데이터는 사용자 기기에만 저장됩니다. 기관 연동 시에만 선택한 정보가 암호화되어 전송됩니다.")
                             .font(.caption)
@@ -654,7 +666,6 @@ struct AppSettingsView: View {
                             title: Text("앱 종료"),
                             message: Text("앱을 완전히 종료하시겠습니까?"),
                             primaryButton: .destructive(Text("종료")) {
-                                print("👋 [App] User confirmed exit.")
                                 exit(0)
                             },
                             secondaryButton: .cancel(Text("취소"))
@@ -663,7 +674,10 @@ struct AppSettingsView: View {
                 }
                 
                 // Section 4: 개발자 임시 기능 (Requested Feature)
-                Section(header: Text("🛠️ 개발자 임시 기능 (Remove Later)")) {
+                Section(header: HStack {
+                    Image(systemName: "hammer.fill")
+                    Text("개발자 임시 기능 (Remove Later)")
+                }) {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("연동 코드 강제 변경")
                             .font(.headline)
@@ -684,7 +698,6 @@ struct AppSettingsView: View {
                                 guard !tempInputCode.isEmpty else { return }
                                 
                                 // Debug: Print Endpoint
-                                print("⚪️ Requesting Verification for: \(tempInputCode)")
                                 
                                 // APIService를 통한 직접 연동 시도
                                 APIService.shared.verifyCenterCode(tempInputCode) { res in
@@ -705,21 +718,21 @@ struct AppSettingsView: View {
                                                     if success {
                                                         // B2GManager 상태 강제 동기화 (Updated for encapsulation)
                                                         b2gManager.forceLink(code: tempInputCode.uppercased())
-                                                        activeAlert = .info("✅ 강제 연동 성공!\n코드: \(tempInputCode.uppercased())")
+                                                        activeAlert = .info("[성공] 강제 연동 성공!\n코드: \(tempInputCode.uppercased())")
                                                         tempInputCode = ""
                                                     } else {
-                                                        activeAlert = .info("❌ 기관 연결(Connect) API 실패")
+                                                        activeAlert = .info("[실패] 기관 연결(Connect) API 실패")
                                                     }
                                                 }
                                             }
                                         } else {
                                             DispatchQueue.main.async {
-                                                activeAlert = .info("⚠️ 센터 ID를 찾을 수 없습니다 (응답 데이터 오류).")
+                                                activeAlert = .info("[주의] 센터 ID를 찾을 수 없습니다 (응답 데이터 오류).")
                                             }
                                         }
                                     case .failure(let err):
                                         DispatchQueue.main.async {
-                                            activeAlert = .info("❌ 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)")
+                                            activeAlert = .info("[오류] 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)")
                                         }
                                     }
                                 }
@@ -741,22 +754,27 @@ struct AppSettingsView: View {
                     Button(action: {
                         UserDefaults.standard.removeObject(forKey: "deleted_diary_ids")
                         UserDefaults.standard.removeObject(forKey: "deleted_diary_dates")
-                        activeAlert = .info("🗑️ 차단 목록(Tombstone)이 초기화되었습니다.\n이제 서버에서 삭제된 일기도 다시 가져올 수 있습니다.")
+                        activeAlert = .info("[초기화] 차단 목록(Tombstone)이 초기화되었습니다.\n이제 서버에서 삭제된 일기도 다시 가져올 수 있습니다.")
                     }) {
-                        Text("삭제/차단 기록 초기화 (Recover Deleted)")
-                            .font(.caption)
-                            .foregroundColor(.red)
+                        HStack {
+                            Image(systemName: "trash.fill")
+                            Text("삭제/차단 기록 초기화 (Recover Deleted)")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.red)
                     }
                     .padding(.top, 4)
                     
                     // [New] Clean Today's Fake Data
                     Button(action: {
-                        print("🧹 [Settings] Requesting cleanup...")
                         cleanTodayFakeData()
                     }) {
-                        Text("🧹 오늘 가짜 데이터 청소 (Clean Today's Fake)")
-                            .font(.caption)
-                            .foregroundColor(.orange)
+                        HStack {
+                            Image(systemName: "eraser.fill")
+                            Text("오늘 가짜 데이터 청소 (Clean Today's Fake)")
+                        }
+                        .font(.caption)
+                        .foregroundColor(.orange)
                     }
                     .padding(.top, 4)
                 }
@@ -824,20 +842,19 @@ struct AppSettingsView: View {
         }
         
         if toDeleteIds.isEmpty {
-            activeAlert = .info("🔍 검색 결과: 오늘(\(todayStr)) 작성된 일기 중\n'가짜 패턴'과 일치하는 항목이 없습니다.")
+            activeAlert = .info("[검색] 검색 결과: 오늘(\(todayStr)) 작성된 일기 중\n'가짜 패턴'과 일치하는 항목이 없습니다.")
             return
         }
         
         // Count for alert
         let deleteCount = toDeleteIds.count
         
-        print("🧹 Cleaning \(deleteCount) fake diaries...")
         
         for id in toDeleteIds {
             LocalDataManager.shared.deleteDiary(id: id) { _ in }
         }
         
-        activeAlert = .info("✨ 청소 완료!\n오늘 작성된 가짜 일기 \(deleteCount)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
+        activeAlert = .info("[완료] 청소 완료!\n오늘 작성된 가짜 일기 \(deleteCount)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
         
         // Refresh Stats
         NotificationCenter.default.post(name: NSNotification.Name("RefreshStats"), object: nil)

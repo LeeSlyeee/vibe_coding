@@ -163,7 +163,6 @@ class MindBridgeManager: ObservableObject {
                 if let idx = self.recipients.firstIndex(where: { $0.id == recipient.id }) {
                     self.recipients[idx].serverId = serverId
                     self.saveLocal()
-                    print("🌉 [MindBridge] 서버 동기화 완료: \(name) (ID: \(serverId))")
                 }
             }
         }
@@ -179,7 +178,6 @@ class MindBridgeManager: ObservableObject {
         if let serverId = target?.serverId {
             APIService.shared.deleteBridgeRecipient(serverId: serverId) { success in
                 if success {
-                    print("🌉 [MindBridge] 서버 수신자 삭제 완료: \(serverId)")
                 }
             }
         }
@@ -282,7 +280,6 @@ class MindBridgeManager: ObservableObject {
                             sharedItems: sharedItems
                         )
                         self.shareSuccess = true
-                        print("🌉 [MindBridge] 공유 완료: \(recipient.name) → \(sharedItems)")
                         completion(true, nil)
                     } else {
                         completion(false, "공유 전송에 실패했습니다")
@@ -329,7 +326,6 @@ class MindBridgeManager: ObservableObject {
         // 서버 데이터도 삭제
         APIService.shared.deleteAllBridgeData { success in
             if success {
-                print("🌉 [MindBridge] 서버 데이터 전체 삭제 완료")
             }
         }
     }
@@ -382,7 +378,6 @@ class MindBridgeManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.recipients = serverRecipients
                     self.saveLocal()
-                    print("🌉 [MindBridge] 서버 수신자 동기화 완료: \(serverRecipients.count)명")
                 }
             }
         }

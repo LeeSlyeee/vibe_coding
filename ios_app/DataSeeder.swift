@@ -35,7 +35,7 @@ class DataSeeder {
             let timeStr = isoFormatter.string(from: createdDate)
             
             // [Winter Context] 2월 날씨 반영
-            let weather = ["맑음 ☀️", "맑음 ☀️", "흐림 ☁️", "눈 ❄️", "바람 💨"].randomElement() // 맑음 확률 높임
+            let weather = ["맑음 ☀️", "맑음 ☀️", "흐림 ☁️", "눈 ❄️", "바람 "].randomElement() // 맑음 확률 높임
             let temp = Double.random(in: -7.0...8.0) // 2월 기온 (-7도 ~ 8도)
             
             // 랜덤 감정 및 내용 생성
@@ -93,7 +93,6 @@ class DataSeeder {
         }
         
         group.notify(queue: .main) {
-             print("🌱 Seeded \(count) dummy diaries.")
             // [UX] 통계 화면 갱신 트리거
             NotificationCenter.default.post(name: NSNotification.Name("RefreshStats"), object: nil)
             completion(count)
@@ -101,7 +100,6 @@ class DataSeeder {
     }
     
     func seedDummyFriends() {
-        print("🌱 Seeding Dummy Friends for Birthday Test...")
         let today = Date()
         let cal = Calendar.current
         let f = DateFormatter()
@@ -131,7 +129,6 @@ class DataSeeder {
             // ShareManager에 주입 (메모리 상에서만 존재, 앱 재실행 시 사라짐)
             DispatchQueue.main.async {
                 ShareManager.shared.connectedUsers.append(contentsOf: [friend1, friend2])
-                print("✅ Seeded 2 Friends. Triggering UI Refresh...")
                 
                 // 알림 강제 트리거 (AppMainTabView에서 감지하도록)
                 // 3초 후 체크 로직이 돌지만, 여기서 강제로 View를 갱신할 수 없으니

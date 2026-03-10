@@ -25,8 +25,9 @@ struct AppLoginView: View {
                     Spacer().frame(height: 60) // Top spacing
                     
                     VStack(spacing: 8) {
-                        Text("🌙")
+                        Image(systemName: "moon.fill")
                             .font(.system(size: 80))
+                            .foregroundColor(.yellow)
                         Text("마음온(maumON)")
                             .font(.largeTitle)
                             .fontWeight(.bold)

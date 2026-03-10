@@ -44,12 +44,9 @@ class SubscriptionManager: ObservableObject {
             let products = try await Product.products(for: [Self.mindBridgeProductID])
             if let mindBridge = products.first {
                 self.product = mindBridge
-                print("✅ [Subscription] 상품 로드 완료: \(mindBridge.displayName) - \(mindBridge.displayPrice)")
             } else {
-                print("⚠️ [Subscription] 상품을 찾을 수 없음. Product ID 확인 필요: \(Self.mindBridgeProductID)")
             }
         } catch {
-            print("❌ [Subscription] 상품 로드 실패: \(error.localizedDescription)")
         }
     }
     
@@ -76,20 +73,16 @@ class SubscriptionManager: ObservableObject {
                 // 트랜잭션 완료 처리
                 await transaction.finish()
                 
-                print("✅ [Subscription] 구매 성공!")
                 
             case .userCancelled:
-                print("ℹ️ [Subscription] 사용자가 구매를 취소함")
-                
+                break
             case .pending:
-                print("⏳ [Subscription] 구매 승인 대기 중 (가족 공유 등)")
-                
+                break
             @unknown default:
-                print("⚠️ [Subscription] 알 수 없는 구매 결과")
+                break
             }
         } catch {
             purchaseError = "구매 중 오류가 발생했습니다: \(error.localizedDescription)"
-            print("❌ [Subscription] 구매 오류: \(error)")
         }
         
         isLoading = false
@@ -102,10 +95,8 @@ class SubscriptionManager: ObservableObject {
         do {
             try await AppStore.sync()
             await updateSubscriptionStatus()
-            print("✅ [Subscription] 구독 복원 완료")
         } catch {
             purchaseError = "구독 복원에 실패했습니다."
-            print("❌ [Subscription] 복원 실패: \(error)")
         }
         
         isLoading = false
@@ -117,7 +108,6 @@ class SubscriptionManager: ObservableObject {
         // 베타 기간에는 항상 구독 상태를 true로 유지
         isSubscribed = true
         UserDefaults.standard.set(true, forKey: "mindBridge_subscribed")
-        print("📊 [Subscription] 상태 업데이트: 베타 모드 (항상 구독 중)")
         
         /* ── 정식 출시 시 아래 코드로 교체 ──
         var hasActiveSubscription = false
@@ -129,21 +119,23 @@ class SubscriptionManager: ObservableObject {
                 if transaction.productID == Self.mindBridgeProductID {
                     if transaction.revocationDate == nil {
                         hasActiveSubscription = true
-                        expirationDate = transaction.expirationDate
-                        
-                        if let offerType = transaction.offerType {
-                            isInTrialPeriod = (offerType == .introductory)
+                        DispatchQueue.main.async {
+                            self.expirationDate = transaction.expirationDate
+                            if let offerType = transaction.offerType {
+                                self.isInTrialPeriod = (offerType == .introductory)
+                            }
                         }
                     }
                 }
             } catch {
-                print("⚠️ [Subscription] 트랜잭션 검증 실패: \(error)")
+                // error
             }
         }
         
-        isSubscribed = hasActiveSubscription
+        DispatchQueue.main.async {
+            self.isSubscribed = hasActiveSubscription
+        }
         UserDefaults.standard.set(hasActiveSubscription, forKey: "mindBridge_subscribed")
-        print("📊 [Subscription] 상태 업데이트: \(isSubscribed ? "구독 중" : "미구독")")
         ── 여기까지 교체 ── */
     }
     
@@ -156,7 +148,6 @@ class SubscriptionManager: ObservableObject {
                     await self.updateSubscriptionStatus()
                     await transaction.finish()
                 } catch {
-                    print("⚠️ [Subscription] 트랜잭션 업데이트 처리 실패: \(error)")
                 }
             }
         }

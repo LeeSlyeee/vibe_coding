@@ -37,7 +37,7 @@ struct MindDiaryApp: App {
     @StateObject private var authManager = AuthManager()
     @State private var showSplash = true
     
-    // 🔥 앱의 현재 상태(백그라운드/포그라운드) 추적
+    //  앱의 현재 상태(백그라운드/포그라운드) 추적
     @Environment(\.scenePhase) private var scenePhase
     
     var body: some Scene {
@@ -63,7 +63,6 @@ struct MindDiaryApp: App {
                     // (A) 로고 감상을 위한 최소 대기 시간 (2초)
                     try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
                     
-                    print("✅ Splash Time Completed. Dismising Splash.")
                     
                     // (C) 메인 화면 전환
                     await MainActor.run {
@@ -95,12 +94,10 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if granted {
-                print("✅ 푸시 알림 권한 허용")
                 DispatchQueue.main.async {
                     application.registerForRemoteNotifications()
                 }
             } else {
-                print("⚠️ 푸시 알림 권한 거부: \(error?.localizedDescription ?? "")")
             }
         }
         return true
@@ -110,7 +107,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
         let hex = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
-        print("✅ APNs 디바이스 토큰: \(hex)")
         UserDefaults.standard.set(hex, forKey: "apns_device_token")
         // APNs 토큰을 즉시 서버에 별도 전송
         sendAPNsTokenToServer(apnsToken: hex)
@@ -128,25 +124,21 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         request.httpBody = try? JSONSerialization.data(withJSONObject: ["apns_token": apnsToken])
         URLSession.shared.dataTask(with: request) { _, response, _ in
             if let r = response as? HTTPURLResponse, r.statusCode == 200 {
-                print("✅ APNs 토큰 서버 등록 완료")
             }
         }.resume()
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
-        print("❌ APNs 등록 실패: \(error.localizedDescription)")
     }
 
     // MARK: - MessagingDelegate (FCM 토큰 수신)
     
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let token = fcmToken else { return }
-        print("✅ FCM 토큰 수신: \(token.prefix(30))...")
         
         // Firebase에서 APNs 토큰 직접 읽기
         if let apnsData = messaging.apnsToken {
             let hex = apnsData.map { String(format: "%02.2hhx", $0) }.joined()
-            print("✅ APNs 토큰 확인: \(hex.prefix(20))...")
             UserDefaults.standard.set(hex, forKey: "apns_device_token")
         }
         
@@ -155,10 +147,8 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             if let apnsData = Messaging.messaging().apnsToken {
                 let hex = apnsData.map { String(format: "%02.2hhx", $0) }.joined()
                 UserDefaults.standard.set(hex, forKey: "apns_device_token")
-                print("✅ APNs 토큰 (지연 확인): \(hex.prefix(20))...")
                 self.sendAPNsTokenToServer(apnsToken: hex)
             } else {
-                print("⚠️ APNs 토큰 없음 (시뮬레이터?)")
             }
         }
         
@@ -181,7 +171,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
-        print("📩 알림 탭: \(userInfo)")
         
         if let type = userInfo["type"] as? String {
             // FCM/APNs 페이로드에서 String 또는 Int로 넘어올 수 있는 값을 안전하게 처리
@@ -199,7 +188,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                         DeepLinkManager.shared.activeScreen = .weeklyLetter(letterId: letterId)
                     }
                 }
-                print("📮 딥링크: 주간 편지 열기 (letter_id=\(letterId ?? -1))")
             } else if type == "mood_alert" || type == "kick_flag_alert" || type == "ai_report_alert" || type == "crisis_alert" {
                 let sharerId = extractInt("sharer_id")
                 DispatchQueue.main.async {
@@ -217,7 +205,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                         }
                     }
                 }
-                print("📮 딥링크: 알림 (type=\(type), sharer_id=\(sharerId ?? -1))")
             }
         }
         
@@ -228,7 +215,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     private func registerFCMTokenToServer(token: String) {
         guard let authToken = UserDefaults.standard.string(forKey: "serverAuthToken"), !authToken.isEmpty else {
-            print("⏳ FCM 토큰 등록 대기: 로그인 토큰 없음")
             UserDefaults.standard.set(token, forKey: "pending_fcm_token")
             return
         }
@@ -249,14 +235,11 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse {
                 if httpResponse.statusCode == 200 {
-                    print("✅ FCM 토큰 서버 등록 완료")
                     UserDefaults.standard.removeObject(forKey: "pending_fcm_token")
                 } else {
                     let respBody = data.flatMap { String(data: $0, encoding: .utf8) } ?? "no body"
-                    print("❌ FCM 토큰 등록 실패: HTTP \(httpResponse.statusCode) | \(respBody)")
                 }
             } else {
-                print("❌ FCM 토큰 등록 네트워크 에러: \(error?.localizedDescription ?? "unknown")")
             }
         }.resume()
     }

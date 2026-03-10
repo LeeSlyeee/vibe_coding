@@ -42,7 +42,6 @@ class APIService: NSObject {
         // [Auth - Unified Identity]
         // CRITICAL FIX: Use "authUsername" (Single Source of Truth)
         guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
-            print("⚠️ [API-OCI] No Valid Identity (authUsername). Require Login.")
             completion(false)
             return
         }
@@ -57,7 +56,6 @@ class APIService: NSObject {
         // 토큰이 없는 경우에만 재로그인 시도
         // [Fix] 사용자가 실제 입력한 비밀번호 사용 (랜덤 UUID 생성 제거)
         guard let password = UserDefaults.standard.string(forKey: "app_password"), !password.isEmpty else {
-            print("⚠️ [API-OCI] No stored password. User must re-login from Login screen.")
             completion(false)
             return
         }
@@ -93,7 +91,6 @@ class APIService: NSObject {
                          if let jwtId = self.decodeUserIdFromJWT(token: accessToken) {
                              UserDefaults.standard.set(jwtId, forKey: "userId")
                              idSaved = true
-                             print("✅ [Auth] Extracted User ID from JWT: \(jwtId)")
                          }
                      }
                      
@@ -105,7 +102,6 @@ class APIService: NSObject {
                 // [Fix] 로그인 실패 시 랜덤 회원가입 시도 제거
                 // ensureAuth는 이미 가입된 사용자의 토큰 갱신 전용
                 // 신규 가입은 AppLoginView → AuthManager.performLogin()에서 처리
-                print("⚠️ [API-OCI] Re-login failed: \(err). User must re-login from Login screen.")
                 completion(false)
             }
         }
@@ -126,11 +122,9 @@ class APIService: NSObject {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
-        // print("🚀 [API-217] Syncing User Info: \(urlStr)")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("⚠️ [API-217] Sync Failed: \(error.localizedDescription)")
                 completion(false)
                 return
             }
@@ -149,7 +143,6 @@ class APIService: NSObject {
             }
             if let name = json["name"] as? String, !name.isEmpty {
                 UserDefaults.standard.set(name, forKey: "realName")
-                // print("✅ [API-217] Real Name Synced: \(name)")
             }
             if let nickname = json["nickname"] as? String, !nickname.isEmpty {
                 UserDefaults.standard.set(nickname, forKey: "userNickname")
@@ -184,28 +177,23 @@ class APIService: NSObject {
     // Unified Sync Method
     func syncDiary(_ diary: Diary, completion: @escaping (Bool) -> Void = { _ in }) {
         let dateStr = diary.date ?? "Unknown"
-        // print("🔄 [API] Syncing Diary: \(dateStr)")
         
         ensureAuth { success in
             guard success else {
-                print("❌ [API] Sync Aborted: Auth Failed.")
                 completion(false)
                 return
             }
             
-            // [Switch] Use Medical Dashboard API (Django)
-            // Django Endpoint: /diaries/date/YYYY-MM-DD/
-            self.performRequest(baseURL: self.medicalURL, endpoint: "/diaries/date/\(dateStr)/", method: "GET") { result in
+            // [Revert] Use Flask API for Push Triggers and Sync
+            self.performRequest(baseURL: self.baseURL, endpoint: "/diaries/date/\(dateStr)", method: "GET") { result in
                 switch result {
                 case .success(let data):
                     // Found -> Update (PUT)
-                    // print("✅ [API] Found existing diary for \(dateStr). Updating...")
                     if let id = data["id"] as? Int {
                         self.updateDiaryOnServer(diaryId: String(id), diary: diary, completion: completion)
                     } else if let id = data["id"] as? String {
                         self.updateDiaryOnServer(diaryId: id, diary: diary, completion: completion)
                     } else {
-                         print("⚠️ [API] ID parsing failed. Falling back to Create.")
                          self.createDiaryOnServer(diary, completion: completion)
                     }
                 case .failure(let error):
@@ -213,7 +201,6 @@ class APIService: NSObject {
                     // [Fix] 이미 동기화된 항목인데 서버에 없다면 → 서버에서 삭제된 것
                     // 재생성하지 않고 로컬에서도 제거
                     if diary.isSynced == true, let sid = diary._id, !sid.isEmpty {
-                        print("🗑️ [API-Medical] Server-deleted diary detected: \(dateStr) (was ID: \(sid)). Skipping re-create.")
                         DispatchQueue.main.async {
                             LocalDataManager.shared.removeServerDeletedDiary(serverId: sid, dateStr: dateStr)
                         }
@@ -228,13 +215,12 @@ class APIService: NSObject {
     }
 
 
-    // [Helper] Build Payload (Django Schema)
+    // [Helper] Build Payload (Flask Schema)
     private func buildDiaryPayload(_ diary: Diary) -> [String: Any] {
-        // Django Model: content, mood_score, date(for creation), sleep_condition, etc.
         var basePayload: [String: Any] = [
-            "date": diary.date ?? "", // Serializer will map this to created_at
-            "content": diary.event ?? "", // [Fix] 'content' instead of 'event'
-            "mood_score": diary.mood_level, // [Fix] 'mood_score' instead of 'mood_level'
+            "date": diary.date ?? "",
+            "event": diary.event ?? "",
+            "mood_level": diary.mood_level,
             "weather": diary.weather ?? "",
             "sleep_condition": diary.sleep_desc ?? (diary.sleep_condition ?? ""),
             "emotion_desc": diary.emotion_desc ?? "",
@@ -261,16 +247,13 @@ class APIService: NSObject {
 
     private func createDiaryOnServer(_ diary: Diary, completion: @escaping (Bool) -> Void) {
         var payload = buildDiaryPayload(diary)
-        print("🚀 [API-Medical] Creating New Diary: \(diary.date ?? "")")
         
-        // Django Endpoint: /diaries/ (POST)
-        performRequest(baseURL: self.medicalURL, endpoint: "/diaries/", method: "POST", body: payload) { result in
+        // Flask Endpoint: /diaries (POST)
+        performRequest(baseURL: self.baseURL, endpoint: "/diaries", method: "POST", body: payload) { result in
             switch result {
             case .success(let data):
-                print("✅ [API-Medical] Diary Created. ID: \(data["id"] ?? "null")")
                 completion(true)
             case .failure(let error):
-                print("❌ [API-Medical] Create Failed: \(error.localizedDescription)")
                 completion(false)
             }
         }
@@ -278,16 +261,13 @@ class APIService: NSObject {
     
     private func updateDiaryOnServer(diaryId: String, diary: Diary, completion: @escaping (Bool) -> Void) {
         var payload = buildDiaryPayload(diary)
-        print("🚀 [API-Medical] Updating Diary ID: \(diaryId)")
         
-        // Django Endpoint: /diaries/{id}/ (PUT)
-        performRequest(baseURL: self.medicalURL, endpoint: "/diaries/\(diaryId)/", method: "PUT", body: payload) { result in
+        // Flask Endpoint: /diaries/{id} (PUT)
+        performRequest(baseURL: self.baseURL, endpoint: "/diaries/\(diaryId)", method: "PUT", body: payload) { result in
             switch result {
             case .success:
-                print("✅ [API-Medical] Diary Updated.")
                 completion(true)
             case .failure(let error):
-                print("❌ [API-Medical] Update Failed: \(error.localizedDescription)")
                 completion(false)
             }
         }
@@ -307,7 +287,6 @@ class APIService: NSObject {
                 } else if let message = json["message"] as? String, message.contains("Data synced") {
                      completion(true, nil)
                 } else {
-                    // print("⚠️ [Sync] JSON 'success' field missing, but HTTP 200 OK. Assuming Success.")
                     completion(true, nil)
                 }
             case .failure(let error):
@@ -335,7 +314,6 @@ class APIService: NSObject {
             case .success:
                 completion(true)
             case .failure(let error):
-                print("❌ [API] Connect Center Failed: \(error.localizedDescription)")
                 completion(false)
             }
         }
@@ -352,7 +330,6 @@ class APIService: NSObject {
                 case .success(let data):
                     completion(data)
                 case .failure(let error):
-                    print("❌ [API] Fetch MindGuide Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -370,7 +347,6 @@ class APIService: NSObject {
                 case .success(let data):
                     completion(data)
                 case .failure(let error):
-                    print("⚠️ [API] Fetch Condition Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -380,13 +356,12 @@ class APIService: NSObject {
     func fetchDiaries(completion: @escaping ([[String: Any]]?) -> Void) {
         ensureAuth { success in
             guard success else { completion(nil); return }
-            // Django Endpoint: /diaries/ (GET List)
-            self.performRequestList(baseURL: self.medicalURL, endpoint: "/diaries/", method: "GET") { result in
+            // Flask Endpoint: /diaries (GET List)
+            self.performRequestList(baseURL: self.baseURL, endpoint: "/diaries", method: "GET") { result in
                 switch result {
                 case .success(let list):
                     completion(list)
                 case .failure(let error):
-                    print("❌ [API-Medical] Fetch Diaries Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -397,16 +372,13 @@ class APIService: NSObject {
     func deleteDiaryOnServer(diaryId: String, completion: @escaping (Bool) -> Void = { _ in }) {
         ensureAuth { success in
             guard success else { completion(false); return }
-            print("🗑️ [API-Medical] Deleting Diary ID: \(diaryId)")
             
-            // Django Endpoint: /diaries/{id}/ (DELETE)
-            self.performRequest(baseURL: self.medicalURL, endpoint: "/diaries/\(diaryId)/", method: "DELETE") { result in
+            // Flask Endpoint: /diaries/{id} (DELETE)
+            self.performRequest(baseURL: self.baseURL, endpoint: "/diaries/\(diaryId)", method: "DELETE") { result in
                 switch result {
                 case .success:
-                    print("✅ [API-Medical] Delete Success")
                     completion(true)
                 case .failure(let error):
-                    print("❌ [API-Medical] Delete Failed: \(error.localizedDescription)")
                     completion(false)
                 }
             }
@@ -449,11 +421,9 @@ class APIService: NSObject {
             
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
             
-            // print("🚀 [API-217] Chat Request to LLM Node: \(llmBaseURL)")
             
             URLSession.shared.dataTask(with: request) { data, response, error in
                 if let error = error {
-                    print("❌ [API-217] Connection Failed: \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
@@ -464,7 +434,6 @@ class APIService: NSObject {
                 }
                 
                 if httpResponse.statusCode != 200 {
-                    print("⚠️ [API-217] Server Error: \(httpResponse.statusCode)")
                     completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                     return
                 }
@@ -516,11 +485,9 @@ class APIService: NSObject {
             
             request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
             
-            print("🚀 [API] Analysis Report Request: mode=\(mode), diaries=\(diaries.count)개")
             
             URLSession.shared.dataTask(with: request) { data, response, error in
                 if let error = error {
-                    print("❌ [API] Analysis Report Failed: \(error.localizedDescription)")
                     completion(.failure(error))
                     return
                 }
@@ -531,7 +498,6 @@ class APIService: NSObject {
                 }
                 
                 if httpResponse.statusCode != 200 {
-                    print("⚠️ [API] Analysis Report Error: \(httpResponse.statusCode)")
                     completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                     return
                 }
@@ -540,7 +506,6 @@ class APIService: NSObject {
                     if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let report = json["report"] as? String {
                         let source = json["source"] as? String ?? "unknown"
-                        print("✅ [API] Analysis Report Received (source: \(source))")
                         completion(.success(report))
                     } else {
                         completion(.failure(NSError(domain: "API", code: -1, userInfo: [NSLocalizedDescriptionKey: "report 필드 없음"])))
@@ -586,6 +551,7 @@ class APIService: NSObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
         request.httpMethod = method
+        request.timeoutInterval = 15.0 // [UX Fix] 60초 기본 대기가 아닌 15초로 단축
         
         if let body = body {
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
@@ -599,17 +565,13 @@ class APIService: NSObject {
             }
         }
         
-        print("🚀 [API-OCI] \(method) \(safeEndpoint)")
         if let token = request.value(forHTTPHeaderField: "Authorization") {
-             // print("🔑 [API-OCI] Token: \(token.prefix(10))...")
         } else if requiresAuth {
-             print("⚠️ [API-OCI] No Auth Token!")
         }
         
         // Use Shared Session
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
-                print("❌ [API-OCI] Network Error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
@@ -623,16 +585,12 @@ class APIService: NSObject {
             let responseData = data ?? Data()
             let responseString = String(data: responseData, encoding: .utf8) ?? "(No Body)"
             
-            print("📡 [API-OCI] Status: \(httpResponse.statusCode) | URL: \(endpoint)")
             
             if !(200...299).contains(httpResponse.statusCode) {
-                print("❌ [API-OCI] Request Failed!")
-                print("📝 [API-OCI] Response Body: \(responseString)")
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                 return
             } else {
                 // Success case logging (Optional, noisy)
-                // print("✅ [API-OCI] Success Body: \(responseString.prefix(100))...")
             }
             
             do {
@@ -643,7 +601,6 @@ class APIService: NSObject {
                       completion(.success(["data": jsonArray]))
                 } else {
                       if let str = String(data: responseData, encoding: .utf8) {
-                        print("📡 [API-OCI] Invalid Dict Format: \(str)")
                       }
                       completion(.failure(NSError(domain: "Invalid Format", code: -1, userInfo: nil)))
                 }
@@ -681,18 +638,15 @@ class APIService: NSObject {
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("true", forHTTPHeaderField: "ngrok-skip-browser-warning")
+        request.timeoutInterval = 15.0 // [UX Fix] 60초 기본 대기가 아닌 15초로 단축
         
         // [Critical Fix] Use In-Memory Cached Token
         if let token = self.token {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             // Debug Header
-            print("🔑 [API-OCI-LIST] Header Set: Bearer \(token.prefix(15))...")
         } else {
-            print("⚠️ [API-OCI-LIST] No Token Available (In-Memory/Disk Empty)")
         }
         
-        print("🚀 [API-OCI-LIST] \(method) \(safeEndpoint)")
-        print("📦 [API-OCI-LIST] Headers: \(request.allHTTPHeaderFields ?? [:])") // Verbose log
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error { completion(.failure(error)); return }
@@ -706,7 +660,6 @@ class APIService: NSObject {
             let responseData = data ?? Data()
             
             if !(200...299).contains(httpResponse.statusCode) {
-                print("📡 [API-OCI-LIST] Failed: \(httpResponse.statusCode)")
                 if let str = String(data: responseData, encoding: .utf8) { print("Body: \(str)") }
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                 return
@@ -723,10 +676,8 @@ class APIService: NSObject {
                         completion(.success(dataList))
                     } else if let msg = jsonDict["msg"] as? String {
                         // Backend returned a message instead of list (likely auth error or empty)
-                        print("⚠️ [API-OCI-LIST] Server Message: \(msg)")
                         completion(.failure(NSError(domain: "Server", code: -1, userInfo: ["msg": msg])))
                     } else {
-                        print("⚠️ [API-OCI-LIST] Unexpected Dict Response: \(jsonDict)")
                         completion(.failure(NSError(domain: "Invalid Format", code: -1, userInfo: nil)))
                     }
                 } else {
@@ -734,7 +685,6 @@ class APIService: NSObject {
                     completion(.failure(NSError(domain: "API", code: -1, userInfo: nil)))
                 }
             } catch {
-                print("JSON Error: \(error)")
                 completion(.failure(error))
             }
         }.resume()
@@ -776,17 +726,14 @@ class APIService: NSObject {
     func triggerBulkSync(completion: @escaping (Bool) -> Void) {
         // [Fix] Removed legacy sync trigger which caused 404.
         // B2G Sync handles data propagation.
-        print("✅ [API] Bulk Sync Skipped (Legacy Endpoint Removed)")
         completion(true)
         
         /*
         performRequest(endpoint: "/maum_on/sync_all/", method: "POST") { result in
             switch result {
             case .success:
-                print("✅ [API] Bulk Sync Triggered Success")
                 completion(true)
             case .failure(let error):
-                print("❌ [API] Bulk Sync Failed: \(error.localizedDescription)")
                 completion(false)
             }
         }
@@ -810,14 +757,12 @@ class APIService: NSObject {
                             let letters = try JSONDecoder().decode([WeeklyLetter].self, from: jsonData)
                             completion(letters)
                         } catch {
-                            print("❌ [API] Decode error: \(error)")
                             completion(nil)
                         }
                     } else {
                         completion(nil)
                     }
                 case .failure(let error):
-                    print("⚠️ [API] Fetch Weekly Letters Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -836,11 +781,9 @@ class APIService: NSObject {
                         let letter = try JSONDecoder().decode(WeeklyLetter.self, from: jsonData)
                         completion(letter)
                     } catch {
-                        print("❌ [API] Decode error: \(error)")
                         completion(nil)
                     }
                 case .failure(let error):
-                    print("⚠️ [API] Fetch Weekly Letter Detail Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -859,11 +802,9 @@ class APIService: NSObject {
                         let mapData = try JSONDecoder().decode(RelationalMapResponse.self, from: jsonData)
                         completion(mapData)
                     } catch {
-                        print("❌ [API] Decode error: \(error)")
                         completion(nil)
                     }
                 case .failure(let error):
-                    print("⚠️ [API] Fetch Relational Map Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -880,7 +821,6 @@ class APIService: NSObject {
                 switch result {
                 case .success(let data): completion(data)
                 case .failure(let error):
-                    print("⚠️ [Bridge] Fetch Recipients Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }
@@ -908,7 +848,6 @@ class APIService: NSObject {
                         completion(nil)
                     }
                 case .failure(let error):
-                    print("⚠️ [Bridge] Add Recipient Failed: \(error.localizedDescription)")
                     completion(nil)
                 }
             }

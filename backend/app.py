@@ -643,6 +643,48 @@ def update_diary(diary_id):
     )
 
     response_data = serialize_diary(diary)
+    
+    # [Local Sync] Update to Medical Dashboard (Localhost:8000)
+    try:
+        from b2g_routes import sync_to_insight_mind
+        sync_to_insight_mind(response_data, user.id)
+    except Exception as e:
+        print(f"⚠️ Sync Trigger Failed: {e}")
+
+    # [Push Notification] 보호자 알림 트리거 (수정 시)
+    try:
+        from push_service import notify_guardians_mood, notify_guardians_crisis, notify_guardians_kick_flag, is_push_available
+        if is_push_available():
+            mood = data.get('mood_level', diary.mood_level)
+            safety = data.get('safety_flag', diary.safety_flag)
+            # ① 기분 온도 알림
+            if mood:
+                notify_guardians_mood(user, int(mood))
+            # ② 위기 감지 알림
+            if safety in [True, 'need_help', 'danger']:
+                notify_guardians_crisis(user)
+            # ③ 킥 분석 (Phase 1~3)
+            try:
+                all_kick_flags = []
+                from kick_analysis import analyze_timeseries
+                ts_result = analyze_timeseries(user.id, db.session, Diary)
+                if ts_result.get('flags'): all_kick_flags.extend(ts_result['flags'])
+                
+                from kick_analysis.linguistic import analyze_linguistic
+                ling_result = analyze_linguistic(user.id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if ling_result.get('flags'): all_kick_flags.extend(ling_result['flags'])
+                
+                from kick_analysis.relational import analyze_relational
+                rel_result = analyze_relational(user.id, db.session, Diary, crypto_decrypt=safe_decrypt)
+                if rel_result.get('flags'): all_kick_flags.extend(rel_result['flags'])
+                
+                if all_kick_flags:
+                    notify_guardians_kick_flag(user, all_kick_flags)
+            except Exception as ke:
+                print(f"⚠️ Kick Analysis Trigger Failed (Update): {ke}")
+    except Exception as e:
+        print(f"⚠️ Push Notification Trigger Failed (Update): {e}")
+
     response_data['msg'] = '일기가 수정되었습니다.'
     return jsonify(response_data)
 

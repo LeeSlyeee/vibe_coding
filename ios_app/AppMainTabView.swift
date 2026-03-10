@@ -116,7 +116,7 @@ struct AppMainTabView: View {
                          Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                          
                          VStack(spacing: 20) {
-                             Text("🎂")
+                             Image(systemName: "birthday.cake.fill").foregroundColor(.pink)
                                  .font(.system(size: 80))
                                  .padding(.bottom, -10)
                              
@@ -125,7 +125,7 @@ struct AppMainTabView: View {
                                  .fontWeight(.heavy)
                                  .foregroundColor(.pink)
                              
-                             Text("오늘 하루 세상에서 가장 행복한 사람이 되길 바랄게! 🎉")
+                             Text("오늘 하루 세상에서 가장 행복한 사람이 되길 바랄게!")
                                  .font(.body)
                                  .fontWeight(.bold)
                                  .foregroundColor(.white)
@@ -135,7 +135,7 @@ struct AppMainTabView: View {
                              Button(action: {
                                  withAnimation { showBirthdayToast = false }
                              }) {
-                                 Text("고마워! 😍")
+                                 Text("고마워!")
                                      .fontWeight(.bold)
                                      .padding(.horizontal, 30)
                                      .padding(.vertical, 12)
@@ -162,7 +162,7 @@ struct AppMainTabView: View {
                          Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                          
                          VStack(spacing: 15) {
-                             Text("🎉")
+                             Image(systemName: "party.popper.fill").foregroundColor(.orange)
                                  .font(.system(size: 60))
                                  .padding(.bottom, -5)
                              
@@ -181,7 +181,7 @@ struct AppMainTabView: View {
                                              .foregroundColor(.yellow)
                                          
                                          if info.dDay == 0 {
-                                             Text("오늘 생일! 🎂")
+                                             HStack { Image(systemName: "birthday.cake.fill"); Text("오늘 생일!") }
                                                  .font(.headline)
                                                  .fontWeight(.heavy)
                                                  .foregroundColor(.white)
@@ -212,7 +212,7 @@ struct AppMainTabView: View {
                              Button(action: {
                                  withAnimation { showFriendBirthdayToast = false }
                              }) {
-                                 Text("확인했어요! 💌")
+                                 Text("확인했어요!")
                                      .fontWeight(.bold)
                                      .padding(.horizontal, 24)
                                      .padding(.vertical, 10)
@@ -338,7 +338,6 @@ struct AppMainTabView: View {
             .onAppear {
                 // [DeepLink] 앱 실행 후 (Splash 이후) 쌓여있는 초기 딥링크 라우팅 실행
                 if let pending = DeepLinkManager.shared.activeScreen {
-                    print("⏳ [DeepLink] AppMainTabView.onAppear - 콜드스타트 대기 라우팅 실행: \(pending)")
                     
                     // 콜드 스타트 시에도 안전하게 이전 상태 청소 후 라우팅
                     self.showAssessment = false
@@ -391,7 +390,6 @@ struct AppMainTabView: View {
                 
                 // [New] Safe Loading (10s Delay)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
-                    print("🚀 [SmartLoad] App stabilized (10s). Pre-loading Local LLM...")
                     Task {
                         await LLMService.shared.loadModel()
                     }
@@ -431,31 +429,26 @@ struct AppMainTabView: View {
                 if newPhase == .active && authManager.isAuthenticated {
                     let uid = UserDefaults.standard.string(forKey: "userId") ?? "N/A"
                     let uname = UserDefaults.standard.string(forKey: "authUsername") ?? "N/A"
-                    print("📱 [App] Scene Active. Auth Status: userId=\(uid), username=\(uname)")
                     
                     // [Step 1] Verify Login Integrity First (Single Source of Truth)
                     if let username = authManager.username, !username.isEmpty {
                         
                         // [Step 2] Valid Auth -> Proceed to Sync
-                        print("✅ [App] Auth Valid (User: \(username)). Triggering Sync.")
                         LocalDataManager.shared.syncWithServer()
                         
                     } else {
                         // [Step 1-Fail] Zombie State -> Recover First, Then Sync
-                        print("🚑 [App] Auth Incomplete (Zombie State). Recovering User Info...")
                         
                         APIService.shared.syncUserInfo { success in
                             if success, let name = UserDefaults.standard.string(forKey: "userId") {
                                 DispatchQueue.main.async {
                                     authManager.username = name
                                     // No need to set "app_username" anymore
-                                    print("✅ [App] Recovery Success! User: \(name). Now Syncing...")
                                     
                                     // [Step 2-Delayed] Now it's safe to sync
                                     LocalDataManager.shared.syncWithServer(force: true)
                                 }
                             } else {
-                                print("❌ [App] Recovery Failed. Please Re-login.")
                             }
                         }
                     }
@@ -482,7 +475,6 @@ struct AppMainTabView: View {
                 }
                 // [Auto-Sync] 캘린더 탭 진입 시 데이터 최신화 (새로고침 부재 대응)
                 if index == 0 {
-                    print("🔄 [Tab] Switched to Calendar. Triggering Sync...")
                     LocalDataManager.shared.syncWithServer()
                 }
             }) {
@@ -549,7 +541,6 @@ struct AppMainTabView: View {
     }
     
     func checkAssessmentStatus() {
-        print("🛑 [App] Automatic Assessment disabled by User Request.")
         return
     }
     
@@ -577,7 +568,7 @@ struct AppGuideView: View {
                 VStack(alignment: .leading, spacing: 30) {
                     // Header
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("📖 사용 설명서")
+                        Text(" 사용 설명서")
                             .font(.system(size: 28, weight: .bold))
                             .foregroundColor(Color(hexString: "1D1D1F"))
                         Text("마음온(maumON)을 100% 활용하는 방법을 알려드려요.")
@@ -588,7 +579,7 @@ struct AppGuideView: View {
                     
                     // Section 1: 일기 작성하기
                     VStack(alignment: .leading, spacing: 20) {
-                        GuideSectionHeader(title: "📝 일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
+                        GuideSectionHeader(title: "일기 작성하기", desc: "하루의 감정을 4단계로 나누어 천천히 기록해보세요.")
                         
                         VStack(spacing: 16) {
                             GuideStepCard(num: "1", title: "사실 (Event)", desc: "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
@@ -600,23 +591,23 @@ struct AppGuideView: View {
                     
                     // Section 2: AI 분석
                     VStack(alignment: .leading, spacing: 20) {
-                        GuideSectionHeader(title: "🤖 AI 감정 분석 & 코멘트", desc: "AI가 당신의 마음을 따뜻하게 읽어드립니다.")
+                        GuideSectionHeader(title: "AI 감정 분석 & 코멘트", desc: "AI가 당신의 마음을 따뜻하게 읽어드립니다.")
                         
-                        GuideFeatureCard(icon: "🧠", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
-                        GuideFeatureCard(icon: "💬", title: "AI 감정 분석 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
+                        GuideFeatureCard(systemIcon: "brain.head.profile", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
+                        GuideFeatureCard(systemIcon: "bubble.left.and.bubble.right.fill", title: "AI 감정 분석 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
                     }
                     
                     // Section 3: 프라이버시 & 심층 분석
                     VStack(alignment: .leading, spacing: 20) {
-                        GuideSectionHeader(title: "📊 프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
+                        GuideSectionHeader(title: "프라이버시 & 심층 분석", desc: "안전하고 깊이 있는 분석을 경험하세요.")
                         
-                        GuideFeatureCard(icon: "🛡️", title: "🔒 철통 보안 AI 감정 분석", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
-                        GuideFeatureCard(icon: "📑", title: "🧠 심층 감정 리포트", desc: "일기가 3개 이상 모이면, **나만의 감정 분석 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 분석)")
-                        GuideFeatureCard(icon: "🔭", title: "🔬 과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
+                        GuideFeatureCard(systemIcon: "checkmark.shield.fill", title: "철통 보안 AI 감정 분석", desc: "외부 클라우드 전송 NO! **안전한 로컬/개인 서버 AI**가 당신만의 비밀 공간에서 분석합니다.", highlight: true)
+                        GuideFeatureCard(systemIcon: "doc.text.below.ecg.fill", title: "심층 감정 리포트", desc: "일기가 3개 이상 모이면, **나만의 감정 분석 보고서**를 발행해 드려요. (숨겨진 욕구, 스트레스 원인 분석)")
+                        GuideFeatureCard(systemIcon: "chart.xyaxis.line", title: "과거 기록 통합 분석", desc: "과거와 현재를 비교 분석하여 감정의 흐름과 성장을 **장기적인 통찰**로 제공합니다.")
                         
                         HStack(spacing: 14) {
-                            GuideSmallFeatureCard(title: "🧩 감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
-                            GuideSmallFeatureCard(title: "🔍 키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
+                            GuideSmallFeatureCard(title: "감정 패턴 통계", desc: "날씨와 기분의 상관관계 한눈에 보기")
+                            GuideSmallFeatureCard(title: "키워드 검색", desc: "감정, 사건 키워드로 과거의 나 찾기")
                         }
                         .fixedSize(horizontal: false, vertical: true)
                     }
@@ -688,7 +679,7 @@ struct GuideStepCard: View {
 }
 
 struct GuideFeatureCard: View {
-    let icon: String
+    let systemIcon: String
     let title: String
     let desc: String
     var highlight: Bool = false
@@ -708,7 +699,7 @@ struct GuideFeatureCard: View {
                     .lineSpacing(4)
             }
             Spacer()
-            Text(icon).font(.system(size: 32))
+            Image(systemName: systemIcon).font(.system(size: 32)).foregroundColor(.blue)
         }
         .padding(24)
         .background(highlight ? Color.white : Color(hexString: "FBFBFD"))

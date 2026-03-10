@@ -41,7 +41,6 @@ class VoiceRecorder: ObservableObject {
             try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            print("Audio Session Error: \(error)")
             return
         }
         #endif
@@ -85,7 +84,6 @@ class VoiceRecorder: ObservableObject {
             try audioEngine.start()
             isRecording = true
         } catch {
-            print("Audio Engine Error: \(error)")
         }
     }
     

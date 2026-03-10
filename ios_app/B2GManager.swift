@@ -10,7 +10,6 @@ class B2GManager: ObservableObject {
     @Published private(set) var centerCode: String = "" {
         didSet {
             if centerCode.isEmpty && !oldValue.isEmpty {
-                print("⚠️ [B2G] CenterCode Cleared! (Old: \(oldValue))")
             }
             // [Fix] Auto-Save on Change
             self.saveState()
@@ -22,7 +21,6 @@ class B2GManager: ObservableObject {
     
     // Explicit Save Helper (Dual Layer)
     private func saveState() {
-        print("💾 [B2G] Saving State: \(centerCode) (Linked: \(isLinked))")
         UserDefaults.standard.set(centerCode, forKey: "healthCenterCode")
         UserDefaults.standard.set(centerCode, forKey: "healthCenterCode_BACKUP") // Save Backup
         UserDefaults.standard.set(isLinked, forKey: "isB2GLinked")
@@ -44,7 +42,6 @@ class B2GManager: ObservableObject {
                 UserDefaults.standard.set(true, forKey: "isB2GLinked")
             }
         } else if !backupCode.isEmpty {
-            print("🚑 [B2G] Main storage empty. Recovering from BACKUP...")
             self.centerCode = backupCode
             self.isLinked = true
             // Repair Main
@@ -85,7 +82,6 @@ class B2GManager: ObservableObject {
                         var successMessage = "연동에 성공했습니다!"
                         
                         if let ownerNick = json["owner_nickname"] as? String, !ownerNick.isEmpty {
-                            print("♻️ [B2G] Identity Merge: Switching to '\(ownerNick)'")
                             
                             // 1. Update Identity
                             UserDefaults.standard.set(ownerNick, forKey: "userNickname")
@@ -95,7 +91,6 @@ class B2GManager: ObservableObject {
                             
                             // [Fix] B2G 연동 유저는 PHQ-9 검사 건너뛰기 (기관 관리 대상)
                             UserDefaults.standard.set(true, forKey: "hasCompletedAssessment")
-                            print("✅ [B2G] PHQ-9 Assessment marked as completed by Association.")
                             
                             // 2. Set Message
                             if let msg = json["message"] as? String {
@@ -117,7 +112,6 @@ class B2GManager: ObservableObject {
                         completion(true, successMessage)
                         
                         // [Critical] Identity Changed -> Must Force Pull All Data
-                        print("🚀 [B2G] Triggering Post-Merge Full Sync...")
                         self.syncData(force: true) 
                         
                     } else {
@@ -135,13 +129,10 @@ class B2GManager: ObservableObject {
     // 연동 해제 (User Action Only)
     // [UNLOCKED] Removed safety guard for immediate disconnect
     func disconnect(force: Bool = false) {
-        print("🔓 [B2G] Disconnect Safety Lock REMOVED by Request")
         guard force else {
-            print("🚫 [B2G] Automatic disconnect prevented. User must explicitly disconnect.")
             return
         }
         
-        print("🚫 [B2G] Disconnecting from Center (User Action)...")
         self.centerCode = ""
         self.isLinked = false
         self.lastSyncDate = 0
@@ -161,14 +152,12 @@ class B2GManager: ObservableObject {
     func syncData(force: Bool = false) {
         // [Create Barrier] 이미 동기화 중이면 중복 실행 방지
         if isSyncing {
-            print("⏳ [B2G] Sync already in progress. Skipping trigger.")
             return
         }
         
         // [Self-Healing] Before sync, check if we have code but bad state
         if !centerCode.isEmpty && !isLinked {
             DispatchQueue.main.async {
-                print("🚑 [B2G] Auto-repairing 'isLinked' state before sync...")
                 self.isLinked = true
                 self.saveState()
             }
@@ -177,7 +166,6 @@ class B2GManager: ObservableObject {
         guard isLinked, !centerCode.isEmpty else { return }
         
         DispatchQueue.main.async { self.isSyncing = true }
-        print("🔄 [B2G] Start Full Sync (Pull + Push, Force: \(force))...")
         
         // 1. Pull (Server -> App)
         APIService.shared.fetchDiaries { [weak self] serverData in
@@ -191,7 +179,6 @@ class B2GManager: ObservableObject {
                     }
                 }
             } else {
-                print("⚠️ [Sync] Fetch failed or no data, skipping merge.")
                 // Failure case runs on background thread, so dispatch to main
                 DispatchQueue.main.async {
                     self.pushData(force: force)
@@ -202,18 +189,15 @@ class B2GManager: ObservableObject {
     
     // [Differential Sync] force: true -> Full Upload, force: false -> Delta Upload
     func pushData(force: Bool = false) {
-        print("🔄 [B2G] Push Local Data to Server (Force: \(force))...")
         
         // 1. 로컬 데이터 수집
         // [Fix] Single Source of Truth: authUsername 우선 사용
         guard let nickname = UserDefaults.standard.string(forKey: "authUsername")
             ?? UserDefaults.standard.string(forKey: "app_username")
             ?? UserDefaults.standard.string(forKey: "userNickname") else {
-            print("❌ [B2G] Sync Aborted: No User Identity (authUsername missing).")
             DispatchQueue.main.async { self.isSyncing = false }
             return
         }
-        print("👤 [B2G] Syncing Identity: \(nickname)")
         
         var diaries = LocalDataManager.shared.diaries
         
@@ -223,12 +207,10 @@ class B2GManager: ObservableObject {
         }
         
         if diaries.isEmpty {
-            print("✅ [B2G] Nothing to push. (All synced)")
             DispatchQueue.main.async { self.isSyncing = false }
             return
         }
         
-        print("📤 [B2G] Uploading \(diaries.count) items...")
         
         // 2. 일기 데이터를 심플한 포맷으로 변환 -> 상세 내용 포함으로 강화
         let metrics = diaries.map { diary -> [String: Any] in
@@ -268,7 +250,6 @@ class B2GManager: ObservableObject {
         APIService.shared.syncCenterData(payload: body) { success, errorMsg in
             // [Sync Chain] Trigger 217 Web Sync immediately after B2G Sync
             if success {
-                print("🔄 [B2G] Center Sync Success. Triggering Web (217) Sync...")
                 
                 // [Optimization] Mark these specific diaries as Synced locally
                 let sentIds = diaries.compactMap { $0.id }
@@ -282,7 +263,6 @@ class B2GManager: ObservableObject {
                 
                 // Trigger Legacy Web Sync (if needed)
                 APIService.shared.triggerBulkSync { _ in 
-                    print("🏁 [B2G] Full Sync Chain Completed.")
                 }
             }
             
@@ -292,13 +272,11 @@ class B2GManager: ObservableObject {
                     self.lastSyncDate = Date().timeIntervalSince1970
                 } else if let msg = errorMsg {
                      // 센터 코드가 만료되었거나 삭제된 경우 -> 연결 해제
-                     print("🚫 [B2G] Sync Failed. Server said: \(msg)")
                      
                      // [CRITICAL SAFETY]
                      // 절대 자동으로 연결을 해제하지 않음.
                      // 사용자가 직접 끊기 전까지는 코드를 유지함.
                      if msg.contains("유효하지 않은 센터 코드") {
-                         print("⚠️ [B2G] Ignoring 'Invalid Code' error to prevent data loss.")
                      }
                 }
             }
@@ -314,7 +292,6 @@ class B2GManager: ObservableObject {
         }
         
         DispatchQueue.main.async { self.isSyncing = true }
-        print("📥 [B2G] Starting Pull-Only Sync...")
         
         APIService.shared.fetchDiaries { [weak self] serverData in
             guard let self = self else { return }
@@ -326,14 +303,12 @@ class B2GManager: ObservableObject {
                         self.isSyncing = false
                         self.lastSyncDate = Date().timeIntervalSince1970
                         self.saveState()
-                        print("✅ [B2G] Pull Completed. (\(data.count) items)")
                         completion(true, "서버에서 \(data.count)개의 데이터를 가져왔습니다.")
                     }
                 }
             } else {
                 DispatchQueue.main.async {
                     self.isSyncing = false
-                    print("⚠️ [B2G] Pull Failed or No Data.")
                     completion(false, "데이터를 가져오지 못했습니다. (서버 응답 없음)")
                 }
             }
@@ -343,7 +318,6 @@ class B2GManager: ObservableObject {
     
     // [Dev] Force Link Helper
     func forceLink(code: String) {
-        print("🛠️ [B2G] Force Linking to \(code)")
         self.centerCode = code
         self.isLinked = true
         self.saveState()

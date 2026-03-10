@@ -53,20 +53,16 @@ class AuthManager: ObservableObject {
            let savedToken = self.token {
             if let jwtId = APIService.shared.decodeUserIdFromJWT(token: savedToken) {
                 UserDefaults.standard.set(jwtId, forKey: "userId")
-                print("✅ [Auth] userId 복구 (JWT에서 추출): \(jwtId)")
             }
         }
         
         // [Standard Architecture] 
         // Single Source of Truth: 'authUsername'. No more 'app_username'.
         if isAuthenticated && (self.username == nil || self.username!.isEmpty) {
-            print("⚠️ [Auth] Login State Inconsistent: Authenticated but No Username. (Zombie State)")
             // Trigger emergency fetch
             Task {
-                print("🚑 [Auth] Attempting background user recovery...")
                 APIService.shared.syncUserInfo { success in
                    if success, let recoveredName = UserDefaults.standard.string(forKey: "userId") {
-                       print("✅ [Auth] Recovered Username: \(recoveredName)")
                        DispatchQueue.main.async {
                            self.username = recoveredName // Updates 'authUsername' automatically
                        }
@@ -112,17 +108,15 @@ class AuthManager: ObservableObject {
         let body: [String: Any] = ["username": username, "password": password]
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
-        print("🔐 [Auth] Trying Login for \(username)...")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
                 // Login Success
-                // [Fix] 비밀번호 저장 (ensureAuth 토큰 갱신에 필요)
-                UserDefaults.standard.set(password, forKey: "app_password")
+                // [Fix] 비밀번호 안전하게 저장 (ensureAuth 토큰 갱신에 필요)
+                KeychainHelper.standard.saveString(password, account: "app_password")
                 self.handleLoginResponse(data: data, username: username, centerCode: centerCode, completion: completion)
             } else {
                 // Login Failed -> Try Registration
-                print("⚠️ [Auth] Login Failed. Attempting Registration for \(username)...")
                 self.performRegister(baseUrl: baseUrl, username: username, password: password, name: name, centerCode: centerCode, completion: completion)
             }
         }.resume()
@@ -148,7 +142,6 @@ class AuthManager: ObservableObject {
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let httpResponse = response as? HTTPURLResponse, (200...201).contains(httpResponse.statusCode) {
                 // Register Success -> Retry Login
-                print("✅ [Auth] Registration Success. Retrying Login...")
                 // Retry Login (Recursion safe? Yes, because login will succeed or fail definitely)
                 // But better to just call login-endpoint code block again usually.
                 // For simplicity, I'll allow one level of retry by calling performLogin WITHOUT fallback?
@@ -205,7 +198,6 @@ class AuthManager: ObservableObject {
             if UserDefaults.standard.string(forKey: "userId") == nil {
                 if let jwtId = APIService.shared.decodeUserIdFromJWT(token: token) {
                     UserDefaults.standard.set(jwtId, forKey: "userId")
-                    print("✅ [Auth] userId extracted from JWT: \(jwtId)")
                 }
             }
             
@@ -216,17 +208,14 @@ class AuthManager: ObservableObject {
             let codeToLink = (inputCode?.isEmpty == false) ? inputCode! : (serverCode ?? "")
             
             if !codeToLink.isEmpty {
-                print("🔗 [Auth] Verifying Center Code before UI transition: \(codeToLink)")
                 B2GManager.shared.connect(code: codeToLink) { success, msg in
                     DispatchQueue.main.async {
                         // 결과와 상관없이 로그인은 성공 처리 (연동 실패했다고 로그인 막으면 안됨)
                         // 단, 성공 시 isLinked가 true가 되어 PHQ-9 스킵됨.
                         if success {
-                             print("✅ [Auth] B2G Link Restored/Verified!")
                              // [New] 연동 성공 시, 서버 데이터를 즉시 가져옴 (Auto-Restore)
                              B2GManager.shared.syncData(force: true)
                         } else {
-                             print("⚠️ [Auth] B2G Link Failed: \(msg)")
                         }
                         
                         // 3. Finalize Login (Trigger UI)
@@ -277,12 +266,15 @@ class AuthManager: ObservableObject {
         // [Fix] 모든 인증/프로필 관련 UserDefaults 완전 정리
         let keysToRemove = [
             "authToken", "authUsername", "userRiskLevel", "userIsPremium",
-            "serverAuthToken", "app_password", "userId", "realName",
+            "serverAuthToken", "userId", "realName",
             "userNickname", "userBirthDate", "app_username",
             "hasCompletedAssessment"
         ]
         for key in keysToRemove {
             UserDefaults.standard.removeObject(forKey: key)
         }
+        
+        // [Fix] Keychain에서도 비밀번호 정리
+        KeychainHelper.standard.deleteString(account: "app_password")
     }
 }

@@ -42,14 +42,11 @@ class LocalDataManager: ObservableObject {
                 self.syncWithServer()
                 self.recoverStuckAnalysis() // [Auto-Recovery]
             }
-            print("📁 [Local] Loaded \(loaded.count) diaries from \(fileURL.lastPathComponent)")
         } catch {
-            print("❌ [Local] Load Error: \(error)")
             
             // [Safety] Load 실패 시 원본 파일 백업 (덮어쓰기 방지)
             let backupURL = fileURL.deletingPathExtension().appendingPathExtension("bak_\(Int(Date().timeIntervalSince1970)).json")
             try? FileManager.default.copyItem(at: fileURL, to: backupURL)
-            print("🛡 [Local] Emergency backup created at: \(backupURL.lastPathComponent)")
         }
     }
     
@@ -57,9 +54,7 @@ class LocalDataManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(diaries)
             try data.write(to: fileURL, options: .atomic)
-            print("💾 [Local] Saved \(diaries.count) diaries.")
         } catch {
-            print("❌ [Local] Save Error: \(error)")
         }
     }
     
@@ -77,7 +72,6 @@ class LocalDataManager: ObservableObject {
         let stuckDiaries = self.diaries.filter { $0.ai_prediction == "재분석 중..." }
         
         if !stuckDiaries.isEmpty {
-            print("🚑 [Recovery] Found \(stuckDiaries.count) diaries stuck. Resetting status & Scheduling Safe Retry.")
             
             // 1. UI Unblocking (Immediate)
             DispatchQueue.main.async {
@@ -117,7 +111,6 @@ class LocalDataManager: ObservableObject {
                 if let idx = blockedDates.firstIndex(of: dateKey) {
                     blockedDates.remove(at: idx)
                     self.deletedDiaryDates = blockedDates
-                    print("🔓 [Tombstone] Unblocked date: \(dateKey) (User wrote new diary)")
                 }
             }
             
@@ -143,7 +136,6 @@ class LocalDataManager: ObservableObject {
             self.saveToDisk()
             
             // [OCI Sync] Upload to Server
-            print("📤 [Sync] Uploading Diary to Server...")
             APIService.shared.syncDiary(newDiary) { success in
                 if success {
                     // Mark as Synced on Success
@@ -213,7 +205,6 @@ class LocalDataManager: ObservableObject {
             }
             if updated {
                 self.saveToDisk()
-                print("✅ [Local] Marked \(ids.count) diaries as synced.")
             }
         }
     }
@@ -225,11 +216,9 @@ class LocalDataManager: ObservableObject {
     func syncWithServer(force: Bool = false) {
         // [Standard Architecture] Strict Auth Check
         guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
-            print("🚫 [SmartSync] Aborted. Missing User Identity (authUsername). Please Login.")
             return
         }
         
-        print("🧠 [SmartSync] Starting Standard Sync (Server Authority)... (User: \(username))")
         
         APIService.shared.ensureAuth { [weak self] authSuccess in
             guard let self = self else { return }
@@ -241,7 +230,6 @@ class LocalDataManager: ObservableObject {
             let itemsToPush = self.diaries.filter { $0.isSynced == false || force }
             
             if !itemsToPush.isEmpty {
-                print("📤 [SmartSync] Pushing \(itemsToPush.count) local changes to Server...")
                 for diary in itemsToPush {
                     outputGroup.enter()
                     APIService.shared.syncDiary(diary) { success in
@@ -257,21 +245,17 @@ class LocalDataManager: ObservableObject {
                     }
                 }
             } else {
-                print("✅ [SmartSync] No local changes to push.")
             }
             
             // 2. Pull Phase: Fetch Latest Server State (After Push)
             outputGroup.notify(queue: .main) {
-                print("📥 [SmartSync] Fetching latest server data (Source of Truth)...")
                 APIService.shared.fetchDiaries { [weak self] serverData in
                     guard let self = self, let finalServerItems = serverData else {
-                        print("⚠️ [SmartSync] Fetch Failed. Sync Aborted.")
                         return 
                     }
                     
                     // 3. Merge Phase: Apply Server Data to Local
                     self.mergeServerDiaries(finalServerItems, ignoreTombstones: force) {
-                        print("✅ [SmartSync] Synchronization Complete.")
                     }
                 }
             }
@@ -287,14 +271,12 @@ class LocalDataManager: ObservableObject {
             for item in serverData {
                 let id = "\(item["id"] ?? "")"
                 let dateRaw = (item["date"] as? String) ?? (item["created_at"] as? String) ?? "Unknown"
-                // print("👀 [SyncDebug] Processing Server Item: ID=\(id), Date=\(dateRaw)")
                 
                 // [Tombstone] 사용자가 삭제한 ID라면 병합 제외 (단, 강제 동기화 시 복구 및 차단 해제)
                 if self.deletedDiaryIds.contains(id) {
                     if ignoreTombstones {
                         // [Recovery] 사용자가 강제 복구를 요청했으므로, 차단 목록에서 영구 제거 (Standard: Restore)
                         self.deletedDiaryIds.removeAll { $0 == id }
-                        print("♻️ [Recovery] Tombstone removed for ID: \(id)")
                     } else {
                         continue
                     }
@@ -311,7 +293,6 @@ class LocalDataManager: ObservableObject {
                     if ignoreTombstones {
                         // [Recovery] 강제 복구 시 날짜 차단도 해제
                         self.deletedDiaryDates.removeAll { $0 == dateStr }
-                        print("♻️ [Recovery] Tombstone removed for Date: \(dateStr)")
                     } else {
                         continue
                     }
@@ -427,7 +408,6 @@ class LocalDataManager: ObservableObject {
                       !sid.isEmpty,
                       !serverIds.contains(sid)           // 서버에 없으면 제거
                 else { return false }
-                print("🗑️ [Sync] Removed stale local diary: \(diary.date ?? "?") (server ID: \(sid))")
                 return true
             }
             let removedCount = beforeCount - self.diaries.count
@@ -435,7 +415,6 @@ class LocalDataManager: ObservableObject {
             self.diaries.sort { ($0.created_at ?? "") > ($1.created_at ?? "") }
             self.saveToDisk()
             
-            print("📥 [Sync] Merge Complete. New: \(newCount), Updated: \(updatedCount), Removed: \(removedCount)")
             
             // [Fix] Broadcast Update
             NotificationCenter.default.post(name: NSNotification.Name("RefreshDiaries"), object: nil)

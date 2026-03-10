@@ -112,7 +112,6 @@ struct AppAssessmentView: View {
         isSubmitting = true
         
         let totalScore = ratings.reduce(0, +)
-        print("📊 Assessment Score: \(totalScore)")
         
         // [Fix] Endpoint: /api/assessment (217 Structure)
         guard let url = URL(string: "\(baseURL)/api/assessment") else { return }
@@ -132,7 +131,6 @@ struct AppAssessmentView: View {
                 isSubmitting = false
                 
                 if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                    print("✅ Assessment Submitted: \(httpResponse.statusCode)")
                     // Refresh Profile or Estimate Risk
                     // Simple Logic: 0-4 (1), 5-9 (2), 10-14 (3), 15-19 (4), 20+ (5)
                     var newLevel = 1
@@ -144,9 +142,7 @@ struct AppAssessmentView: View {
                     authManager.setRiskLevel(newLevel)
                     presentationMode.wrappedValue.dismiss()
                 } else {
-                    print("❌ Assessment Failed: \(error?.localizedDescription ?? "Unknown Error")")
                     if let data = data, let str = String(data: data, encoding: .utf8) {
-                        print("Server Response: \(str)")
                     }
                     // 실패 시에도 일단 넘겨주려면 주석 해제 (지금은 Strict하게 감)
                     // presentationMode.wrappedValue.dismiss()

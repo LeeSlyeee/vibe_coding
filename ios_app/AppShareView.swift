@@ -291,7 +291,7 @@ struct AppShareView: View {
                     // [P1-수정4] 보호자 알림 공유 범위 설정
                     if !shareManager.myGuardians.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("🔔 보호자에게 공유할 알림")
+                            Text("보호자에게 공유할 알림")
                                 .font(.headline)
                                 .padding(.horizontal)
                             
@@ -302,7 +302,8 @@ struct AppShareView: View {
                             
                             VStack(spacing: 0) {
                                 ShareToggleRow(
-                                    icon: "🌡️",
+                                    systemIcon: "thermometer",
+                                    iconColor: .red,
                                     title: "기분 온도 알림",
                                     subtitle: "매일의 감정 온도를 공유합니다",
                                     isOn: $shareMood
@@ -313,7 +314,8 @@ struct AppShareView: View {
                                 Divider().padding(.leading, 50)
                                 
                                 ShareToggleRow(
-                                    icon: "📊",
+                                    systemIcon: "chart.bar.fill",
+                                    iconColor: .blue,
                                     title: "분석 리포트",
                                     subtitle: "주간/월간 감정 분석을 공유합니다",
                                     isOn: $shareReport
@@ -324,7 +326,8 @@ struct AppShareView: View {
                                 Divider().padding(.leading, 50)
                                 
                                 ShareToggleRow(
-                                    icon: "🚨",
+                                    systemIcon: "exclamationmark.triangle.fill",
+                                    iconColor: .orange,
                                     title: "위기 감지 알림",
                                     subtitle: "위기 신호 감지 시 즉시 알립니다",
                                     isOn: $shareCrisis
@@ -378,7 +381,7 @@ struct AppShareView: View {
                                 
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
-                                        Text("🌉 감정 리포트 공유")
+                                        Text("감정 리포트 공유")
                                             .font(.headline)
                                             .fontWeight(.bold)
                                             .foregroundColor(Color(hexString: "6366f1"))
@@ -451,7 +454,9 @@ struct AppShareView: View {
         if !shareManager.guardianAlerts.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("⚠️ 알림 이력")
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text("알림 이력")
                         .font(.headline)
                     Spacer()
                     Text("\(shareManager.guardianAlerts.count)건")
@@ -480,9 +485,13 @@ struct AppShareView: View {
                         
                         if let guides = alert.actionGuide, !guides.isEmpty {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text("💡 대응 가이드")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
+                                HStack {
+                                    Image(systemName: "lightbulb.fill")
+                                        .foregroundColor(.yellow)
+                                    Text("대응 가이드")
+                                }
+                                .font(.caption)
+                                .foregroundColor(.gray)
                                 ForEach(guides, id: \.self) { guide in
                                     Text(guide)
                                         .font(.caption)
@@ -547,7 +556,8 @@ struct AppShareView: View {
 
 // [P1-수정4] 토글 행 서브컴포넌트
 struct ShareToggleRow: View {
-    let icon: String
+    let systemIcon: String
+    let iconColor: Color
     let title: String
     let subtitle: String
     @Binding var isOn: Bool
@@ -555,8 +565,9 @@ struct ShareToggleRow: View {
     
     var body: some View {
         HStack {
-            Text(icon)
+            Image(systemName: systemIcon)
                 .font(.title2)
+                .foregroundColor(iconColor)
                 .frame(width: 36)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)

@@ -38,7 +38,7 @@ struct PremiumModalView: View {
             
             // ✅ Dobong-gu Notice (Green Box)
             HStack(alignment: .top, spacing: 10) {
-                Text("🏥")
+                Image(systemName: "building.2.fill").foregroundColor(.blue)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("보건소/정신건강복지센터 안내")
                         .font(.system(size: 14, weight: .bold))

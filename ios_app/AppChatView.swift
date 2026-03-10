@@ -89,7 +89,7 @@ struct AppChatView: View {
                                 // Intro Message
                                 if messages.isEmpty {
                                     VStack(spacing: 10) {
-                                        Text("👋")
+                                        Image(systemName: "hand.wave.fill").foregroundColor(.yellow)
                                             .font(.system(size: 40))
                                         Text(llmService.useServerAI ? "안녕하세요!\n(서버 AI 모드 동작 중)" : "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.")
                                             .multilineTextAlignment(.center)
@@ -140,7 +140,7 @@ struct AppChatView: View {
                                     
                                     // 이미 메시지가 있으면 인사 생략 (단, 텅 빈 경우에만 인사)
                                     if messages.isEmpty {
-                                        let welcomeText = "안녕하세요, \(userName)님! 👋\n\n저는 AI 감정 케어 도우미 '마음온'이에요.\n전문 상담사는 아니지만, 당신의 이야기를 조용히 들을 준비가 되어 있어요.\n\n오늘 하루 중 기억에 남는 순간이 있었나요? 🌡️"
+                                        let welcomeText = "안녕하세요, \(userName)님!\n\n저는 AI 감정 케어 도우미 '마음온'이에요.\n전문 상담사는 아니지만, 당신의 이야기를 조용히 들을 준비가 되어 있어요.\n\n오늘 하루 중 기억에 남는 순간이 있었나요?"
                                         
                                         // 약간의 딜레이 후 등장
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -260,7 +260,7 @@ struct AppChatView: View {
                             Task { await llmService.loadModel() }
                         }
                     }) {
-                        Text(llmService.useServerAI ? "☁️ 서버 AI" : "📱 로컬 AI")
+                        Text(llmService.useServerAI ? "서버 AI" : "로컬 AI")
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -290,6 +290,7 @@ struct AppChatView: View {
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background
+            .screenshotProtected(isProtected: true) // [보안 Fix] 민감한 상담 로그 보호
             
             // [Gatekeeper] AI Mode Selection Overlay
             // [Gatekeeper] 서버 AI 전용 — 모드 선택 오버레이 비활성
@@ -307,7 +308,6 @@ struct AppChatView: View {
         // [Gatekeeper] 분석 중이면 채팅 불가 (1-by-1 정책)
         if !llmService.useServerAI && (llmService.isProcessingQueue || !llmService.analysisQueue.isEmpty) {
             // Alert logic (SwiftUI Alert State binding needed, but for now simple print or shake)
-            print("⛔️ [Chat] LLM Busy. Cannot start chat.")
             // 임시로 채팅창에 시스템 메시지 추가
             let sysMsg = ChatMessage(text: "⚠️ 현재 일기 분석 중입니다. 잠시 후 다시 시도해주세요.", isUser: false)
             messages.append(sysMsg)
@@ -324,12 +324,12 @@ struct AppChatView: View {
             try? await Task.sleep(nanoseconds: 4 * 1_000_000_000)
             // 아직도 타이핑 중이고, AI 메시지가 없거나 비어있다면 (대기 중)
             if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
-                withAnimation { self.loadingHint = "AI가 마음의 준비를 하고 있어요... 🌿\n(서버가 깨어나는 중입니다)" }
+                withAnimation { self.loadingHint = "AI가 마음의 준비를 하고 있어요...\n(서버가 깨어나는 중입니다)" }
             }
             
             try? await Task.sleep(nanoseconds: 6 * 1_000_000_000) // +6초 (총 10초)
             if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
-                withAnimation { self.loadingHint = "거의 다 되었습니다! 잠시만요... 🏃🏻" }
+                withAnimation { self.loadingHint = "거의 다 되었습니다! 잠시만요..." }
             }
         } 
         
@@ -357,9 +357,7 @@ struct AppChatView: View {
             let historyLimit = isComplaint ? 0 : 4 
             
             if isComplaint {
-                print("🚨 [Dynamic Context] Complaint detected (Short Anger). Clearing history to break loop.")
             } else {
-                print("🧠 [Context] Sending last \(historyLimit) messages for context.")
             }
             
             // [Phase 4] 3단계 위기 분류 시스템
@@ -368,18 +366,15 @@ struct AppChatView: View {
             let crisisLevel1 = ["힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물"]
             
             if crisisLevel3.contains(where: { userText.contains($0) }) {
-                print("🚨 [Crisis] LEVEL 3 detected!")
                 withAnimation {
                     self.isCrisis = true
                     self.showSOSModal = true // Level 3: 즉시 모달 팝업
                 }
             } else if crisisLevel2.contains(where: { userText.contains($0) }) {
-                print("⚠️ [Crisis] LEVEL 2 detected!")
                 withAnimation {
                     self.isCrisis = true // Level 2: SOS 배너 표시
                 }
             } else if crisisLevel1.contains(where: { userText.contains($0) }) {
-                print("💛 [Crisis] LEVEL 1 detected - empathy mode")
                 // Level 1: 기본 공감 모드 (배너 미노출, AI가 공감 대응)
             }
             
@@ -544,7 +539,7 @@ struct SOSView: View {
                     
                     // Near Center Info
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("🏥 가까운 정신건강복지센터 찾기")
+                        HStack { Image(systemName: "cross.case.fill"); Text("가까운 정신건강복지센터 찾기") }
                         .font(.headline)
                         
                         Text("거주하시는 지역의 보건소나 정신건강복지센터에서 무료로 상담을 받으실 수 있습니다.")

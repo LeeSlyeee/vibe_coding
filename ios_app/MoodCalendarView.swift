@@ -82,6 +82,7 @@ struct MoodCalendarView: View {
                                     .fontWeight(.semibold)
                                     .foregroundColor(.black)
                             }
+                            .accessibilityIdentifier("SettingsMenuButton")
                         }
                     }
                     .padding(.horizontal)
@@ -129,7 +130,7 @@ struct MoodCalendarView: View {
                                                             .scaledToFit()
                                                             .frame(width: 28, height: 28)
                                                         
-                                                        // [New] 약물 복용 표시 💊
+                                                        // [New] 약물 복용 표시
                                                         if d.medication == true {
                                                             Image(systemName: "pills.fill")
                                                                 .font(.system(size: 10))
@@ -179,7 +180,6 @@ struct MoodCalendarView: View {
                         .id(currentDate) // Force view refresh for transition
                     }
                     .refreshable {
-                        print("🔄 [UI] Pull-to-Refresh Triggered")
                         await refreshData()
                     }
                     
@@ -200,7 +200,7 @@ struct MoodCalendarView: View {
                                             )
                                         )
                                         .frame(width: 40, height: 40)
-                                    Text("🌉")
+                                    Image(systemName: "bridge").foregroundColor(.blue)
                                         .font(.system(size: 20))
                                 }
                                 
@@ -264,7 +264,6 @@ struct MoodCalendarView: View {
                     
                     // [New] Bottom Manual Sync Button
                     Button(action: {
-                        print("🔄 [UI] Manual Sync Triggered (Bottom)")
                         self.isLoading = true
                         // [Fix] Force Sync to recover 'Tombstoned' (Deleted) diaries if they exist on server
                         LocalDataManager.shared.syncWithServer(force: true)
@@ -306,7 +305,6 @@ struct MoodCalendarView: View {
                 .onChangeCompat(of: dataManager.diaries) { _ in fetchDiaries() } // ✅ Auto Refresh on Sync
                 // [Fix] Listen for Explicit Sync Notification
                 .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshDiaries"))) { _ in
-                    print("🔔 [Calendar] Received Refresh Signal. Updating UI...")
                     fetchDiaries()
                 }
                 .alert(isPresented: $showErrorAlert) {
@@ -441,7 +439,7 @@ struct MoodCalendarView: View {
         } else {
             // [OOM Prevention] AI 모델 로딩 전 진입 차단
             if !LLMService.shared.isModelLoaded {
-                self.errorMessage = "AI 모델을 폰으로 모셔오는 중이에요.\n잠시만 기다려주세요! 🚚 (약 5초)"
+                self.errorMessage = "AI 모델을 폰으로 모셔오는 중이에요.\n잠시만 기다려주세요! (약 5초)"
                 self.showErrorAlert = true
                 return
             }
@@ -528,7 +526,7 @@ struct MoodCalendarView: View {
     }
     func monthYearString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "YYYY년 M월"; return f.string(from: d) }
     func dateString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
-    func moodEmoji(_ l: Int) -> String { ["", "😠", "😢", "😐", "😌", "😊"][l] }
+    func moodEmoji(_ l: Int) -> String { ["", "매우나쁨", "나쁨", "보통", "좋음", "매우좋음"][l] }
     func moodColor(_ l: Int) -> Color { [Color.clear, .red, .blue, .gray, .green, .yellow][l] }
     
     /// AI 감정 분석 기반 배경색 (Android와 동일)

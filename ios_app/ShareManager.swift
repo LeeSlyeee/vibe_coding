@@ -103,9 +103,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         }
         
-        print("🚀 [Share] \(method) \(url.absoluteString)")
         
-        print("🚀 [Share] \(method) \(url.absoluteString)")
         
         // [Standardization] Use URLSession.shared for 217 Server (Official Cert)
         // SSL Bypass is no longer needed/recommended for nip.io with Let's Encrypt
@@ -121,10 +119,8 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             }
             
             if !(200...299).contains(httpResponse.statusCode) {
-                print("❌ [Share] Status: \(httpResponse.statusCode)")
                 // [Debug] Print Body
                 if let str = String(data: data, encoding: .utf8) {
-                    print("📝 [Share] Response Body: \(str)")
                 }
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode)))
                 return
@@ -165,7 +161,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
               let authUsername = defaults.string(forKey: "authUsername"), !authUsername.isEmpty else {
             let missing = (defaults.string(forKey: "userId") == nil) ? "userId" : "authUsername"
             self.lastErrorMessage = "로그인 정보 누락 (\(missing)). 재로그인 해주세요."
-            print("❌ Generate Code Aborted: Missing User Identity (\(missing))")
             completion(nil)
             return
         }
@@ -190,7 +185,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                         completion(nil)
                     }
                 case .failure(let err):
-                    print("❌ Generate Code Failed: \(err)")
                     completion(nil)
                 }
             }
@@ -223,7 +217,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         // [GEMINI Rule: No Silent Fallback]
         guard let userId = defaults.string(forKey: "userId"), !userId.isEmpty else {
             self.lastErrorMessage = "사용자 정보를 불러올 수 없습니다."
-            print("❌ Fetch List Aborted: Missing userId")
             return
         }
         let username = defaults.string(forKey: "authUsername") ?? ""
@@ -234,7 +227,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         // [Fix] Include username query param for robustness. Use percent encoding for safe URL.
         let encodedUsername = username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? username
         let endpoint = "/share/list?user_id=\(userId)&username=\(encodedUsername)&role=\(role)"
-        print("🚀 Fetching List: \(endpoint)")
         
         performShareRequest(endpoint: endpoint, method: "GET") { result in
             DispatchQueue.main.async {
@@ -251,17 +243,14 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                             } else {
                                 self.myGuardians = users
                             }
-                            print("✅ Fetch Success: \(users.count) items")
                             
                         } catch {
-                            print("❌ Parse List Failed: \(error)")
                             self.lastErrorMessage = "파싱 에러: \(error)"
                         }
                     } else {
                         self.lastErrorMessage = "데이터 형식 불일치 (data key missing)"
                     }
                 case .failure(let err):
-                    print("❌ Fetch List Failed: \(err)")
                     self.lastErrorMessage = "통신 에러: \(err.localizedDescription)"
                 }
             }
@@ -274,7 +263,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         
         // [GEMINI Rule: No Silent Fallback]
         guard let userId = defaults.string(forKey: "userId"), !userId.isEmpty else {
-            print("❌ Disconnect Aborted: Missing userId")
             completion(false)
             return
         }
@@ -296,7 +284,6 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                     self.fetchList(role: "viewer")
                     completion(true)
                 case .failure(let err):
-                    print("❌ Disconnect Failed: \(err)")
                     completion(false)
                 }
             }
@@ -317,11 +304,9 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                         self.currentSharedStats = stats
                         completion(true)
                     } catch {
-                        print("❌ Parse Stats Failed: \(error)")
                         completion(false)
                     }
                 case .failure(let err):
-                    print("❌ Fetch Stats Failed: \(err)")
                     completion(false)
                 }
             }
@@ -399,7 +384,7 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
         let sharerName: String
         let message: String
         let severity: String       // "high", "medium", "low"
-        let icon: String
+        let icon: String // Revert systemIcon -> icon
         let actionGuide: [String]?
         let avgMood: Double?
         
@@ -428,13 +413,11 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
                             let data = try JSONSerialization.data(withJSONObject: alertsArray)
                             let alerts = try JSONDecoder().decode([GuardianAlert].self, from: data)
                             self.guardianAlerts = alerts
-                            print("✅ Guardian Alerts: \(alerts.count)건")
                         } catch {
-                            print("❌ Parse Alerts Failed: \(error)")
                         }
                     }
-                case .failure(let err):
-                    print("❌ Fetch Alerts Failed: \(err)")
+                case .failure(_):
+                    break
                 }
             }
         }
@@ -451,10 +434,8 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
             DispatchQueue.main.async {
                 switch result {
                 case .success(_):
-                    print("✅ Share scope updated")
                     completion(true)
                 case .failure(let err):
-                    print("❌ Share scope update failed: \(err)")
                     completion(false)
                 }
             }

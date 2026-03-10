@@ -94,7 +94,8 @@ struct MindBridgeExportView: View {
                 if includeEmoji {
                     HStack(spacing: 12) {
                         Text(viewModel.todayEmoji)
-                            .font(.system(size: 48))
+                            .font(.system(size: 32, weight: .bold))
+                            .foregroundColor(Color(hexString: "6366f1"))
                         VStack(alignment: .leading, spacing: 4) {
                             Text("오늘의 감정")
                                 .font(.caption)
@@ -211,19 +212,19 @@ struct MindBridgeExportView: View {
             
             VStack(spacing: 0) {
                 ExportToggleRow(
-                    icon: "😊",
+                    icon: "감정",
                     title: "오늘의 감정 (이모지)",
                     isOn: $includeEmoji
                 )
                 Divider().padding(.leading, 50)
                 ExportToggleRow(
-                    icon: "🌡️",
+                    icon: "온도",
                     title: "마음 온도 (점수)",
                     isOn: $includeMoodScore
                 )
                 Divider().padding(.leading, 50)
                 ExportToggleRow(
-                    icon: "📊",
+                    icon: "",
                     title: "7일간 감정 변화",
                     isOn: $includeWeeklyTrend
                 )
@@ -339,7 +340,7 @@ struct ExportToggleRow: View {
 // MARK: - ViewModel (로컬 데이터 기반)
 class ExportViewModel: ObservableObject {
     @Published var userName: String = ""
-    @Published var todayEmoji: String = "😊"
+    @Published var todayEmoji: String = "보통"
     @Published var todayMoodLabel: String = "보통"
     @Published var moodScore: Int = 65
     @Published var weeklyMoods: [WeeklyMood] = []
@@ -378,7 +379,6 @@ class ExportViewModel: ObservableObject {
                 guard let self = self else { return }
                 
                 guard let diaries = diaries, !diaries.isEmpty else {
-                    print("❌ [Export] 일기 데이터 로드 실패 또는 비어있음")
                     self.aiSummary = "데이터를 불러올 수 없습니다."
                     // 빈 주간 데이터
                     let shortFormatter = DateFormatter()
@@ -395,7 +395,7 @@ class ExportViewModel: ObservableObject {
                 
                 // 오늘 일기
                 if let latest = sortedDiaries.first {
-                    self.todayEmoji = (latest["emoji"] as? String) ?? "😊"
+                    self.todayEmoji = (latest["mood_label"] as? String) ?? "보통"
                     self.todayMoodLabel = (latest["mood_label"] as? String) ?? "보통"
                     
                     // score 처리 (Int 또는 Double)
