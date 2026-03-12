@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  /* A4 가로(Landscape) 규격: 297mm x 210mm -> 1122px x 794px (96dpi) */
+  body { font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif; background:#ccc; margin:0; padding:20px; display:flex; justify-content:center; align-items:center; }
+  .page { width: 1122px; height: 794px; background:#fff; border:1px solid #000; padding:40px; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .page-title { text-align:center; font-size:18px; font-weight:bold; margin-bottom:10px; border-bottom:2px solid #000; padding-bottom:5px; width:100%; }
+  
+  /* 다이어그램 내부 비율을 A4에 맞춤 */
+  .mermaid { width: 100%; display:flex; justify-content:center; align-items:center; flex-grow:1; }
+  .mermaid svg { filter: grayscale(100%) contrast(1.2); width: 100%; max-height: 550px; } /* 최대 높이 설정하여 문서 내에 들어오게 함 */
+  .mermaid svg text { fill: #000 !important; font-size: 16px !important; }
+  
+  .mermaid svg .node rect, .mermaid svg .node polygon, .mermaid svg .node circle { stroke: #000 !important; stroke-width: 2px !important; }
+  .mermaid svg .edgePath path { stroke: #000 !important; stroke-width: 2px !important; }
+  .mermaid svg marker path { fill: #000 !important; }
+  
+  .ref-note { font-size:14px; text-align:center; margin-top:10px; color:#333; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+  startOnLoad:true,
+  theme:'neutral',
+  flowchart:{curve:'basis', nodeSpacing:40, rankSpacing:50},
+  themeVariables:{
+    primaryColor:'#ffffff',secondaryColor:'#ffffff',tertiaryColor:'#ffffff',
+    primaryBorderColor:'#000000',secondaryBorderColor:'#000000',
+    primaryTextColor:'#000000',secondaryTextColor:'#000000',
+    lineColor:'#000000',textColor:'#000000',
+    mainBkg:'#ffffff',nodeBorder:'#000000',
+    clusterBkg:'#f9f9f9',clusterBorder:'#000000',
+    edgeLabelBackground:'#ffffff',
+    fontSize: '16px'
+  }
+});
+</script>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-title">【도 5】</div>
+  <div class="mermaid">
+graph LR
+    subgraph "사용자 단말기(100)"
+        direction TB
+        A1["생리 상태<br>평가 모듈(110)"]
+        A2["임계값<br>검증부(120)"]
+        A3["동적 질문 트리<br>생성기(130)"]
+        A4["대화/일기<br>인터페이스(140)"]
+        A5["하이브리드 라우팅<br>제어 모듈(150)"]
+        A6["제1 AI 모델(160)"]
+        A7["NPU/Neural<br>Engine"]
+        A8["보안 후처리<br>모듈(190)"]
+        A9["로컬 암호화<br>저장소"]
+    end
+    
+    subgraph "통신망(200)"
+        B1["무선/유선<br>네트워크"]
+    end
+    
+    subgraph "클라우드 서버(300)"
+        direction TB
+        C1["제2 AI 모델(170)<br>대형 LLM"]
+        C2["비식별화<br>처리부(310)"]
+        C3["암호화<br>데이터베이스(320)"]
+    end
+    
+    A1-->A2-->A3-->A4-->A5
+    A5-->A6-->A7
+    A6-->A8-->A9
+    
+    A5-->B1
+    B1-->C2-->C1-->C3
+  </div>
+  <div class="ref-note">시스템 전체 구성 블록도 (사용자 단말기 / 통신망 / 클라우드 서버)</div>
+</div>
+
+</body>
+</html>

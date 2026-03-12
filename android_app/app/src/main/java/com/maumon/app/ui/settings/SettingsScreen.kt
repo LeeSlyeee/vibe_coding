@@ -401,6 +401,33 @@ fun SettingsScreen(
             }
 
             // ═══════════════════════════════════════════
+            // 보안
+            // ═══════════════════════════════════════════
+            SettingsSection(title = "보안") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Security, contentDescription = null, tint = Primary, modifier = Modifier.size(24.dp))
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("화면 캡처 방지", style = MaterialTheme.typography.bodyLarge)
+                        Text("앱 화면이 캡처되거나 녹화되는 것을 방지합니다", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Switch(
+                        checked = uiState.isScreenshotPreventEnabled,
+                        onCheckedChange = { settingsViewModel.toggleScreenshotPrevent(it) },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = Primary
+                        )
+                    )
+                }
+            }
+
+            // ═══════════════════════════════════════════
             // 도움말 — iOS AppGuideView 대응
             // ═══════════════════════════════════════════
             SettingsSection(title = "도움말") {
@@ -444,7 +471,7 @@ fun SettingsScreen(
                 SettingsItem(
                     icon = Icons.Default.Groups,
                     title = "개발자",
-                    subtitle = "Maum-on Team",
+                    subtitle = "마음온 팀",
                     onClick = { }
                 )
             }
@@ -634,65 +661,255 @@ fun NicknameEditDialog(
 
 // ═══════════════════════════════════════════
 // 생년월일 선택 다이얼로그
-// iOS BirthDatePickerView 대응
+// 완전 커스텀 한국어 달력
+// 일요일(빨간색), 토요일(파란색), 모든 텍스트 한국어
 // ═══════════════════════════════════════════
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BirthDatePickerDialog(
     currentDate: String?,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    // DatePicker 상태
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = currentDate?.let { dateStr ->
+    // 초기 날짜 파싱
+    val initialDate = remember {
+        currentDate?.let { dateStr ->
             try {
                 val parts = dateStr.split("-")
-                if (parts.size == 3) {
-                    val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
-                    cal.set(parts[0].toInt(), parts[1].toInt() - 1, parts[2].toInt(), 0, 0, 0)
-                    cal.timeInMillis
-                } else null
+                if (parts.size == 3) Triple(parts[0].toInt(), parts[1].toInt(), parts[2].toInt())
+                else null
             } catch (_: Exception) { null }
         }
-    )
+    }
 
-    DatePickerDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC"))
-                        cal.timeInMillis = millis
-                        val year = cal.get(java.util.Calendar.YEAR)
-                        val month = cal.get(java.util.Calendar.MONTH) + 1
-                        val day = cal.get(java.util.Calendar.DAY_OF_MONTH)
-                        val formatted = String.format("%04d-%02d-%02d", year, month, day)
-                        onConfirm(formatted)
-                    }
-                }
-            ) {
-                Text("저장", color = Primary, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소")
-            }
-        },
-    ) {
-        DatePicker(
-            state = datePickerState,
-            title = {
+    val today = remember {
+        val cal = java.util.Calendar.getInstance()
+        Triple(
+            cal.get(java.util.Calendar.YEAR),
+            cal.get(java.util.Calendar.MONTH) + 1,
+            cal.get(java.util.Calendar.DAY_OF_MONTH)
+        )
+    }
+
+    var displayYear by remember { mutableIntStateOf(initialDate?.first ?: today.first) }
+    var displayMonth by remember { mutableIntStateOf(initialDate?.second ?: today.second) }
+    var selectedYear by remember { mutableIntStateOf(initialDate?.first ?: -1) }
+    var selectedMonth by remember { mutableIntStateOf(initialDate?.second ?: -1) }
+    var selectedDay by remember { mutableIntStateOf(initialDate?.third ?: -1) }
+
+    val koreanDays = listOf("일", "월", "화", "수", "목", "금", "토")
+
+    // 달력 데이터 계산
+    val firstDayOfWeek = remember(displayYear, displayMonth) {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(displayYear, displayMonth - 1, 1)
+        cal.get(java.util.Calendar.DAY_OF_WEEK) - 1 // 0=일요일
+    }
+    val daysInMonth = remember(displayYear, displayMonth) {
+        val cal = java.util.Calendar.getInstance()
+        cal.set(displayYear, displayMonth - 1, 1)
+        cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH)
+    }
+
+    val hasSelection = selectedYear > 0
+    val headlineText = if (hasSelection) {
+        "${selectedYear}년 ${selectedMonth}월 ${selectedDay}일"
+    } else {
+        "날짜를 선택하세요"
+    }
+
+    val sundayColor = Color(0xFFFF3B30)
+    val saturdayColor = Color(0xFF007AFF)
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                // 제목
                 Text(
                     "생년월일 선택",
-                    modifier = Modifier.padding(start = 24.dp, top = 16.dp),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 13.sp,
+                    color = Color.Gray
                 )
+                Spacer(Modifier.height(4.dp))
+
+                // 선택된 날짜 헤드라인
+                Text(
+                    headlineText,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1D1D1F)
+                )
+
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 16.dp),
+                    color = Color(0xFFE5E5EA)
+                )
+
+                // ── 월 네비게이션 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        if (displayMonth == 1) { displayMonth = 12; displayYear-- }
+                        else displayMonth--
+                    }) {
+                        Icon(
+                            Icons.Default.ChevronLeft,
+                            contentDescription = "이전 달",
+                            tint = Primary
+                        )
+                    }
+                    Text(
+                        "${displayYear}년 ${displayMonth}월",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 17.sp,
+                        color = Color(0xFF1D1D1F)
+                    )
+                    IconButton(onClick = {
+                        if (displayMonth == 12) { displayMonth = 1; displayYear++ }
+                        else displayMonth++
+                    }) {
+                        Icon(
+                            Icons.Default.ChevronRight,
+                            contentDescription = "다음 달",
+                            tint = Primary
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // ── 요일 헤더 (일=빨강, 토=파랑) ──
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    koreanDays.forEachIndexed { index, day ->
+                        val color = when (index) {
+                            0 -> sundayColor
+                            6 -> saturdayColor
+                            else -> Color(0xFF8E8E93)
+                        }
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                day,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = color
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(6.dp))
+
+                // ── 날짜 그리드 ──
+                val totalCells = firstDayOfWeek + daysInMonth
+                val rows = (totalCells + 6) / 7
+
+                for (row in 0 until rows) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(42.dp)
+                    ) {
+                        for (col in 0..6) {
+                            val cellIndex = row * 7 + col
+                            val day = cellIndex - firstDayOfWeek + 1
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (day in 1..daysInMonth) {
+                                    val isSelected = selectedYear == displayYear &&
+                                            selectedMonth == displayMonth &&
+                                            selectedDay == day
+                                    val isToday = today.first == displayYear &&
+                                            today.second == displayMonth &&
+                                            today.third == day
+
+                                    val textColor = when {
+                                        isSelected -> Color.White
+                                        col == 0 -> sundayColor
+                                        col == 6 -> saturdayColor
+                                        else -> Color(0xFF1D1D1F)
+                                    }
+
+                                    Surface(
+                                        onClick = {
+                                            selectedYear = displayYear
+                                            selectedMonth = displayMonth
+                                            selectedDay = day
+                                        },
+                                        shape = CircleShape,
+                                        color = when {
+                                            isSelected -> Primary
+                                            isToday -> Primary.copy(alpha = 0.1f)
+                                            else -> Color.Transparent
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                "$day",
+                                                fontSize = 15.sp,
+                                                fontWeight = when {
+                                                    isSelected -> FontWeight.Bold
+                                                    isToday -> FontWeight.Bold
+                                                    else -> FontWeight.Normal
+                                                },
+                                                color = textColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                // ── 버튼 ──
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("취소", color = Color.Gray, fontWeight = FontWeight.SemiBold)
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (hasSelection) {
+                                val formatted = String.format(
+                                    "%04d-%02d-%02d",
+                                    selectedYear, selectedMonth, selectedDay
+                                )
+                                onConfirm(formatted)
+                            }
+                        },
+                        enabled = hasSelection
+                    ) {
+                        Text(
+                            "저장",
+                            color = if (hasSelection) Primary else Color.Gray,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
-        )
+        }
     }
 }
 

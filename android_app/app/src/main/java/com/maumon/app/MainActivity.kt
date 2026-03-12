@@ -15,6 +15,10 @@ import com.maumon.app.ui.MaumOnApp
 import com.maumon.app.ui.theme.MaumOnTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import android.view.WindowManager
+import androidx.lifecycle.lifecycleScope
+import com.maumon.app.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -23,6 +27,20 @@ class MainActivity : ComponentActivity() {
 
         // [Push Notification] FCM 초기화
         initFirebase()
+
+        val authRepo = AuthRepository(applicationContext)
+        lifecycleScope.launch {
+            authRepo.isScreenshotPreventEnabled.collect { enabled ->
+                if (enabled) {
+                    window.setFlags(
+                        WindowManager.LayoutParams.FLAG_SECURE,
+                        WindowManager.LayoutParams.FLAG_SECURE
+                    )
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
+        }
 
         // 딥링크 체크 (푸시 터치로 앱이 열린 경우)
         handleDeepLink(intent)

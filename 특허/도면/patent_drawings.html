@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  body { font-family: "Malgun Gothic","Apple SD Gothic Neo",sans-serif; background:#fff; margin:0; padding:0; }
+  .page { width:794px; min-height:1050px; margin:40px auto; padding:60px; background:#fff; border:2px solid #000; page-break-after:always; box-sizing:border-box; }
+  .page-landscape { width:1123px; min-height:794px; margin:40px auto; padding:60px; background:#fff; border:2px solid #000; page-break-after:always; box-sizing:border-box; }
+  .page-landscape .mermaid svg { transform: scale(1.25); transform-origin: top center; margin-top: 30px; margin-bottom: 60px; }
+  .page-title { text-align:center; font-size:18px; font-weight:bold; margin-bottom:30px; border-bottom:2px solid #000; padding-bottom:10px; }
+  .mermaid { display:flex; justify-content:center; margin:20px 0; }
+  /* Force all mermaid to grayscale */
+  .mermaid svg { filter: grayscale(100%) contrast(1.2); }
+  .mermaid svg text { fill: #000 !important; }
+  .mermaid svg .node rect, .mermaid svg .node polygon, .mermaid svg .node circle { stroke: #000 !important; stroke-width: 2px !important; }
+  .mermaid svg .edgePath path { stroke: #000 !important; }
+  .mermaid svg marker path { fill: #000 !important; }
+  .ref-note { font-size:11px; text-align:center; margin-top:20px; color:#333; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+mermaid.initialize({
+  startOnLoad:true,
+  theme:'neutral',
+  flowchart:{curve:'basis',nodeSpacing:30,rankSpacing:40},
+  themeVariables:{
+    primaryColor:'#ffffff',secondaryColor:'#ffffff',tertiaryColor:'#ffffff',
+    primaryBorderColor:'#000000',secondaryBorderColor:'#000000',
+    primaryTextColor:'#000000',secondaryTextColor:'#000000',
+    lineColor:'#000000',textColor:'#000000',
+    mainBkg:'#ffffff',nodeBorder:'#000000',
+    clusterBkg:'#f5f5f5',clusterBorder:'#000000',
+    edgeLabelBackground:'#ffffff'
+  }
+});
+</script>
+</head>
+<body>
+
+<!-- 도 1 -->
+<div class="page" id="fig1">
+  <div class="page-title">【도 1】</div>
+  <div class="mermaid">
+graph TD
+    A(["사용자 단말기(100)"])-->B{"생리적 상태 평가 모듈(110)"}
+    B-->|"수면 상태 평가 / 약물 복용 여부"|C["임계값 검증부(120)"]
+    C-->D["동적 질문 트리 생성기(130)"]
+    D-->|"수면부족/약물 영향"|D1["우회 질의 배치"]
+    D-->|"정상 컨디션"|D2["기본 순차 질문 배치"]
+    D1-.->E
+    D2-.->E
+    E["대화/일기 인터페이스(140)"]-->F(["사용자 텍스트 입력"])
+    F-->G{"하이브리드 라우팅 제어 모듈(150)"}
+    G-->|"고민감/네트워크단절"|H["제1 AI 모델(160) 온디바이스"]
+    G-->|"일반/동의완료/네트워크양호"|I["제2 AI 모델(170) 클라우드"]
+    H-->J(("심리 결과 도출"))
+    I-->J
+    J-->K["솔루션 제공(180)"]
+    K-->L["보안 후처리 모듈(190)"]
+  </div>
+  <div class="ref-note">생리적 상태 기반 동적 질문 트리 및 하이브리드 라우팅 시스템 전체 프로세스 흐름도</div>
+</div>
+
+<!-- 도 2 -->
+<div class="page" id="fig2">
+  <div class="page-title">【도 2】</div>
+  <div class="mermaid">
+graph TD
+    S1["START: 생리 파라미터 수신"]-->S2{"수면 시간 ≤ T1? (4h)"}
+    S2-->|"YES"|S3["Wsleep = 0.8"]
+    S2-->|"NO"|S4{"수면 시간 ≤ T2? (6h)"}
+    S4-->|"YES"|S5["Wsleep = 0.4"]
+    S4-->|"NO"|S6["Wsleep = 0.0"]
+    S3-->S7{"약물 복용?"}
+    S5-->S7
+    S6-->S7
+    S7-->|"YES: T3시간 이내"|S8["Wdrug = 0.6"]
+    S7-->|"NO / T3 초과"|S9["Wdrug = 0.0"]
+    S8-->S10["Wphysio = Wsleep + Wdrug"]
+    S9-->S10
+    S10-->S11{"Wphysio ≥ 0.4?"}
+    S11-->|"YES"|S12["우회 질의 최우선 배치"]
+    S11-->|"NO"|S13["기본 질문 순서 유지"]
+    S12-->S14["질문 트리 출력"]
+    S13-->S14
+  </div>
+  <div class="ref-note">동적 질문 트리 생성기(130)의 생리적 상태 임계값 기반 질문 재배열 알고리즘</div>
+</div>
+
+<!-- 도 3 -->
+<div class="page" id="fig3">
+  <div class="page-title">【도 3】</div>
+  <div class="mermaid">
+graph TD
+    R1["응답 텍스트 수신"]-->R2["키워드 민감도 분석"]
+    R2-->R3["TF-IDF + 정규식 매칭"]
+    R3-->R4["Ssens 스코어 산출"]
+    R4-->R5{"Ssens ≥ 0.7?"}
+    R5-->|"YES"|R6["ROUTE: 온디바이스(160)"]
+    R5-->|"NO"|R7{"Ping RTT ≤ 500ms?"}
+    R7-->|"NO: 불안정"|R6
+    R7-->|"YES: 양호"|R9{"사용자 동의?"}
+    R9-->|"NO"|R6
+    R9-->|"YES + 심층분석"|R10["ROUTE: 클라우드(170)"]
+    R6-->R11["온디바이스 SLM 추론"]
+    R10-->R12["비식별화 후 LLM 호출"]
+  </div>
+  <div class="ref-note">하이브리드 라우팅 제어 모듈(150)의 민감도 스코어링 및 경로 결정 로직</div>
+</div>
+
+<!-- 도 4 -->
+<div class="page" id="fig4">
+  <div class="page-title">【도 4】</div>
+  <div class="mermaid">
+sequenceDiagram
+    participant App as 출력부(180)
+    participant Mem as 메모리 관리부(191)
+    participant OS as OS 보안 API
+    participant Scr as 화면 보호부(192)
+    App->>Scr: 캡처 차단 API 호출
+    Scr->>OS: 캡처 감시 등록
+    App->>App: 결과 리포트 렌더링
+    App->>Mem: 렌더링 완료 이벤트
+    Mem->>Mem: Step1: 공백 덮어쓰기
+    Mem->>Mem: Step2: null 바이트 처리
+    Mem->>Mem: Step3: 메모리 해제
+    Mem->>OS: 로그 캐시 삭제 요청
+    OS-->>Mem: 삭제 확인
+    Mem-->>App: Stripping 완료
+  </div>
+  <div class="ref-note">보안 후처리 모듈(190)의 Atomic Print Stripping 시퀀스 다이어그램</div>
+</div>
+
+<!-- 도 5 -->
+<div class="page-landscape" id="fig5">
+  <div class="page-title">【도 5】</div>
+  <div class="mermaid">
+%%{init: {'themeVariables': { 'fontSize': '18px', 'nodeSpacing': 60, 'rankSpacing': 80}}}%%
+graph LR
+    subgraph "사용자 단말기(100)"
+        A1["생리 상태<br>평가 모듈(110)"]
+        A2["임계값<br>검증부(120)"]
+        A3["동적 질문 트리<br>생성기(130)"]
+        A4["대화/일기<br>인터페이스(140)"]
+        A5["하이브리드 라우팅<br>제어 모듈(150)"]
+        A6["제1 AI 모델(160)"]
+        A7["NPU/Neural Engine"]
+        A8["보안 후처리<br>모듈(190)"]
+        A9["로컬 암호화<br>저장소"]
+    end
+    subgraph "통신망(200)"
+        B1["네트워크"]
+    end
+    subgraph "클라우드 서버(300)"
+        C1["제2 AI 모델(170)"]
+        C2["비식별화<br>처리부(310)"]
+        C3["암호화 DB(320)"]
+    end
+    A1-->A2-->A3-->A4
+    A4-->A5
+    A5-->A6
+    A6-->A7
+    A5-->B1-->C2-->C1
+    C1-->C3
+    A6-->A8-->A9
+  </div>
+  <div class="ref-note">시스템 전체 구성 블록도 (사용자 단말기 / 통신망 / 클라우드 서버)</div>
+</div>
+
+</body>
+</html>

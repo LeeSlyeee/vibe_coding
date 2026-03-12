@@ -445,7 +445,7 @@ fun MoodDistributionContent(state: StatsUiState) {
                 }
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("$total", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                    Text("TOTAL", fontSize = 11.sp, color = Color.Gray)
+                    Text("합계", fontSize = 11.sp, color = Color.Gray)
                 }
             }
 

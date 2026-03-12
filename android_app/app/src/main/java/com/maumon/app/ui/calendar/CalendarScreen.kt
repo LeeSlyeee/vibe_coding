@@ -1,5 +1,7 @@
 package com.maumon.app.ui.calendar
 
+import java.time.DayOfWeek
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -341,6 +343,7 @@ fun CalendarGrid(
 
                 DayCell(
                     day = day,
+                    date = date,
                     isToday = isToday,
                     diary = diary,
                     onClick = { onDayClick(dateStr) }
@@ -391,7 +394,7 @@ fun moodEmojiFor(diary: Diary): String {
 }
 
 @Composable
-fun DayCell(day: Int, isToday: Boolean, diary: Diary?, onClick: () -> Unit) {
+fun DayCell(day: Int, date: LocalDate, isToday: Boolean, diary: Diary?, onClick: () -> Unit) {
     val bgColor = emotionColor(diary)
     val hasDiary = diary != null
     // AI 감정 라벨 추출 (iOS parseAI 대응)
@@ -411,6 +414,10 @@ fun DayCell(day: Int, isToday: Boolean, diary: Diary?, onClick: () -> Unit) {
             translations[label] ?: label
         }
     }
+
+    // 토요일=파란, 일요일=빨간 색상
+    val isSunday = date.dayOfWeek == DayOfWeek.SUNDAY
+    val isSaturday = date.dayOfWeek == DayOfWeek.SATURDAY
 
     Box(
         modifier = Modifier
@@ -435,12 +442,14 @@ fun DayCell(day: Int, isToday: Boolean, diary: Diary?, onClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 4.dp)
         ) {
-            // 1. 날짜
+            // 1. 날짜 (토요일=파란, 일요일=빨간)
             Text(
                 text = "$day",
                 fontSize = if (hasDiary) 10.sp else 13.sp,
                 fontWeight = if (isToday || hasDiary) FontWeight.Bold else FontWeight.Normal,
                 color = when {
+                    isSunday -> Color(0xFFFF3B30)  // 빨간색
+                    isSaturday -> Primary          // 파란색
                     isToday -> Primary
                     hasDiary -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
                     else -> MaterialTheme.colorScheme.onSurface

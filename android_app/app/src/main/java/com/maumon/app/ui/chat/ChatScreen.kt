@@ -103,7 +103,7 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "마음 톡(Talk)",
+                        "한마디",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -200,7 +200,7 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                 ChatBubble(message = msg)
             }
 
-            // 타이핑 인디케이터
+            // 타이핑 인디케이터 (loadingHint 반영)
             if (uiState.isTyping) {
                 item {
                     Row(
@@ -212,7 +212,7 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                             color = Color.Gray.copy(alpha = 0.1f)
                         ) {
                             Text(
-                                "답변을 생각하는 중...",
+                                uiState.loadingHint ?: "답변을 생각하는 중...",
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                                 color = Color.Gray,
                                 fontSize = 14.sp
@@ -238,6 +238,25 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
         }
 
         // 입력 영역
+        val inputEnabled = when {
+            uiState.isFreeChatMode -> true  // 자유 대화: AI 응답 중에도 항상 입력 가능
+            uiState.isTyping -> false       // 가이드 플로우: AI 응답 중 차단
+            uiState.isFlowCompleted -> false
+            else -> true
+        }
+        val placeholderText = when {
+            isVoiceRecording -> "🎤 듣고 있어요..."
+            uiState.isFreeChatMode -> "마음온에게 자유롭게 이야기해보세요..."
+            uiState.isFlowCompleted -> "오늘의 기록이 완료되었어요 ✨"
+            uiState.currentStepIndex == 0 -> "약 복용 여부를 알려주세요..."
+            uiState.currentStepIndex == 1 -> "수면 상태를 알려주세요..."
+            uiState.currentStepIndex == 2 -> "오늘 있었던 일을 알려주세요..."
+            uiState.currentStepIndex == 3 -> "느낀 감정을 표현해주세요..."
+            uiState.currentStepIndex == 4 -> "그 감정의 이유를 생각해보세요..."
+            uiState.currentStepIndex == 5 -> "오늘의 나에게 한마디..."
+            else -> "메시지 보내기..."
+        }
+
         Surface(shadowElevation = 4.dp) {
             Row(
                 modifier = Modifier
@@ -263,7 +282,7 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                             }
                         }
                     },
-                    enabled = !uiState.isTyping,
+                    enabled = inputEnabled,
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
@@ -283,15 +302,10 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                     value = inputText,
                     onValueChange = { inputText = it },
                     modifier = Modifier.weight(1f),
-                    placeholder = {
-                        Text(
-                            if (isVoiceRecording) "🎤 듣고 있어요..."
-                            else "메시지 보내기..."
-                        )
-                    },
+                    placeholder = { Text(placeholderText) },
                     shape = RoundedCornerShape(24.dp),
                     singleLine = true,
-                    enabled = !uiState.isTyping
+                    enabled = inputEnabled
                 )
 
                 // 보내기 버튼
@@ -302,12 +316,12 @@ fun ChatScreen(chatViewModel: ChatViewModel = viewModel()) {
                             inputText = ""
                         }
                     },
-                    enabled = inputText.isNotBlank() && !uiState.isTyping,
+                    enabled = inputText.isNotBlank() && inputEnabled,
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
                         .background(
-                            if (inputText.isNotBlank() && !uiState.isTyping) Primary
+                            if (inputText.isNotBlank() && inputEnabled) Primary
                             else Color.Gray.copy(alpha = 0.3f)
                         )
                 ) {

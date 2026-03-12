@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>특허청 나홀로 전자출원 A to Z 가이드</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 40px;
+            display: flex;
+            align-items: center;
+        }
+        h2::before {
+            content: "📌";
+            margin-right: 10px;
+        }
+        .step {
+            background-color: #f8f9fa;
+            border-left: 5px solid #3498db;
+            padding: 20px;
+            margin-bottom: 25px;
+            border-radius: 0 5px 5px 0;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 10px;
+        }
+        a {
+            color: #e74c3c;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .tip-box {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 40px;
+        }
+        .tip-box h4 {
+            margin-top: 0;
+        }
+        .highlight {
+            background-color: #e8f4f8;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>특허청 나홀로 전자출원 A to Z 가이드</h1>
+    <p>변리사 없이 직접 특허를 출원하기 위한 5단계 가이드입니다. 이미 작성된 명세서(HTML)와 도면(PNG)이 있으므로, 아래 절차에 따라 '복사 및 붙여넣기'만 진행하시면 됩니다.</p>
+
+    <div class="step">
+        <h3>1단계: '특허로' 가입 및 특허고객번호 발급</h3>
+        <ul>
+            <li>특허청 전자출원 포털인 <a href="https://patent.go.kr" target="_blank">특허로 (patent.go.kr)</a>에 접속합니다.</li>
+            <li>우측 상단 메뉴 또는 메인 화면의 <strong>'특허고객번호 부여신청'</strong>을 클릭하여 본인 인증 후 고유 번호를 발급받습니다. (이 번호가 평생 사용하는 특허 식별번호입니다.)</li>
+            <li>발급받은 번호로 회원가입을 진행하고, 로그인을 위해 <strong>공동인증서(또는 금융인증서)</strong>를 사이트에 등록합니다.</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>2단계: '웹작성/제출' 실행 (가장 확실한 방법, 소프트웨어 설치 불필요)</h3>
+        <p>제가 직접 특허로 사이트 전체를 스캔하여 가장 확실하게 웹작성기로 들어가는 루트를 찾아냈습니다. 이 방법을 따라주세요!</p>
+        <ul style="font-size: 1.1em; color: #004085;">
+            <li><a href="https://patent.go.kr" target="_blank">특허로 메인 홈페이지(patent.go.kr)</a>에 접속합니다.</li>
+            <li>로그인 하기 전이라도 괜찮으니, <strong>마우스 스크롤을 화면 맨 아래쪽 끝까지 쭈욱 내리세요.</strong></li>
+            <li>화면 우측 하단에 작은 회색 박스로 <strong>"웹작성/제출"</strong>이라는 구역이 보입니다.</li>
+            <li>그 구역 안에 4개의 큰 아이콘(특허, 실용, 디자인, 상표)이 있는데, 그 중 첫 번째인 자격증/도장 모양의 <strong><span class="highlight" style="background-color: #f1f8ff; color: #0056b3; border: 1px solid #b8daff; padding: 3px 8px; border-radius: 5px;">[ 특허 ]</span></strong> 아이콘을 클릭합니다.</li>
+            <li>(클릭하시면 로그인이 필요하다는 안내가 나오며, 공인인증서 로그인 후 즉시 '특허출원서' 작성 창이 열립니다.)</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>3단계: 명세서 항목별 복사 & 붙여넣기</h3>
+        <p>제가 작성해드린 <code>특허명세서_v2_마음온_AI_하이브리드_심리케어시스템.html</code> 파일을 브라우저에서 열고, 각 섹션의 내용을 웹작성기의 동일한 항목 빈칸에 그대로 복사해서 붙여넣습니다.</p>
+        <ul>
+            <li><strong>발명의 명칭:</strong> 국문 및 영문 명칭 입력</li>
+            <li><strong>발명의 설명:</strong> 
+                <ul>
+                    <li>기술분야, 배경기술, 선행기술문헌 복사</li>
+                    <li>해결하고자 하는 과제, 과제의 해결 수단, 발명의 효과 복사</li>
+                    <li>도면의 간단한 설명 및 발명을 실시하기 위한 구체적인 내용 복사</li>
+                </ul>
+            </li>
+            <li><strong>청구범위:</strong> 【청구항 1】 부터 【청구항 7】 까지 <strong>각각의 입력란을 추가</strong>하여 복사/붙여넣기 진행</li>
+            <li><strong>요약서:</strong> 요약 내용 텍스트 복사, <strong>대표도</strong>는 <code>도 1</code>로 기재</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>4단계: 캡처된 도면 이미지 첨부</h3>
+        <ul>
+            <li>웹작성기의 <strong>[도면]</strong> 탭 또는 첨부 파일 섹션으로 이동합니다.</li>
+            <li>특허 도면 폴더에 저장된 5장의 흑백 <code>.png</code> 파일들을 순서대로 업로드합니다.</li>
+            <li>파일을 추가할 때 항목 이름을 <code>도 1</code>, <code>도 2</code>... 로 명명합니다. (특허로 시스템이 자동으로 해상도를 조절하고 필요한 형식(예: TIF)으로 변환해 줍니다.)</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>5단계: 오류 검사 및 온라인 제출 (수수료 납부)</h3>
+        <ul>
+            <li>웹작성기 화면 상단 또는 하단의 <strong>"오류검사"</strong> 버튼을 눌러 필수 항목 누락 여부를 시스템이 점검하도록 합니다.</li>
+            <li>오류가 없다면 <strong>"온라인 제출"</strong> (또는 문서제출) 버튼을 클릭하고, 등록된 공인/금융 인증서로 서명하여 특허청으로 전송합니다.</li>
+            <li>제출이 완료되면 즉시 <strong>특허출원번호(10-202X-XXXXXXX)</strong>가 발급되며, 이때부터 서비스에 '특허 출원 중(Patent Pending)' 문구를 사용할 수 있습니다.</li>
+            <li>접수 완료 후 안내받은 계좌나 납부 메뉴를 통해 <strong>출원 수수료(기본 약 4~5만원)</strong>를 다음날 자정 전까지 납부하면 최종 완료됩니다.</li>
+        </ul>
+    </div>
+
+    <div class="tip-box">
+        <h4>💡 진행 전 특급 팁: 수수료 감면 혜택 챙기기!</h4>
+        <p>출원인이 <strong>개인, 학생, 청년 창업자, 또는 중소기업</strong>에 해당하는 경우 특허청 수수료의 <strong>70~85%를 감면</strong>받을 수 있습니다. 제출 전 특허로의 <a href="https://patent.go.kr/smart/jsp/inf/dtl/fee/FeeCommInq.do" target="_blank">[수수료 감면제도 안내]</a>를 확인하시고, 출원서 작성 시 감면 사유를 꼭 체크하세요!</p>
+    </div>
+
+</div>
+
+</body>
+</html>

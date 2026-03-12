@@ -17,6 +17,7 @@ data class SettingsUiState(
     val isLoggedIn: Boolean = false,
     val isLoading: Boolean = false,
     val message: String? = null,
+    val isScreenshotPreventEnabled: Boolean = false,
     // B2G 상태
     val b2gCenterCode: String = "",
     val b2gIsLinked: Boolean = false,
@@ -58,6 +59,14 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                         realName = state.realName,
                         birthDate = state.birthDate,
                     )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            authRepo.isScreenshotPreventEnabled.collect { enabled ->
+                _uiState.update { current ->
+                    current.copy(isScreenshotPreventEnabled = enabled)
                 }
             }
         }
@@ -118,6 +127,13 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             }.onFailure { e ->
                 _uiState.update { it.copy(isLoading = false, message = "생년월일 변경 실패: ${e.message}") }
             }
+        }
+    }
+
+    /** 스크린샷 방지 설정 토글 */
+    fun toggleScreenshotPrevent(enabled: Boolean) {
+        viewModelScope.launch {
+            authRepo.setScreenshotPreventEnabled(enabled)
         }
     }
 

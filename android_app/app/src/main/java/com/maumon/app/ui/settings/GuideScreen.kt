@@ -93,10 +93,10 @@ fun GuideScreen(onBack: () -> Unit) {
                     desc = "하루의 감정을 4단계로 나누어 천천히 기록해보세요."
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    GuideStepCard("1", "사실 (Event)", "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
-                    GuideStepCard("2", "감정 (Emotion)", "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
-                    GuideStepCard("3", "의미 (Meaning)", "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
-                    GuideStepCard("4", "위로 (Self-Talk)", "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
+                    GuideStepCard("1", "사실", "오늘 있었던 일이나 상황을 객관적으로 적어보세요.")
+                    GuideStepCard("2", "감정", "그 상황에서 느낀 솔직한 감정들을 단어나 문장으로 표현해요.")
+                    GuideStepCard("3", "의미", "왜 그런 감정이 들었는지, 나에게 어떤 의미인지 깊이 생각해보세요.")
+                    GuideStepCard("4", "위로", "오늘 하루 고생한 나에게 따뜻한 위로와 격려의 말을 건네주세요.")
                 }
             }
 
@@ -115,7 +115,7 @@ fun GuideScreen(onBack: () -> Unit) {
                 )
                 GuideFeatureCard(
                     icon = "💬",
-                    title = "AI 감정 분석 코멘트 (Gemma 2)",
+                    title = "AI 감정 분석 코멘트",
                     desc = "구글의 최신 모델 Gemma 2 (2b)가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다."
                 )
             }

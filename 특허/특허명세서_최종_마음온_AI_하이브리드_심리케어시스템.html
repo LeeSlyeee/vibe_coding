@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>특허 출원 명세서: 마음온 하이브리드 심리케어 시스템</title>
+    <style>
+      body {
+        font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+        line-height: 1.8;
+        padding: 40px;
+        max-width: 1000px;
+        margin: 0 auto;
+        color: #333;
+        background-color: #fcfcfc;
+      }
+      .container {
+        background-color: #ffffff;
+        padding: 50px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        border-radius: 8px;
+      }
+      h1 {
+        text-align: center;
+        border-bottom: 3px solid #2c3e50;
+        padding-bottom: 20px;
+        margin-bottom: 40px;
+        color: #2c3e50;
+      }
+      h2 {
+        color: #2c3e50;
+        margin-top: 40px;
+        border-left: 6px solid #3498db;
+        padding-left: 15px;
+        font-size: 1.5em;
+      }
+      h3 {
+        color: #34495e;
+        margin-top: 25px;
+        font-size: 1.2em;
+      }
+      p {
+        margin-bottom: 20px;
+        text-align: justify;
+        font-size: 1.05em;
+      }
+      .patent-section {
+        margin-bottom: 40px;
+      }
+      .mermaid {
+        display: flex;
+        justify-content: center;
+        margin: 40px 0;
+        padding: 20px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+      }
+      .claim {
+        font-weight: bold;
+        color: #2980b9;
+        margin-top: 20px;
+      }
+      .claim-text {
+        margin-left: 20px;
+        margin-bottom: 30px;
+        padding-left: 15px;
+        border-left: 3px solid #ecf0f1;
+      }
+      .highlight {
+        background-color: #f1c40f33;
+        padding: 2px 4px;
+        border-radius: 3px;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "default",
+        flowchart: { curve: "basis" },
+      });
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>특허 출원 명세서 (특허청용 초안)</h1>
+
+      <div class="patent-section">
+        <h2>【발명의 명칭】</h2>
+        <p>
+          <strong>국문:</strong> 생리적 상태 입력에 기반한 동적 질문 트리 구성
+          및 데이터 민감도에 따른 온디바이스-클라우드 하이브리드 라우팅 기반
+          인공지능 심리 케어 제공 시스템 및 그 제어 방법
+        </p>
+        <p>
+          <strong>영문:</strong> System and Control Method for Providing
+          Artificial Intelligence Psychological Care Based on Dynamic Question
+          Tree Configuration Using Physiological State Inputs and
+          On-Device/Cloud Hybrid Routing According to Data Sensitivity
+        </p>
+      </div>
+
+      <div class="patent-section">
+        <h2>【기술분야】</h2>
+        <p>
+          본 발명은 인공지능(AI) 기반 맞춤형 심리 케어 및 진단 보조 시스템에
+          관한 것으로서, 더욱 상세하게는 사용자의 신체적, 생리적 상태 데이터를
+          선제적으로 획득하여 심층 분석을 위한 대화형 질문 식별 트리를
+          실시간으로 동적 재조합하고, 수집되는 입력 데이터의 프라이버시 민감도와
+          네트워크 가용성에 따라 로컬 단말 내
+          <span class="highlight">온디바이스(On-device) AI 모델</span>과 원격
+          서버의 <span class="highlight">클라우드(Cloud) AI 모델</span> 간의
+          데이터 처리 경로를 가변적으로 라우팅하여 보안성과 처리 효율성을
+          극대화하는 하이브리드 기반 AI 심리 케어 제공 시스템 및 그 제어 방법에
+          관한 것이다.
+        </p>
+      </div>
+
+      <div class="patent-section">
+        <h2>【배경기술】</h2>
+        <p>
+          종래의 챗봇 기반 심리 상담 어플리케이션이나 디지털 감정 일기 서비스는
+          주로 정해진 규칙(Rule-based)이나 단일한 거대 언어 모델(LLM)에 의존하여
+          사용자의 감정 상태나 일상을 묻는 획일화된 질의 구조를 갖는다. 이러한
+          기존 시스템은 다음과 같은 치명적인 한계점들을 보유하고 있다.
+        </p>
+        <p>
+          첫째, 사용자의 그날의 생물학적/물리적 상태(예: 극심한 수면 부족,
+          정신건강의학과 처방 약물 복용 여부 및 시기 등)를 고려하지 않은 채
+          정해진 순서대로 감정이나 사건만을 추출하려 든다. 임상 심리학적으로
+          우울감이나 불안감의 발현 원인이 외부 사건이 아니라 수면 부족과 같은
+          신체적 호르몬 불균형에서 기인할 수 있음에도, 기존 AI는 이를 감별 및
+          교정(Calibration)하지 못해 심리 진단 결과에 심각한 오류와 왜곡을
+          발생시키는 문제점이 있다.
+        </p>
+        <p>
+          둘째, 클라우드 의존성 및 개인정보 유출에 대한 우려이다. 양질의 텍스트
+          생성과 분석을 위해 대부분의 서비스가 서버 클라우드(API)로 사용자의
+          입력 값을 전송한다. 이는 자해, 트라우마 등 지극히 역린에 해당하는
+          개인적이고 민감한 정신 건강 데이터가 네트워크를 거쳐 보관됨을
+          의미하며, 이러한 보안 위험성에 대한 본능적 거부감으로 인하여 실제
+          치료가 필요한 잠재 사용자가 솔직한 기록을 회피하게 만드는 진입
+          장벽으로 작용하고 있다.
+        </p>
+      </div>
+
+      <div class="patent-section">
+        <h2>【발명의 내용】</h2>
+
+        <h3>【해결하고자 하는 과제】</h3>
+        <p>
+          본 발명이 목적하는 바는 첫째, 사용자의 수면 상태, 치료 약물 복용
+          상태와 같은 특정 생리적/물리적 파라미터를 사건 및 감정 텍스트보다
+          선행하여 입력받고, 그 결과값을 토대로 후속 AI 질문(사건 추출, 감정
+          상태 식별, 인지 재구성 등)의 가중치, 내용 및 순서를 실시간으로 동적
+          재배열함으로써, 신체적 교란 요인과 순수 심리적 요인을 구별하여 다차원
+          감정 분석의 정확도를 비약적으로 상승시키는 것이다.
+        </p>
+        <p>
+          둘째, 사용자가 입력하는 일기 데이터나 대화 내용을 실시간으로 파싱하여
+          정보의 민감도(Sensitivity)를 평가하고, 일상적 내용이거나 또는 반대로
+          외부 유출 시 치명적인 고위험군 민감 데이터인 경우, 사용자 단말기에
+          내장된 '온디바이스 경량 AI 수론 모델'에서만 즉각적인 오프라인 처리를
+          수행하도록 하고, 오직 사용자가 심층 전문가 리포트를 위해 외부 클라우드
+          분석에 명시적 동의 서명(Consent)을 한 경우에 한해 비식별화 처리 후
+          클라우드 AI 서버로 비동기 전송 처리하는
+          <span class="highlight">하이브리드 동적 라우팅 스위칭 메커니즘</span
+          >을 제공하여 철저한 프라이버시 보호와 효율적 서버 운용을 달성하는
+          것이다.
+        </p>
+
+        <h3>【과제의 해결 수단】</h3>
+        <p>
+          상술한 목적을 달성하기 위한 본 발명의 일 측면에 따른 방법은 다음과
+          같은 단계를 포함한다.
+        </p>
+        <p>
+          사용자 단말기상에서 구동되는 앱이 사용자의 생리적 체형 데이터(수면
+          품질, 약물 투약 여부)를 수신하는 단계;
+        </p>
+        <p>
+          동적 트리 생성 모듈이 상기 생리적 상태 값에 기초하여, 임상 심리 모델에
+          기반한 질문 순서 및 우회 질의를 재결합하여 구조화된 대화 프롬프트를
+          사용자에게 제공하는 단계;
+        </p>
+        <p>
+          상기 대화 프롬프트에 대응하는 사용자의 자연어 입력 텍스트를 수신하는
+          단계;
+        </p>
+        <p>
+          라우팅 제어 모듈이 상기 수신된 텍스트의 키워드 민감도, 단말기의
+          네트워크 접속 상태, 및 사전 설정된 프라이버시 설정값을 평가 판단하여,
+          입력 텍스트의 추론 실행 프로세서(Target Processor)를 해당 사용자
+          단말기에 적재된 제1 모델(온디바이스 AI 모델) 및 무선 통신망을 통해
+          연결된 중앙 서버의 제2 모델(클라우드 기반 대형 AI 모델) 중 어느 하나로
+          동적 할당(Routing)하는 단계; 및
+        </p>
+        <p>
+          상기 할당된 타겟 모델의 추론 처리가 완료된 후 생성된 심리 진단 리포트
+          또는 대화 응답 위젯을 상기 단말기의 화면에 출력하고, 상기 제1
+          모델(온디바이스 AI)을 통해 처리된 기록은 시스템 메모리에 단편 잔류하지
+          않도록 즉각적인 영구 파기(Atomic Stripping)를 실행하는 단계를 특징으로
+          한다.
+        </p>
+
+        <h3>【발명의 효과】</h3>
+        <p>
+          본 발명에 따르면, 심리 상태와 신체 상태 간의 임상적 인과 관계를
+          반영하도록 AI 텍스트 생성 모델의 프롬프트 흐름이 동적으로 변환되므로,
+          획일화된 질문 방식에 비해 개인의 컨디션을 반영한 압도적으로 정밀한
+          감정 원인 분석 결과를 제공할 수 있는 효과가 있다.
+        </p>
+        <p>
+          더불어, 핵심 감정 데이터나 민감도 높은 고위험 일기 데이터가 네트워크
+          단절 상태(Offline)에서도 기기 자체의 파워만으로 안전하게
+          처리(컴퓨팅)될 수 있는 구조적 메커니즘을 제공함으로써, 정보 보안에
+          극도로 민감한 심리 케어 시장의 장벽을 낮추고 글로벌 서비스 운용 시
+          외부 클라우드(LLM API) 호출 비용을 대폭 절감할 수 있는 이점을
+          제공한다.
+        </p>
+      </div>
+
+      <div class="patent-section">
+        <h2>【도면의 간단한 설명】</h2>
+        <p>
+          <strong>도 1</strong>은 본 발명의 일 실시예에 따른 생리적 상태 기반
+          동적 질문 트리 및 온디바이스-클라우드 하이브리드 라우팅 심리 케어 제공
+          시스템의 전체적인 프로세스 흐름도 및 시스템 아키텍처를 나타내는
+          도면이다.
+        </p>
+
+        <div class="mermaid">
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#e1f5fe', 'edgeLabelBackground':'#ffffff', 'tertiaryColor': '#fff5e6'}}}%%
+graph TD
+    classDef userbox fill:#e8f5e9,stroke:#4caf50,stroke-width:2px;
+    classDef cloudbox fill:#e3f2fd,stroke:#2196f3,stroke-width:2px;
+    classDef logicbox fill:#fff3e0,stroke:#ff9800,stroke-width:2px;
+
+    A([사용자 단말기/앱 구동]):::userbox --> B{1차: 생리적 상태 평가}
+    
+    B -->|수면 상태 평가<br>약물 복용 여부 체크| C[생리 데이터 임계값 검증 모듈]:::logicbox
+    C --> D[동적 질문 트리 생성기]:::logicbox
+    
+    D -->|수면부족/약물 복용 시| D1[신체적 원인 우회 질문 전진 배치<br>예: '오늘은 피로로 감정이 예민해질 수 있어요']
+    D -->|정상 컨디션| D2[일반 사건/감정/인지 순차 질문 배치]
+    
+    D1 -.-> E
+    D2 -.-> E
+    
+    E[맞춤형 대화/일기 인터페이스 구동] --> F([사용자 자연어 텍스트 입력]):::userbox
+    
+    F --> G{2차: 스위칭 파서<br>민감도 및 네트워크 평가}
+    
+    G -->|Condition 1.<br>민감도 1등급 키워드<br>네트워크 핑 손실<br>빠른 응답 속도 우선| H[제 1 모듈: 단말 로컬 처리<br>On-Device SLM/NPU 구동]:::userbox
+    G -->|Condition 2.<br>일반 대화<br>명시적 심층 리포트 요청<br>네트워크 양호| I[제 2 모듈: 원격 서버 처리<br>Cloud-based LLM API]:::cloudbox
+    
+    H --> J((다차원 심리 결과 도출))
+    I --> J
+    
+    J --> K[개인화 맞춤 솔루션 제공]
+    K --> L[앱 내 보안 후처리: <br>Atomic Print Stripping 및 화면 캡쳐 차단]:::logicbox
+        </div>
+      </div>
+
+      <div class="patent-section">
+        <h2>【발명을 실시하기 위한 구체적인 내용】</h2>
+        <p>
+          도 1을 참조하면, 본 발명의 시스템은 사용자 단말기상에서 작동하는 앱의
+          입력부와 중앙 로직, 그리고 통신망을 매개로 한 클라우드 연산부로
+          구성된다. 최초 사용자가 세션을 시작하면, 중앙 제어 로직은 질문 트리
+          생성에 앞서 <strong>생리적 상태 평가 모듈(B)</strong>을 호출한다. 이때
+          입력 받은 수면의 질이 특정 값(예: 3시간 이하 수면 등)에 기 설정된 제 1
+          임계치를 하회하면, 인공지능은 사용자의 우울감 호소를 병리학적 우울
+          시그널보다는 '수면 부족으로 인한 일시적 코티솔(Cortisol) 증가
+          현상'으로 판단하기 위한 컨텍스트(Context)를 확보한다.
+        </p>
+        <p>
+          이러한 생리/물리 데이터를 바탕으로
+          <strong>동적 질문 트리 생성기(D)</strong>는 기존에 정형화된
+          A-B-C-D(사건-생각-감정-행동) 서식에서 탈피하여 A'-B(신체적 취약성
+          고지-감정)의 순서로 문항의 가중치와 노드를 재구성한다(D1, D2).
+        </p>
+        <p>
+          사용자 응답 수신(F) 이후, 시스템의 핵심 구동체인
+          <strong>동적 라우터 스위처(G)</strong>가 작동한다. 앱 내부에는 정규
+          표현식 및 TF-IDF 기반의 경량화된 분류기(Classifier)가 탑재되어 있어
+          텍스트 내 자해, 불안, 트라우마 등 치명적인 민감 키워드를 식별한다.
+          민감도가 상(High)으로 판별될 경우, 클라우드 서버와 데이터베이스 연동이
+          즉각 차단되며, 오로지 아이폰 등 사용자 모바일 기기의 Neural
+          Engine(NPU)을 통해 하드웨어 가속되는
+          <strong>온디바이스 로컬 모델(H)</strong> 체인만이 응답을 생성하여 통신
+          과정 내 유출을 원천에 막는다. 이 처리 내역은 결과 출력 후 안티 포렌식
+          기법인
+          <strong>메모리 덮어쓰기 및 스트리핑(Atomic Print Stripping)(L)</strong
+          >을 통해 휘발성 메모리에서도 영원히 파기된다.
+        </p>
+      </div>
+
+      <div class="patent-section">
+        <h2>【특허청구범위】</h2>
+
+        <div class="claim">【청구항 1】</div>
+        <div class="claim-text">
+          프로세서 및 메모리를 구비하는 사용자 단말기에서 실행되는 AI 기반 심리
+          케어 어플리케이션의 제어 방법에 있어서,<br />
+          (a) 상기 사용자 단말기에 위치한 생리 상태 평가 모듈이 사용자의 당일
+          수면 상태 및 특정 약물 복용 여부를 포함하는
+          <strong>생리적 상태 데이터를 입력받아 임계값을 판별</strong>하는
+          단계;<br />
+          (b) 동적 질문 생성 모듈이 상기 판별된 생리적 상태 데이터의 결과값에
+          기초하여, 정형화된 심플 텍스트 수집 폼이 아닌 임상 심리 분석용 후속
+          질문(사건 추출, 감정 상태 묘사, 인지 재구성)의 도출
+          <strong
+            >순서 및 우회 질의를 재배열하여 맞춤형 질문 트리를 메모리 상에
+            생성</strong
+          >
+          및 화면에 표시하는 단계;<br />
+          (c) 상기 생성된 질문 트리에 따른 사용자의 응답 텍스트를 수신하는
+          단계;<br />
+          (d) 하이브리드 라우팅 제어 모듈이 상기 수신된 응답 텍스트에 포함된
+          자연어의 키워드를 기반으로 연산된
+          <strong
+            >개인정보 민감도 수치, 현재 접속된 무선 네트워크의 전송
+            지연율(Ping), 및 사용자의 명시적 클라우드 전송 동의 여부</strong
+          >를 종합 스코어링하여 분석 처리 주체를 상기 사용자 단말기 내부
+          프로세서에 적재된 제 1 AI 모델(온디바이스 로컬 제어)과 외부 통신을
+          통해 구축된 제 2 AI 모델(클라우드 서버 제어) 중 하나로
+          <strong>동적 할당(Dynamic Routing)</strong>하여 전환하는 단계; 및<br />
+          (e) 상기 할당된 모델의 연산을 통해 도출된 다차원 심리 결과 리포트를
+          상기 사용자 단말기 화면에 출력하는 단계를 포함하는 것을 특징으로 하는,
+          생리적 파라미터 기반 동적 환경에서의 인공지능 심리 케어 제공 시스템
+          제어 방법.
+        </div>
+
+        <div class="claim">【청구항 2】</div>
+        <div class="claim-text">
+          제 1항에 있어서,<br />
+          상기 (d) 단계의 하이브리드 라우팅 제어 모듈은,<br />
+          상기 응답 텍스트 분석 결과 기 등록된 고위험성(Private&Sensitive) 어휘
+          패턴이 특정 임계 횟수 이상 감지되거나, 외부 네트워크의 품질이 기
+          설정된 기준 이하로 불안정한 것으로 판단된 제 1 조건에 해당하는 경우,
+          <br />
+          외부 클라우드 대형 서버로의 데이터 전송 함수(API Call) 호출 권한을
+          일시 차단(Block)하고, 상기
+          <strong
+            >사용자 단말기 내부 프로세서에 적재된 제 1 AI 모델(온디바이스 로컬
+            모델)만을 구동</strong
+          >시켜 오프라인 상태에서도 응답 처리가 중단되지 않도록 제어하는 것을
+          특징으로 하는 제어 방법.
+        </div>
+
+        <div class="claim">【청구항 3】</div>
+        <div class="claim-text">
+          제 1항에 있어서,<br />
+          상기 (e) 단계 이후, <br />
+          상기 제 1 AI 모델(온디바이스 로컬 제어)을 통해 처리된 기록에 대하여,
+          화면 출력이 완료됨과 동시에 상기 사용자 단말기의 메모리 캐시 영역 및
+          운영 체제 로그 영역에 상기 텍스트 응답 관련 문자열이 잔류하지 않도록
+          <strong
+            >공백 문자열 덮어쓰기 결합 처리를 통한 영구 파기(Atomic Print
+            Stripping)를 시스템 백그라운드에서 자동 실행</strong
+          >하며, 상기 리포트 화면 노출 시 영상 캡처 권한을 비활성화하는 OS API를
+          종속 호출하도록 구성된 것을 특징으로 하는 제어 방법.
+        </div>
+
+        <div class="claim">【청구항 4】</div>
+        <div class="claim-text">
+          제 1항에 있어서,<br />
+          상기 (b) 단계의 동적 질문 생성 모듈은,<br />
+          상기 (a) 단계에서 입력된 수면 상태 데이터가 정해진 적정 수면 시간
+          임계치를 하회하거나, 약물 복용 시점에 따른 부작용 영향 구간에 있는
+          것으로 검증된 경우, 상기 사용자가 표출하는 분노 또는 우울의 원인을
+          외부 사건이 아닌 신체적 요인에 우선 귀인하도록 유도하는
+          <strong
+            >인지 환기성 우회 질의를 상기 맞춤형 질문 트리의 최우선 순위
+            문항(Top-node)으로 강제 병합 배치</strong
+          >하여, 추후 상기 AI 모델의 감정 분석 왜곡을 방지하도록 하는 디버깅
+          절차를 수행하는 것을 특징으로 하는 제어 방법.
+        </div>
+      </div>
+
+      <div class="patent-section">
+        <h2>【요약서】</h2>
+        <h3>【요약】</h3>
+        <p>
+          본 발명은 사용자의 신체적(수면/약물) 상태를 최우선적으로 파악해
+          인공지능이 수행할 심리 문진의 순서 및 심도를 재조합(동적 질문 트리
+          구성)하고, 작성된 사용자 감정 일기의 개인정보 민감도 및 네트워크
+          상태에 따라 데이터를 외부 클라우드 모델 또는 로컬 단말 내
+          온디바이스(On-device) 모델로 분기 전송(Hybrid Routing)하는 최첨단 심리
+          케어 플랫폼 제공 기술이다. 이를 통하여 사용자의 신체적 피로도에 기인한
+          가짜 심리적 우울증 오진(왜곡)을 방지하고 프라이버시 노출 위험을 원천
+          차단하여 완전한 오프라인 환경에서도 고성능의 멘탈 케어 분석 서비스를
+          제공할 수 있다.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
