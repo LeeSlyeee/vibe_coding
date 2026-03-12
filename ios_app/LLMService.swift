@@ -39,31 +39,19 @@ class LLMService: ObservableObject {
     @Published var isGenerating = false
     @Published var modelLoadingProgress: Double = 0.0
     
-    let modelName = "mlx-community/gemma-2-2b-it-4bit"
+    let modelName = "slyeee/maum-on-eeve-2.8b-4bit"
     var modelContainer: ModelContainer?
+    var chatSession: ChatSession? // [New] Persistent session for native ChatML history
     
-    // [System Persona] Few-Shot Prompting (예시를 통한 강력한 세뇌)
+    // [System Persona] EEVE-Korean-2.8B Optimized Prompt
     let systemPrompt = """
-    당신은 따뜻한 공감을 주는 한국의 감정 케어 도우미 '마음온'입니다.
+    당신은 따뜻한 공감을 주는 감정 케어 도우미 '마음온'입니다.
     
-    [핵심 규칙]
-    1. **절대 영어 금지**: 뇌에서 영어를 지우세요. 사용자가 영어를 써도, 당신은 오직 한국어(존댓말)로만 답해야 합니다. ('Okay', 'So' 같은 추임새도 금지)
-    2. **말투**: 기계적인 말투(~합니다) 대신 친근한 해요체(~해요, ~인가요?)를 사용하세요.
-    3. **반복 금지**: "저런", "힘드셨겠어요" 같은 쿠션어를 매번 쓰지 마세요. 대화의 흐름에 맞춰 자연스럽게 반응하세요.
-    4. **능동적 대화**: 사용자의 말을 잘 듣고, 관련된 질문을 던져 대화를 이어가세요.
-    5. **위기 대응**: 자살, 자해 관련 언급이 감지되면 즉시 따뜻하게 위로하고, 전문 상담 연결(자살예방상담전화 1393)을 안내하세요.
-    
-    [절대 금지 표현]
-    - "힘내세요", "긍정적으로 생각하세요", "잘 될 거예요", "웃으세요" 등 공허한 격려는 사용하지 마세요.
-    - 대신 공감, 인정, 구체적 질문으로 대응하세요.
-    
-    [예시]
-    User: I feel so lonely.
-    Model: 많이 외로우셨군요. 제가 곁에 있어 드릴게요. 오늘 무슨 일이 있었나요?
-    User: I want to die.
-    Model: 정말 많이 힘드셨겠어요. 저에게 그 마음을 조금만 더 나눠주시겠어요? 혼자 감당하지 않으셔도 돼요. 자살예방상담전화 1393에 전화해보시는 것도 좋겠어요.
+    [규칙]
+    1. 사용자의 감정에 공감하고, 짧고 다정하게 대답하세요.
+    2. 동문서답이나 같은 말을 반복하지 마세요.
+    3. "~요"로 끝나는 친근한 체를 사용하세요.
     """
-    
     // [New] AI Mode Toggle (Server vs On-Device)
     // Default to TRUE (Server Mode) for stability
     // [New] AI Mode Toggle (Server vs On-Device)
@@ -84,7 +72,7 @@ class LLMService: ObservableObject {
     
 
     // Remote Config
-    var huggingFaceRepoID = "slyeee/maum-on-gemma-2b" // Default Backup
+    var huggingFaceRepoID = "slyeee/maum-on-eeve-2.8b-4bit" // Local EEVE Model
     var huggingFaceToken = ""
     
     // Constants
@@ -93,10 +81,9 @@ class LLMService: ObservableObject {
     let modelFiles = [
         "config.json",
         "model.safetensors",
+        "model.safetensors.index.json",
         "tokenizer.json",
-        "tokenizer_config.json",
-        "special_tokens_map.json",
-        "tokenizer.model"
+        "tokenizer_config.json"
     ]
     
     // MARK: - Remote Config

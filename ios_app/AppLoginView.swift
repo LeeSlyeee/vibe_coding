@@ -129,12 +129,10 @@ struct AppLoginView: View {
                 }
                 .padding(.vertical)
             }
-            #if os(iOS)
-            .scrollDismissesKeyboard(.interactively)
-            #endif
         }
+        // [Cursor Fix] UIKit 기반: 입력 필드 포커스 방해 없이 빈 영역 탭 시에만 키보드 닫기
         #if os(iOS)
-        .dismissKeyboardOnTap() // [Cursor Fix] UIKit 기반 키보드 닫기 (TextField 포커스 방해 없음)
+        .dismissKeyboardOnTap()
         #endif
     }
     

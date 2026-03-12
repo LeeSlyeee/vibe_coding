@@ -23,6 +23,9 @@ struct AppSettingsView: View {
     @State private var showBirthDatePicker = false // [New] Birth Date Picker
     @State private var showMindBridgeMain = false // [Phase 3] 마음 브릿지 메인
     
+    // [보안] 스크린샷 방지 설정
+    @AppStorage("isScreenshotPreventionOn") private var isScreenshotPreventionOn: Bool = false
+    
     // Unified Alert System [Fix]
     enum ActiveAlert: Identifiable {
         case info(String)
@@ -597,6 +600,23 @@ struct AppSettingsView: View {
                     }
                 }
                 
+                // Section 4.5: 보안 설정
+                Section(header: Text("보안")) {
+                    HStack {
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundColor(.green)
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle("화면 캡처 방지", isOn: $isScreenshotPreventionOn)
+                                .font(.headline)
+                            Text("앱 화면이 캡처되거나 녹화되는 것을 방지합니다.")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                
                 // Section 4.5: 법적 고지 (Legal Disclaimer)
                 Section(header: HStack {
                     Image(systemName: "building.columns.fill")
@@ -867,13 +887,76 @@ struct BirthDatePickerView: View {
     @EnvironmentObject var authManager: AuthManager
     
     @State private var selectedDate = Date()
+    @State private var displayedMonth = Date()
+    
+    private let calendar = Calendar.current
+    private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
     
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("생일 선택")) {
-                    DatePicker("생년월일", selection: $selectedDate, displayedComponents: .date)
-                        .datePickerStyle(.graphical)
+                    VStack(spacing: 12) {
+                        // 월 네비게이션
+                        HStack {
+                            Button(action: { changeMonth(by: -1) }) {
+                                Image(systemName: "chevron.left")
+                                    .foregroundColor(.blue)
+                            }
+                            Spacer()
+                            Text(monthYearString(displayedMonth))
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            Spacer()
+                            Button(action: { changeMonth(by: 1) }) {
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        
+                        // 요일 헤더 (일=빨간, 토=파란)
+                        HStack {
+                            ForEach(Array(weekdays.enumerated()), id: \.offset) { index, day in
+                                Text(day)
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(index == 0 ? .red : (index == 6 ? .blue : .gray))
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                        
+                        // 날짜 그리드
+                        let days = calendarDays()
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+                            ForEach(days.indices, id: \.self) { i in
+                                if let date = days[i] {
+                                    let day = calendar.component(.day, from: date)
+                                    let wd = calendar.component(.weekday, from: date)
+                                    let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+                                    
+                                    Button(action: { selectedDate = date }) {
+                                        Text("\(day)")
+                                            .font(.system(size: 16, weight: isSelected ? .bold : .regular))
+                                            .foregroundColor(
+                                                isSelected ? .white :
+                                                wd == 1 ? .red :
+                                                wd == 7 ? .blue :
+                                                .primary
+                                            )
+                                            .frame(width: 36, height: 36)
+                                            .background(
+                                                isSelected ? Circle().fill(Color.blue) : Circle().fill(Color.clear)
+                                            )
+                                    }
+                                } else {
+                                    Text("")
+                                        .frame(width: 36, height: 36)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 8)
                 }
                 
                 Section {
@@ -882,7 +965,6 @@ struct BirthDatePickerView: View {
                         formatter.dateFormat = "yyyy-MM-dd"
                         let dateStr = formatter.string(from: selectedDate)
                         
-                        // Save & Close
                         authManager.updateBirthDate(dateStr) { success in
                             isPresented = false
                         }
@@ -905,17 +987,49 @@ struct BirthDatePickerView: View {
                 formatter.dateFormat = "yyyy-MM-dd"
                 if let saved = authManager.birthDate, let date = formatter.date(from: saved) {
                     selectedDate = date
+                    displayedMonth = date
                 } else {
-                    // Default to 1986-03-11 (User's Example) for convenience
                     var components = DateComponents()
                     components.year = 1986
                     components.month = 3
                     components.day = 11
-                    if let defaultDate = Calendar.current.date(from: components) {
+                    if let defaultDate = calendar.date(from: components) {
                         selectedDate = defaultDate
+                        displayedMonth = defaultDate
                     }
                 }
             }
         }
+    }
+    
+    private func changeMonth(by offset: Int) {
+        if let newMonth = calendar.date(byAdding: .month, value: offset, to: displayedMonth) {
+            displayedMonth = newMonth
+        }
+    }
+    
+    private func monthYearString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ko_KR")
+        formatter.dateFormat = "yyyy년 M월"
+        return formatter.string(from: date)
+    }
+    
+    private func calendarDays() -> [Date?] {
+        let comps = calendar.dateComponents([.year, .month], from: displayedMonth)
+        guard let firstOfMonth = calendar.date(from: comps) else { return [] }
+        let startWeekday = calendar.component(.weekday, from: firstOfMonth)
+        guard let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
+        
+        var days: [Date?] = []
+        for _ in 0..<(startWeekday - 1) {
+            days.append(nil)
+        }
+        for day in range {
+            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth) {
+                days.append(date)
+            }
+        }
+        return days
     }
 }

@@ -182,7 +182,7 @@ struct AppDiaryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .preferredColorScheme(.light)
-        .screenshotProtected(isProtected: true) // [보안 Fix] 민감한 일기 화면 캡처 방지
+        .screenshotProtected() // [보안] 스크린샷 방지 (설정에 따라 동작)
         // 수정 시트 연결 (+수정 완료 시 닫기 & 새로고침)
         .sheet(isPresented: $showingEditSheet) {
             // 날짜 파싱 (임시, WriteView 내부에서 다시 계산함)

@@ -90,8 +90,12 @@ struct MoodCalendarView: View {
                     
                     // 요일 헤더
                     HStack {
-                        ForEach(["일", "월", "화", "수", "목", "금", "토"], id: \.self) { day in
-                            Text(day).font(.caption).fontWeight(.bold).foregroundColor(.gray).frame(maxWidth: .infinity)
+                        ForEach(Array(["일", "월", "화", "수", "목", "금", "토"].enumerated()), id: \.offset) { index, day in
+                            Text(day)
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(index == 0 ? .red : (index == 6 ? .blue : .gray))
+                                .frame(maxWidth: .infinity)
                         }
                     }
                     
@@ -112,10 +116,12 @@ struct MoodCalendarView: View {
                                     
                                     Button(action: { handleDateTap(date, diary: diary) }) {
                                         VStack(spacing: 1) { // 간격 최소화
-                                            // 1. 날짜
+                                            // 1. 날짜 (토요일=파란, 일요일=빨간)
+                                            let wd = Calendar.current.component(.weekday, from: date)
+                                            let dayColor: Color = wd == 1 ? .red : (wd == 7 ? .blue : (Calendar.current.isDateInToday(date) ? .blue : .primary))
                                             Text("\(Calendar.current.component(.day, from: date))")
                                                 .font(.system(size: 10, weight: diary != nil ? .bold : .regular)) // 날짜 크기 축소
-                                                .foregroundColor(Calendar.current.isDateInToday(date) ? .blue : .primary)
+                                                .foregroundColor(dayColor)
                                                 .padding(.top, 4)
                                             
                                             if let d = diary {
@@ -169,6 +175,12 @@ struct MoodCalendarView: View {
                                         .background(
                                             RoundedRectangle(cornerRadius: 8)
                                                 .fill(diary != nil ? emotionBackgroundColor(for: diary!) : Color.clear)
+                                        )
+                                        .overlay(
+                                            Calendar.current.isDateInToday(date) ?
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .stroke(Color.blue, lineWidth: 2)
+                                                : nil
                                         )
                                     }
                                 } else {
@@ -311,14 +323,14 @@ struct MoodCalendarView: View {
                     Alert(title: Text("알림"), message: Text(errorMessage ?? "알 수 없는 오류가 발생했습니다."), dismissButton: .default(Text("확인")))
                 }
                 .sheet(item: $writeTarget) { target in
-                     // 바인딩 전달을 위한 래퍼
-                     AppDiaryWriteView(
-                        isPresented: Binding(
-                            get: { writeTarget != nil },
-                            set: { if !$0 { writeTarget = nil } }
-                        ),
-                        date: target.date,
-                        onSave: fetchDiaries
+                     // [Focus Fix] wrapper View로 감싸서 MoodCalendarView.body 재평가 시
+                     // sheet content가 재생성되지 않도록 함
+                     // 기존: 매번 새 Binding 인스턴스 생성 → SwiftUI가 prop 변경으로 판단 → 재생성
+                     // 수정: wrapper가 @State로 내부 관리 → 안정적인 identity 유지
+                     DiaryWriteSheetContent(
+                         targetDate: target.date,
+                         onDismiss: { writeTarget = nil },
+                         onSave: fetchDiaries
                      )
                 }
                 .sheet(isPresented: $showSettings) {
@@ -578,3 +590,28 @@ struct MoodCalendarView: View {
 }
 
 // MARK: - PremiumModalView Moved to PremiumModalView.swift
+
+// MARK: - [Focus Fix] Sheet Content Wrapper
+// 부모 View(MoodCalendarView)의 body가 재평가되어도,
+// .sheet 내부의 AppDiaryWriteView가 재생성되지 않도록 안정적인 identity를 제공합니다.
+// @State isPresented를 내부에서 관리하여 매번 새 Binding이 생성되는 문제를 해결합니다.
+struct DiaryWriteSheetContent: View {
+    let targetDate: Date
+    let onDismiss: () -> Void
+    let onSave: () -> Void
+    
+    @State private var isPresented = true
+    
+    var body: some View {
+        AppDiaryWriteView(
+            isPresented: $isPresented,
+            date: targetDate,
+            onSave: onSave
+        )
+        .onChangeCompat(of: isPresented) { newValue in
+            if !newValue {
+                onDismiss()
+            }
+        }
+    }
+}

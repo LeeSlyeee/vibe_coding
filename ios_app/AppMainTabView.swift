@@ -5,9 +5,6 @@ struct AppMainTabView: View {
     @EnvironmentObject var authManager: AuthManager
     @Environment(\.scenePhase) var scenePhase // [New] Detect App Background/Foreground
     @StateObject private var networkMonitor = NetworkMonitor()
-    #if os(iOS)
-    @StateObject private var keyboardObserver = KeyboardObserver() // [Keyboard Fix] Direct observation
-    #endif
     @State private var showAssessment = false
     @State private var selection = 0
     @State private var isTabBarHidden = false // [New] TabBar Visibility Control
@@ -27,14 +24,9 @@ struct AppMainTabView: View {
     }
     @State private var upcomingBirthdays: [BirthdayInfo] = []
     
-    // [Keyboard Fix] 탭바 표시 여부: KeyboardObserver가 직접 감지 (Notification 불필요)
-    private var shouldShowTabBar: Bool {
-        #if os(iOS)
-        return !keyboardObserver.isKeyboardVisible
-        #else
-        return true
-        #endif
-    }
+    // [Keyboard Fix] shouldShowTabBar는 KeyboardAwareTabBar 내부로 이동
+    // → KeyboardObserver 변경이 AppMainTabView.body 재평가를 일으키지 않음
+    // → .sheet 안의 AppDiaryWriteView가 재생성되지 않아 포커스 유지됨
     
     var body: some View {
         if !authManager.isAuthenticated {
@@ -69,25 +61,10 @@ struct AppMainTabView: View {
                     .allowsHitTesting(selection == 3)
                 
                 // Custom Tab Bar
-                // [Keyboard Fix] 키보드가 올라오면 탭바 숨김, 내려오면 탭바 표시
-                if shouldShowTabBar {
-                    VStack(spacing: 0) {
-                        Divider()
-                            .background(Color.gray.opacity(0.1))
-                        
-                        HStack(spacing: 0) {
-                            TabButton(index: 0, title: "캘린더", image: "tab_calendar", systemIcon: "calendar", selection: $selection)
-                            TabButton(index: 1, title: "분석", image: "tab_stats", systemIcon: "chart.bar.fill", selection: $selection)
-                            TabButton(index: 2, title: "한마디", image: "tab_chat", systemIcon: "message.fill", selection: $selection)
-                            TabButton(index: 3, title: "긴급", image: "tab_emergency", systemIcon: "exclamationmark.triangle.fill", selection: $selection)
-                        }
-                        .padding(.top, 10)
-                        .padding(.bottom, 20)
-                        .background(Color.white)
-                        .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
+                // [Keyboard Fix] 별도의 View로 추출 → KeyboardObserver 변경이
+                // AppMainTabView.body 재평가를 일으키지 않음
+                // → .sheet 내 AppDiaryWriteView의 StableTextEditor가 재생성되지 않아 포커스 유지
+                KeyboardAwareTabBar(selection: $selection)
                 
                 // [New] AI Loaded Toast (Floating above TabBar)
                 if showToast {
@@ -115,45 +92,63 @@ struct AppMainTabView: View {
                      ZStack {
                          Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                          
-                         VStack(spacing: 20) {
-                             Image(systemName: "birthday.cake.fill").foregroundColor(.pink)
-                                 .font(.system(size: 80))
-                                 .padding(.bottom, -10)
+                         VStack(spacing: 24) {
+                             // ✨ 케이크 이모지 효과
+                             ZStack {
+                                 Circle()
+                                     .fill(Color.yellow.opacity(0.2))
+                                     .frame(width: 100, height: 100)
+                                 
+                                 Text("🎂")
+                                     .font(.system(size: 60))
+                                     .offset(y: -4)
+                             }
                              
-                             Text("생일 축하해!!")
-                                 .font(.largeTitle)
-                                 .fontWeight(.heavy)
-                                 .foregroundColor(.pink)
-                             
-                             Text("오늘 하루 세상에서 가장 행복한 사람이 되길 바랄게!")
-                                 .font(.body)
-                                 .fontWeight(.bold)
-                                 .foregroundColor(.white)
-                                 .multilineTextAlignment(.center)
-                                 .padding(.horizontal)
+                             VStack(spacing: 8) {
+                                 Text("생일 축하해요! 🎉")
+                                     .font(.title2)
+                                     .fontWeight(.bold)
+                                     .foregroundColor(Color.primary)
+                                 
+                                 Text("세상에서 가장 특별하고\n따뜻한 하루가 되기를 바랄게요!")
+                                     .font(.body)
+                                     .foregroundColor(Color.secondary)
+                                     .multilineTextAlignment(.center)
+                                     .lineSpacing(4)
+                             }
                              
                              Button(action: {
                                  withAnimation { showBirthdayToast = false }
                              }) {
-                                 Text("고마워!")
+                                 Text("고마워요")
+                                     .font(.headline)
                                      .fontWeight(.bold)
-                                     .padding(.horizontal, 30)
-                                     .padding(.vertical, 12)
-                                     .background(Color.white)
-                                     .foregroundColor(.pink)
-                                     .cornerRadius(20)
+                                     .foregroundColor(.white)
+                                     .frame(maxWidth: .infinity)
+                                     .padding(.vertical, 16)
+                                     .background(
+                                         LinearGradient(
+                                             colors: [Color.pink.opacity(0.8), Color.orange.opacity(0.6)],
+                                             startPoint: .leading,
+                                             endPoint: .trailing
+                                         )
+                                     )
+                                     .cornerRadius(16)
                              }
+                             .padding(.top, 10)
+                             .padding(.horizontal, 20)
                          }
-                         .padding(40)
+                         .padding(.vertical, 40)
+                         .padding(.horizontal, 20)
                          .background(
-                            RoundedRectangle(cornerRadius: 25)
-                                .fill(LinearGradient(gradient: Gradient(colors: [Color.purple, Color.blue]), startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .shadow(radius: 20)
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.white)
+                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                          )
                          .padding(30)
                      }
                      .zIndex(200) // Top Priority
-                     .transition(.scale)
+                     .transition(.scale.combined(with: .opacity))
                 }
                 
                 // [New] Friend Birthday Toast (Different Style)
@@ -161,82 +156,98 @@ struct AppMainTabView: View {
                      ZStack {
                          Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                          
-                         VStack(spacing: 15) {
-                             Image(systemName: "party.popper.fill").foregroundColor(.orange)
-                                 .font(.system(size: 60))
-                                 .padding(.bottom, -5)
+                         VStack(spacing: 24) {
+                             ZStack {
+                                 Circle()
+                                     .fill(Color.yellow.opacity(0.2))
+                                     .frame(width: 80, height: 80)
+                                 
+                                 Text("🎉")
+                                     .font(.system(size: 45))
+                             }
                              
-                             Text("챙겨주실 생일이 있어요!")
-                                 .font(.title2)
-                                 .fontWeight(.bold)
-                                 .foregroundColor(.white)
+                             VStack(spacing: 8) {
+                                 Text("다가오는 생일이 있어요!")
+                                     .font(.title3)
+                                     .fontWeight(.bold)
+                                     .foregroundColor(Color.primary)
+                                 
+                                 Text("소중한 사람에게 따뜻한 축하를 전해보세요.")
+                                     .font(.subheadline)
+                                     .foregroundColor(Color.secondary)
+                                     .multilineTextAlignment(.center)
+                             }
                              
                              // List of Birthdays
-                             VStack(spacing: 8) {
+                             VStack(spacing: 12) {
                                  ForEach(upcomingBirthdays) { info in
                                      HStack {
                                          Text(info.name)
-                                             .font(.title3)
-                                             .fontWeight(.bold)
-                                             .foregroundColor(.yellow)
+                                             .font(.headline)
+                                             .foregroundColor(Color.primary)
+                                         
+                                         Spacer()
                                          
                                          if info.dDay == 0 {
-                                             HStack { Image(systemName: "birthday.cake.fill"); Text("오늘 생일!") }
-                                                 .font(.headline)
-                                                 .fontWeight(.heavy)
-                                                 .foregroundColor(.white)
-                                                 .padding(.horizontal, 8)
-                                                 .padding(.vertical, 4)
-                                                 .background(Color.red)
-                                                 .cornerRadius(10)
+                                             HStack(spacing: 4) { 
+                                                 Text("🎂")
+                                                 Text("오늘 생일!") 
+                                             }
+                                             .font(.caption)
+                                             .fontWeight(.bold)
+                                             .foregroundColor(.white)
+                                             .padding(.horizontal, 10)
+                                             .padding(.vertical, 6)
+                                             .background(Color.pink)
+                                             .cornerRadius(12)
                                          } else {
                                              Text("D-\(info.dDay)")
-                                                 .font(.headline)
+                                                 .font(.caption)
                                                  .fontWeight(.bold)
-                                                 .foregroundColor(.white)
-                                                 .padding(.horizontal, 8)
-                                                 .padding(.vertical, 4)
-                                                 .background(Color.blue.opacity(0.8))
-                                                 .cornerRadius(10)
+                                                 .foregroundColor(.blue)
+                                                 .padding(.horizontal, 10)
+                                                 .padding(.vertical, 6)
+                                                 .background(Color.blue.opacity(0.1))
+                                                 .cornerRadius(12)
                                          }
                                      }
+                                     .padding(.horizontal, 16)
+                                     .padding(.vertical, 12)
+                                     .background(Color.gray.opacity(0.05))
+                                     .cornerRadius(12)
                                  }
                              }
-                             .padding(.vertical, 5)
-                             
-                             Text("따뜻한 축하 메시지 준비해볼까요?")
-                                 .font(.body)
-                                 .foregroundColor(.white.opacity(0.9))
-                                 .multilineTextAlignment(.center)
+                             .padding(.horizontal, 8)
                              
                              Button(action: {
                                  withAnimation { showFriendBirthdayToast = false }
                              }) {
-                                 Text("확인했어요!")
+                                 Text("확인했어요")
+                                     .font(.headline)
                                      .fontWeight(.bold)
-                                     .padding(.horizontal, 24)
-                                     .padding(.vertical, 10)
-                                     .background(Color.white)
-                                     .foregroundColor(.orange)
-                                     .cornerRadius(15)
+                                     .foregroundColor(.white)
+                                     .frame(maxWidth: .infinity)
+                                     .padding(.vertical, 16)
+                                     .background(Color.orange)
+                                     .cornerRadius(16)
                              }
+                             .padding(.top, 10)
                          }
-                         .padding(30)
+                         .padding(24)
                          .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(LinearGradient(gradient: Gradient(colors: [Color.orange, Color.pink]), startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .shadow(radius: 15)
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(Color.white)
+                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                          )
-                         .padding(40)
+                         .padding(30)
                      }
                      .zIndex(190) // Slightly lower than My Birthday
-                     .transition(.scale)
+                     .transition(.scale.combined(with: .opacity))
                 }
             }
             .edgesIgnoringSafeArea(.bottom)
 
             #if os(iOS)
-            .environmentObject(keyboardObserver) // [Keyboard Fix] 하위 뷰에 단일 인스턴스 공유
             .fullScreenCover(isPresented: $showAssessment) {
                 AppAssessmentView()
                     .onDisappear {
@@ -720,6 +731,90 @@ struct GuideFeatureCard: View {
 }
 
 
+// MARK: - [Keyboard Fix] 키보드 인식 탭바
+// KeyboardObserver를 자체적으로 소유하여, 키보드 상태 변경이
+// AppMainTabView.body 재평가를 일으키지 않음
+// → .sheet 안의 AppDiaryWriteView가 재생성되지 않아 포커스 유지
+#if os(iOS)
+struct KeyboardAwareTabBar: View {
+    @Binding var selection: Int
+    @StateObject private var keyboardObserver = KeyboardObserver()
+    
+    private var shouldShow: Bool {
+        !keyboardObserver.isKeyboardVisible
+    }
+    
+    var body: some View {
+        if shouldShow {
+            VStack(spacing: 0) {
+                Divider()
+                    .background(Color.gray.opacity(0.1))
+                
+                HStack(spacing: 0) {
+                    tabButton(index: 0, title: "캘린더", systemIcon: "calendar")
+                    tabButton(index: 1, title: "분석", systemIcon: "chart.bar.fill")
+                    tabButton(index: 2, title: "한마디", systemIcon: "message.fill")
+                    tabButton(index: 3, title: "긴급", systemIcon: "exclamationmark.triangle.fill")
+                }
+                .padding(.top, 10)
+                .padding(.bottom, 20)
+                .background(Color.white)
+                .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
+            }
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+    
+    private func tabButton(index: Int, title: String, systemIcon: String) -> some View {
+        let isSelected = selection == index
+        let isEmergency = index == 3
+        
+        return Button(action: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                selection = index
+            }
+            if index == 0 {
+                LocalDataManager.shared.syncWithServer()
+            }
+        }) {
+            VStack(spacing: 4) {
+                Image(systemName: systemIcon)
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .frame(width: 24, height: 24)
+                    .foregroundColor(isEmergency
+                        ? (isSelected ? .red : .red.opacity(0.6))
+                        : (isSelected ? .black : Color.gray.opacity(0.5)))
+                
+                Text(title)
+                    .font(.caption)
+                    .fontWeight(isSelected ? .bold : .regular)
+                    .foregroundColor(isEmergency
+                        ? (isSelected ? .red : .gray)
+                        : (isSelected ? .black : .gray))
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+    }
+}
+#else
+struct KeyboardAwareTabBar: View {
+    @Binding var selection: Int
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+                .background(Color.gray.opacity(0.1))
+            
+            HStack(spacing: 0) {
+                // macOS용 간단 탭바 (필요시 구현)
+            }
+        }
+    }
+}
+#endif
 struct GuideSmallFeatureCard: View {
     let title: String
     let desc: String

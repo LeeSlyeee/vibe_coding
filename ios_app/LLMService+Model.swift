@@ -20,7 +20,8 @@ extension LLMService {
         await ensureModelDownloaded() // Download model files first
         
         let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let modelDir = docURL.appendingPathComponent("maum-on-model")
+        let repoFolderName = huggingFaceRepoID.replacingOccurrences(of: "/", with: "_")
+        let modelDir = docURL.appendingPathComponent(repoFolderName)
         
         // [Migration] 기존 haru-on-model 폴더가 있으면 자동 이전
         let legacyDir = docURL.appendingPathComponent("haru-on-model")
@@ -51,9 +52,13 @@ extension LLMService {
             let container = try await MLXLLM.LLMModelFactory.shared.loadContainer(configuration: config) { progress in
                 Task { @MainActor in self.modelLoadingProgress = progress.fractionCompleted }
             }
+            let instructions = self.systemPrompt
+            // ChatSession을 빈 상태로 초기화하되 System Prompt는 프레임워크 템플릿에 맞춤
+            let newSession = ChatSession(container, instructions: instructions)
             
             await MainActor.run { 
                 self.modelContainer = container
+                self.chatSession = newSession
                 self.isModelLoaded = true
             }
             
@@ -76,7 +81,8 @@ extension LLMService {
     // MARK: - Downloader (Hugging Face)
     func ensureModelDownloaded() async -> Bool {
         let docURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let modelDir = docURL.appendingPathComponent("maum-on-model")
+        let repoFolderName = huggingFaceRepoID.replacingOccurrences(of: "/", with: "_")
+        let modelDir = docURL.appendingPathComponent(repoFolderName)
         
         // Create Directory if missing
         if !FileManager.default.fileExists(atPath: modelDir.path) {

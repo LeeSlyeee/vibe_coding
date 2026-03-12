@@ -24,6 +24,11 @@ struct AppDiaryWriteView: View {
     @State private var insightMessage: String = ""
     @State private var isLoadingInsight = true
     
+    // [Focus Fix] UIKit 기반 포커스 관리 — @FocusState 완전 제거
+    // SwiftUI @FocusState + ScrollView 호환 버그 때문에 UIKit First Responder로 대체
+    // 이 변수는 UI 스타일링(배경색, 테두리)에만 사용됨 (포커스 제어에는 사용하지 않음)
+    @State private var focusedField: Int? = nil
+    
     // Form State
     @State private var q1: String = "" // Event (무슨 일)
     @State private var q2: String = "" // Emotion (어떤 감정)
@@ -204,9 +209,20 @@ struct AppDiaryWriteView: View {
                             }
                             .padding()
                         }
-                        #if os(iOS)
-                        .scrollDismissesKeyboard(.interactively)
-                        #endif
+                        // [ROOT CAUSE FIX] SwiftUI의 내장 키보드 회피(keyboard avoidance) 비활성화
+                        // 키보드 출현 시 SwiftUI가 safe area를 자동 조정 → body 재평가 트리거
+                        // → SwiftUI Update.dispatchActions가 UITextView의 first responder를 리셋
+                        // .ignoresSafeArea(.keyboard)로 이 동작을 막으면 ScrollView의
+                        // UIKit 기반 키보드 처리가 대신 작동하여 포커스가 유지됨
+                        .ignoresSafeArea(.keyboard, edges: .bottom)
+                    }
+                    // [Cursor Fix] UIKit 기반: 빈 영역 터치 시에만 키보드 닫기
+                    #if os(iOS)
+                    .dismissKeyboardOnTap()
+                    #endif
+                    // [Focus Fix] 사용자가 빈 영역 탭 → focusedField UI 스타일 초기화
+                    .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UserDismissedKeyboard"))) { _ in
+                        focusedField = nil
                     }
                     .transition(.opacity)
                 } else {
@@ -273,7 +289,6 @@ struct AppDiaryWriteView: View {
                 }
             }
             #if os(iOS)
-            .dismissKeyboardOnTap() // [Cursor Fix] UIKit 기반 키보드 닫기 (TextField 포커스 방해 없음)
             .navigationBarHidden(true)
             #endif
             .alert(isPresented: $showError) {
@@ -384,18 +399,71 @@ struct AppDiaryWriteView: View {
         }
     }
     
-    // Components (질문 카드)
+    // Logic: 질문 카드 (인라인으로 변경하여 부모의 FocusState를 직접 참조)
     func questionCard(title: String, binding: Binding<String>, fieldId: Int) -> some View {
-        QuestionCardView(
-            title: title,
-            text: binding,
-            fieldId: fieldId,
-            activeRecordingField: $activeRecordingField,
-            voiceRecorder: voiceRecorder,
-            onToggleRecording: { fid, currentText in
-                toggleRecording(for: fid, currentText: currentText)
+        let placeholders: [Int: String] = [
+            0: "수면 상태를 적어보세요...",
+            1: "오늘 있었던 일을 적어보세요...",
+            2: "느낀 감정을 표현해보세요...",
+            3: "그 감정이 나에게 어떤 의미인지...",
+            4: "스스로에게 해주고 싶은 말..."
+        ]
+        
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title).font(.headline).foregroundColor(Color.secondary)
+                Spacer()
+                // 마이크 버튼
+                Button(action: { toggleRecording(for: fieldId, currentText: binding.wrappedValue) }) {
+                    Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .red : .blue)
+                        .scaleEffect((activeRecordingField == fieldId && voiceRecorder.isRecording) ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
+                }
             }
-        )
+            
+            // [Focus Fix] UIKit UITextView 직접 래핑 — SwiftUI @FocusState 버그 완전 우회
+            // UIKit의 First Responder는 SwiftUI 리렌더링과 독립적이므로
+            // 키보드가 올라올 때 ScrollView가 content inset을 조정해도 포커스가 유지됨
+            #if os(iOS)
+            let isFocusedBinding = Binding<Bool>(
+                get: { focusedField == fieldId },
+                set: { newValue in
+                    if newValue {
+                        focusedField = fieldId
+                    } else if focusedField == fieldId {
+                        focusedField = nil
+                    }
+                }
+            )
+            
+            StableTextEditor(
+                text: binding,
+                placeholder: placeholders[fieldId] ?? "여기에 입력하세요...",
+                isFocused: isFocusedBinding
+            )
+            .frame(minHeight: 100)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(focusedField == fieldId ? Color.blue.opacity(0.04) : Color.gray.opacity(0.08))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(focusedField == fieldId ? Color.blue.opacity(0.6) : Color.clear, lineWidth: 2)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            #else
+            // macOS Fallback
+            TextEditor(text: binding)
+                .frame(minHeight: 100)
+                .padding(8)
+            #endif
+        }
+        .padding()
+        .background(Color.white)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
     }
     
     // Logic: 녹음 토글
@@ -698,68 +766,4 @@ struct MedicationSettingView: View {
     }
 }
 
-// MARK: - QuestionCardView (포커스 상태 시각 피드백)
-struct QuestionCardView: View {
-    let title: String
-    @Binding var text: String
-    let fieldId: Int
-    @Binding var activeRecordingField: Int?
-    @ObservedObject var voiceRecorder: VoiceRecorder
-    var onToggleRecording: (Int, String) -> Void
-    
-    @FocusState private var isFocused: Bool
-    
-    private let placeholders: [Int: String] = [
-        0: "수면 상태를 적어보세요...",
-        1: "오늘 있었던 일을 적어보세요...",
-        2: "느낀 감정을 표현해보세요...",
-        3: "그 감정이 나에게 어떤 의미인지...",
-        4: "스스로에게 해주고 싶은 말..."
-    ]
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(title).font(.headline).foregroundColor(Color.secondary)
-                Spacer()
-                // 마이크 버튼
-                Button(action: { onToggleRecording(fieldId, text) }) {
-                    Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
-                        .font(.system(size: 30))
-                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .red : .blue)
-                        .scaleEffect((activeRecordingField == fieldId && voiceRecorder.isRecording) ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
-                }
-            }
-            
-            ZStack(alignment: .topLeading) {
-                // Placeholder (텍스트가 비어있고 포커스 아닐 때)
-                if text.isEmpty {
-                    Text(placeholders[fieldId] ?? "여기에 입력하세요...")
-                        .foregroundColor(Color.gray.opacity(0.5))
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 16)
-                        .allowsHitTesting(false)
-                }
-                
-                TextEditor(text: $text)
-                    .focused($isFocused)
-                    .frame(height: 100)
-                    .padding(8)
-                    .scrollContentBackground(.hidden)
-                    .background(isFocused ? Color.blue.opacity(0.04) : Color.gray.opacity(0.08))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(isFocused ? Color.blue.opacity(0.6) : Color.clear, lineWidth: 2)
-                    )
-                    .tint(.blue) // 커서 색상
-                    .animation(.easeInOut(duration: 0.2), value: isFocused)
-            }
-        }
-        .padding()
-        .background(Color.white)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
-    }
-}
+// Component removed and moved inline to AppDiaryWriteView as questionCard method to preserve centralized @FocusState.

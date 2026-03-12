@@ -80,7 +80,8 @@ extension View {
     
     // [Cursor Fix] 빈 영역 탭 시 키보드 닫기 (TextField 포커스를 방해하지 않음)
     // SwiftUI onTapGesture는 TextField의 First Responder 획득을 가로채므로,
-    // UIKit UITapGestureRecognizer(cancelsTouchesInView: false)를 사용
+    // UIKit UITapGestureRecognizer(cancelsTouchesInView: false)를 사용하여
+    // 입력창 터치 시 커서가 정상적으로 나타나면서, 빈 영역 탭 시에만 키보드가 닫히도록 함
     func dismissKeyboardOnTap() -> some View {
         self.background(
             KeyboardDismissTapView()
@@ -91,9 +92,9 @@ extension View {
 }
 
 // MARK: - [Cursor Fix] UIKit 기반 키보드 닫기 탭 뷰
-// SwiftUI의 onTapGesture는 TextField/TextEditor의 First Responder 획득을 방해하므로,
-// UIKit의 UITapGestureRecognizer(cancelsTouchesInView: false)를 사용하여
-// 입력창 터치 시 커서가 정상적으로 나타나면서, 빈 영역 탭 시에만 키보드가 닫히도록 함
+// 핵심: UIGestureRecognizerDelegate로 터치 대상을 검사하여
+// UITextField/UITextView 위의 터치는 제스처를 아예 무시 → 포커스 방해 없음
+// 빈 영역 터치만 제스처 인식 → dismissKeyboard() 호출
 #if os(iOS)
 struct KeyboardDismissTapView: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
@@ -101,7 +102,8 @@ struct KeyboardDismissTapView: UIViewRepresentable {
         view.backgroundColor = .clear
         
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap))
-        tapGesture.cancelsTouchesInView = false // ⭐️ 핵심: TextField 터치를 방해하지 않음
+        tapGesture.cancelsTouchesInView = false
+        tapGesture.delegate = context.coordinator // ⭐️ 핵심: delegate로 터치 필터링
         view.addGestureRecognizer(tapGesture)
         
         return view
@@ -113,9 +115,27 @@ struct KeyboardDismissTapView: UIViewRepresentable {
         Coordinator()
     }
     
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, UIGestureRecognizerDelegate {
         @objc func handleTap() {
+            // 사용자가 빈 영역을 탭하여 의도적으로 키보드를 닫음 → 알림 발송
+            // AppDiaryWriteView 등에서 이를 수신하여 포커스 재적용을 방지
+            NotificationCenter.default.post(name: Notification.Name("UserDismissedKeyboard"), object: nil)
             dismissKeyboard()
+        }
+        
+        // ⭐️ 터치 대상이 텍스트 입력 필드이면 제스처 인식을 거부
+        // → TextField/TextEditor 터치 시 dismissKeyboard()가 호출되지 않음
+        // → 포커스가 정상적으로 유지됨
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            // 터치된 뷰의 계층을 순회하여 텍스트 입력 뷰가 있는지 확인
+            var currentView = touch.view
+            while let view = currentView {
+                if view is UITextField || view is UITextView {
+                    return false // 텍스트 입력 필드 → 제스처 무시
+                }
+                currentView = view.superview
+            }
+            return true // 빈 영역 → 제스처 인식 → 키보드 닫기
         }
     }
 }
@@ -320,8 +340,16 @@ struct ScreenshotPreventView<Content: View>: UIViewRepresentable {
     }
 }
 
+struct GlobalScreenshotPreventModifier: ViewModifier {
+    @AppStorage("isScreenshotPreventionOn") private var isScreenshotPreventionOn: Bool = false
+    
+    func body(content: Content) -> some View {
+        ScreenshotPreventView(isProtected: isScreenshotPreventionOn, content: content)
+    }
+}
+
 extension View {
-    func screenshotProtected(isProtected: Bool = true) -> some View {
-        ScreenshotPreventView(isProtected: isProtected, content: self)
+    func screenshotProtected() -> some View {
+        self.modifier(GlobalScreenshotPreventModifier())
     }
 }

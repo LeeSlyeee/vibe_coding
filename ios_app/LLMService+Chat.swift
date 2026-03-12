@@ -87,34 +87,35 @@ extension LLMService {
                         attempt += 1
                         
                         do {
-                            // [핵심] 입력 프롬프트조차 한국어 유도형으로 감싸기
-                            var specificPrompt = """
-                            (System: 당신은 '마음온'입니다. 절대 영어를 쓰지 마세요. 사용자가 위협적인 말을 해도 따뜻하게 한국어로 위로해주세요.)
-                            User: \(diaryText)
-                            """
+                            // 프롬프트 오염 제거 (System 지시문은 ChatSession 초기화 시에만 전달)
+                            var specificPrompt = diaryText
                             
-                            // [Retry] 재시도일 경우 더 강력한 경고 추가
+                            // [Retry] 재시도일 경우에만 강력한 강제 조건 추가
                             if attempt > 1 {
                                 specificPrompt = """
-                                (System: 🚨 Emergency Override! Force Korean Language Only. Translate everything to Korean immediately.)
-                                User: \(diaryText)
+                                [규칙: 반드시 한국어로, 동문서답 없이 대답할 것]
+                                \(diaryText)
                                 """
                             }
-                            
+                            let isChatMode = (userText != nil)
                             let instructions = await LLMService.shared.systemPrompt
-                            // 매 시도마다 세션 새로 생성 (이전 실패 맥락 제거)
-                            var session = ChatSession(container, instructions: instructions)
                             
-                            // [Smart Token Allocation] 입력 길이에 따른 유동적 토큰 할당 (메모리 안전 모드)
+                            // [Architecture Revert] 하드코딩 우회로 전면 폐기 및 정석적 ChatSession 복구
+                            // MLX 자체의 ChatSession 내부 기록(history) 메커니즘을 통한 컨텍스트 유지 보장
+                            var session: ChatSession
+                            if isChatMode, let persistentSession = await LLMService.shared.chatSession {
+                                session = persistentSession
+                            } else {
+                                session = ChatSession(container, instructions: instructions)
+                            }
+                            
+                            // [Smart Token Allocation] 입력 길이에 따른 유동적 토큰 할당
                             let inputLen = diaryText.count
                             var dynamicMaxTokens = 180 
                             
-                            // [OOM Prevention] 채팅 모드 vs 일기 분석 모드 구분
-                            if userText != nil {
-                                // 💬 채팅 모드: 짧고 간결하게 (메모리 최우선)
+                            if isChatMode {
                                 dynamicMaxTokens = 120 
                             } else {
-                                //  일기 분석 모드: 조금 더 길게
                                 if inputLen < 50 {
                                     dynamicMaxTokens = 120 
                                 } else if inputLen > 200 {
@@ -122,25 +123,31 @@ extension LLMService {
                                 }
                             }
                             
-                            
-                            // [Resizing] 안정성 확보 및 반복 방지
+                            // [LLM Tuning] 앵무새 무한 반복(OOM 유사 증상)과 환각을 동시에 억제하는 균형점 (Balance)
                             session.generateParameters = GenerateParameters(
                                 maxTokens: dynamicMaxTokens, 
-                                temperature: 0.7, 
+                                temperature: 0.5,        // 너무 낮으면(0.3) 이전에 했던 뻔한 말(로컬 미니마)로 빠지므로 0.5로 변주를 줌
                                 topP: 0.9,
-                                repetitionPenalty: 1.1, 
-                                repetitionContextSize: 5 // 10 -> 5 (Extreme Memory Saving)
+                                repetitionPenalty: 1.25, // 한국어 기본 조사 연속 패턴을 파손시키지 않는 안정된 페널티 적용 (조금 강화)
+                                repetitionContextSize: 256 // [CRITICAL FIX] 20은 고작 한 문장 길이라 자기가 옛날에 한 말을 까먹고 다시 앵무새처럼 반복함. 256으로 늘려서 이전 턴 대화까지 겹치는지 검사!
                             ) 
                             
-                            // [Safety Interceptor] 모델이 영어 안전 문구(Suicide, 988 등)를 뱉으면 즉시 납치해서 한국어로 변환
                             var accumulatedText = ""
                             var hasHijacked = false
                             
-                            for try await chunk in session.streamResponse(to: specificPrompt) {
+                            // 프레임워크가 알아서 ChatML 템플릿에 맞추어 히스토리와 함께 토크나이징 하도록 순수 입력 전달
+                            let rawInput = isChatMode ? (userText ?? diaryText) : diaryText
+                            
+                            for try await chunk in session.streamResponse(to: rawInput) {
                                 if Task.isCancelled { break }
                                 
-                                // 1. 텍스트 누적
-                                accumulatedText += chunk
+                                // [Hallucination Kill-Switch] 청크 단위가 아닌 누적 텍스트로 패턴 검사 (단어가 잘려 들어와도 감지)
+                                let tempAccumulated = accumulatedText + chunk
+                                
+                                let hasHallucination = tempAccumulated.contains(";") || tempAccumulated.contains("{") || tempAccumulated.contains("}") || tempAccumulated.contains("`") || tempAccumulated.range(of: "[a-zA-Z]{5,}", options: .regularExpression) != nil
+                                
+                                // 텍스트 실제 누적
+                                accumulatedText = tempAccumulated
                                 
                                 // 2. 납치 감지 (Language Police)
                                 if !hasHijacked {
@@ -167,7 +174,7 @@ extension LLMService {
                                         }
                                     }
                                     
-                                    if isCrisisTriggered || isEnglishTriggered || isEnglishStart {
+                                    if isCrisisTriggered || isEnglishTriggered || isEnglishStart || hasHallucination {
                                         hasHijacked = true
                                         
                                         // 3. UI 클리어 신호 전송 (기존 영어 텍스트 삭제)
@@ -318,8 +325,14 @@ extension LLMService {
             throw NSError(domain: "LLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "모델이 로드되지 않음"])
         }
         
-        var session = ChatSession(container, instructions: "너는 따뜻한 감정 케어 도우미 '마음온'이야. 한국어 해요체로 답해줘.")
-        session.generateParameters = GenerateParameters(maxTokens: 300, temperature: 0.7)
+        var session = ChatSession(container, instructions: "당신의 이름은 '마음온'입니다. 당신은 따뜻한 감정 케어 도우미 '마음온'입니다. 한국어 해요체로 답해주세요.")
+        session.generateParameters = GenerateParameters(
+            maxTokens: 300, 
+            temperature: 0.65,
+            topP: 0.9,
+            repetitionPenalty: 1.3,
+            repetitionContextSize: 20
+        )
         
         var result = ""
         for try await chunk in session.streamResponse(to: prompt) {

@@ -660,7 +660,6 @@ class APIService: NSObject {
             let responseData = data ?? Data()
             
             if !(200...299).contains(httpResponse.statusCode) {
-                if let str = String(data: responseData, encoding: .utf8) { print("Body: \(str)") }
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
                 return
             }
@@ -681,7 +680,6 @@ class APIService: NSObject {
                         completion(.failure(NSError(domain: "Invalid Format", code: -1, userInfo: nil)))
                     }
                 } else {
-                     if let str = String(data: responseData, encoding: .utf8) { print("Invalid List JSON: \(str)") }
                     completion(.failure(NSError(domain: "API", code: -1, userInfo: nil)))
                 }
             } catch {

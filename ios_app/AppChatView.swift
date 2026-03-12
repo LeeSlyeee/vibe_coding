@@ -9,7 +9,6 @@ struct AppChatView: View {
     @State private var isTyping: Bool = false
     @State private var scrollViewProxy: ScrollViewProxy? = nil
     
-    
     // [UX] Cold Start Hint
     @State private var loadingHint: String? = nil
     
@@ -17,7 +16,7 @@ struct AppChatView: View {
     @State private var isCrisis: Bool = false
     @State private var showSOSModal: Bool = false
     
-    // [Gatekeeper] Mode Selection — 기본값 서버 AI, 네비게이션바 버튼으로 로컬 전환 가능
+    // [Gatekeeper] Mode Selection
     @State private var showModeSelection: Bool = false
     
     // [New] Settings Modal State
@@ -26,12 +25,23 @@ struct AppChatView: View {
     // [New] Focus State based Keyboard Handling
     @FocusState private var isInputFocused: Bool
     
-    // [Keyboard Fix] Real keyboard height observer (AppMainTabView에서 주입)
-    #if os(iOS)
-    @EnvironmentObject var keyboardObserver: KeyboardObserver
+    // [Guided Diary Flow]
+    @State private var currentStepIndex: Int = 0
+    @State private var collectedAnswers: [String] = ["", "", "", "", "", ""]
+    @State private var isFreeChatMode: Bool = false // 자유 대화 모드 (일기 완료 후 활성화)
+    private let stepQuestions = [
+        "어젯밤 잠은 어떻게 주무셨나요? 푹 쉬셨기를 바라요.", // 1 (수면)
+        "그렇군요. 그럼 오늘 하루 어떤 일들이 있었는지 편하게 말씀해주세요.", // 2 (사건)
+        "그 경험을 하면서 어떤 감정이 들었는지 말씀해주시겠어요?", // 3 (감정)
+        "왜 그런 감정이 들었는지, 나에게 어떤 의미였는지 조금 더 깊이 생각해 볼까요?", // 4 (의미)
+        "오늘 하루도 정말 고생 많으셨어요. 마지막으로 힘든 나에게 따뜻한 위로의 한마디를 남겨주세요." // 5 (독백/위로)
+    ]
     
-    // 하단 Safe Area 높이 (Home Indicator 영역)
-    // [Keyboard Fix] keyWindow 기준으로 안전하게 safeArea 읽기
+    // [Keyboard Fix] Real keyboard height observer
+    #if os(iOS)
+    @StateObject private var keyboardObserver = KeyboardObserver()
+    
+    // 하단 Safe Area 높이
     private var safeAreaBottom: CGFloat {
         UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -41,7 +51,6 @@ struct AppChatView: View {
     #endif
     
     // Server Configuration
-    // [Target Fix] Updated to 217 Server
     let baseURL = "https://217.142.253.35.nip.io/api"
     
     var body: some View {
@@ -49,15 +58,14 @@ struct AppChatView: View {
             // Main Chat UI
             NavigationView {
                 VStack(spacing: 0) {
-                    // [Keyboard Fix] SwiftUI 자동 키보드 회피를 차단하고 수동으로만 처리
-                    // [New] Model Loading Indicator (로컬 AI 모드에서만 표시)
                     if !llmService.useServerAI && !llmService.isModelLoaded && llmService.modelLoadingProgress > 0 {
                         VStack(spacing: 8) {
-                            Text(llmService.modelLoadingProgress > 0 ? "AI 모델 준비 중 (\(Int(llmService.modelLoadingProgress * 100))%)" : "AI 모델 다운로드 대기 중...")
+                            Text(llmService.modelLoadingProgress > 0 ? "🔒 보안 캡슐 활성화 및 가중치 전송 완료! (준비 중...)" : "🔒 로컬 AI 엔진 기동 대기 중...")
                                 .font(.caption)
-                                .foregroundColor(.blue)
+                                .foregroundColor(.green)
                             ProgressView(value: llmService.modelLoadingProgress)
                                 .progressViewStyle(LinearProgressViewStyle())
+                                .accentColor(.green)
                                 .frame(height: 2)
                         }
                         .padding(.horizontal)
@@ -71,15 +79,48 @@ struct AppChatView: View {
                             Image(systemName: "lock.shield.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(.green)
-                            Text("이 대화는 폰 안에서만 처리됩니다")
+                            Text("완벽히 단절된 안전지대 (데이터는 폰 안에만 머뭅니다)")
                                 .font(.system(size: 11))
                                 .foregroundColor(.gray)
+                            Spacer()
+                            Text("Off-Grid")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.green)
+                                .foregroundColor(.white)
+                                .cornerRadius(4)
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 6)
                         .padding(.horizontal, 12)
                         .background(Color.green.opacity(0.08))
                         .cornerRadius(12)
                         .padding(.top, 4)
+                        .padding(.horizontal, 16)
+                    } else {
+                        // 서버 모드 배지 (Opt-In & Anonymization)
+                        HStack(spacing: 4) {
+                            Image(systemName: "shield.righthalf.filled")
+                                .font(.system(size: 10))
+                                .foregroundColor(.blue)
+                            Text("전문가 심층 분석 (개인정보는 익명화되어 전송됩니다)")
+                                .font(.system(size: 11))
+                                .foregroundColor(.gray)
+                            Spacer()
+                            Text("Opt-In")
+                                .font(.system(size: 9, weight: .bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.blue)
+                                .foregroundColor(.white)
+                                .cornerRadius(4)
+                        }
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 12)
+                        .background(Color.blue.opacity(0.08))
+                        .cornerRadius(12)
+                        .padding(.top, 4)
+                        .padding(.horizontal, 16)
                     }
 
                     // Chat List
@@ -91,7 +132,7 @@ struct AppChatView: View {
                                     VStack(spacing: 10) {
                                         Image(systemName: "hand.wave.fill").foregroundColor(.yellow)
                                             .font(.system(size: 40))
-                                        Text(llmService.useServerAI ? "안녕하세요!\n(서버 AI 모드 동작 중)" : "안녕하세요!\n마음 속 이야기를 자유롭게 들려주세요.\n제가 경청하고 공감해드릴게요.")
+                                        Text(llmService.useServerAI ? "안전하게 감정을 기록해보세요.\n안내에 따라 답을 하다 보면 일기가 완성됩니다." : "어떤 감정이든 쏟아내세요.\n안전지대에서 질문에 답하며 저와 함께 정리해볼까요?")
                                             .multilineTextAlignment(.center)
                                             .font(.body)
                                             .foregroundColor(.gray)
@@ -111,7 +152,7 @@ struct AppChatView: View {
                                         if let hint = loadingHint {
                                             Text(hint)
                                                 .font(.caption)
-                                                .foregroundColor(.gray)
+                                                .foregroundColor(hint.contains("🔒") ? .green : (hint.contains("🛡️") ? .blue : .gray))
                                                 .transition(.opacity)
                                                 .multilineTextAlignment(.leading)
                                         }
@@ -126,10 +167,9 @@ struct AppChatView: View {
                         .onAppear {
                             self.scrollViewProxy = proxy
                             
-                            // [Sync & Greeting] 서버에서 최신 실명 가져온 뒤 인사
+                            // [Sync & Greeting + 오늘 일기 체크]
                             APIService.shared.syncUserInfo { success in
                                 DispatchQueue.main.async {
-                                    // [Name Fix] 실명 우선 사용
                                     var userName = UserDefaults.standard.string(forKey: "realName") 
                                                 ?? UserDefaults.standard.string(forKey: "userNickname") 
                                                 ?? "회원"
@@ -138,27 +178,52 @@ struct AppChatView: View {
                                         userName = "회원"
                                     }
                                     
-                                    // 이미 메시지가 있으면 인사 생략 (단, 텅 빈 경우에만 인사)
-                                    if messages.isEmpty {
-                                        let welcomeText = "안녕하세요, \(userName)님!\n\n저는 AI 감정 케어 도우미 '마음온'이에요.\n전문 상담사는 아니지만, 당신의 이야기를 조용히 들을 준비가 되어 있어요.\n\n오늘 하루 중 기억에 남는 순간이 있었나요?"
+                                    // 이미 메시지가 있으면 인사 생략
+                                    guard messages.isEmpty else { return }
+                                    
+                                    // 오늘 날짜 계산
+                                    let f = DateFormatter()
+                                    f.dateFormat = "yyyy-MM-dd"
+                                    f.timeZone = TimeZone.current
+                                    let todayStr = f.string(from: Date())
+                                    
+                                    // 오늘 일기가 이미 존재하는지 확인
+                                    let todayDiary = LocalDataManager.shared.diaries.first(where: { $0.date == todayStr })
+                                    
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                        guard messages.isEmpty else { return }
                                         
-                                        // 약간의 딜레이 후 등장
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            if messages.isEmpty { 
-                                                withAnimation {
-                                                    messages.append(ChatMessage(text: welcomeText, isUser: false))
-                                                }
+                                        if let diary = todayDiary {
+                                            // ━━━ 오늘 일기 존재 → 자유 대화 모드로 시작 ━━━
+                                            var contextMsg = "안녕하세요, \(userName)님! 👋\n\n오늘 이미 일기를 작성해주셨네요 ✨\n"
+                                            if let event = diary.event, !event.isEmpty {
+                                                contextMsg += "오늘 있었던 일: \(String(event.prefix(80)))\n"
+                                            }
+                                            if let emotion = diary.emotion_desc, !emotion.isEmpty {
+                                                contextMsg += "느낀 감정: \(String(emotion.prefix(80)))\n"
+                                            }
+                                            contextMsg += "\n더 이야기하고 싶은 게 있으시면 편하게 말씀해주세요. 💬"
+                                            
+                                            withAnimation {
+                                                messages.append(ChatMessage(text: contextMsg, isUser: false))
+                                                currentStepIndex = 6
+                                                isFreeChatMode = true
+                                            }
+                                        } else {
+                                            // ━━━ 오늘 일기 없음 → 기존 6단계 가이드 플로우 시작 ━━━
+                                            let welcomeText = "안녕하세요, \(userName)님!\n오늘 하루를 편안하게 돌아보는 시간을 가져볼까요?\n\n가장 먼저, 혹시 챙겨 드시는 약이 있다면 오늘 잘 복용하셨나요?\n(없다면 '없다'고 말씀해주셔도 좋아요)"
+                                            
+                                            withAnimation {
+                                                messages.append(ChatMessage(text: welcomeText, isUser: false))
                                             }
                                         }
                                     }
                                 }
                             }
 
-                            // [New] Trigger Model Load ONLY if Local Mode is confirmed
                             if !showModeSelection && !llmService.useServerAI && !llmService.isModelLoaded {
                                 Task { await llmService.loadModel() }
                             }
-                            
                         }
                         .onChangeCompat(of: messages.count) { _ in
                             scrollToBottom(proxy: proxy)
@@ -166,27 +231,20 @@ struct AppChatView: View {
                         .onChangeCompat(of: isTyping) { _ in
                             scrollToBottom(proxy: proxy)
                         }
-                        // [UX] Dismiss Keyboard on Drag/Tap
-                        // [Keyboard Fix] simultaneousGesture로 변경하여 scrollDismissesKeyboard와 충돌 방지
-                        .simultaneousGesture(
-                            TapGesture().onEnded {
-                                #if os(iOS)
-                                dismissKeyboard()
-                                #endif
-                            }
-                        )
                         #if os(iOS)
-                        .scrollDismissesKeyboard(.interactively)
+                        // [Cursor Fix] UIKit 기반: 메시지 영역 탭 시 키보드 닫기 (입력 필드 포커스 방해 없음)
+                        .dismissKeyboardOnTap()
                         #endif
                     }
                     
-                    // [New] Crisis Banner (위기 감지 시 노출)
+                    // Crisis Banner
                     if isCrisis {
                         Button(action: { showSOSModal = true }) {
                             HStack {
                                 Image(systemName: "exclamationmark.triangle.fill")
                                     .foregroundColor(.white)
-                                Text("전문가의 도움이 필요하신가요? (긴급 연락처)")
+                                    .padding(.trailing, 4)
+                                Text("도움이 필요하신가요? (긴급 연락처)")
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                                 Spacer()
@@ -204,15 +262,15 @@ struct AppChatView: View {
                     
                     // Input Area
                     HStack(spacing: 10) {
-                        TextField("메시지 보내기...", text: $inputText)
+                        TextField(isFreeChatMode ? "마음온에게 자유롭게 이야기해보세요..." : "메시지 보내기...", text: $inputText)
                             .focused($isInputFocused)
                             .keyboardType(.default)
                             .autocorrectionDisabled(false)
-                            .tint(.blue) // [Fix] 커서 색상 명시적 설정 (입력 상태 시각적 피드백)
+                            .tint(.blue)
                             .padding(12)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(20)
-                            .disabled(showModeSelection)
+                            .disabled(showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode))
                         
                         Button(action: sendMessage) {
                             Image(systemName: "paperplane.fill")
@@ -222,11 +280,9 @@ struct AppChatView: View {
                                 .background(Color.blue.opacity(0.1))
                                 .clipShape(Circle())
                         }
-                        .disabled(inputText.isEmpty || isTyping || showModeSelection)
+                        .disabled(inputText.isEmpty || showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode) || (!isFreeChatMode && isTyping))
                     }
                     .padding()
-                    // [Keyboard Fix] 키보드가 올라오면 탭바 패딩(60)을 제거하고,
-                    // 키보드 높이만큼 패딩 적용 (SwiftUI 자동 회피는 .ignoresSafeArea로 차단됨)
                     #if os(iOS)
                     .padding(.bottom, keyboardObserver.isKeyboardVisible
                         ? max(keyboardObserver.keyboardHeight - safeAreaBottom, 0)
@@ -238,16 +294,12 @@ struct AppChatView: View {
                     .background(Color.white)
                     .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
                 }
-                // [Keyboard Fix] SwiftUI 자동 키보드 회피 비활성화 (수동 패딩으로 대체)
                 #if os(iOS)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
-                // [Keyboard Fix] 키보드가 내려가면 FocusState 동기화 (다시 터치 시 키보드 올라오도록)
                 .onChangeCompat(of: keyboardObserver.isKeyboardVisible) { visible in
                     if !visible {
                         isInputFocused = false
                     } else if visible && !isInputFocused {
-                        // [Keyboard Fix] 양방향 동기화: 키보드가 올라왔는데 Focus가 풀린 경우 복원
-                        // (키보드 언어 전환 시 Hide→Show 사이클에서 Focus 유실 방지)
                         isInputFocused = true
                     }
                 }
@@ -255,7 +307,6 @@ struct AppChatView: View {
                 .navigationBarItems(
                     leading: Button(action: {
                         llmService.toggleAIMode()
-                        // 로컬 모드 전환 시 모델 로드
                         if !llmService.useServerAI && !llmService.isModelLoaded {
                             Task { await llmService.loadModel() }
                         }
@@ -290,52 +341,27 @@ struct AppChatView: View {
                 }
             }
             .blur(radius: showModeSelection ? 5 : 0) // Blur background
-            .screenshotProtected(isProtected: true) // [보안 Fix] 민감한 상담 로그 보호
-            
-            // [Gatekeeper] AI Mode Selection Overlay
-            // [Gatekeeper] 서버 AI 전용 — 모드 선택 오버레이 비활성
-            // 로컬 LLM은 일기 분석 전용으로만 사용 (채팅에서는 서버 AI 강제)
+            .screenshotProtected() // [보안] 스크린샷 방지 (설정에 따라 동작)
         }
     }
     
     private func sendMessage() {
-        // [Critical Fix] 중복 실행 방지 가드는 맨 처음에!
-        // 1. 입력값 및 상태 체크
-        guard !isTyping else { return }
         guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
-        // 2. 상태 체크 (LLM Busy check)
-        // [Gatekeeper] 분석 중이면 채팅 불가 (1-by-1 정책)
-        if !llmService.useServerAI && (llmService.isProcessingQueue || !llmService.analysisQueue.isEmpty) {
-            // Alert logic (SwiftUI Alert State binding needed, but for now simple print or shake)
-            // 임시로 채팅창에 시스템 메시지 추가
-            let sysMsg = ChatMessage(text: "⚠️ 현재 일기 분석 중입니다. 잠시 후 다시 시도해주세요.", isUser: false)
-            messages.append(sysMsg)
+        // 자유 대화 모드이면 별도 처리 (AI 응답 중에도 메시지 전송 가능)
+        if isFreeChatMode {
+            sendFreeChat()
             return
         }
+        
+        // 가이드 플로우에서는 AI 응답 중 입력 차단
+        guard !isTyping else { return }
+        
+        guard currentStepIndex < 6 else { return } // 평가 6단계(0~5 인덱스)
         
         let userText = inputText
         inputText = ""
         isTyping = true 
-        self.loadingHint = "답변을 생각하는 중..."
-        
-        // [UX] Cold Start Timer (서버 깨어날 때 지루하지 않게 멘트 변경)
-        Task {
-            try? await Task.sleep(nanoseconds: 4 * 1_000_000_000)
-            // 아직도 타이핑 중이고, AI 메시지가 없거나 비어있다면 (대기 중)
-            if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
-                withAnimation { self.loadingHint = "AI가 마음의 준비를 하고 있어요...\n(서버가 깨어나는 중입니다)" }
-            }
-            
-            try? await Task.sleep(nanoseconds: 6 * 1_000_000_000) // +6초 (총 10초)
-            if isTyping && (messages.last?.isUser == true || messages.last?.text.isEmpty == true) {
-                withAnimation { self.loadingHint = "거의 다 되었습니다! 잠시만요..." }
-            }
-        } 
-        
-        // 3. 사용자 메시지 추가
-        let userMsg = ChatMessage(text: userText, isUser: true)
-        messages.append(userMsg)
         
         // Haptic Feedback
         #if os(iOS)
@@ -343,87 +369,228 @@ struct AppChatView: View {
         generator.impactOccurred()
         #endif
         
-        // 4. AI 작업 시작 (MainActor Task)
+        // 사용자 메시지 추가
+        messages.append(ChatMessage(text: userText, isUser: true))
+        
+        // 데이터 보관
+        collectedAnswers[currentStepIndex] = userText
+        currentStepIndex += 1
+        
         Task {
-            // 대화 내역 조합
-            var historyContext = ""
-            
-            // [Memory & Logic Fix] 상황별 컨텍스트 길이 조절 (Dynamic Context Window)
-            let triggers = ["반복", "그만", "똑같", "뭐하", "장난", "tq", "시발", "답답", "멍충", "바보"] 
-            let isComplaint = (triggers.contains { userText.contains($0) }) && (userText.count < 30)
-            
-            // [Memory & Performance] 대화가 길어지면 서버가 힘들어하므로 최근 4개(2번의 티키타카)만 기억
-            // 불만 토로 시에는 빠른 전환을 위해 기억을 지움
-            let historyLimit = isComplaint ? 0 : 4 
-            
-            if isComplaint {
-            } else {
-            }
-            
-            // [Phase 4] 3단계 위기 분류 시스템
+            // [Crisis] 3단계 위기 분류 시스템
             let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
-            let crisisLevel2 = ["사라지고", "없어지고", "살기 싫", "의미 없", "끝내", "망했", "수면제", "칼", "약 먹", "다 끝"]
-            let crisisLevel1 = ["힘들", "지치", "우울", "불안", "두렵", "외로", "무서", "포기", "눈물"]
-            
             if crisisLevel3.contains(where: { userText.contains($0) }) {
-                withAnimation {
+                await MainActor.run {
                     self.isCrisis = true
-                    self.showSOSModal = true // Level 3: 즉시 모달 팝업
+                    self.showSOSModal = true
                 }
-            } else if crisisLevel2.contains(where: { userText.contains($0) }) {
-                withAnimation {
-                    self.isCrisis = true // Level 2: SOS 배너 표시
-                }
-            } else if crisisLevel1.contains(where: { userText.contains($0) }) {
-                // Level 1: 기본 공감 모드 (배너 미노출, AI가 공감 대응)
             }
             
-            let recentMessages = messages.suffix(historyLimit)
-            for msg in recentMessages {
-                let role = msg.isUser ? "User" : "Model"
-                // 메시지 길이 제한 (너무 긴 메시지는 잘라서 전달)
-                let safeText = String(msg.text.prefix(300)) 
-                historyContext += "\(role): \(safeText)\n"
-            }
+            // 타이핑 딜레이 약간
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
             
-            let prompt = """
-            [대화 내역]
-            \(historyContext)
-            
-            User: \(userText)
-            """
-            
-            // 빈 말풍선 추가 (이제 곧 채워질 공간)
-            messages.append(ChatMessage(text: "", isUser: false))
-            
-            var fullResponse = ""
-            
-            // 스트림 구독 (LLMService.generateAnalysis는 이미 백그라운드에서 동작)
-            for await token in await LLMService.shared.generateAnalysis(
-                diaryText: prompt, 
-                userText: userText,        // Server Mode용
-                historyString: historyContext // Server Mode용
-            ) {
-                // 첫 토큰 도착 시 힌트 삭제 (타이핑 시작)
-                if loadingHint != nil { 
-                    withAnimation { loadingHint = nil } 
+            await MainActor.run {
+                if self.currentStepIndex < 6 {
+                    self.isTyping = false
+                    messages.append(ChatMessage(text: self.stepQuestions[self.currentStepIndex - 1], isUser: false))
+                } else if self.currentStepIndex == 6 {
+                    messages.append(ChatMessage(text: "소중한 이야기들을 나눠주셔서 감사해요.\n다이어리를 기록하고 감정을 분석해 드릴게요. 잠시만 기다려주세요.", isUser: false))
+                    self.startFinalAnalysis()
                 }
-                // [RESET] 명령 감지 시 텍스트 초기화 (안전 장치 발동 시 기존 영어 텍스트 날리기)
-                if token.contains("[RESET]") {
-                    fullResponse = ""
-                    continue
+            }
+        }
+    }
+    
+    private func startFinalAnalysis() {
+        self.loadingHint = "📝 일기장에 기록을 옮기는 중..."
+        self.isTyping = true
+        
+        let qMed = collectedAnswers[0] // medication
+        let qs = collectedAnswers[1] // sleep
+        let q1 = collectedAnswers[2] // event
+        let q2 = collectedAnswers[3] // emotion
+        let q3 = collectedAnswers[4] // meaning
+        let q4 = collectedAnswers[5] // selftalk
+        
+        // Medication 약물 섭취 여부 유추 (긍정 단어 기반)
+        let medPositiveWords = ["명", "모", "머", "머겄", "먹", "네", "응", "ㅇ", "Y", "y", "약", "타", "챙", "복용"]
+        let hasTakenMed = medPositiveWords.contains(where: { qMed.contains($0) })
+        
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone.current 
+        let dateString = f.string(from: Date())
+        
+        var newDiary = Diary(
+            id: UUID().uuidString,
+            _id: nil,
+            date: dateString,
+            mood_level: 3, // 기본값
+            event: q1,
+            emotion_desc: q2,
+            emotion_meaning: q3,
+            self_talk: q4,
+            sleep_desc: qs,
+            weather: "맑음", 
+            temperature: 20.0,
+            created_at: nil,
+            medication: hasTakenMed,
+            medication_desc: qMed
+        )
+        
+        newDiary.ai_prediction = "분석 대기 중..."
+        
+        // 1. 다이어리 로컬 저장
+        LocalDataManager.shared.saveDiary(newDiary) { success in
+            // 서버/로컬 AI 추론
+            Task {
+                let combinedText = "투약여부: \(qMed)\n사건: \(q1)\n감정: \(q2)\n의미: \(q3)\n혼잣말: \(q4)\n수면: \(qs)"
+                let analyzeSystemInstruction = "[일기 전체를 요약하고, 사용자의 감정에 공감하며 한 문단의 따뜻한 조언을 제공하세요. 반드시 한국어를 사용하세요.]\n\n\(combinedText)"
+                
+                await MainActor.run {
+                    self.loadingHint = !llmService.useServerAI ? "🔒 AI 마음 가이드 생성 중... (데이터는 보호됩니다)" : "🛡️ 마음 가이드 생성 중..."
+                    messages.append(ChatMessage(text: "", isUser: false)) 
                 }
                 
-                fullResponse += token
+                var fullResponse = ""
                 
-                // 화면 갱신
-                if let lastIdx = messages.indices.last {
-                    messages[lastIdx] = ChatMessage(text: fullResponse, isUser: false)
+                for await token in await LLMService.shared.generateAnalysis(
+                    diaryText: combinedText, 
+                    userText: analyzeSystemInstruction, // Server mode triggers chat endpoint
+                    historyString: "사용자가 방금 남긴 일기 기록입니다."
+                ) {
+                    await MainActor.run {
+                        if self.loadingHint != nil { self.loadingHint = nil }
+                        
+                        if token.contains("[RESET]") {
+                            fullResponse = ""
+                            if let lastIdx = self.messages.indices.last {
+                                self.messages[lastIdx] = ChatMessage(text: fullResponse, isUser: false)
+                            }
+                        } else {
+                            fullResponse += token
+                            if let lastIdx = self.messages.indices.last {
+                                self.messages[lastIdx] = ChatMessage(text: fullResponse, isUser: false)
+                            }
+                        }
+                    }
+                }
+                
+                // 추론 완료 후 다이어리 필드 업데이트
+                await MainActor.run {
+                    self.isTyping = false
+                    if let index = LocalDataManager.shared.diaries.firstIndex(where: { $0.id == newDiary.id }) {
+                        LocalDataManager.shared.diaries[index].ai_analysis = fullResponse
+                        LocalDataManager.shared.saveDiary(LocalDataManager.shared.diaries[index]) { _ in }
+                    }
+                    
+                    // 채팅 종료 멘트 + 자유 대화 전환
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.messages.append(ChatMessage(text: "분석을 마치고 일기장에 보관해두었어요.\n오늘 하루도 수고 많으셨습니다. 😊", isUser: false))
+                        
+                        // 자유 대화 전환 안내
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            self.messages.append(ChatMessage(text: "더 이야기하고 싶은 게 있으시면 편하게 말씀해주세요.\n오늘 있었던 일, 지금 느끼는 감정 등 자유롭게 대화할 수 있어요. 💬", isUser: false))
+                            self.isFreeChatMode = true
+                        }
+                    }
                 }
             }
+        }
+    }
+    
+    /// 자유 대화 모드 — 6단계 일기 작성 완료 후 활성화
+    /// 이전 대화 기록을 history에 포함시켜 서버 AI에 전달
+    private func sendFreeChat() {
+        let userText = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        inputText = ""
+        isTyping = true
+        
+        // Haptic Feedback
+        #if os(iOS)
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        #endif
+        
+        // 사용자 메시지 추가
+        messages.append(ChatMessage(text: userText, isUser: true))
+        
+        // [Crisis] 위기 감지 (자유 대화 중에도 동작)
+        let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
+        if crisisLevel3.contains(where: { userText.contains($0) }) {
+            self.isCrisis = true
+            self.showSOSModal = true
+        }
+        
+        Task {
+            // 이전 대화 기록을 history 문자열로 조합 (최근 10턴 = 20개 메시지)
+            let recentMessages = Array(messages.suffix(20))
+            let historyStr = recentMessages.dropLast() // 방금 추가한 userMsg 제외
+                .map { msg in
+                    if msg.isUser {
+                        return "User: \(String(msg.text.prefix(100)))"
+                    } else {
+                        return "AI: \(String(msg.text.prefix(100)))"
+                    }
+                }
+                .joined(separator: "\n")
             
-            // 완료
-            isTyping = false
+            if llmService.useServerAI {
+                // 서버 AI 모드: APIService 직접 호출
+                let serverResponse: String? = await withCheckedContinuation { continuation in
+                    APIService.shared.sendChatMessage(text: userText, history: historyStr) { result in
+                        switch result {
+                        case .success(let response):
+                            continuation.resume(returning: response)
+                        case .failure:
+                            continuation.resume(returning: nil)
+                        }
+                    }
+                }
+                
+                await MainActor.run {
+                    let responseText = serverResponse ?? LLMService.shared.getEmergencyEmpathy(for: userText)
+                    self.messages.append(ChatMessage(text: responseText, isUser: false))
+                    self.isTyping = false
+                }
+            } else {
+                // 로컬 AI 모드: LLMService 스트리밍
+                await MainActor.run {
+                    self.messages.append(ChatMessage(text: "", isUser: false))
+                }
+                
+                var fullResponse = ""
+                for await token in await LLMService.shared.generateAnalysis(
+                    diaryText: userText,
+                    userText: userText,
+                    historyString: historyStr
+                ) {
+                    await MainActor.run {
+                        if token.contains("[RESET]") {
+                            fullResponse = ""
+                        } else {
+                            fullResponse += token
+                        }
+                        if let lastIdx = self.messages.indices.last {
+                            self.messages[lastIdx] = ChatMessage(text: fullResponse, isUser: false)
+                        }
+                    }
+                }
+                
+                // 로컬 AI 응답이 비었으면 fallback
+                if fullResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    await MainActor.run {
+                        let fallback = LLMService.shared.getEmergencyEmpathy(for: userText)
+                        if let lastIdx = self.messages.indices.last {
+                            self.messages[lastIdx] = ChatMessage(text: fallback, isUser: false)
+                        }
+                    }
+                }
+                
+                await MainActor.run {
+                    self.isTyping = false
+                }
+            }
         }
     }
     
