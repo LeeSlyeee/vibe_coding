@@ -493,6 +493,58 @@ def create_diary():
     response_data['msg'] = '일기가 저장되었습니다.'
     return jsonify(response_data), 201
 
+def safe_extract_ai_comment(raw_text):
+    """AI 코멘트에서 JSON/마크다운 쓰레기를 제거하고 순수 텍스트만 추출"""
+    if not raw_text:
+        return raw_text
+    text = str(raw_text).strip()
+    if not text:
+        return ''
+
+    # 1. RunPod 응답 객체가 그대로인 경우 → 빈 문자열
+    if text.startswith('[{"choices"') or '"tokens"' in text and '"usage"' in text:
+        return ''
+
+    # 2. JSON 파싱 시도 → comment 키 추출
+    import json as _json
+    json_start = text.find('{')
+    json_end = text.rfind('}')
+    if json_start != -1 and json_end > json_start:
+        try:
+            parsed = _json.loads(text[json_start:json_end + 1])
+            if isinstance(parsed, dict):
+                comment = parsed.get('comment') or parsed.get('ai_comment') or parsed.get('message') or parsed.get('analysis')
+                if comment and isinstance(comment, str) and comment.strip():
+                    return comment.strip()
+        except Exception:
+            pass
+
+    # 3. 마크다운+JSON에서 comment 정규식 추출
+    import re as _re
+    comment_match = _re.search(r'["\']comment["\']\s*:\s*["\']((?:[^"\'\\]|\\.)*)[\'"]\s*', text)
+    if comment_match and comment_match.group(1):
+        extracted = comment_match.group(1).replace('\\n', '\n').replace('\\"', '"').strip()
+        if extracted:
+            return extracted
+
+    # 4. 코드 블록(```json```) 안에서 추출
+    code_match = _re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
+    if code_match and code_match.group(1):
+        try:
+            block_parsed = _json.loads(code_match.group(1).strip())
+            if isinstance(block_parsed, dict) and block_parsed.get('comment'):
+                return block_parsed['comment'].strip()
+        except Exception:
+            pass
+
+    # 5. 마크다운/JSON 잔여물 포함 시 빈 문자열
+    if '```' in text or text.startswith('[{') or text.startswith('{"'):
+        return ''
+
+    # 6. 깨끗한 텍스트
+    return text
+
+
 def serialize_diary(d):
     return {
         'id': str(d.id), # Cast to String for iOS
@@ -506,7 +558,7 @@ def serialize_diary(d):
         'self_talk': safe_decrypt(d.self_talk),
         'sleep_condition': safe_decrypt(d.sleep_condition),
         'gratitude_note': safe_decrypt(d.gratitude_note),
-        'ai_comment': safe_decrypt(d.ai_comment),
+        'ai_comment': safe_extract_ai_comment(safe_decrypt(d.ai_comment)),
         'ai_emotion': safe_decrypt(d.ai_emotion),
         'ai_prediction': safe_decrypt(d.ai_emotion), # Map for iOS
         'mode': d.mode,
@@ -563,7 +615,7 @@ def get_diary(diary_id):
         decrypted_self_talk = safe_decrypt(diary.self_talk)
         decrypted_gratitude = safe_decrypt(diary.gratitude_note)
         decrypted_sleep = safe_decrypt(diary.sleep_condition)
-        decrypted_ai_comment = safe_decrypt(diary.ai_comment) 
+        decrypted_ai_comment = safe_extract_ai_comment(safe_decrypt(diary.ai_comment)) 
         decrypted_ai_emotion = safe_decrypt(diary.ai_emotion) 
 
         # [Lazy Analysis Logic omitted/preserved]

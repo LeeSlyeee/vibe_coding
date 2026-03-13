@@ -403,10 +403,12 @@ def prepare_share_data(recipient_id):
         for d in diaries:
             if d.ai_comment:
                 try:
-                    from app import safe_decrypt
-                    comment = safe_decrypt(d.ai_comment)
+                    from app import safe_decrypt, safe_extract_ai_comment
+                    comment = safe_extract_ai_comment(safe_decrypt(d.ai_comment))
                 except Exception:
                     comment = d.ai_comment
+                if not comment:
+                    continue
                 # 첫 100자만 요약
                 summaries.append({
                     'date': d.date,

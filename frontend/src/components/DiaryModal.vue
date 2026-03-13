@@ -170,12 +170,12 @@
           </div>
 
           <!-- AI 코멘트 표시 (분석 완료 시) -->
-          <div v-else-if="currentDiary.ai_comment" class="ai-letter-box">
+          <div v-else-if="cleanAiComment" class="ai-letter-box">
             <div class="letter-header">
               <span class="ai-icon">💌</span>
               <span class="ai-sender">마음온의 편지</span>
             </div>
-            <p class="ai-comment-text">{{ currentDiary.ai_comment }}</p>
+            <p class="ai-comment-text">{{ cleanAiComment }}</p>
             <p style="font-size: 10px; color: #b0b0b0; margin-top: 8px; text-align: right;">💡 AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.</p>
             <p style="font-size: 10px; color: #ff9500; margin-top: 2px; text-align: right;">⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.</p>
           </div>
@@ -363,6 +363,69 @@ export default {
       }
       
       return result;
+    });
+
+    // === AI Comment 정제 ===
+    // LLM 응답이 JSON 문자열이나 마크다운+JSON 형태로 저장된 경우
+    // comment 필드의 순수 텍스트만 추출하여 표시
+    const cleanAiComment = computed(() => {
+      const raw = currentDiary.value?.ai_comment;
+      if (!raw) return '';
+      const text = String(raw).trim();
+      if (!text) return '';
+
+      // 1. RunPod 응답 객체가 그대로 저장된 경우 → 분석 실패
+      //    예: [{"choices": [{"tokens": [""]}], "usage": {"input": 228, "output": 1}}]
+      if (text.startsWith('[{"choices"') || text.includes('"tokens"') || text.includes('"usage"')) {
+        return '';
+      }
+
+      // 2. 순수 JSON 문자열인 경우 → comment 키 추출
+      //    예: {"emotion":"짜증","comment":"위로 메시지...","score":5}
+      const jsonStart = text.indexOf('{');
+      const jsonEnd = text.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        try {
+          const parsed = JSON.parse(text.substring(jsonStart, jsonEnd + 1));
+          if (parsed && typeof parsed === 'object') {
+            const comment = parsed.comment || parsed.ai_comment || parsed.message || parsed.analysis;
+            if (comment && typeof comment === 'string' && comment.trim()) {
+              return comment.trim();
+            }
+          }
+        } catch (e) {
+          // JSON 파싱 실패 → 아래 정규식 시도
+        }
+      }
+
+      // 3. 마크다운 + JSON이 섞인 경우 → comment 값 정규식 추출
+      //    예: **예시:** ```json { "comment": "위로 메시지..." } ```
+      const commentMatch = text.match(/["']comment["']\s*:\s*["']((?:[^"'\\]|\\.)*)['"]/s);
+      if (commentMatch && commentMatch[1]) {
+        const extracted = commentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').trim();
+        if (extracted) return extracted;
+      }
+
+      // 4. 마크다운 블록(```json```) 안에 있는 경우 → 추출하여 재파싱
+      const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        try {
+          const blockParsed = JSON.parse(codeBlockMatch[1].trim());
+          if (blockParsed && blockParsed.comment) {
+            return blockParsed.comment.trim();
+          }
+        } catch (e) {
+          // 파싱 실패
+        }
+      }
+
+      // 5. 마크다운 기호나 JSON 형태가 포함되어 있으면 쓰레기 데이터로 판단
+      if (text.includes('```') || text.startsWith('[{') || text.startsWith('{"')) {
+        return '';
+      }
+
+      // 6. 깨끗한 텍스트인 경우 그대로 반환
+      return text;
     });
 
     const isValid = computed(
@@ -828,6 +891,7 @@ export default {
       formattedDateTime,
       isValid,
       parsedContent,
+      cleanAiComment,
       displayMoodLevel, // [New]
       getMoodEmoji,
       getMoodName,
