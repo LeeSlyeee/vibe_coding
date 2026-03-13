@@ -45,6 +45,19 @@ struct AppStatsView: View {
     @State private var moodTempColor: String = "#86868b"
     @State private var moodTempLoaded = false
     
+    // [New] 마음 컨디션 State (Phase 1~6 교차 분석)
+    @State private var conditionScore: Int = 100
+    @State private var conditionGrade: String = ""
+    @State private var conditionIcon: String = "☀️"
+    @State private var conditionLabel: String = "측정 중"
+    @State private var conditionMessage: String = ""
+    @State private var conditionCareTip: String = ""
+    @State private var conditionLoaded = false
+    
+    // [New] 킥 인사이트 State (Phase 1~6 통합 요약)
+    @State private var kickInsights: [String] = []
+    @State private var kickInsightsLoaded = false
+    
     
     
     let tabs = [
@@ -185,6 +198,48 @@ struct AppStatsView: View {
                     .padding(.bottom, 10)
                 }
                 
+                // 마음 컨디션 카드 (Phase 1~6)
+                if conditionLoaded {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.12))
+                                .frame(width: 56, height: 56)
+                            Text(conditionIcon)
+                                .font(.system(size: 28))
+                        }
+                        
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text("마음 컨디션")
+                                    .font(.caption)
+                                    .foregroundColor(.secondaryText)
+                                Text("\(conditionScore)점")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.green)
+                            }
+                            Text(conditionLabel)
+                                .font(.headline)
+                                .foregroundColor(.primaryText)
+                            if !conditionMessage.isEmpty {
+                                Text(conditionMessage)
+                                    .font(.caption2)
+                                    .foregroundColor(.secondaryText)
+                                    .lineLimit(2)
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(16)
+                    .background(Color.white)
+                    .cornerRadius(16)
+                    .shadow(color: Color.black.opacity(0.05), radius: 5)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 10)
+                }
+                
                 // Modern Tab Bar
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -274,6 +329,11 @@ struct AppStatsView: View {
                                         }
                                     }
                                     .padding(.vertical, 8)
+                                    
+                                    // [New] 킥 인사이트 섹션 (Phase 1~6 통합 요약)
+                                    if kickInsightsLoaded && !kickInsights.isEmpty {
+                                        KickInsightsSectionView(insights: kickInsights)
+                                    }
                                 }
                             default: EmptyView()
                             }
@@ -293,6 +353,8 @@ struct AppStatsView: View {
             fetchExistingReports()
         }
         fetchMoodTemperature()
+        fetchMyCondition()
+        fetchMyKickInsights()
     }
     .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("RefreshStats"))) { _ in
         // [UX] 데이터 갱신 알림 수신 시 재계산
@@ -392,6 +454,61 @@ struct AppStatsView: View {
                     self.moodTempColor = color
                 }
                 self.moodTempLoaded = true
+            }
+        }.resume()
+    }
+    
+    // [New] 마음 컨디션 (Phase 1~6 교차 분석)
+    func fetchMyCondition() {
+        guard let token = authManager.token else { return }
+        
+        let baseURL = "https://217.142.253.35.nip.io/api"
+        guard let url = URL(string: "\(baseURL)/kick/my-condition") else { return }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30 // 분석에 시간이 걸릴 수 있음
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let condition = json["condition"] as? [String: Any] else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.conditionScore = condition["score"] as? Int ?? 100
+                self.conditionGrade = condition["grade"] as? String ?? ""
+                self.conditionIcon = condition["icon"] as? String ?? "☀️"
+                self.conditionLabel = condition["label"] as? String ?? "측정 중"
+                self.conditionMessage = condition["message"] as? String ?? ""
+                self.conditionCareTip = condition["care_tip"] as? String ?? ""
+                self.conditionLoaded = true
+            }
+        }.resume()
+    }
+    
+    // [New] 킥 인사이트 (Phase 1~6 통합 요약)
+    func fetchMyKickInsights() {
+        guard let token = authManager.token else { return }
+        
+        let baseURL = "https://217.142.253.35.nip.io/api"
+        guard let url = URL(string: "\(baseURL)/kick/my-insights") else { return }
+        
+        var request = URLRequest(url: url)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.timeoutInterval = 30
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            guard let data = data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let insights = json["insights"] as? [String] else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.kickInsights = insights
+                self.kickInsightsLoaded = true
             }
         }.resume()
     }
@@ -869,4 +986,89 @@ struct ReportView: View {
     }
 }
 
+
+// MARK: - 킥 인사이트 섹션 (Phase 1~6 통합 요약)
+struct KickInsightsSectionView: View {
+    let insights: [String]
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                Text("🔍")
+                    .font(.title2)
+                Text("킥 인사이트")
+                    .font(.headline)
+                    .foregroundColor(.primaryText)
+                
+                Text("\(insights.count)건")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.accent)
+                    .cornerRadius(10)
+            }
+            
+            Text("킥 분석 엔진이 발견한 주요 변화 신호")
+                .font(.caption)
+                .foregroundColor(.secondaryText)
+            
+            ForEach(insights, id: \.self) { insight in
+                let parsed = parseInsight(insight)
+                HStack(alignment: .top, spacing: 10) {
+                    Text(parsed.icon)
+                        .font(.system(size: 16))
+                    Text(parsed.text)
+                        .font(.system(size: 13))
+                        .foregroundColor(parsed.isWarning ? Color(hexString: "D32F2F") : .primaryText)
+                        .fontWeight(parsed.isWarning ? .semibold : .regular)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(parsed.isWarning ? Color(hexString: "FFF3F3") : parsed.bgColor)
+                .cornerRadius(12)
+            }
+        }
+        .modifier(CardModifier())
+    }
+    
+    struct ParsedInsight {
+        let icon: String
+        let text: String
+        let bgColor: Color
+        let isWarning: Bool
+    }
+    
+    func parseInsight(_ insight: String) -> ParsedInsight {
+        let isWarning = insight.contains("⚠️")
+        
+        if insight.contains("[시계열]") {
+            return ParsedInsight(icon: "📊", text: cleanTag(insight), bgColor: Color(hexString: "F0F4FF"), isWarning: isWarning)
+        } else if insight.contains("[언어]") {
+            return ParsedInsight(icon: "🔤", text: cleanTag(insight), bgColor: Color(hexString: "FFF8F0"), isWarning: isWarning)
+        } else if insight.contains("[관계]") {
+            return ParsedInsight(icon: "🧑‍🤝‍🧑", text: cleanTag(insight), bgColor: Color(hexString: "F0FFF4"), isWarning: isWarning)
+        } else if insight.contains("[감정흐름]") {
+            return ParsedInsight(icon: "🌊", text: cleanTag(insight), bgColor: Color(hexString: "F8F0FF"), isWarning: isWarning)
+        } else if insight.contains("[수면]") {
+            return ParsedInsight(icon: "💤", text: cleanTag(insight), bgColor: Color(hexString: "F0FAFF"), isWarning: isWarning)
+        } else if insight.contains("[서사]") {
+            return ParsedInsight(icon: "📖", text: cleanTag(insight), bgColor: Color(hexString: "FFF0F5"), isWarning: isWarning)
+        } else {
+            return ParsedInsight(icon: "📌", text: insight, bgColor: Color(hexString: "F5F5F7"), isWarning: isWarning)
+        }
+    }
+    
+    func cleanTag(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "[시계열] ", with: "")
+            .replacingOccurrences(of: "[언어] ", with: "")
+            .replacingOccurrences(of: "[관계] ", with: "")
+            .replacingOccurrences(of: "[감정흐름] ", with: "")
+            .replacingOccurrences(of: "[수면] ", with: "")
+            .replacingOccurrences(of: "[서사] ", with: "")
+    }
+}
 
