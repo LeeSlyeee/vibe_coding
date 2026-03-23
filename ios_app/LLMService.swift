@@ -75,9 +75,8 @@ class LLMService: ObservableObject {
     var huggingFaceRepoID = "slyeee/maum-on-eeve-2.8b-4bit" // Local EEVE Model
     var huggingFaceToken = ""
     
-    // Constants
-    // [Target Fix] Updated to 217 Server (app.py: /api/config)
-    let configServerURL = "https://217.142.253.35.nip.io/api/config"
+    // URL 관리 → APIService.swift > ServerConfig
+    let configServerURL = ServerConfig.apiBase + "/config"
     let modelFiles = [
         "config.json",
         "model.safetensors",

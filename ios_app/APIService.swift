@@ -2,18 +2,29 @@
 import Foundation
 import Combine
 
+// MARK: - Server Configuration (단일 진실 공급원)
+// ⚠️ URL 변경 시 이 enum 한 곳만 수정하면 앱 전체에 적용됩니다.
+enum ServerConfig {
+    #if DEBUG
+    /// 로컬 개발 서버 (Xcode 디버그 빌드 전용)
+    static let productionHost = "https://217.142.253.35.nip.io"
+    #else
+    /// 운영 서버 (Archive / TestFlight / App Store 배포)
+    static let productionHost = "https://217.142.253.35.nip.io"
+    #endif
+
+    static let apiBase    = productionHost + "/api"       // Flask 메인 API
+    static let medicalAPI = productionHost + "/api/v1"    // Django 의료 대시보드
+}
+
 class APIService: NSObject {
     static let shared = APIService()
-    
-    // OCI Production Server (Main Backend) -> Moved to 217
-    // [Target Fix] Updated to 217 Server for Web/App Sync
-    private let baseURL = "https://217.142.253.35.nip.io/api"
-    
-    // [Medical Dashboard] Django API (Role: Source of Truth for Diaries)
-    private let medicalURL = "https://217.142.253.35.nip.io/api/v1"
-    
-    // [Target Fix] Dedicated LLM Node (217.142...)
-    private let llmServerURL = "https://217.142.253.35.nip.io/api"
+
+    // 모든 URL 참조는 ServerConfig 를 통해서만 접근
+    private let baseURL    = ServerConfig.apiBase
+    private let medicalURL = ServerConfig.medicalAPI
+    private let llmServerURL = ServerConfig.apiBase  // LLM 도 동일 서버 사용
+
     
     private var memoryToken: String?
     

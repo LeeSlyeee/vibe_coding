@@ -57,7 +57,7 @@ def generate_weekly_letter_for_user(user_id, db_session, User, Diary, crypto_dec
                 lg_summary.append(f"{label} {d['change_pct']:+.0f}% 변화")
                 
     # 3. 관계 지형도 요약
-    rl = analyze_relational(user_id, db_session, Diary, crypto_decrypt=crypto_decrypt)
+    rl = analyze_relational(user_id, db_session, Diary, crypto_decrypt=crypto_decrypt, skip_llm_ner=True)
     rl_summary = []
     if rl.get('status') == 'completed':
         rel = rl.get('relational', {})
@@ -103,7 +103,7 @@ def generate_weekly_letter_for_user(user_id, db_session, User, Diary, crypto_dec
                 "stream": False,
                 "options": {"temperature": 0.5, "num_predict": 500}
             },
-            timeout=30
+            timeout=60
         )
         if res.status_code == 200:
             letter_content = res.json().get('response', '').strip()
@@ -166,11 +166,10 @@ def process_all_users_weekly_letter():
     Fetches all distinct user_ids from diaries (over last 7 days) and generates weekly letters for them.
     Returns dict of success/failures.
     """
-    from app import create_app, db
-    from models import User, Diary
+    from app import app
+    from models import db, User, Diary
     from datetime import datetime, timedelta
     
-    app = create_app()
     with app.app_context():
         end_date_time = datetime.utcnow()
         start_date_time = end_date_time - timedelta(days=7)

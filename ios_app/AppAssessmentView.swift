@@ -22,9 +22,7 @@ struct AppAssessmentView: View {
     @State private var currentStep = 0
     @State private var isSubmitting = false
     
-    // [Target Fix] Updated to 217 Server
-    let baseURL = "https://217.142.253.35.nip.io"
-    
+
     var body: some View {
         NavigationView {
             VStack {
@@ -114,7 +112,7 @@ struct AppAssessmentView: View {
         let totalScore = ratings.reduce(0, +)
         
         // [Fix] Endpoint: /api/assessment (217 Structure)
-        guard let url = URL(string: "\(baseURL)/api/assessment") else { return }
+        guard let url = URL(string: ServerConfig.apiBase + "/assessment") else { return }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

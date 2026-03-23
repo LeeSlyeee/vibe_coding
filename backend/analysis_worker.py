@@ -260,6 +260,22 @@ def generate_ai_analysis(content):
                  except (ValueError, TypeError):
                      score = 5
 
+                 # [Fix] 프롬프트 예시 텍스트가 그대로 반환된 경우 garbage 판정 → fallback
+                 GARBAGE_PATTERNS = [
+                     "위로의 메시지", "핵심감정단어", "분위기 파악", "다음 분위기",
+                     "감정단어하나", "조언", "메시지...", "...", "example"
+                 ]
+                 is_garbage = (
+                     not comment or
+                     not emotion or
+                     any(p in str(comment) for p in GARBAGE_PATTERNS) or
+                     any(p in str(emotion) for p in GARBAGE_PATTERNS) or
+                     len(str(comment).strip()) < 10
+                 )
+                 if is_garbage:
+                     print(f"⚠️ [GarbageFilter] AI가 프롬프트 예시를 그대로 반환했습니다. Fallback 적용. comment='{comment[:30]}', emotion='{emotion}'")
+                     return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5
+
                  # [Fix] Fallback for empty emotion
                  if not emotion:
                      if score >= 8: emotion = "행복"

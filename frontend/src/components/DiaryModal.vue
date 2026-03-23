@@ -105,10 +105,8 @@
 
       <!-- Red Mode: Safety Check (REMOVED) -->
 
-      <!-- Medication Check: Only for Severe/Paid Users (Red Mode) -->
-      <!-- 경증 사용자(Green)는 약물 체크 불가 -->
+      <!-- Medication Check: 모든 사용자 공통 -->
       <div
-        v-if="uiMode === 'red'"
         class="medication-check-section"
         style="margin-top: 16px; padding: 0 10px"
       >

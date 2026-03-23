@@ -428,8 +428,7 @@ struct AppStatsView: View {
     func fetchMoodTemperature() {
         guard let token = authManager.token else { return }
         
-        let baseURL = "https://217.142.253.35.nip.io/api"
-        guard let url = URL(string: "\(baseURL)/mood-temperature") else { return }
+        guard let url = URL(string: ServerConfig.apiBase + "/mood-temperature") else { return }
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -462,8 +461,7 @@ struct AppStatsView: View {
     func fetchMyCondition() {
         guard let token = authManager.token else { return }
         
-        let baseURL = "https://217.142.253.35.nip.io/api"
-        guard let url = URL(string: "\(baseURL)/kick/my-condition") else { return }
+        guard let url = URL(string: ServerConfig.apiBase + "/kick/my-condition") else { return }
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -492,8 +490,7 @@ struct AppStatsView: View {
     func fetchMyKickInsights() {
         guard let token = authManager.token else { return }
         
-        let baseURL = "https://217.142.253.35.nip.io/api"
-        guard let url = URL(string: "\(baseURL)/kick/my-insights") else { return }
+        guard let url = URL(string: ServerConfig.apiBase + "/kick/my-insights") else { return }
         
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

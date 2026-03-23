@@ -28,6 +28,15 @@ const patient = ref(null);
 const diaries = ref([]);
 const loading = ref(true);
 
+// Kick Analysis (Phase 1~6) State
+const kickLoading = ref(false);
+const kickTimeseries = ref(null);
+const kickLinguistic = ref(null);
+const kickRelational = ref(null);
+const kickEmotionFlow = ref(null);
+const kickSleepMind = ref(null);
+const kickNarrative = ref(null);
+
 // Chart Options
 const lineChartOptions = {
     responsive: true,
@@ -180,14 +189,17 @@ const fetchPatientDetail = async () => {
                 analysis_result: ar,
                 display: {
                     weather: ar.weather || d.weather || '',
-                    temperature: ar.temperature,
-                    medication_taken: ar.medication_taken,
-                    gratitude_note: ar.gratitude_note,
+                    temperature: ar.temperature || d.temperature || '',
+                    medication_taken: ar.medication_taken ?? d.medication_taken ?? null,
+                    gratitude_note: ar.gratitude_note || d.gratitude_note || '',
                     
                     sleep_condition: ar.sleep_condition || d.sleep_condition || '',
                     sleep_desc: ar.sleep_desc || d.sleep_desc || '',
-                    self_talk: ar.self_talk || d.self_talk || '',
+                    emotion_desc: ar.emotion_desc || d.emotion_desc || '',
                     emotion_meaning: ar.emotion_meaning || d.emotion_meaning || '',
+                    self_talk: ar.self_talk || d.self_talk || '',
+                    
+                    mood_level: d.mood_level || ar.mood_level || null,
                     
                     ai_comment: ar.ai_comment || ar.comment || d.ai_comment || '',
                     ai_advice: ar.ai_advice || ar.advice || d.ai_advice || '',
@@ -250,6 +262,7 @@ import { onUnmounted } from 'vue';
 
 onMounted(() => {
     fetchPatientDetail();
+    fetchKickAnalysis();
     // 5초마다 데이터 갱신 (실시간 모니터링)
     intervalId = setInterval(fetchPatientDetail, 5000);
 });
@@ -258,6 +271,35 @@ onUnmounted(() => {
     if (intervalId) clearInterval(intervalId);
 });
 
+// Kick Analysis Loader (Phase 1~6)
+const fetchKickAnalysis = async () => {
+    const userId = route.params.id;
+    kickLoading.value = true;
+    try {
+        const endpoints = [
+            { key: 'timeseries', ref: kickTimeseries, path: `kick/timeseries/${userId}` },
+            { key: 'linguistic', ref: kickLinguistic, path: `kick/linguistic/${userId}` },
+            { key: 'relational', ref: kickRelational, path: `kick/relational/${userId}` },
+            { key: 'emotionFlow', ref: kickEmotionFlow, path: `kick/emotion-flow/${userId}` },
+            { key: 'sleepMind', ref: kickSleepMind, path: `kick/sleep-mind/${userId}` },
+            { key: 'narrative', ref: kickNarrative, path: `kick/self-narrative/${userId}` }
+        ];
+
+        const results = await Promise.allSettled(
+            endpoints.map(ep => api.get(ep.path))
+        );
+
+        results.forEach((result, i) => {
+            if (result.status === 'fulfilled' && result.value?.data) {
+                endpoints[i].ref.value = result.value.data;
+            }
+        });
+    } catch (err) {
+        console.error('Kick analysis load error:', err);
+    } finally {
+        kickLoading.value = false;
+    }
+};
 
 </script>
 
@@ -363,6 +405,121 @@ onUnmounted(() => {
                     </div>
                 </div>
 
+                <!-- 킥 분석 (Phase 1~6) 결과 섹션 -->
+                <div v-if="kickLoading" class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 text-center">
+                    <div class="text-slate-400 animate-pulse">🔍 킥 분석 엔진 로딩 중...</div>
+                </div>
+                <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <!-- Phase 1: 시계열 분석 -->
+                    <div v-if="kickTimeseries" class="bg-white p-6 rounded-2xl shadow-sm border border-blue-100">
+                        <h4 class="font-bold text-blue-800 text-sm mb-3 flex items-center gap-2">
+                            📊 Phase 1: 시계열 분석
+                        </h4>
+                        <div v-if="kickTimeseries.flags?.length" class="space-y-2">
+                            <div v-for="flag in kickTimeseries.flags?.slice(0, 3)" :key="flag.type"
+                                 class="text-xs p-2 rounded-lg"
+                                 :class="flag.severity === 'high' ? 'bg-red-50 text-red-700' : flag.severity === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-blue-50 text-blue-700'">
+                                <span class="font-bold">{{ flag.severity === 'high' ? '🔴' : flag.severity === 'medium' ? '🟡' : '🔵' }}</span>
+                                {{ flag.description || flag.type }}
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">이상 신호 없음</p>
+                    </div>
+
+                    <!-- Phase 2: 언어 패턴 -->
+                    <div v-if="kickLinguistic" class="bg-white p-6 rounded-2xl shadow-sm border border-orange-100">
+                        <h4 class="font-bold text-orange-800 text-sm mb-3 flex items-center gap-2">
+                            🔤 Phase 2: 언어 패턴
+                        </h4>
+                        <div v-if="kickLinguistic.risk_keywords?.length" class="flex flex-wrap gap-1 mb-2">
+                            <span v-for="kw in kickLinguistic.risk_keywords.slice(0, 5)" :key="kw"
+                                  class="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-medium">{{ kw }}</span>
+                        </div>
+                        <div v-if="kickLinguistic.flags?.length" class="space-y-1">
+                            <div v-for="flag in kickLinguistic.flags?.slice(0, 2)" :key="flag.type" class="text-xs text-orange-700 bg-orange-50 p-2 rounded">
+                                {{ flag.description || flag.type }}
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">위험 키워드 미발견</p>
+                    </div>
+
+                    <!-- Phase 3: 관계 네트워크 -->
+                    <div v-if="kickRelational" class="bg-white p-6 rounded-2xl shadow-sm border border-green-100">
+                        <h4 class="font-bold text-green-800 text-sm mb-3 flex items-center gap-2">
+                            🧑‍🤝‍🧑 Phase 3: 관계 네트워크
+                        </h4>
+                        <div v-if="kickRelational.persons?.length" class="space-y-1">
+                            <div v-for="person in kickRelational.persons?.slice(0, 4)" :key="person.name" class="text-xs flex items-center gap-2">
+                                <span class="font-medium text-green-700">{{ person.name }}</span>
+                                <span class="text-slate-400">{{ person.avg_sentiment_label || '' }}</span>
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">언급된 인물 없음</p>
+                    </div>
+
+                    <!-- Phase 4: 감정 흐름 -->
+                    <div v-if="kickEmotionFlow" class="bg-white p-6 rounded-2xl shadow-sm border border-purple-100">
+                        <h4 class="font-bold text-purple-800 text-sm mb-3 flex items-center gap-2">
+                            🌊 Phase 4: 감정 흐름
+                        </h4>
+                        <div v-if="kickEmotionFlow.metrics" class="space-y-1 text-xs">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">변동성</span>
+                                <span class="font-bold" :class="(kickEmotionFlow.metrics.volatility_score || 0) > 60 ? 'text-red-600' : 'text-slate-700'">
+                                    {{ kickEmotionFlow.metrics.volatility_score || 0 }}점
+                                </span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">회복 탄력성</span>
+                                <span class="font-bold text-green-600">{{ kickEmotionFlow.metrics.resilience_score || 0 }}점</span>
+                            </div>
+                        </div>
+                        <div v-if="kickEmotionFlow.flags?.length" class="mt-2 space-y-1">
+                            <div v-for="flag in kickEmotionFlow.flags?.slice(0, 2)" :key="flag.type" class="text-xs text-purple-700 bg-purple-50 p-2 rounded">
+                                {{ flag.description || flag.type }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 5: 수면-마음 -->
+                    <div v-if="kickSleepMind" class="bg-white p-6 rounded-2xl shadow-sm border border-cyan-100">
+                        <h4 class="font-bold text-cyan-800 text-sm mb-3 flex items-center gap-2">
+                            💤 Phase 5: 수면-마음
+                        </h4>
+                        <div v-if="kickSleepMind.correlation" class="text-xs space-y-1">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">수면-감정 상관도</span>
+                                <span class="font-bold">{{ kickSleepMind.correlation.sleep_mood_r?.toFixed(2) || '-' }}</span>
+                            </div>
+                        </div>
+                        <div v-if="kickSleepMind.flags?.length" class="mt-2 space-y-1">
+                            <div v-for="flag in kickSleepMind.flags?.slice(0, 2)" :key="flag.type" class="text-xs text-cyan-700 bg-cyan-50 p-2 rounded">
+                                {{ flag.description || flag.type }}
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">수면 데이터 부족</p>
+                    </div>
+
+                    <!-- Phase 6: 자기서사 -->
+                    <div v-if="kickNarrative" class="bg-white p-6 rounded-2xl shadow-sm border border-pink-100">
+                        <h4 class="font-bold text-pink-800 text-sm mb-3 flex items-center gap-2">
+                            📖 Phase 6: 자기서사
+                        </h4>
+                        <div v-if="kickNarrative.narrative_arc" class="text-xs space-y-1">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">서사 흐름</span>
+                                <span class="font-medium text-pink-700">{{ kickNarrative.narrative_arc.current_phase || '-' }}</span>
+                            </div>
+                        </div>
+                        <div v-if="kickNarrative.flags?.length" class="mt-2 space-y-1">
+                            <div v-for="flag in kickNarrative.flags?.slice(0, 2)" :key="flag.type" class="text-xs text-pink-700 bg-pink-50 p-2 rounded">
+                                {{ flag.description || flag.type }}
+                            </div>
+                        </div>
+                        <p v-else class="text-xs text-slate-400">서사 데이터 부족</p>
+                    </div>
+                </div>
+
                 <!-- 일기 타임라인 -->
                 <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
                     <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -403,20 +560,34 @@ onUnmounted(() => {
                             <!-- 2. 일기 본문 -->
                             <p class="text-slate-800 text-lg leading-relaxed mb-6 whitespace-pre-wrap font-book bg-slate-50/50 p-4 rounded-xl border border-slate-100/50">{{ diary.content }}</p>
 
-                            <!-- 3. 추가 감정 데이터 (수면, 혼잣말, 감정) -->
-                            <div v-if="diary.display.sleep_condition || diary.display.self_talk || diary.display.emotion_meaning" class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div v-if="diary.display.sleep_condition" class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <h5 class="text-sm font-bold text-slate-600 mb-1">💤 수면 상태</h5>
+                            <!-- 3. 내담자 기록 전체 (수면, 감정, 감정의미, 나에게한마디, 감사노트) -->
+                            <div v-if="diary.display.sleep_condition || diary.display.emotion_desc || diary.display.emotion_meaning || diary.display.self_talk || diary.display.gratitude_note || true" class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div v-if="diary.display.sleep_condition" class="bg-sky-50 p-4 rounded-xl border border-sky-100">
+                                    <h5 class="text-sm font-bold text-sky-700 mb-1">💤 잠은 잘 주무셨나요?</h5>
                                     <p class="text-base text-slate-800">{{ diary.display.sleep_condition }}</p>
                                     <p v-if="diary.display.sleep_desc" class="text-xs text-slate-400 mt-2">{{ diary.display.sleep_desc }}</p>
                                 </div>
-                                <div v-if="diary.display.self_talk" class="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <h5 class="text-sm font-bold text-slate-600 mb-1">🗣️ 나에게 한마디</h5>
+                                <div v-if="diary.display.emotion_desc" class="bg-rose-50 p-4 rounded-xl border border-rose-100">
+                                    <h5 class="text-sm font-bold text-rose-700 mb-1">💭 어떤 감정이 들었나요?</h5>
+                                    <p class="text-base text-slate-800">{{ diary.display.emotion_desc }}</p>
+                                </div>
+                                <div v-if="diary.display.emotion_meaning" class="bg-purple-50 p-4 rounded-xl border border-purple-100">
+                                    <h5 class="text-sm font-bold text-purple-700 mb-1">❤️ 감정을 더 깊게 써보기</h5>
+                                    <p class="text-base text-slate-800">{{ diary.display.emotion_meaning }}</p>
+                                </div>
+                                <div v-if="diary.display.self_talk" class="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                    <h5 class="text-sm font-bold text-amber-700 mb-1">🗣️ 나에게 해주고 싶은 말</h5>
                                     <p class="text-base text-slate-800">{{ diary.display.self_talk }}</p>
                                 </div>
-                                <div v-if="diary.display.emotion_meaning" class="col-span-1 md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                    <h5 class="text-sm font-bold text-slate-600 mb-1">❤️ 감정의 의미</h5>
-                                    <p class="text-base text-slate-800">{{ diary.display.emotion_meaning }}</p>
+                                <div class="bg-teal-50 p-4 rounded-xl border border-teal-100">
+                                    <h5 class="text-sm font-bold text-teal-700 mb-1">💊 약물 복용 여부</h5>
+                                    <p class="text-base font-bold" :class="diary.display.medication_taken === true ? 'text-green-700' : diary.display.medication_taken === false ? 'text-red-600' : 'text-slate-400'">
+                                        {{ diary.display.medication_taken === true ? '✅ 복용 완료' : diary.display.medication_taken === false ? '❌ 미복용' : '— 미입력' }}
+                                    </p>
+                                </div>
+                                <div v-if="diary.display.gratitude_note" class="col-span-1 md:col-span-2 bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                    <h5 class="text-sm font-bold text-emerald-700 mb-1">🙏 감사 노트</h5>
+                                    <p class="text-base text-slate-800">{{ diary.display.gratitude_note }}</p>
                                 </div>
                             </div>
 

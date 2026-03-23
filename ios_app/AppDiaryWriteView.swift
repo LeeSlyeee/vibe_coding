@@ -29,6 +29,10 @@ struct AppDiaryWriteView: View {
     // 이 변수는 UI 스타일링(배경색, 테두리)에만 사용됨 (포커스 제어에는 사용하지 않음)
     @State private var focusedField: Int? = nil
     
+    // [Keyboard Avoidance] 키보드 높이를 수동 추적하여 ScrollView 하단 여백 조정
+    // .ignoresSafeArea(.keyboard)로 자동 회피를 막았기 때문에 직접 처리
+    @State private var keyboardHeight: CGFloat = 0
+    
     // Form State
     @State private var q1: String = "" // Event (무슨 일)
     @State private var q2: String = "" // Emotion (어떤 감정)
@@ -208,6 +212,9 @@ struct AppDiaryWriteView: View {
                                 Spacer(minLength: 50)
                             }
                             .padding()
+                            // [Keyboard Avoidance] 키보드가 올라왔을 때 하단 패딩으로 마지막 항목 노출
+                            .padding(.bottom, keyboardHeight)
+                            .animation(.easeOut(duration: 0.25), value: keyboardHeight)
                         }
                         // [ROOT CAUSE FIX] SwiftUI의 내장 키보드 회피(keyboard avoidance) 비활성화
                         // 키보드 출현 시 SwiftUI가 safe area를 자동 조정 → body 재평가 트리거
@@ -223,6 +230,17 @@ struct AppDiaryWriteView: View {
                     // [Focus Fix] 사용자가 빈 영역 탭 → focusedField UI 스타일 초기화
                     .onReceive(NotificationCenter.default.publisher(for: Notification.Name("UserDismissedKeyboard"))) { _ in
                         focusedField = nil
+                    }
+                    // [Keyboard Height Tracking] 키보드 높이 실시간 반영
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                        if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                            // safe area 하단 높이를 빼서 실제 가려지는 높이만 계산
+                            let safeBottom = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+                            keyboardHeight = max(0, frame.height - safeBottom)
+                        }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                        keyboardHeight = 0
                     }
                     .transition(.opacity)
                 } else {

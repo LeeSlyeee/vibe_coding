@@ -10,6 +10,24 @@ import SwiftUI
 
 #if os(iOS)
 
+// MARK: - UIResponder Current First Responder Extension
+// 현재 어떤 뷰가 first responder인지 확인하기 위한 표준 iOS 유틸리티
+extension UIResponder {
+    private weak static var _currentFirstResponder: UIResponder?
+    
+    static var currentFirstResponder: UIResponder? {
+        _currentFirstResponder = nil
+        // sendAction으로 responder chain을 통해 현재 first responder를 찾음
+        UIApplication.shared.sendAction(#selector(findFirstResponder(_:)), to: nil, from: nil, for: nil)
+        return _currentFirstResponder
+    }
+    
+    @objc private func findFirstResponder(_ sender: Any) {
+        UIResponder._currentFirstResponder = self
+    }
+}
+
+
 // MARK: - UIViewControllerRepresentable Wrapper
 struct StableTextEditor: UIViewControllerRepresentable {
     @Binding var text: String
@@ -150,10 +168,27 @@ class StableTextEditorVC: UIViewController, UITextViewDelegate {
     
     func textViewDidEndEditing(_ textView: UITextView) {
         if shouldMaintainFocus && !userDismissedKeyboard {
-            // SwiftUI가 강제로 포커스를 뺏었음 → 즉시 되찾기!
+            // [Focus Fix] 다른 UITextView로 포커스가 이동한 경우에는 re-focus 금지
+            // → 이것이 textarea간 포커스 쟁탈전(무한 루프)의 근본 원인이었음
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                self.textView.becomeFirstResponder()
+                
+                // 현재 first responder가 다른 UITextView이면 = 사용자가 다른 필드를 탭한 것
+                // → 이 경우 re-focus하면 두 필드가 서로 becomeFirstResponder 무한 루프
+                if let currentFirst = UIResponder.currentFirstResponder,
+                   currentFirst is UITextView,
+                   currentFirst !== self.textView {
+                    // 다른 입력 필드로 정상 이동 → re-focus 하지 않음
+                    self.shouldMaintainFocus = false
+                    self.onFocusChange?(false)
+                    return
+                }
+                
+                // first responder가 없거나 텍스트 입력 필드가 아님
+                // = SwiftUI 렌더 패스에 의한 강제 resign → 되찾기
+                if !self.textView.isFirstResponder {
+                    self.textView.becomeFirstResponder()
+                }
             }
             return // onFocusChange(false) 호출하지 않음
         }

@@ -155,6 +155,70 @@ fun StatsScreen(
             }
         }
 
+        // ── 마음 컨디션 카드 (Phase 1~6 교차 분석) ──
+        if (uiState.conditionLoaded) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // 컨디션 아이콘
+                    Box(
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(Color(0xFF34C759).copy(alpha = 0.12f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            uiState.conditionIcon,
+                            fontSize = 28.sp
+                        )
+                    }
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "마음 컨디션",
+                                fontSize = 12.sp,
+                                color = Color.Gray
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "${uiState.conditionScore}점",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF34C759)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            uiState.conditionLabel,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1D1D1F)
+                        )
+                        if (uiState.conditionMessage.isNotBlank()) {
+                            Text(
+                                uiState.conditionMessage,
+                                fontSize = 11.sp,
+                                color = Color.Gray,
+                                maxLines = 2
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         // ── 탭 바 (iOS Modern Tab Bar 대응) ──
         Row(
             modifier = Modifier
@@ -249,6 +313,12 @@ fun StatsScreen(
                             accentColor = Color(0xFF5B7FFF),
                             onClick = onNavigateToRelationalMap
                         )
+
+                        // 킥 인사이트 섹션 (Phase 1~6 통합 요약)
+                        if (uiState.kickInsightsLoaded && uiState.kickInsights.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            KickInsightsSection(insights = uiState.kickInsights)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(80.dp))
@@ -832,6 +902,77 @@ fun KickEntryCard(
                 )
             }
             Text("›", fontSize = 24.sp, color = Color.Gray)
+        }
+    }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 킥 인사이트 섹션 (Phase 1~6 통합 요약)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+@Composable
+fun KickInsightsSection(insights: List<String>) {
+    StatsCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🔍", fontSize = 18.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("킥 인사이트", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                "${insights.size}건",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier
+                    .background(Primary, shape = RoundedCornerShape(10.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            "킥 분석 엔진이 발견한 주요 변화 신호",
+            fontSize = 12.sp,
+            color = Color.Gray
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        insights.forEach { insight ->
+            val (icon, bgColor) = when {
+                insight.contains("[시계열]") -> "📊" to Color(0xFFF0F4FF)
+                insight.contains("[언어]") -> "🔤" to Color(0xFFFFF8F0)
+                insight.contains("[관계]") -> "🧑‍🤝‍🧑" to Color(0xFFF0FFF4)
+                insight.contains("[감정흐름]") -> "🌊" to Color(0xFFF8F0FF)
+                insight.contains("[수면]") -> "💤" to Color(0xFFF0FAFF)
+                insight.contains("[서사]") -> "📖" to Color(0xFFFFF0F5)
+                else -> "📌" to Color(0xFFF5F5F7)
+            }
+            val hasWarning = insight.contains("⚠️")
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp)
+                    .background(
+                        if (hasWarning) Color(0xFFFFF3F3) else bgColor,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(icon, fontSize = 16.sp)
+                Text(
+                    insight
+                        .replace("[시계열] ", "")
+                        .replace("[언어] ", "")
+                        .replace("[관계] ", "")
+                        .replace("[감정흐름] ", "")
+                        .replace("[수면] ", "")
+                        .replace("[서사] ", ""),
+                    fontSize = 13.sp,
+                    color = if (hasWarning) Color(0xFFD32F2F) else Color(0xFF1D1D1F),
+                    fontWeight = if (hasWarning) FontWeight.SemiBold else FontWeight.Normal
+                )
+            }
         }
     }
 }

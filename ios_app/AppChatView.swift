@@ -50,8 +50,8 @@ struct AppChatView: View {
     }
     #endif
     
-    // Server Configuration
-    let baseURL = "https://217.142.253.35.nip.io/api"
+    // Server Configuration - APIService.swift > ServerConfig 에서 관리
+    let baseURL = ServerConfig.apiBase
     
     var body: some View {
         ZStack {

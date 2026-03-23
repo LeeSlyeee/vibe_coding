@@ -16,28 +16,36 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
         # history is expected to be a string or list of "User: ... / AI: ..."
         context_str = f"### [이전 대화 기록]\n{history}\n\n"
 
-    # 3. Prompt Switching
-    # Combined Prompt for continuous conversation
+    # 3. Few-Shot Prompt (2B 모델 최적화 버전)
+    # 구조: 역할 선언 → 규칙 → 예시 → [이전 대화] → 현재 입력 → 답변 유도
+    # history는 Examples 뒤에 주입하여 2B 모델이 "패턴 학습 → 맥락 → 질문" 순서로 읽도록 설계
     prompt_text = (
-        f"너는 다정하고 통찰력 있는 감정 케어 도우미 '마음온'이야.\n"
-        f"{context_str}"
-        f"### [내담자의 현재 말]: \"{sanitized}\"\n\n"
-        "### [지시사항]:\n"
-        "1. 이전 대화 기록이 있다면 그 흐름을 자연스럽게 이어서 답변해.\n"
-        "2. 내담자의 감정을 읽어주고, 그 말이 타당함을 지지해줘.\n"
-        "3. 딱딱한 분석보다는, 옆에서 이야기하듯 따뜻하고 부드러운 '해요체'를 사용해.\n"
-        "4. 혼자 떠들지 말고, 내담자가 이야기를 계속 할 수 있도록 이끌어줘.\n"
-        "5. 150자 이내로 간결하게.\n\n"
-        "마음온 답변:"
+        "# Role\n"
+        "너의 이름은 '마음온'이야. 사용자의 말에 깊이 공감하고 다정하게 위로해 주는 따뜻한 친구야.\n\n"
+        "# Rules\n"
+        "1. 무조건 3문장 이내로 아주 짧게 대답해.\n"
+        "2. 사용자의 감정(슬픔, 기쁨, 짜증 등)을 먼저 짚어주고 위로해 줘.\n"
+        "3. 친절하고 부드러운 존댓말(해요체)을 사용해.\n"
+        "4. 절대 네가 인공지능(AI)이라는 걸 티 내지 마.\n\n"
+        "# Examples\n"
+        "User: 오늘 회사에서 진짜 깨져서 너무 우울해...\n"
+        "Assistant: 오늘 하루 정말 고생 많으셨어요. 속상한 마음이 여기까지 전해져서 저도 마음이 아프네요. 어떤 일이 있었는지 조금만 더 이야기해주실 수 있어요?\n\n"
+        "User: 나 드디어 취업했어!! 미쳤다 진짜!!\n"
+        "Assistant: 와, 정말 축하드려요!! 그동안 맘고생 많으셨을 텐데 너무 장하십니다. 오늘만큼은 세상에서 제일 행복하게 보내세요!\n\n"
+        "User: 넌 이름이 뭐야?\n"
+        "Assistant: 제 이름은 '마음온'이에요! 당신의 마음을 따뜻하게 데워드리기 위해 항상 여기 있답니다.\n\n"
+        f"{context_str}"  # 이전 대화 기록 (없으면 빈 문자열)
+        f"User: {sanitized}\n"
+        "Assistant:"
     )
     
     input_len = len(user_text)
-    dynamic_tokens = 800 # Default Base (Increased)
-    
-    if input_len < 50:
-        dynamic_tokens = 500  # 짧은 질문도 충분히
-    elif input_len > 200:
-        dynamic_tokens = 1200 # 긴 고민은 아주 길게 (약 3~4문단 가능)
+    # [2B 모델 최적화] "3문장 이내" 규칙에 맞게 토큰 상한을 낮게 유지
+    # 토큰이 많으면 2B 모델은 규칙을 무시하고 길게 뱉는 경향이 있음
+    dynamic_tokens = 120  # Default: 3문장 기준 (~80~120자)
+
+    if input_len > 200:
+        dynamic_tokens = 150  # 긴 고민엔 약간 여유 허용 (여전히 3문장 이내 수준)
         
     print(f"📏 [Auto-Scale] Input: {input_len} chars -> Allocating {dynamic_tokens} tokens")
 

@@ -30,7 +30,18 @@ data class StatsUiState(
     val moodTempLabel: String = "측정 중",
     val moodTempDesc: String = "",
     val moodTempColor: String = "#86868b",
-    val moodTempLoaded: Boolean = false
+    val moodTempLoaded: Boolean = false,
+    // 마음 컨디션 (Phase 1~6)
+    val conditionScore: Int = 100,
+    val conditionGrade: String = "",
+    val conditionIcon: String = "☀️",
+    val conditionLabel: String = "측정 중",
+    val conditionMessage: String = "",
+    val conditionCareTip: String = "",
+    val conditionLoaded: Boolean = false,
+    // 킥 인사이트 (Phase 1~6 통합 요약)
+    val kickInsights: List<String> = emptyList(),
+    val kickInsightsLoaded: Boolean = false
 )
 
 class StatsViewModel : ViewModel() {
@@ -41,6 +52,8 @@ class StatsViewModel : ViewModel() {
     init {
         loadStats()
         loadMoodTemperature()
+        loadMyCondition()
+        loadKickInsights()
     }
 
     private fun loadStats() {
@@ -151,6 +164,55 @@ class StatsViewModel : ViewModel() {
                 }
             } catch (e: Exception) {
                 // 마음 온도 로딩 실패는 조용히 무시 (필수 기능이 아님)
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun loadMyCondition() {
+        viewModelScope.launch {
+            try {
+                val api = com.maumon.app.data.api.ApiClient.flaskApi
+                val response = api.getMyCondition()
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        @Suppress("UNCHECKED_CAST")
+                        val condition = body["condition"] as? Map<String, Any>
+                        _uiState.value = _uiState.value.copy(
+                            conditionScore = (condition?.get("score") as? Number)?.toInt() ?: 100,
+                            conditionGrade = (condition?.get("grade") as? String) ?: "",
+                            conditionIcon = (condition?.get("icon") as? String) ?: "☀️",
+                            conditionLabel = (condition?.get("label") as? String) ?: "측정 중",
+                            conditionMessage = (condition?.get("message") as? String) ?: "",
+                            conditionCareTip = (condition?.get("care_tip") as? String) ?: "",
+                            conditionLoaded = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun loadKickInsights() {
+        viewModelScope.launch {
+            try {
+                val api = com.maumon.app.data.api.ApiClient.flaskApi
+                val response = api.getMyKickInsights()
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    if (body != null) {
+                        @Suppress("UNCHECKED_CAST")
+                        val insights = (body["insights"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                        _uiState.value = _uiState.value.copy(
+                            kickInsights = insights,
+                            kickInsightsLoaded = true
+                        )
+                    }
+                }
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
         }

@@ -11,8 +11,8 @@ struct AppDiaryDetailView: View {
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
     
-    // [Target Fix] Updated to 217 Server
-    let baseURL = "https://217.142.253.35.nip.io/api"
+    // URL 관리 → APIService.swift > ServerConfig
+    let baseURL = ServerConfig.apiBase
     
     var body: some View {
         ScrollView {

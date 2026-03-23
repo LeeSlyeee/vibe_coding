@@ -5,10 +5,6 @@
         <h1 class="auth-title">maumON</h1>
         
         <form @submit.prevent="handleLogin" class="auth-form">
-          <div class="test-account-info">
-             <p>Test Account: <strong>test</strong> / <strong>12qw</strong></p>
-          </div>
-
           <div class="form-group">
             <input
               v-model="userId"

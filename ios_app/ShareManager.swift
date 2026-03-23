@@ -70,8 +70,8 @@ class ShareManager: NSObject, ObservableObject, URLSessionDelegate {
     }
     
     private func performShareRequest(endpoint: String, method: String, body: [String: Any]? = nil, completion: @escaping (Result<[String: Any], Error>) -> Void) {
-        // [Fix] Share API moved to /api/share/ (no v1 prefix)
-        let baseURL = "https://217.142.253.35.nip.io/api"
+        // URL 관리 → APIService.swift > ServerConfig
+        let baseURL = ServerConfig.apiBase
         
         // [Standard] RFC 6750 Sec 2.3 & Custom Nginx: URI Query Parameter
         // APIService does this, so ShareManager should too for consistency.

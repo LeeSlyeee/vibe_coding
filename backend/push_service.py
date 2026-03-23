@@ -49,31 +49,37 @@ def is_push_available():
 def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_token: str = None) -> bool:
     """
     단일 기기에 푸시 알림 발송
-    iOS 사용자의 경우 APNs 직접 발송을 최우선으로 하고, FCM은 선택적으로(또는 안드로이드용으로) 발송합니다.
+    1. APNs 직접 발송 시도 (iOS, .p8 키 필요)
+    2. APNs 성공 시 완료, 실패 시 FCM fallback
+    3. FCM 발송 시 iOS 기기면 apns config 제외 (Firebase에 APNs키 미등록 시 ThirdPartyAuthError 방지)
     """
     if not _firebase_initialized and not apns_token:
         logger.debug("푸시 비활성화 상태 → 건너뜀")
         return False
 
     success = False
+    is_ios = bool(apns_token)
     
-    # 1. iOS인 경우 APNs 직접 발송 우선 실행! (Firebase FCM의 iOS Silent Fail 문제 방어)
+    # 1. iOS인 경우 APNs 직접 발송 우선 실행
     if apns_token:
         logger.info("🍏 APNs 직접 발송 우선 시도...")
         success = _send_apns_direct(apns_token, title, body, data)
+        if success:
+            return True  # APNs 성공 → FCM 불필요
 
-    # 2. FCM 발송 (Android 이거나 APNs 실패 시 백업)
+    # 2. FCM 발송 (Android / APNs 실패 시 백업)
     if _firebase_initialized and fcm_token:
         try:
             safe_data = {str(k): str(v) for k, v in (data or {}).items()}
-            message = messaging.Message(
+            
+            # 메시지 구성: iOS 기기면 apns config 제외 (Firebase에 APNs키 미등록 시 ThirdPartyAuthError 방지)
+            msg_kwargs = dict(
                 notification=messaging.Notification(
                     title=title,
                     body=body,
                 ),
                 data=safe_data,
                 token=fcm_token,
-                # Android 전용 설정
                 android=messaging.AndroidConfig(
                     priority='high',
                     notification=messaging.AndroidNotification(
@@ -82,17 +88,20 @@ def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_tok
                         color='#7C4DFF',
                     ),
                 ),
-                # iOS 전용 설정 (FCM 경유)
-                apns=messaging.APNSConfig(
+            )
+            
+            # iOS가 아닌 경우에만 apns config 추가
+            if not is_ios:
+                msg_kwargs['apns'] = messaging.APNSConfig(
                     payload=messaging.APNSPayload(
                         aps=messaging.Aps(
                             sound='default',
                             badge=1,
                         ),
                     ),
-                ),
-            )
-
+                )
+            
+            message = messaging.Message(**msg_kwargs)
             response = messaging.send(message)
             logger.info(f"✅ FCM 푸시 발송 성공: {response}")
             success = True
@@ -102,11 +111,6 @@ def send_push(fcm_token: str, title: str, body: str, data: dict = None, apns_tok
         except Exception as e:
             error_name = type(e).__name__
             logger.error(f"❌ FCM 푸시 발송 실패 ({error_name}): {e}")
-            
-            # APNs 발송을 시도하지 않았던 iOS 기기라면 여기서 시도
-            if apns_token and not success and 'ThirdPartyAuth' in error_name:
-                logger.info(f"🔄 직접 APNs 발송 시도...")
-                success = _send_apns_direct(apns_token, title, body, data)
 
     return success
 

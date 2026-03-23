@@ -2,18 +2,44 @@ from flask import Flask, jsonify, request, make_response
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
-# from flask_pymongo import PyMongo # Removed
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from config import Config
 from models import db, User, Diary, ChatLog, Center, ShareCode, ShareRelationship
 import os
 import sys
-from dotenv import load_dotenv # [Fix] Explicit loading
+import logging
+import traceback
+from logging.handlers import RotatingFileHandler
+from dotenv import load_dotenv
 from crypto_utils import EncryptionManager
-from analysis_worker import start_analysis_thread 
+from analysis_worker import start_analysis_thread
 
-import traceback 
+# ── Logging 초기화 (print() 대체) ────────────────────────────────────────
+def setup_logging():
+    """표준 logging 설정: 콘솔 + 로테이팅 파일 핸들러"""
+    log_formatter = logging.Formatter(
+        '[%(asctime)s] %(levelname)s %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+
+    # 콘솔 핸들러
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(log_formatter)
+    root_logger.addHandler(console_handler)
+
+    # 파일 핸들러 (최대 10MB × 5개 유지)
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    log_path = os.path.join(basedir, 'app.log')
+    file_handler = RotatingFileHandler(log_path, maxBytes=10 * 1024 * 1024, backupCount=5, encoding='utf-8')
+    file_handler.setFormatter(log_formatter)
+    root_logger.addHandler(file_handler)
+
+    return logging.getLogger('maumon')
+
+logger = setup_logging()
 
 # [Init] Load Env & Fail Fast
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -126,10 +152,7 @@ except Exception as e:
 
 @app.before_request
 def log_request_info():
-    print(f"📡 [Global] Request: {request.method} {request.url}")
-    print(f"📦 [Headers] {request.headers}")
-    if request.method in ['PUT', 'POST']:
-        pass
+    logger.info(f"[REQ] {request.method} {request.path} from {request.remote_addr}")
 
 jwt = JWTManager(app)
 
@@ -220,11 +243,8 @@ def login():
          return jsonify({'msg': '아이디 또는 비밀번호가 올바르지 않습니다.'}), 401
          
     if not check_password_hash(user.password, password):
-        # Allow fallback for pure MD5 or plain text (dev only)
-        if user.password == password:
-             pass # Allowed
-        else:
-             return jsonify({'msg': '아이디 또는 비밀번호가 올바르지 않습니다.'}), 401
+        logger.warning(f"[AUTH] 로그인 실패 — username={username} / IP={request.remote_addr}")
+        return jsonify({'msg': '아이디 또는 비밀번호가 올바르지 않습니다.'}), 401
 
     # [Fix] Use user.id as identity (int -> str) for consistency with get_diary
     access_token = create_access_token(
@@ -397,6 +417,14 @@ def create_diary():
     client_date = data.get('date')
     if not client_date:
         return jsonify({"msg": "Diary date is required"}), 400
+
+    # [Fix] 동일 날짜 중복 일기 방지: 같은 날 이미 저장된 일기가 있으면 409 반환
+    existing_diary = Diary.query.filter_by(user_id=user.id, date=client_date).first()
+    if existing_diary:
+        print(f"⚠️ [Duplicate] 이미 {client_date} 일기가 존재합니다. (User: {user.id}, Diary ID: {existing_diary.id})")
+        response_data = serialize_diary(existing_diary)
+        response_data['msg'] = '해당 날짜의 일기가 이미 존재합니다.'
+        return jsonify(response_data), 409
 
     # Encrypt Content Fields
     encrypted_event = safe_encrypt(data.get('event') or data.get('question1'))

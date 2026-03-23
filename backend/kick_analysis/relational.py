@@ -105,7 +105,7 @@ def _extract_people_llm(text):
     return []
 
 
-def _extract_people_from_text(text):
+def _extract_people_from_text(text, skip_llm=False):
     """
     텍스트에서 인물을 추출한다.
     
@@ -113,6 +113,9 @@ def _extract_people_from_text(text):
     2차: LLM NER 보완 (성희, 혜진 등 실제 이름 — 문맥 기반 정확도)
     
     호칭 사전이 핵심. LLM은 보완재. LLM 실패 시 호칭 사전만으로 동작.
+    
+    Args:
+        skip_llm: True이면 LLM NER 호출을 건너뜀 (배치 작업용)
     """
     people = []
     seen = set()
@@ -127,19 +130,20 @@ def _extract_people_from_text(text):
             })
             seen.add(kinship)
     
-    # 2차: LLM NER 보완 (실제 이름 추가 추출)
-    llm_names = _extract_people_llm(text)
-    for name in llm_names:
-        if name not in seen:
-            # 호칭 사전에 있으면 이미 1차에서 잡았으므로 스킵
-            if name in KINSHIP_DICT:
-                continue
-            people.append({
-                "name": name,
-                "type": "고유명사(LLM)",
-                "group": None,
-            })
-            seen.add(name)
+    # 2차: LLM NER 보완 (실제 이름 추가 추출) — skip_llm=True이면 건너뜀
+    if not skip_llm:
+        llm_names = _extract_people_llm(text)
+        for name in llm_names:
+            if name not in seen:
+                # 호칭 사전에 있으면 이미 1차에서 잡았으므로 스킵
+                if name in KINSHIP_DICT:
+                    continue
+                people.append({
+                    "name": name,
+                    "type": "고유명사(LLM)",
+                    "group": None,
+                })
+                seen.add(name)
     
     return people
 
@@ -153,7 +157,7 @@ def _analyze_sentence_emotions(sentence_text):
     return found_categories
 
 
-def _map_people_emotions(text):
+def _map_people_emotions(text, skip_llm=False):
     """
     인물-감정 매핑: 각 문장에서 인물과 감정어를 동시에 추출하여 연결.
     
@@ -163,7 +167,7 @@ def _map_people_emotions(text):
     kiwi = _get_kiwi()
     sentences = kiwi.split_into_sents(text)
     
-    all_people = _extract_people_from_text(text)
+    all_people = _extract_people_from_text(text, skip_llm=skip_llm)
     people_names = {p["name"] for p in all_people}
     
     # 인물별 감정 집합
@@ -188,7 +192,7 @@ def _map_people_emotions(text):
     return dict(person_emotions)
 
 
-def _analyze_single_diary_relational(text):
+def _analyze_single_diary_relational(text, skip_llm=False):
     """
     단일 일기의 관계 분석.
     Returns dict or None.
@@ -196,8 +200,8 @@ def _analyze_single_diary_relational(text):
     if not text or len(text.strip()) < 10:
         return None
     
-    people = _extract_people_from_text(text)
-    person_emotions = _map_people_emotions(text)
+    people = _extract_people_from_text(text, skip_llm=skip_llm)
+    person_emotions = _map_people_emotions(text, skip_llm=skip_llm)
     
     # 인물별 감정 정보 통합
     people_detail = []
@@ -230,7 +234,7 @@ def _analyze_single_diary_relational(text):
     }
 
 
-def analyze_relational(user_id, db_session, Diary, crypto_decrypt=None, today=None):
+def analyze_relational(user_id, db_session, Diary, crypto_decrypt=None, today=None, skip_llm_ner=False):
     """
     특정 사용자의 관계 지형도를 분석한다.
     
@@ -292,7 +296,7 @@ def analyze_relational(user_id, db_session, Diary, crypto_decrypt=None, today=No
     
     for diary in all_diaries:
         text = extract_text(diary)
-        result = _analyze_single_diary_relational(text)
+        result = _analyze_single_diary_relational(text, skip_llm=skip_llm_ner)
         
         if not result:
             continue

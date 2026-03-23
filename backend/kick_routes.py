@@ -5,7 +5,10 @@
 Phase 1: 시계열 분석 (timeseries)
 Phase 2: 언어 지문 분석 (linguistic)
 Phase 3: 관계 지형도 분석 (relational)
-마음 컨디션: Phase 1~3 교차 분석 → 케어 가이드
+Phase 4: 감정 흐름 지도 (emotion_flow)
+Phase 5: 수면-마음 상관 (sleep_mind)
+Phase 6: 자기 서사 분석 (self_narrative)
+마음 컨디션: Phase 1~6 교차 분석 → 케어 가이드
 """
 
 from flask import Blueprint, jsonify
@@ -14,6 +17,9 @@ from models import db, User, Diary
 from kick_analysis import analyze_timeseries, analyze_all_users_timeseries
 from kick_analysis.linguistic import analyze_linguistic, analyze_all_users_linguistic
 from kick_analysis.relational import analyze_relational, analyze_all_users_relational
+from kick_analysis.emotion_flow import analyze_emotion_flow, analyze_all_users_emotion_flow
+from kick_analysis.sleep_mind import analyze_sleep_mind, analyze_all_users_sleep_mind
+from kick_analysis.self_narrative import analyze_self_narrative, analyze_all_users_self_narrative
 from kick_analysis.condition import generate_condition, generate_all_users_condition
 
 kick_bp = Blueprint('kick', __name__)
@@ -77,6 +83,47 @@ def get_my_kick_insights():
                     insights.append("[관계] 최근 일기에 타인 등장 없음")
         for f in rl.get('flags', []):
             insights.append(f"[관계] ⚠️ {f['message']}")
+
+        # Phase 4: 감정 흐름 지도
+        ef = analyze_emotion_flow(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+        if ef.get('status') == 'completed':
+            flow = ef.get('emotion_flow', {})
+            dom = flow.get('dominant_emotion_label')
+            if dom:
+                insights.append(f"[감정흐름] 최근 주된 감정: {dom}")
+            inertia = flow.get('inertia', {})
+            if inertia.get('current_streak', 0) >= 3:
+                insights.append(f"[감정흐름] {inertia.get('stuck_emotion_label', '')} 감정 {inertia['current_streak']}일 지속 중")
+        for f in ef.get('flags', []):
+            insights.append(f"[감정흐름] ⚠️ {f['message']}")
+
+        # Phase 5: 수면-마음 상관
+        sm = analyze_sleep_mind(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+        if sm.get('status') in ('completed', 'limited_data'):
+            sleep_data = sm.get('sleep_mind', {})
+            recent_7d = sleep_data.get('recent_7d', {})
+            avg_score = recent_7d.get('avg_score')
+            if avg_score is not None:
+                insights.append(f"[수면] 최근 7일 수면 품질: {avg_score:.0f}점")
+            corr = sleep_data.get('correlation', {}).get('pearson_r')
+            if corr is not None:
+                insights.append(f"[수면] 수면-감정 상관: {corr:.2f} ({sleep_data.get('correlation', {}).get('interpretation', '')})")
+        for f in sm.get('flags', []):
+            insights.append(f"[수면] ⚠️ {f['message']}")
+
+        # Phase 6: 자기 서사 분석
+        sn = analyze_self_narrative(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+        if sn.get('status') == 'completed':
+            narr = sn.get('narrative', {}).get('recent_7d', {})
+            if narr:
+                eff = narr.get('efficacy_score')
+                if eff is not None and eff <= 0.3:
+                    insights.append(f"[서사] 자기 효능감 낮음 ({eff:.0%})")
+                fut = narr.get('future_ratio')
+                if fut is not None and fut < 0.1:
+                    insights.append("[서사] 미래 지향적 표현이 매우 적음")
+        for f in sn.get('flags', []):
+            insights.append(f"[서사] ⚠️ {f['message']}")
 
     except Exception as e:
         print(f"⚠️ My Kick Insights Error: {e}")
@@ -228,42 +275,36 @@ def _build_dashboard_overview():
     lg_result = analyze_all_users_linguistic(db.session, User, Diary, crypto_decrypt=_decrypt_func)
     # Phase 3
     rl_result = analyze_all_users_relational(db.session, User, Diary, crypto_decrypt=_decrypt_func)
+    # Phase 4
+    ef_result = analyze_all_users_emotion_flow(db.session, User, Diary, crypto_decrypt=_decrypt_func)
+    # Phase 5
+    sm_result = analyze_all_users_sleep_mind(db.session, User, Diary, crypto_decrypt=_decrypt_func)
+    # Phase 6
+    sn_result = analyze_all_users_self_narrative(db.session, User, Diary, crypto_decrypt=_decrypt_func)
 
     # 통합 플래그
     all_flags = []
 
-    for user_data in ts_result.get('flagged_users', []):
-        for flag in user_data.get('flags', []):
-            all_flags.append({
-                'phase': 'timeseries',
-                'phase_label': '시계열',
-                'username': user_data.get('username', ''),
-                'real_name': user_data.get('real_name', ''),
-                'user_id': user_data.get('user_id'),
-                **flag
-            })
+    phase_sources = [
+        (ts_result, 'timeseries', '시계열'),
+        (lg_result, 'linguistic', '언어 지문'),
+        (rl_result, 'relational', '관계 지형도'),
+        (ef_result, 'emotion_flow', '감정 흐름'),
+        (sm_result, 'sleep_mind', '수면-마음'),
+        (sn_result, 'self_narrative', '자기 서사'),
+    ]
 
-    for user_data in lg_result.get('flagged_users', []):
-        for flag in user_data.get('flags', []):
-            all_flags.append({
-                'phase': 'linguistic',
-                'phase_label': '언어 지문',
-                'username': user_data.get('username', ''),
-                'real_name': user_data.get('real_name', ''),
-                'user_id': user_data.get('user_id'),
-                **flag
-            })
-
-    for user_data in rl_result.get('flagged_users', []):
-        for flag in user_data.get('flags', []):
-            all_flags.append({
-                'phase': 'relational',
-                'phase_label': '관계 지형도',
-                'username': user_data.get('username', ''),
-                'real_name': user_data.get('real_name', ''),
-                'user_id': user_data.get('user_id'),
-                **flag
-            })
+    for phase_result, phase_key, phase_label in phase_sources:
+        for user_data in phase_result.get('flagged_users', []):
+            for flag in user_data.get('flags', []):
+                all_flags.append({
+                    'phase': phase_key,
+                    'phase_label': phase_label,
+                    'username': user_data.get('username', ''),
+                    'real_name': user_data.get('real_name', ''),
+                    'user_id': user_data.get('user_id'),
+                    **flag
+                })
 
     # 심각도순 정렬
     severity_order = {'high': 0, 'medium': 1, 'low': 2}
@@ -271,7 +312,10 @@ def _build_dashboard_overview():
 
     # 요약 통계
     severity_counts = {'high': 0, 'medium': 0, 'low': 0}
-    phase_counts = {'timeseries': 0, 'linguistic': 0, 'relational': 0}
+    phase_counts = {
+        'timeseries': 0, 'linguistic': 0, 'relational': 0,
+        'emotion_flow': 0, 'sleep_mind': 0, 'self_narrative': 0,
+    }
     for f in all_flags:
         severity_counts[f.get('severity', 'low')] = severity_counts.get(f.get('severity', 'low'), 0) + 1
         phase_counts[f.get('phase', '')] = phase_counts.get(f.get('phase', ''), 0) + 1
@@ -610,3 +654,243 @@ def get_my_relational_map():
             links.append({"source": "Me", "target": person, "value": 1})
             
     return jsonify({'nodes': nodes, 'links': links}), 200
+
+
+# ═════════════════════════════════════════════════
+# Phase 4: 감정 흐름 지도 (Emotion Flow Map)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/emotion-flow/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_emotion_flow(user_id):
+    """특정 사용자의 감정 흐름 분석 결과 조회 (의료진 전용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    target_user = db.session.query(User).filter_by(id=user_id).first()
+    if not target_user:
+        return jsonify({'error': '사용자를 찾을 수 없습니다'}), 404
+
+    result = analyze_emotion_flow(
+        user_id, db.session, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+    result['username'] = target_user.username
+    result['real_name'] = target_user.real_name
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/emotion-flow/flags', methods=['GET'])
+@jwt_required()
+def get_emotion_flow_flags():
+    """전체 사용자 중 감정 흐름 플래그 발생자 목록 (의료진 대시보드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_emotion_flow(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/emotion-flow/summary', methods=['GET'])
+@jwt_required()
+def get_emotion_flow_summary():
+    """감정 흐름 플래그 요약 통계 (대시보드 상단 카드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_emotion_flow(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    type_counts = {}
+    severity_counts = {'high': 0, 'medium': 0, 'low': 0}
+
+    for user_data in result['flagged_users']:
+        for flag in user_data['flags']:
+            flag_type = flag['type']
+            severity = flag['severity']
+            type_counts[flag_type] = type_counts.get(flag_type, 0) + 1
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+    return jsonify({
+        'analysis_date': result['analysis_date'],
+        'total_users': result['total_users'],
+        'flagged_count': result['flagged_count'],
+        'flag_rate_pct': round(
+            result['flagged_count'] / max(result['total_users'], 1) * 100, 1
+        ),
+        'by_type': type_counts,
+        'by_severity': severity_counts
+    })
+
+
+# ═════════════════════════════════════════════════
+# Phase 5: 수면-마음 상관 분석 (Sleep-Mind Correlation)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/sleep-mind/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_sleep_mind(user_id):
+    """특정 사용자의 수면-마음 상관 분석 결과 조회 (의료진 전용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    target_user = db.session.query(User).filter_by(id=user_id).first()
+    if not target_user:
+        return jsonify({'error': '사용자를 찾을 수 없습니다'}), 404
+
+    result = analyze_sleep_mind(
+        user_id, db.session, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+    result['username'] = target_user.username
+    result['real_name'] = target_user.real_name
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/sleep-mind/flags', methods=['GET'])
+@jwt_required()
+def get_sleep_mind_flags():
+    """전체 사용자 중 수면-마음 플래그 발생자 목록 (의료진 대시보드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_sleep_mind(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/sleep-mind/summary', methods=['GET'])
+@jwt_required()
+def get_sleep_mind_summary():
+    """수면-마음 플래그 요약 통계 (대시보드 상단 카드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_sleep_mind(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    type_counts = {}
+    severity_counts = {'high': 0, 'medium': 0, 'low': 0}
+
+    for user_data in result['flagged_users']:
+        for flag in user_data['flags']:
+            flag_type = flag['type']
+            severity = flag['severity']
+            type_counts[flag_type] = type_counts.get(flag_type, 0) + 1
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+    return jsonify({
+        'analysis_date': result['analysis_date'],
+        'total_users': result['total_users'],
+        'flagged_count': result['flagged_count'],
+        'flag_rate_pct': round(
+            result['flagged_count'] / max(result['total_users'], 1) * 100, 1
+        ),
+        'by_type': type_counts,
+        'by_severity': severity_counts
+    })
+
+
+# ═════════════════════════════════════════════════
+# Phase 6: 자기 서사 분석 (Self-Narrative Analysis)
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/self-narrative/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_user_self_narrative(user_id):
+    """특정 사용자의 자기 서사 분석 결과 조회 (의료진 전용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    target_user = db.session.query(User).filter_by(id=user_id).first()
+    if not target_user:
+        return jsonify({'error': '사용자를 찾을 수 없습니다'}), 404
+
+    result = analyze_self_narrative(
+        user_id, db.session, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+    result['username'] = target_user.username
+    result['real_name'] = target_user.real_name
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/self-narrative/flags', methods=['GET'])
+@jwt_required()
+def get_self_narrative_flags():
+    """전체 사용자 중 자기 서사 플래그 발생자 목록 (의료진 대시보드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_self_narrative(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/self-narrative/summary', methods=['GET'])
+@jwt_required()
+def get_self_narrative_summary():
+    """자기 서사 플래그 요약 통계 (대시보드 상단 카드용)"""
+    current_user_id = int(get_jwt_identity())
+    staff = _require_staff(current_user_id)
+    if not staff:
+        return jsonify({'error': '의료진 권한이 필요합니다'}), 403
+
+    result = analyze_all_users_self_narrative(
+        db.session, User, Diary,
+        crypto_decrypt=_decrypt_func
+    )
+
+    type_counts = {}
+    severity_counts = {'high': 0, 'medium': 0, 'low': 0}
+
+    for user_data in result['flagged_users']:
+        for flag in user_data['flags']:
+            flag_type = flag['type']
+            severity = flag['severity']
+            type_counts[flag_type] = type_counts.get(flag_type, 0) + 1
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+
+    return jsonify({
+        'analysis_date': result['analysis_date'],
+        'total_users': result['total_users'],
+        'flagged_count': result['flagged_count'],
+        'flag_rate_pct': round(
+            result['flagged_count'] / max(result['total_users'], 1) * 100, 1
+        ),
+        'by_type': type_counts,
+        'by_severity': severity_counts
+    })

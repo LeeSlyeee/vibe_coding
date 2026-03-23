@@ -93,9 +93,10 @@ class AuthManager: ObservableObject {
     // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
     // 실제 서버 로그인 API 호출 (Auto-Register Logic Included)
     func performLogin(username: String, password: String, name: String? = nil, centerCode: String? = nil, completion: @escaping (Bool, String) -> Void) {
-        // [Fix] Use HTTPS and Correct API Endpoint (217 Server)
-        let baseUrl = "https://217.142.253.35.nip.io/api" 
-        
+        // [Architecture] URL 단일 진실 공급원: APIService.swift > ServerConfig
+        // ⚠️ 서버 주소 변경은 APIService.swift 의 ServerConfig.productionHost 만 수정
+        let baseUrl = ServerConfig.apiBase
+
         // 1. Attempt Login First
         let loginUrl = URL(string: "\(baseUrl)/login")!
         var request = URLRequest(url: loginUrl)

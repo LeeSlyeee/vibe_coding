@@ -114,7 +114,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     
     private func sendAPNsTokenToServer(apnsToken: String) {
         guard let authToken = UserDefaults.standard.string(forKey: "serverAuthToken"), !authToken.isEmpty else { return }
-        var components = URLComponents(string: "https://217.142.253.35.nip.io/api/device/apns")
+        var components = URLComponents(string: ServerConfig.apiBase + "/device/apns")
         components?.queryItems = [URLQueryItem(name: "jwt", value: authToken)]
         guard let url = components?.url else { return }
         var request = URLRequest(url: url)
@@ -219,7 +219,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
             return
         }
         
-        var components = URLComponents(string: "https://217.142.253.35.nip.io/api/device/register")
+        var components = URLComponents(string: ServerConfig.apiBase + "/device/register")
         components?.queryItems = [URLQueryItem(name: "jwt", value: authToken)]
         guard let url = components?.url else { return }
 
