@@ -20,22 +20,22 @@ struct AppDiaryDetailView: View {
                 // 상단 날짜 및 버튼 영역
                 HStack {
                     Text(formatDate(diary.created_at ?? ""))
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.journalTitle)
+                        .foregroundColor(.primaryText)
                     Spacer()
                     
                     // 수정 버튼
                     Button(action: { showingEditSheet = true }) {
                         Image(systemName: "pencil.circle")
                             .font(.title2)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.accent)
                     }
                     .padding(.trailing, 10)
                     
                     // 삭제 버튼
                     Button(action: deleteDiary) {
                         Image(systemName: "trash")
-                            .foregroundColor(.red)
+                            .foregroundColor(.mood1)
                     }
                 }
                 .padding(.top)
@@ -45,14 +45,11 @@ struct AppDiaryDetailView: View {
                 // 감정 및 내용
                 HStack {
                     Text("오늘의 기분")
-                        .font(.headline)
+                        .font(.journalHeading)
                     Spacer()
                     let mood = getMoodAsset(level: diary.mood_level)
                     VStack {
-                        Image(mood.image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 50, height: 50)
+                        MoodFaceView(level: mood.level, size: 50)
                         Text(mood.title)
                             .font(.subheadline)
                             .foregroundColor(mood.color)
@@ -95,8 +92,8 @@ struct AppDiaryDetailView: View {
                    VStack(alignment: .leading, spacing: 10) {
                        HStack {
                            Text("AI 감정 분석")
-                               .font(.headline)
-                               .foregroundColor(.blue)
+                               .font(.journalHeading)
+                               .foregroundColor(.accent)
                            Spacer()
                            if !percent.isEmpty {
                                Text(percent)
@@ -104,7 +101,7 @@ struct AppDiaryDetailView: View {
                                    .fontWeight(.bold)
                                    .padding(.horizontal, 8)
                                    .padding(.vertical, 4)
-                                   .background(Color.blue)
+                                   .background(Color.accent)
                                    .foregroundColor(.white)
                                    .cornerRadius(8)
                            }
@@ -115,7 +112,7 @@ struct AppDiaryDetailView: View {
                            Text("오늘의 주요 감정: \(label)")
                                .font(.subheadline)
                                .fontWeight(.semibold)
-                               .foregroundColor(.primary)
+                               .foregroundColor(.primaryText)
                                .padding(.bottom, 2)
                        }
                        
@@ -125,7 +122,7 @@ struct AppDiaryDetailView: View {
                                .font(.body)
                                .padding()
                                .frame(maxWidth: .infinity, alignment: .leading) // 왼쪽 정렬
-                               .background(Color.blue.opacity(0.1))
+                               .background(Color.accent.opacity(0.10))
                                .cornerRadius(10)
                        }
                    }
@@ -134,11 +131,11 @@ struct AppDiaryDetailView: View {
                      // Fallback for old data without prediction
                     VStack(alignment: .leading, spacing: 10) {
                         Text("AI 감정 분석")
-                            .font(.headline)
-                            .foregroundColor(.blue)
+                            .font(.journalHeading)
+                            .foregroundColor(.accent)
                         Text(aiAnalysisOnly)
                             .padding()
-                            .background(Color.blue.opacity(0.1))
+                            .background(Color.accent.opacity(0.10))
                             .cornerRadius(10)
                     }
                     .padding(.top)
@@ -150,11 +147,11 @@ struct AppDiaryDetailView: View {
                     if !cleanedAdvice.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("AI 조언")
-                                .font(.headline)
-                                .foregroundColor(.green)
+                                .font(.journalHeading)
+                                .foregroundColor(.mood4)
                             Text(cleanedAdvice)
                                 .padding()
-                                .background(Color.green.opacity(0.1))
+                                .background(Color.mood4.opacity(0.10))
                                 .cornerRadius(10)
                         }
                         .padding(.top)
@@ -166,10 +163,10 @@ struct AppDiaryDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.secondaryText)
                         Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")
                             .font(.caption2)
-                            .foregroundColor(.orange)
+                            .foregroundColor(.mood2)
                     }
                     .padding(.top, 4)
                 }
@@ -205,8 +202,8 @@ struct AppDiaryDetailView: View {
     
     func label(_ text: String) -> some View {
         Text(text)
-            .font(.headline)
-            .foregroundColor(.gray)
+            .font(.journalHeading)
+            .foregroundColor(.secondaryText)
     }
     
     /// AI 응답에서 JSON 원문, 마크다운 코드블록, **예시 답변** 등의 잔여물을 제거

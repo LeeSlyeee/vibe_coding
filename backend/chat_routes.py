@@ -287,3 +287,166 @@ def _extract_from_choices(choices):
         return str(choice['message'].get('content', ''))
     
     return str(choice)
+
+
+# ═════════════════════════════════════════════════
+# [Feature] 가이디드 저널링 — 맥락 기반 선질문 생성
+# ═════════════════════════════════════════════════
+
+import random
+
+# 컨디션 등급별 Fallback 질문 세트 (LLM 실패 시 사용)
+_GUIDED_FALLBACKS = {
+    'sunny': [
+        "오늘 가장 즐거웠던 순간은 언제였나요?",
+        "지금 이 기분을 누군가에게 말해준다면 어떤 말을 하고 싶나요?",
+        "오늘 새롭게 시도해본 것이 있나요?",
+    ],
+    'mostly_sunny': [
+        "오늘 하루 중 가장 편안했던 시간은 언제였나요?",
+        "요즘 나를 안정시켜주는 루틴이 있나요?",
+        "오늘 감사했던 작은 것 하나를 떠올려볼까요?",
+    ],
+    'partly_cloudy': [
+        "오늘 마음 한 켠에 걸리는 것이 있다면 무엇인가요?",
+        "지금 내 기분을 날씨로 표현한다면 어떤 날씨일까요?",
+        "오늘 하루 중 가장 힘들었던 순간은 언제였나요?",
+    ],
+    'cloudy': [
+        "요즘 자주 떠오르는 생각이 있나요?",
+        "오늘 몸과 마음의 에너지를 0~10으로 표현하면 몇일까요?",
+        "지금 가장 필요한 것이 뭔지 떠올려볼 수 있을까요?",
+    ],
+    'rainy': [
+        "오늘 하루 어떻게 보내셨나요?",
+        "지금 이 순간 어떤 감정이 가장 크게 느껴지나요?",
+        "나에게 한 마디 해줄 수 있다면 어떤 말을 해주고 싶나요?",
+    ],
+    'default': [
+        "오늘 하루 어떠셨나요?",
+        "지금 떠오르는 생각이 있나요?",
+        "오늘 내 마음에 가장 가까운 이모지를 하나 고른다면?",
+    ],
+}
+
+
+@chat_bp.route('/api/chat/guided-start', methods=['POST'])
+@jwt_required()
+def guided_start():
+    """
+    가이디드 저널링 시작 질문 생성 API.
+    사용자의 최근 일기/컨디션 맥락을 기반으로 맞춤 선질문 3개를 반환한다.
+    iOS에서 질문 터치 → 기존 /api/chat/reaction으로 이어지는 구조.
+
+    Response:
+        {
+            "questions": ["Q1", "Q2", "Q3"],
+            "context_grade": "mostly_sunny",
+            "source": "llm" | "fallback"
+        }
+    """
+    user_id = int(get_jwt_identity())
+
+    # ─── 1. 컨텍스트 수집 ───
+    from models import db, Diary
+    from datetime import datetime, timedelta
+
+    recent_cutoff = datetime.utcnow() - timedelta(days=3)
+    recent_diaries = Diary.query.filter(
+        Diary.user_id == user_id,
+        Diary.created_at >= recent_cutoff
+    ).order_by(Diary.date.desc()).limit(3).all()
+
+    # 컨디션 등급 조회 (가벼운 호출: skip_phase3=True)
+    condition_grade = 'default'
+    try:
+        from kick_analysis.condition import generate_condition
+        cond = generate_condition(
+            user_id, db.session, Diary,
+            skip_phase3=True
+        )
+        condition_grade = cond.get('condition', {}).get('grade', 'default')
+    except Exception as e:
+        print(f"⚠️ [Guided] Condition fetch failed: {e}")
+
+    # 최근 일기 요약 (LLM 컨텍스트용)
+    diary_context = ""
+    try:
+        from app import safe_decrypt
+        for d in recent_diaries[:2]:
+            mood = d.mood_level or '?'
+            content_text = safe_decrypt(d.event) if d.event else ""
+            snippet = content_text[:80] if content_text else "(내용 없음)"
+            diary_context += f"- {d.date}: 기분{mood}/5, \"{snippet}\"\n"
+    except Exception as e:
+        print(f"⚠️ [Guided] Diary context build failed: {e}")
+
+    # ─── 2. LLM 호출 ───
+    questions = None
+    source = 'fallback'
+
+    if diary_context.strip():
+        try:
+            import requests as req
+            import json
+
+            # 요일/시간대 컨텍스트
+            now = datetime.utcnow() + timedelta(hours=9)  # KST
+            day_names = ['월', '화', '수', '목', '금', '토', '일']
+            day_of_week = day_names[now.weekday()]
+            hour = now.hour
+            time_label = '아침' if hour < 12 else '오후' if hour < 18 else '밤'
+
+            prompt = (
+                "# 역할\n"
+                "너는 따뜻한 심리 상담사 '마음온'이야.\n\n"
+                "# 임무\n"
+                f"오늘은 {day_of_week}요일 {time_label}이야.\n"
+                f"사용자의 최근 일기 기록:\n{diary_context}\n"
+                f"현재 마음 컨디션: {condition_grade}\n\n"
+                "위 맥락을 바탕으로, 사용자가 오늘 일기를 시작할 때\n"
+                "편하게 대답할 수 있는 따뜻한 질문 3개를 만들어줘.\n\n"
+                "# 규칙\n"
+                "1. 각 질문은 20자 이내로 짧게\n"
+                "2. 존댓말(해요체) 사용\n"
+                "3. 판단이나 조언 금지, 순수한 질문만\n"
+                "4. JSON 배열로만 답변: [\"Q1\", \"Q2\", \"Q3\"]\n"
+                "5. 다른 말 절대 하지 마\n\n"
+                "답변:"
+            )
+
+            payload = {
+                "model": "maumON-gemma",
+                "prompt": prompt,
+                "stream": False,
+                "options": {"temperature": 0.8, "num_predict": 100}
+            }
+            res = req.post("http://localhost:11434/api/generate", json=payload, timeout=15)
+
+            if res.status_code == 200:
+                raw = res.json().get('response', '').strip()
+                # JSON 배열 추출 시도
+                import re as re_mod
+                match = re_mod.search(r'\[.*?\]', raw, re_mod.DOTALL)
+                if match:
+                    parsed = json.loads(match.group())
+                    if isinstance(parsed, list) and len(parsed) >= 2:
+                        questions = [str(q).strip() for q in parsed[:3]]
+                        source = 'llm'
+
+        except Exception as e:
+            print(f"⚠️ [Guided] LLM call failed: {e}")
+
+    # ─── 3. Fallback ───
+    if not questions:
+        fallback_pool = _GUIDED_FALLBACKS.get(condition_grade, _GUIDED_FALLBACKS['default'])
+        questions = list(fallback_pool)  # 복사본
+        random.shuffle(questions)
+        questions = questions[:3]
+
+    return jsonify({
+        'questions': questions,
+        'context_grade': condition_grade,
+        'source': source,
+    }), 200
+

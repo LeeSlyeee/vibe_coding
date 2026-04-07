@@ -58,18 +58,17 @@ struct MoodCalendarView: View {
                             Button(action: { changeMonth(by: -1) }) {
                                 Image(systemName: "chevron.left")
                                     .font(.title2)
-                                    .foregroundColor(.black)
+                                    .foregroundColor(.secondaryText)
                             }
                             
                             Text(monthYearString(currentDate))
-                                .font(.title2)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
+                                .font(.journalTitle)
+                                .foregroundColor(.primaryText)
                             
                             Button(action: { changeMonth(by: 1) }) {
                                 Image(systemName: "chevron.right")
                                     .font(.title2)
-                                    .foregroundColor(.black)
+                                    .foregroundColor(.secondaryText)
                             }
                         }
                         
@@ -80,7 +79,7 @@ struct MoodCalendarView: View {
                                 Image(systemName: "line.3.horizontal") // 햄버거 메뉴
                                     .font(.title2)
                                     .fontWeight(.semibold)
-                                    .foregroundColor(.black)
+                                    .foregroundColor(.secondaryText)
                             }
                             .accessibilityIdentifier("SettingsMenuButton")
                         }
@@ -92,9 +91,9 @@ struct MoodCalendarView: View {
                     HStack {
                         ForEach(Array(["일", "월", "화", "수", "목", "금", "토"].enumerated()), id: \.offset) { index, day in
                             Text(day)
-                                .font(.caption)
+                                .font(.journalCaption)
                                 .fontWeight(.bold)
-                                .foregroundColor(index == 0 ? .red : (index == 6 ? .blue : .gray))
+                                .foregroundColor(index == 0 ? .mood1 : (index == 6 ? .mood2 : .secondaryText))
                                 .frame(maxWidth: .infinity)
                         }
                     }
@@ -118,9 +117,9 @@ struct MoodCalendarView: View {
                                         VStack(spacing: 1) { // 간격 최소화
                                             // 1. 날짜 (토요일=파란, 일요일=빨간)
                                             let wd = Calendar.current.component(.weekday, from: date)
-                                            let dayColor: Color = wd == 1 ? .red : (wd == 7 ? .blue : (Calendar.current.isDateInToday(date) ? .blue : .primary))
+                                            let dayColor: Color = wd == 1 ? .mood1 : (wd == 7 ? .mood2 : (Calendar.current.isDateInToday(date) ? .accent : .primaryText))
                                             Text("\(Calendar.current.component(.day, from: date))")
-                                                .font(.system(size: 10, weight: diary != nil ? .bold : .regular)) // 날짜 크기 축소
+                                                .font(.system(size: 10, weight: diary != nil ? .bold : .regular, design: .rounded))
                                                 .foregroundColor(dayColor)
                                                 .padding(.top, 4)
                                             
@@ -131,17 +130,14 @@ struct MoodCalendarView: View {
                                                     let asset = aiAsset ?? getMoodAsset(level: d.mood_level)
                                                     
                                                     ZStack(alignment: .bottomTrailing) {
-                                                        Image(asset.image)
-                                                            .resizable()
-                                                            .scaledToFit()
-                                                            .frame(width: 28, height: 28)
+                                                        MoodFaceView(level: asset.level, size: 28)
                                                         
                                                         // [New] 약물 복용 표시
                                                         if d.medication == true {
                                                             Image(systemName: "pills.fill")
                                                                 .font(.system(size: 10))
-                                                                .foregroundColor(.green)
-                                                                .background(Circle().fill(Color.white).frame(width: 12, height: 12))
+                                                                .foregroundColor(.mood4)
+                                                                .background(Circle().fill(Color.cardBg).frame(width: 12, height: 12))
                                                                 .offset(x: 4, y: 2)
                                                         }
                                                     }
@@ -151,15 +147,15 @@ struct MoodCalendarView: View {
                                                     let (label, percent) = parseAI(d.ai_prediction)
                                                     if !label.isEmpty {
                                                         Text(label)
-                                                            .font(.system(size: 8, weight: .bold)) // 텍스트 크기 축소
-                                                            .foregroundColor(.primary)
+                                                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                                                            .foregroundColor(.primaryText)
                                                             .lineLimit(1)
                                                             .minimumScaleFactor(0.7)
                                                         
                                                         if !percent.isEmpty {
                                                             Text(percent)
-                                                                .font(.system(size: 7))
-                                                                .foregroundColor(.secondary)
+                                                                .font(.system(size: 7, design: .rounded))
+                                                                .foregroundColor(.secondaryText)
                                                                 .lineLimit(1)
                                                                 .minimumScaleFactor(0.7)
                                                         }
@@ -173,13 +169,13 @@ struct MoodCalendarView: View {
                                         .frame(height: 75) // 셀 높이 약간 증가
                                         .frame(maxWidth: .infinity)
                                         .background(
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(diary != nil ? emotionBackgroundColor(for: diary!) : Color.clear)
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .fill(diary != nil ? emotionBackgroundColor(for: diary!) : Color.bgMain)
                                         )
                                         .overlay(
                                             Calendar.current.isDateInToday(date) ?
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .stroke(Color.blue, lineWidth: 2)
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .stroke(Color.accent, lineWidth: 2)
                                                 : nil
                                         )
                                     }
@@ -212,7 +208,7 @@ struct MoodCalendarView: View {
                                             )
                                         )
                                         .frame(width: 40, height: 40)
-                                    Image(systemName: "bridge").foregroundColor(.blue)
+                                    Image(systemName: "bridge").foregroundColor(.accent)
                                         .font(.system(size: 20))
                                 }
                                 
@@ -240,9 +236,9 @@ struct MoodCalendarView: View {
                                 }) {
                                     Image(systemName: "xmark")
                                         .font(.system(size: 12, weight: .bold))
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                         .padding(6)
-                                        .background(Color.gray.opacity(0.1))
+                                        .background(Color.softTan.opacity(0.3))
                                         .clipShape(Circle())
                                 }
                                 .buttonStyle(BorderlessButtonStyle())
@@ -287,10 +283,10 @@ struct MoodCalendarView: View {
                             Image(systemName: "arrow.clockwise")
                             Text("데이터 새로고침")
                         }
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .font(.journalCaption)
+                        .foregroundColor(.secondaryText)
                         .padding(8)
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color.softTan.opacity(0.5))
                         .cornerRadius(8)
                     }
                     .padding(.top, 10)
@@ -539,35 +535,35 @@ struct MoodCalendarView: View {
     func monthYearString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "YYYY년 M월"; return f.string(from: d) }
     func dateString(_ d: Date) -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f.string(from: d) }
     func moodEmoji(_ l: Int) -> String { ["", "매우나쁨", "나쁨", "보통", "좋음", "매우좋음"][l] }
-    func moodColor(_ l: Int) -> Color { [Color.clear, .red, .blue, .gray, .green, .yellow][l] }
+    func moodColor(_ l: Int) -> Color { [Color.clear, .mood1, .mood2, .mood3, .mood4, .mood5][l] }
     
-    /// AI 감정 분석 기반 배경색 (Android와 동일)
+    /// AI 감정 분석 기반 배경색 (☕ Warm Journal 어스톤 파스텔)
     func emotionBackgroundColor(for diary: Diary) -> Color {
         let emotion = (diary.ai_prediction ?? diary.ai_comment ?? "").lowercased()
         
         if emotion.contains("행복") || emotion.contains("기쁨") || emotion.contains("즐거") || emotion.contains("사랑") {
-            return Color(red: 1.0, green: 0.878, blue: 0.902).opacity(0.85) // 연핑크
+            return Color.mood5.opacity(0.18) // 피치 코랄
         } else if emotion.contains("평온") || emotion.contains("편안") || emotion.contains("안정") || emotion.contains("감사") {
-            return Color(red: 0.878, green: 0.961, blue: 0.914).opacity(0.85) // 연초록
+            return Color.mood4.opacity(0.18) // 세이지 그린
         } else if emotion.contains("보통") || emotion.contains("무난") || emotion.contains("그저") {
-            return Color(red: 1.0, green: 0.953, blue: 0.878).opacity(0.85) // 연오렌지
+            return Color.mood3.opacity(0.20) // 샌드
         } else if emotion.contains("우울") || emotion.contains("슬") || emotion.contains("외로") {
-            return Color(red: 0.910, green: 0.878, blue: 0.961).opacity(0.85) // 연보라
+            return Color.mood2.opacity(0.18) // 뮤트 블루
         } else if emotion.contains("화") || emotion.contains("짜증") || emotion.contains("분노") || emotion.contains("스트레스") {
-            return Color(red: 1.0, green: 0.878, blue: 0.878).opacity(0.85) // 연빨강
+            return Color.mood1.opacity(0.18) // 더스티 로즈
         } else if emotion.contains("불안") || emotion.contains("걱정") || emotion.contains("긴장") || emotion.contains("두려움") {
-            return Color(red: 0.878, green: 0.925, blue: 0.961).opacity(0.85) // 연파랑
+            return Color.mood2.opacity(0.15) // 뮤트 블루 (연하게)
         } else if emotion.contains("뿌듯") || emotion.contains("성취") || emotion.contains("흥분") {
-            return Color(red: 1.0, green: 0.976, blue: 0.878).opacity(0.85) // 연노랑
+            return Color.mood5.opacity(0.15) // 피치 코랄 (연하게)
         } else {
             // AI 감정 없으면 mood_level 기반 폴백
             switch diary.mood_level {
-            case 5: return Color(red: 1.0, green: 0.878, blue: 0.902).opacity(0.7)
-            case 4: return Color(red: 0.878, green: 0.961, blue: 0.914).opacity(0.7)
-            case 3: return Color(red: 1.0, green: 0.953, blue: 0.878).opacity(0.7)
-            case 2: return Color(red: 0.910, green: 0.878, blue: 0.961).opacity(0.7)
-            case 1: return Color(red: 1.0, green: 0.878, blue: 0.878).opacity(0.7)
-            default: return Color.gray.opacity(0.1)
+            case 5: return Color.mood5.opacity(0.15)
+            case 4: return Color.mood4.opacity(0.15)
+            case 3: return Color.mood3.opacity(0.15)
+            case 2: return Color.mood2.opacity(0.15)
+            case 1: return Color.mood1.opacity(0.15)
+            default: return Color.softTan.opacity(0.3)
             }
         }
     }

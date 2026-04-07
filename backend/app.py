@@ -149,6 +149,13 @@ try:
 except Exception as e:
     print(f"⚠️ Failed to register Stats Routes: {e}")
 
+try:
+    from emotional_push import emotional_push_bp
+    app.register_blueprint(emotional_push_bp)
+    print("✅ Emotional Push Routes Registered")
+except Exception as e:
+    print(f"⚠️ Failed to register Emotional Push Routes: {e}")
+
 
 @app.before_request
 def log_request_info():

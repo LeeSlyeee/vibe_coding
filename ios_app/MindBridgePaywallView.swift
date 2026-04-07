@@ -19,7 +19,7 @@ struct MindBridgePaywallView: View {
                     Button(action: { isPresented = false }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.gray.opacity(0.6))
+                            .foregroundColor(.hintText.opacity(0.6))
                     }
                 }
                 .padding(.top, 8)
@@ -104,7 +104,7 @@ struct MindBridgePaywallView: View {
                 
                 // MARK: - B2G 안내
                 HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "building.2.fill").foregroundColor(.blue)
+                    Image(systemName: "building.2.fill").foregroundColor(.accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Text("보건소/정신건강복지센터 안내")
                             .font(.system(size: 14, weight: .bold))
@@ -145,7 +145,7 @@ struct MindBridgePaywallView: View {
                         
                         Text("/월")
                             .font(.subheadline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                     }
                     
                     // 구매 버튼
@@ -198,13 +198,13 @@ struct MindBridgePaywallView: View {
                     }) {
                         Text("이전 구독 복원하기")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                     }
                     
                     // 안내 문구
                     Text("언제든 해지 가능합니다. 무료 체험 기간 내 해지 시 과금되지 않습니다.")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -244,7 +244,7 @@ struct BridgeFeatureRow: View {
                     .fontWeight(.bold)
                 Text(description)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             

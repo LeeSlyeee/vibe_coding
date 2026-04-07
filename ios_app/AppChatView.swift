@@ -29,13 +29,46 @@ struct AppChatView: View {
     @State private var currentStepIndex: Int = 0
     @State private var collectedAnswers: [String] = ["", "", "", "", "", ""]
     @State private var isFreeChatMode: Bool = false // 자유 대화 모드 (일기 완료 후 활성화)
-    private let stepQuestions = [
-        "어젯밤 잠은 어떻게 주무셨나요? 푹 쉬셨기를 바라요.", // 1 (수면)
-        "그렇군요. 그럼 오늘 하루 어떤 일들이 있었는지 편하게 말씀해주세요.", // 2 (사건)
-        "그 경험을 하면서 어떤 감정이 들었는지 말씀해주시겠어요?", // 3 (감정)
-        "왜 그런 감정이 들었는지, 나에게 어떤 의미였는지 조금 더 깊이 생각해 볼까요?", // 4 (의미)
-        "오늘 하루도 정말 고생 많으셨어요. 마지막으로 힘든 나에게 따뜻한 위로의 한마디를 남겨주세요." // 5 (독백/위로)
+    // [P1-1 Fix] 질문 풀(Pool) — 동일 구조 유지하면서 매일 다른 표현
+    private let stepQuestionPool: [[String]] = [
+        [ // 1 (수면)
+            "어젯밤 잠은 어떻게 주무셨나요? 푹 쉬셨기를 바라요.",
+            "어젯밤 수면은 어떠셨어요? 충분히 쉬셨는지 궁금해요.",
+            "잠은 잘 주무셨나요? 꿈도 꾸셨는지 궁금하네요.",
+            "어제 밤 잠자리는 편안했나요? 마음이가 궁금해해요 😊"
+        ],
+        [ // 2 (사건)
+            "그렇군요. 그럼 오늘 하루 어떤 일들이 있었는지 편하게 말씀해주세요.",
+            "오늘 하루는 어떻게 보내셨어요? 기억에 남는 일이 있다면 들려주세요.",
+            "오늘 어떤 일들이 있었나요? 크든 작든 상관없이 편하게 얘기해주세요.",
+            "그렇군요! 그럼 오늘 하루 중 마음에 남은 장면이 있다면 말씀해주세요."
+        ],
+        [ // 3 (감정)
+            "그 경험을 하면서 어떤 감정이 들었는지 말씀해주시겠어요?",
+            "그때 어떤 기분이 들었나요? 솔직하게 표현해주시면 좋겠어요.",
+            "그 순간 어떤 마음이었는지 떠올려볼까요?",
+            "그런 일이 있었군요. 그때 느꼈던 감정을 자유롭게 적어주세요."
+        ],
+        [ // 4 (의미)
+            "왜 그런 감정이 들었는지, 나에게 어떤 의미였는지 조금 더 깊이 생각해 볼까요?",
+            "그 감정이 왜 올라왔을까요? 나에게 어떤 의미가 있는지 살펴볼까요?",
+            "조금 더 들어가볼게요. 그 감정이 어디서 왔는지 탐색해볼까요?",
+            "그 감정이 나에게 무엇을 말해주고 있을까요? 천천히 생각해봐요."
+        ],
+        [ // 5 (독백/위로)
+            "오늘 하루도 정말 고생 많으셨어요. 힘든 나에게 따뜻한 위로의 한마디를 남겨주세요.",
+            "수고한 오늘의 나에게 한마디 해준다면 뭐라고 말해주고 싶나요?",
+            "오늘 하루 고생한 자신에게 따뜻한 말 한마디 건네볼까요?",
+            "마지막으로, 오늘 힘들었던 나 자신을 토닥여주는 말을 남겨주세요 💛"
+        ]
     ]
+    
+    /// 질문 풀에서 랜덤으로 하나 선택 (인덱스 기반)
+    private func getStepQuestion(for index: Int) -> String {
+        guard index >= 0 && index < stepQuestionPool.count else { return "" }
+        let pool = stepQuestionPool[index]
+        return pool.randomElement() ?? pool[0]
+    }
     
     // [Keyboard Fix] Real keyboard height observer
     #if os(iOS)
@@ -62,10 +95,10 @@ struct AppChatView: View {
                         VStack(spacing: 8) {
                             Text(llmService.modelLoadingProgress > 0 ? "🔒 보안 캡슐 활성화 및 가중치 전송 완료! (준비 중...)" : "🔒 로컬 AI 엔진 기동 대기 중...")
                                 .font(.caption)
-                                .foregroundColor(.green)
+                                .foregroundColor(.mood4)
                             ProgressView(value: llmService.modelLoadingProgress)
                                 .progressViewStyle(LinearProgressViewStyle())
-                                .accentColor(.green)
+                                .accentColor(.mood4)
                                 .frame(height: 2)
                         }
                         .padding(.horizontal)
@@ -78,22 +111,22 @@ struct AppChatView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "lock.shield.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(.green)
+                                .foregroundColor(.mood4)
                             Text("완벽히 단절된 안전지대 (데이터는 폰 안에만 머뭅니다)")
                                 .font(.system(size: 11))
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             Spacer()
                             Text("Off-Grid")
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.green)
+                                .background(Color.mood4)
                                 .foregroundColor(.white)
                                 .cornerRadius(4)
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
-                        .background(Color.green.opacity(0.08))
+                        .background(Color.mood4.opacity(0.08))
                         .cornerRadius(12)
                         .padding(.top, 4)
                         .padding(.horizontal, 16)
@@ -102,22 +135,22 @@ struct AppChatView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "shield.righthalf.filled")
                                 .font(.system(size: 10))
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accent)
                             Text("전문가 심층 분석 (개인정보는 익명화되어 전송됩니다)")
                                 .font(.system(size: 11))
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             Spacer()
                             Text("Opt-In")
                                 .font(.system(size: 9, weight: .bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.blue)
+                                .background(Color.accent)
                                 .foregroundColor(.white)
                                 .cornerRadius(4)
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
-                        .background(Color.blue.opacity(0.08))
+                        .background(Color.accent.opacity(0.08))
                         .cornerRadius(12)
                         .padding(.top, 4)
                         .padding(.horizontal, 16)
@@ -132,10 +165,10 @@ struct AppChatView: View {
                                     VStack(spacing: 10) {
                                         Image(systemName: "hand.wave.fill").foregroundColor(.yellow)
                                             .font(.system(size: 40))
-                                        Text(llmService.useServerAI ? "안전하게 감정을 기록해보세요.\n안내에 따라 답을 하다 보면 일기가 완성됩니다." : "어떤 감정이든 쏟아내세요.\n안전지대에서 질문에 답하며 저와 함께 정리해볼까요?")
+                                        Text(llmService.useServerAI ? "마음이가 오늘 하루를 함께 돌아봐드릴게요.\n안내에 따라 답하다 보면 일기가 완성됩니다." : "마음이에게 어떤 감정이든 쏟아내세요.\n안전지대에서 함께 정리해볼까요?")
                                             .multilineTextAlignment(.center)
                                             .font(.body)
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(.hintText)
                                     }
                                     .padding(.top, 40)
                                 }
@@ -152,7 +185,7 @@ struct AppChatView: View {
                                         if let hint = loadingHint {
                                             Text(hint)
                                                 .font(.caption)
-                                                .foregroundColor(hint.contains("🔒") ? .green : (hint.contains("🛡️") ? .blue : .gray))
+                                                .foregroundColor(hint.contains("🔒") ? .mood4 : (hint.contains("🛡️") ? .accent : .hintText))
                                                 .transition(.opacity)
                                                 .multilineTextAlignment(.leading)
                                         }
@@ -195,7 +228,7 @@ struct AppChatView: View {
                                         
                                         if let diary = todayDiary {
                                             // ━━━ 오늘 일기 존재 → 자유 대화 모드로 시작 ━━━
-                                            var contextMsg = "안녕하세요, \(userName)님! 👋\n\n오늘 이미 일기를 작성해주셨네요 ✨\n"
+                                            var contextMsg = "안녕하세요, \(userName)님! 👋 마음이예요.\n\n오늘 이미 일기를 작성해주셨네요 ✨\n"
                                             if let event = diary.event, !event.isEmpty {
                                                 contextMsg += "오늘 있었던 일: \(String(event.prefix(80)))\n"
                                             }
@@ -211,7 +244,7 @@ struct AppChatView: View {
                                             }
                                         } else {
                                             // ━━━ 오늘 일기 없음 → 기존 6단계 가이드 플로우 시작 ━━━
-                                            let welcomeText = "안녕하세요, \(userName)님!\n오늘 하루를 편안하게 돌아보는 시간을 가져볼까요?\n\n가장 먼저, 혹시 챙겨 드시는 약이 있다면 오늘 잘 복용하셨나요?\n(없다면 '없다'고 말씀해주셔도 좋아요)"
+                                            let welcomeText = "안녕하세요, \(userName)님! 마음이예요 💛\n오늘 하루를 편안하게 돌아보는 시간을 가져볼까요?\n\n가장 먼저, 혹시 챙겨 드시는 약이 있다면 오늘 잘 복용하셨나요?\n(없다면 '없다'고 말씀해주셔도 좋아요)"
                                             
                                             withAnimation {
                                                 messages.append(ChatMessage(text: welcomeText, isUser: false))
@@ -262,22 +295,22 @@ struct AppChatView: View {
                     
                     // Input Area
                     HStack(spacing: 10) {
-                        TextField(isFreeChatMode ? "마음온에게 자유롭게 이야기해보세요..." : "메시지 보내기...", text: $inputText)
+                        TextField(isFreeChatMode ? "마음이에게 자유롭게 이야기해보세요..." : "메시지 보내기...", text: $inputText)
                             .focused($isInputFocused)
                             .keyboardType(.default)
                             .autocorrectionDisabled(false)
-                            .tint(.blue)
+                            .tint(.accent)
                             .padding(12)
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color.softTan.opacity(0.3))
                             .cornerRadius(20)
                             .disabled(showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode))
                         
                         Button(action: sendMessage) {
                             Image(systemName: "paperplane.fill")
                                 .font(.system(size: 20))
-                                .foregroundColor(inputText.isEmpty ? .gray : .blue)
+                                .foregroundColor(inputText.isEmpty ? .hintText : .accent)
                                 .padding(10)
-                                .background(Color.blue.opacity(0.1))
+                                .background(Color.accent.opacity(0.10))
                                 .clipShape(Circle())
                         }
                         .disabled(inputText.isEmpty || showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode) || (!isFreeChatMode && isTyping))
@@ -315,14 +348,14 @@ struct AppChatView: View {
                             .font(.system(size: 12, weight: .bold))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(llmService.useServerAI ? Color.blue.opacity(0.15) : Color.green.opacity(0.15))
-                            .foregroundColor(llmService.useServerAI ? .blue : .green)
+                            .background(llmService.useServerAI ? Color.accent.opacity(0.15) : Color.mood4.opacity(0.15))
+                            .foregroundColor(llmService.useServerAI ? .accent : .mood4)
                             .cornerRadius(8)
                     }
                     .disabled(isTyping),
                     trailing: Button(action: { showSettings = true }) {
                         Image(systemName: "gearshape.fill")
-                            .foregroundColor(.black)
+                            .foregroundColor(.primaryText)
                     }
                 )
                 #endif
@@ -377,9 +410,8 @@ struct AppChatView: View {
         currentStepIndex += 1
         
         Task {
-            // [Crisis] 3단계 위기 분류 시스템
-            let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
-            if crisisLevel3.contains(where: { userText.contains($0) }) {
+            // [P0-2 Fix] 위기 감지 — 확장 키워드 + 우회 표현 + 문맥 판별
+            if Self.detectCrisis(in: userText) {
                 await MainActor.run {
                     self.isCrisis = true
                     self.showSOSModal = true
@@ -392,7 +424,7 @@ struct AppChatView: View {
             await MainActor.run {
                 if self.currentStepIndex < 6 {
                     self.isTyping = false
-                    messages.append(ChatMessage(text: self.stepQuestions[self.currentStepIndex - 1], isUser: false))
+                    messages.append(ChatMessage(text: self.getStepQuestion(for: self.currentStepIndex - 1), isUser: false))
                 } else if self.currentStepIndex == 6 {
                     messages.append(ChatMessage(text: "소중한 이야기들을 나눠주셔서 감사해요.\n다이어리를 기록하고 감정을 분석해 드릴게요. 잠시만 기다려주세요.", isUser: false))
                     self.startFinalAnalysis()
@@ -412,15 +444,36 @@ struct AppChatView: View {
         let q3 = collectedAnswers[4] // meaning
         let q4 = collectedAnswers[5] // selftalk
         
-        // Medication 약물 섭취 여부 유추 (긍정 단어 기반)
-        let medPositiveWords = ["명", "모", "머", "머겄", "먹", "네", "응", "ㅇ", "Y", "y", "약", "타", "챙", "복용"]
-        let hasTakenMed = medPositiveWords.contains(where: { qMed.contains($0) })
+        // [P0-1 Fix] 약물 섭취 여부 유추 — 부정어 필터링 추가
+        let hasTakenMed = Self.parseMedicationTaken(from: qMed)
         
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
         f.timeZone = TimeZone.current 
         let dateString = f.string(from: Date())
         
+        // [P0 Fix] WeatherKit 실시간 날씨 조회 (하드코딩 "맑음" 제거)
+        Task {
+            let weatherData = await WeatherService.shared.fetchTodayWeather()
+            
+            await MainActor.run {
+                self.continueAnalysis(
+                    dateString: dateString, qMed: qMed, qs: qs, q1: q1, q2: q2, q3: q3, q4: q4,
+                    hasTakenMed: hasTakenMed,
+                    weather: weatherData.weather,
+                    temperature: weatherData.temperature
+                )
+            }
+        }
+    }
+    
+    /// startFinalAnalysis()의 후속 처리 — 날씨 조회 완료 후 Diary 생성 및 AI 분석 시작
+    private func continueAnalysis(
+        dateString: String, qMed: String, qs: String, q1: String, q2: String, q3: String, q4: String,
+        hasTakenMed: Bool,
+        weather: String,
+        temperature: Double
+    ) {
         var newDiary = Diary(
             id: UUID().uuidString,
             _id: nil,
@@ -431,8 +484,8 @@ struct AppChatView: View {
             emotion_meaning: q3,
             self_talk: q4,
             sleep_desc: qs,
-            weather: "맑음", 
-            temperature: 20.0,
+            weather: weather,
+            temperature: temperature,
             created_at: nil,
             medication: hasTakenMed,
             medication_desc: qMed
@@ -515,9 +568,8 @@ struct AppChatView: View {
         // 사용자 메시지 추가
         messages.append(ChatMessage(text: userText, isUser: true))
         
-        // [Crisis] 위기 감지 (자유 대화 중에도 동작)
-        let crisisLevel3 = ["죽고", "자살", "뛰어내", "목을", "손목", "유서", "마지막", "끝내고", "자해", "목숨"]
-        if crisisLevel3.contains(where: { userText.contains($0) }) {
+        // [P0-2 Fix] 위기 감지 (자유 대화 중에도 동작) — 확장 버전
+        if Self.detectCrisis(in: userText) {
             self.isCrisis = true
             self.showSOSModal = true
         }
@@ -603,6 +655,89 @@ struct AppChatView: View {
             }
         }
     }
+    
+    // MARK: - [P0-1] 약물 복용 파싱 (부정어 필터링)
+    /// "안 먹었어", "못 먹었어", "없어" 등 부정 표현을 먼저 검사하여 오판 방지
+    static func parseMedicationTaken(from text: String) -> Bool {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // 1) 명시적 부정 표현 → false
+        let negativePatterns = [
+            "안 먹", "안먹", "못 먹", "못먹", "안 챙", "안챙",
+            "까먹", "깜빡", "놓쳤", "빠뜨", "빼먹",
+            "없어", "없다", "없습", "없음",
+            "안 했", "안했", "하지 않", "아니", "아닌", "아뇨", "아니요", "아니오",
+            "ㄴㄴ", "ㄴ", "노", "no", "No", "NO", "nope", "x", "X"
+        ]
+        if negativePatterns.contains(where: { t.contains($0) }) {
+            return false
+        }
+        
+        // 2) 명시적 긍정 표현 → true
+        let positivePatterns = [
+            "먹었", "먹음", "챙겼", "챙김", "복용", "먹고",
+            "네", "응", "ㅇㅇ", "ㅇ", "Y", "y", "yes", "Yes",
+            "했어", "했습", "완료"
+        ]
+        if positivePatterns.contains(where: { t.contains($0) }) {
+            return true
+        }
+        
+        // 3) 판별 불가 → false (안전 기본값)
+        return false
+    }
+    
+    // MARK: - [P0-2] 위기 감지 (확장 키워드 + 우회 표현)
+    /// 직접적 위기 표현 + 우회적 위기 표현을 모두 감지
+    /// "마지막" 등 오탐 가능 키워드는 문맥 필터 적용
+    static func detectCrisis(in text: String) -> Bool {
+        // 1) 직접적 위기 표현 (높은 확신)
+        let directCrisis = [
+            "죽고", "죽을", "죽겠", "죽자", "죽어",
+            "자살", "자해",
+            "뛰어내", "뛰어 내",
+            "목을 매", "목매", "목을매",
+            "손목을 긋", "손목 긋", "손목긋", "손목을",
+            "유서",
+            "끝내고", "끝내자", "끝내려", "끝낼",
+            "목숨",
+            "살고 싶지", "살기 싫"
+        ]
+        if directCrisis.contains(where: { text.contains($0) }) {
+            return true
+        }
+        
+        // 2) 우회적 위기 표현 (간접적이지만 위험)
+        let indirectCrisis = [
+            "없어지고 싶", "없어지면", "없어졌으면",
+            "사라지고 싶", "사라져버", "사라졌으면",
+            "더 이상 못", "더이상 못",
+            "세상에 있고 싶지",
+            "다 필요 없", "다 필요없",
+            "다 끝났", "다 끝나",
+            "이 세상을 떠", "세상을 떠나",
+            "태어나지 말", "태어나지 않",
+            "짐이 되", "짐만 되",
+            "나만 없으면", "내가 없으면",
+            "모든 게 끝", "모든게 끝",
+            "아무 의미", "무의미",
+            "살아있는 게", "살아있는게"
+        ]
+        if indirectCrisis.contains(where: { text.contains($0) }) {
+            return true
+        }
+        
+        // 3) "마지막" — 문맥 판별 (시험, 주 마지막 등 일상적 사용 제외)
+        if text.contains("마지막") {
+            let safeContexts = ["시험", "학기", "수업", "회의", "날", "주", "여행", "영화", "선물", "식사", "저녁", "버스", "전화", "인사"]
+            let hasSafeContext = safeContexts.contains(where: { text.contains($0) })
+            if !hasSafeContext {
+                return true
+            }
+        }
+        
+        return false
+    }
 }
 
 // MARK: - Models
@@ -620,14 +755,20 @@ struct ChatBubble: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             if !message.isUser {
-                Image(systemName: "face.smiling.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 30, height: 30)
-                .foregroundColor(.purple)
-                .background(Color.white)
-                .clipShape(Circle())
-                .shadow(radius: 1)
+                // [P1-2] "마음이" 캐릭터 아바타
+                VStack(spacing: 2) {
+                    Image(systemName: "heart.circle.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 32, height: 32)
+                        .foregroundColor(.accent)
+                        .background(Color.white)
+                        .clipShape(Circle())
+                        .shadow(color: Color.accent.opacity(0.3), radius: 3)
+                    Text("마음이")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondaryText)
+                }
             } else {
                 Spacer()
             }
@@ -636,8 +777,8 @@ struct ChatBubble: View {
                 .font(.system(size: 16))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(message.isUser ? Color.blue : Color.gray.opacity(0.1))
-                .foregroundColor(message.isUser ? .white : .black)
+                .background(message.isUser ? Color.accent : Color.softTan.opacity(0.3))
+                .foregroundColor(message.isUser ? .white : .primaryText)
                 .cornerRadius(20)
                 .frame(maxWidth: 250, alignment: message.isUser ? .trailing : .leading)
             
@@ -660,9 +801,9 @@ struct TypingIndicator: View {
             Circle().frame(width: 6, height: 6).offset(y: -offset)
             Circle().frame(width: 6, height: 6).offset(y: offset)
         }
-        .foregroundColor(.gray)
+        .foregroundColor(.hintText)
         .padding(12)
-        .background(Color.gray.opacity(0.1))
+        .background(Color.softTan.opacity(0.3))
         .cornerRadius(20)
         .onAppear {
             withAnimation(Animation.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
@@ -691,7 +832,7 @@ struct SOSView: View {
                         .fontWeight(.bold)
                         Text("언제든 도움을 요청할 수 있어요.\n전문가와 이야기해보세요.")
                         .multilineTextAlignment(.center)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                     }
                     .padding(.top, 20)
                     
@@ -711,14 +852,14 @@ struct SOSView: View {
                         
                         Text("거주하시는 지역의 보건소나 정신건강복지센터에서 무료로 상담을 받으실 수 있습니다.")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                         
                         Link("센터 찾기 (보건복지부)", destination: URL(string: "https://www.ncmh.go.kr")!)
                         .font(.body)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.accent)
                     }
                     .padding()
-                    .background(Color.gray.opacity(0.1))
+                    .background(Color.softTan.opacity(0.3))
                     .cornerRadius(12)
                     .padding(.horizontal)
                     

@@ -44,20 +44,140 @@ KINSHIP_DICT = {
     "사촌": "가족", "조카": "가족", "며느리": "가족", "시어머니": "가족",
     "시아버지": "가족", "장인": "가족", "장모": "가족",
     "남편": "가족", "아내": "가족", "와이프": "가족", "남친": "연인",
-    "여친": "연인", "애인": "연인",
+    "여친": "연인", "애인": "연인", "아기": "가족", "아들": "가족",
+    "딸": "가족", "큰아들": "가족", "큰딸": "가족", "막내": "가족",
+    "올케": "가족", "형수": "가족", "제수": "가족", "처형": "가족",
+    "처제": "가족", "매형": "가족", "매제": "가족", "형부": "가족",
     
     # 직장/학교
-    "팀장": "직장", "부장": "직장", "과장": "직장", "대리": "직장",
-    "사장": "직장", "사수": "직장", "부사수": "직장", "상사": "직장",
-    "동료": "직장", "후배": "직장", "선배": "직장/학교",
+    "팀장": "직장", "팀장님": "직장", "부장": "직장", "부장님": "직장",
+    "과장": "직장", "과장님": "직장", "대리": "직장", "대리님": "직장",
+    "사장": "직장", "사장님": "직장", "사수": "직장", "부사수": "직장",
+    "상사": "직장", "동료": "직장", "후배": "직장", "선배": "직장/학교",
     "선생님": "학교", "교수님": "학교", "교수": "학교", "담임": "학교",
+    "강사": "학교", "강사님": "학교", "보조강사": "학교", "보조강사님": "학교",
+    "원장님": "학교", "원장": "학교", "조교": "학교", "조교님": "학교",
+    "실장": "직장", "실장님": "직장", "차장": "직장", "차장님": "직장",
+    "이사": "직장", "이사님": "직장", "대표": "직장", "대표님": "직장",
+    "인턴": "직장", "멘토": "직장/학교", "멘토님": "직장/학교",
     
     # 사회적 관계
     "친구": "친구", "절친": "친구", "베프": "친구",
     "룸메이트": "친구", "룸메": "친구",
-    "이웃": "사회", "의사": "의료", "상담사": "의료",
-    "선생": "학교", "코치": "학교",
+    "이웃": "사회", "의사": "의료", "상담사": "의료", "상담선생님": "의료",
+    "선생": "학교", "코치": "학교", "트레이너": "사회",
+    "목사님": "사회", "신부님": "사회", "스님": "사회",
 }
+
+# ─── 한국어 접미 패턴 (사람 이름 + 접미사) ───
+# 확실도 높은 접미사만 사용 (씨, 한테, 에게, 야/아 호격 등)
+# "야/아"는 문장 끝에서 호칭으로 쓰일 때만 유효 → 별도 패턴
+import re
+
+# 고정밀 접미사: 사람에게만 붙는 것이 확실한 패턴
+_PERSON_SUFFIX_PATTERN = re.compile(
+    r'([가-힣]{2,4})'           # 2~4글자 한글 이름
+    r'(?:씨|님|한테|에게|이한테|이에게)'  # 사람에게만 확실히 붙는 접미사
+)
+
+# 호격 패턴: "성희야!", "민수야!", "건이야!" (문장부호/공백 뒤)
+_VOCATIVE_PATTERN = re.compile(
+    r'([가-힣]{2,4})(?:야|아|이야)(?:[!!\s.,]|$)'
+)
+
+# ─── 비인물 단어 블록리스트 (오탐 방지, 대폭 확장) ───
+_NON_PERSON_WORDS = {
+    # 시간/장소
+    "오늘", "내일", "어제", "그때", "거기", "여기", "저기", "이번", "다음",
+    "지금", "나중", "잠시", "갑자기", "하루", "매일", "항상", "가끔", "요즘",
+    "오전", "오후", "저녁", "아침", "밤에",
+    # 대명사/지시어
+    "이것", "그것", "저것", "아무", "모두", "전부", "혼자", "같이", "함께",
+    "누구", "무엇", "어디", "언제",
+    # 부사/감탄사
+    "그냥", "정말", "진짜", "너무", "대박", "역시",
+    # 감정/상태 (동사/형용사 어간)
+    "기분", "마음", "생각", "느낌", "감정", "걱정", "걱정이", "고민",
+    "기쁘지", "슬프지", "괜찮", "졸려", "지쳤", "피곤",
+    "기분좋", "행복", "우울", "짜증",
+    # 동사 어간 (오탐 최빈출)
+    "쉬다", "보다", "하다", "있다", "없다", "되다", "가다", "오다",
+    "진행하", "수정", "발견", "테스트하", "작업", "연락", "집중",
+    "못했", "했다", "있을거", "알았", "먹었", "마셨",
+    "맴돌", "야기하다",
+    # 형용사/판단
+    "느낌이", "그래", "앞으로", "잘할거", "중이",
+    # 지역/장소
+    "서울", "부산", "대구", "인천", "대전", "광주", "울산", "세종",
+    "강남", "홍대", "이태원", "명동", "종로", "잠실", "판교",
+    "영종", "영종도", "학원", "집에", "회사",
+    # 사물/음식
+    "커피", "케이크", "닭한마리", "드라마", "산책", "드라이브",
+    "프로젝트", "마음온", "버그", "사진", "패션쇼", "한복",
+    "사진하", "드라", "영향", "상황", "일들",
+    # 일반명사
+    "생일", "누군", "하해준다", "인공지능", "대화",
+}
+
+
+def _extract_people_kiwi_nnp(text):
+    """
+    Kiwi 형태소 분석기의 NNP(고유명사) 태그로 사람 이름 후보를 추출한다.
+    한국 이름 패턴(2~3글자)에 맞고, 블록리스트에 없는 경우만 허용.
+    
+    Returns:
+        list of str: 추출된 고유명사 후보 목록
+    """
+    kiwi = _get_kiwi()
+    results = []
+    seen = set()
+    
+    try:
+        tokens = kiwi.tokenize(text)
+        for i, token in enumerate(tokens):
+            # NNP = 고유명사, 2~3글자 (한국 이름 길이)
+            if token.tag == 'NNP' and 2 <= len(token.form) <= 3:
+                name = token.form
+                if name in seen or name in _NON_PERSON_WORDS:
+                    continue
+                # 추가 필터: 한글로만 구성되어야 함
+                if not all('\uAC00' <= c <= '\uD7A3' for c in name):
+                    continue
+                results.append(name)
+                seen.add(name)
+    except Exception:
+        pass
+    
+    return results
+
+
+def _extract_people_suffix_pattern(text):
+    """
+    한국어 접미사 패턴으로 사람 이름을 추출한다.
+    고정밀 패턴(씨, 한테, 에게)과 호격 패턴(야, 아)을 분리 적용.
+    
+    예: "채아씨", "건이한테", "성희야!" → "채아", "건이", "성희"
+    
+    Returns:
+        list of str: 추출된 이름 목록
+    """
+    results = []
+    seen = set()
+    
+    # 고정밀 패턴: ~씨, ~한테, ~에게
+    for match in _PERSON_SUFFIX_PATTERN.findall(text):
+        if match not in seen and match not in _NON_PERSON_WORDS and len(match) >= 2:
+            results.append(match)
+            seen.add(match)
+    
+    # 호격 패턴: ~야!, ~아! (문장부호/공백 뒤)
+    for match in _VOCATIVE_PATTERN.findall(text):
+        if match not in seen and match not in _NON_PERSON_WORDS and len(match) >= 2:
+            results.append(match)
+            seen.add(match)
+    
+    return results
+
 
 def _extract_people_llm(text):
     """
@@ -94,7 +214,6 @@ def _extract_people_llm(text):
         if res.status_code == 200:
             response_text = res.json().get('response', '').strip()
             # JSON 배열 추출
-            import re
             match = re.search(r'\[.*?\]', response_text, re.DOTALL)
             if match:
                 names = json.loads(match.group())
@@ -107,12 +226,12 @@ def _extract_people_llm(text):
 
 def _extract_people_from_text(text, skip_llm=False):
     """
-    텍스트에서 인물을 추출한다.
+    텍스트에서 인물을 추출한다. 3단계 + 보조 패턴 매칭.
     
-    1차: 호칭 사전 매칭 (엄마, 팀장, 친구 등 — 오탐률 0%, 항상 동작)
-    2차: LLM NER 보완 (성희, 혜진 등 실제 이름 — 문맥 기반 정확도)
-    
-    호칭 사전이 핵심. LLM은 보완재. LLM 실패 시 호칭 사전만으로 동작.
+    1차: 호칭 사전 매칭 (엄마, 팀장, 강사님 등 — 오탐률 0%)
+    1.5차: Kiwi NNP 고유명사 추출 (채아, 건이 등 — LLM 없이 동작)
+    1.5차-2: 한국어 접미사 패턴 ("채아씨", "건이한테" → 이름 추출)
+    2차: LLM NER 보완 (문맥 이해 — skip_llm=False일 때만)
     
     Args:
         skip_llm: True이면 LLM NER 호출을 건너뜀 (배치 작업용)
@@ -121,14 +240,46 @@ def _extract_people_from_text(text, skip_llm=False):
     seen = set()
     
     # 1차: 호칭 사전 매칭 (항상 안전, 기본 동작)
-    for kinship, group in KINSHIP_DICT.items():
+    # 긴 호칭 우선 매칭 ("보조강사님" → "보조강사", "강사님", "강사" 중복 방지)
+    sorted_kinships = sorted(KINSHIP_DICT.keys(), key=len, reverse=True)
+    for kinship in sorted_kinships:
         if kinship in text and kinship not in seen:
+            # 이미 매칭된 더 긴 호칭의 부분이면 스킵
+            is_substring = False
+            for already in seen:
+                if kinship in already or already in kinship:
+                    is_substring = True
+                    break
+            if is_substring:
+                continue
             people.append({
                 "name": kinship,
                 "type": "호칭",
-                "group": group,
+                "group": KINSHIP_DICT[kinship],
             })
             seen.add(kinship)
+    
+    # 1.5차: Kiwi NNP 고유명사 추출 (LLM 없이도 작동)
+    nnp_names = _extract_people_kiwi_nnp(text)
+    for name in nnp_names:
+        if name not in seen and name not in KINSHIP_DICT:
+            people.append({
+                "name": name,
+                "type": "고유명사(Kiwi)",
+                "group": None,
+            })
+            seen.add(name)
+    
+    # 1.5차-2: 접미사 패턴 매칭 ("채아씨", "건이한테" 등)
+    suffix_names = _extract_people_suffix_pattern(text)
+    for name in suffix_names:
+        if name not in seen and name not in KINSHIP_DICT:
+            people.append({
+                "name": name,
+                "type": "고유명사(패턴)",
+                "group": None,
+            })
+            seen.add(name)
     
     # 2차: LLM NER 보완 (실제 이름 추가 추출) — skip_llm=True이면 건너뜀
     if not skip_llm:

@@ -13,7 +13,7 @@ struct PremiumModalView: View {
                 Spacer()
                 Button(action: { isPresented = false }) {
                     Image(systemName: "xmark")
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                         .padding(5)
                 }
             }
@@ -25,7 +25,7 @@ struct PremiumModalView: View {
                     .fontWeight(.bold)
                 Text("더 깊은 이해와 치유를 위한 선택")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
             }
             
             // Features
@@ -38,7 +38,7 @@ struct PremiumModalView: View {
             
             // ✅ Dobong-gu Notice (Green Box)
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "building.2.fill").foregroundColor(.blue)
+                Image(systemName: "building.2.fill").foregroundColor(.accent)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("보건소/정신건강복지센터 안내")
                         .font(.system(size: 14, weight: .bold))
@@ -63,7 +63,7 @@ struct PremiumModalView: View {
                 Text("₩9,900")
                     .font(.callout)
                     .strikethrough()
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
                 
                 Text("₩4,900")
                     .font(.title)
@@ -72,7 +72,7 @@ struct PremiumModalView: View {
                 
                 Text("/월")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
                 
                 Text("런칭 특가 50%")
                     .font(.caption)
@@ -88,7 +88,7 @@ struct PremiumModalView: View {
                 .fontWeight(.bold)
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color.blue)
+                .background(Color.accent)
                 .foregroundColor(.white)
                 .cornerRadius(14)
             }
@@ -103,7 +103,7 @@ struct PremiumModalView: View {
             
             Text("언제든 해지 가능합니다.")
                 .font(.caption)
-                .foregroundColor(.gray)
+                .foregroundColor(.hintText)
         }
         .padding(24)
         .background(Color.white)
@@ -133,7 +133,7 @@ struct FeatureRow: View {
                     .fontWeight(.bold)
                 Text(desc)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

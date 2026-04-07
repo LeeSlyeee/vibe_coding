@@ -34,7 +34,7 @@ struct AppLoginView: View {
                             .foregroundColor(.primary)
                         Text("로그인 및 시작하기")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                             .padding(.top, 4)
                     }
                     .padding(.bottom, 20)
@@ -44,18 +44,18 @@ struct AppLoginView: View {
                             .keyboardType(.default)
                             .padding(.horizontal, 16)
                             .frame(height: 48)
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color.hintText.opacity(0.1))
                             .cornerRadius(12)
-                            .tint(.blue)
+                            .tint(.accent)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                         
                         TextField("아이디 (닉네임)", text: $username)
                             .keyboardType(.default)
                             .padding(.horizontal, 16)
                             .frame(height: 48)
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color.hintText.opacity(0.1))
                             .cornerRadius(12)
-                            .tint(.blue)
+                            .tint(.accent)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
 
                         // [Fix] SecureField을 완전히 제거 → iOS 로그인 폼 감지 방지 → 서드파티 키보드 유지
@@ -64,7 +64,7 @@ struct AppLoginView: View {
                             ZStack(alignment: .leading) {
                                 TextField("비밀번호", text: $password)
                                     .keyboardType(.default)
-                                    .tint(.blue)
+                                    .tint(.accent)
                                     .foregroundColor(isPasswordVisible ? .primary : .clear)
                                 
                                 if !isPasswordVisible && !password.isEmpty {
@@ -76,12 +76,12 @@ struct AppLoginView: View {
                             
                             Button(action: { isPasswordVisible.toggle() }) {
                                 Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                         }
                         .padding(.horizontal, 16)
                         .frame(height: 48)
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color.hintText.opacity(0.1))
                         .cornerRadius(12)
                         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                             
@@ -91,7 +91,7 @@ struct AppLoginView: View {
                             .frame(height: 48)
                             .background(Color(hexString: "f0fdf4"))
                             .cornerRadius(12)
-                            .tint(.blue)
+                            .tint(.accent)
                             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 12)
@@ -120,7 +120,7 @@ struct AppLoginView: View {
                                 .frame(height: 50)
                         }
                     }
-                    .background(Color.blue)
+                    .background(Color.accent)
                     .foregroundColor(.white)
                     .cornerRadius(12)
                     .padding(.horizontal, 24)

@@ -60,7 +60,7 @@ struct AppDiaryWriteView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color.gray.opacity(0.1).edgesIgnoringSafeArea(.all)
+                Color.bgMain.edgesIgnoringSafeArea(.all)
                 
                 if showForm {
                     // 일기 작성 폼
@@ -68,38 +68,35 @@ struct AppDiaryWriteView: View {
                         // 커스텀 헤더
                         HStack {
                             Button("취소") { isPresented = false }
-                                .foregroundColor(.gray)
+                                .foregroundColor(.secondaryText)
                             Spacer()
-                            Text(diaryToEdit != nil ? "일기 수정" : dateStringLocal(date)).font(.headline)
+                            Text(diaryToEdit != nil ? "일기 수정" : dateStringLocal(date)).font(.journalHeading).foregroundColor(.primaryText)
                             Spacer()
                             Button(action: saveDiary) {
                                 if isSaving { ProgressView() } else { Text("저장").fontWeight(.bold) }
                             }
                             .disabled(q1.isEmpty || q2.isEmpty || qs.isEmpty || isSaving)
-                            .foregroundColor((q1.isEmpty || q2.isEmpty || qs.isEmpty) ? .gray : .blue)
+                            .foregroundColor((q1.isEmpty || q2.isEmpty || qs.isEmpty) ? .hintText : .accent)
                         }
                         .padding()
-                        .background(Color.white)
-                        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 5)
+                        .background(Color.cardBg)
+                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 5)
                         .zIndex(1)
                         
                         ScrollView {
                             VStack(spacing: 20) {
                                 // 1. 기분 선택 (카드 스타일)
                                 VStack(alignment: .leading, spacing: 10) {
-                                    Text("오늘의 기분").font(.headline).foregroundColor(.gray)
+                                    Text("오늘의 기분").font(.journalHeading).foregroundColor(.secondaryText)
                                     HStack(spacing: 5) {
                                         ForEach(1...5, id: \.self) { m in
                                             let asset = getMoodAsset(level: m)
                                             Button(action: { withAnimation { mood = m } }) {
                                                 VStack(spacing: 8) {
-                                                    Image(asset.image)
-                                                        .resizable()
-                                                        .scaledToFit()
-                                                        .frame(width: 40, height: 40)
+                                                    MoodFaceView(level: m, size: 40)
                                                     Text(asset.title)
-                                                        .font(.system(size: 11, weight: .medium))
-                                                        .foregroundColor(.primary)
+                                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                                        .foregroundColor(.primaryText)
                                                         .lineLimit(1)
                                                         .minimumScaleFactor(0.8)
                                                 }
@@ -118,9 +115,13 @@ struct AppDiaryWriteView: View {
                                         }
                                     }
                                     .padding()
-                                    .background(Color.white)
+                                    .background(Color.cardBg)
                                     .cornerRadius(16)
-                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(Color.warmBorder, lineWidth: 0.5)
+                                    )
+                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
                                 }
                                 .padding(.top)
                                 
@@ -131,11 +132,11 @@ struct AppDiaryWriteView: View {
                                         HStack {
                                             Text("약물 복용")
                                                 .fontWeight(.semibold)
-                                                .foregroundColor(.primary)
+                                                .foregroundColor(.primaryText)
                                             Spacer()
                                             Button(action: { showingMedSetting = true }) {
                                                 Image(systemName: "gearshape.fill")
-                                                    .foregroundColor(.gray)
+                                                    .foregroundColor(.secondaryText)
                                             }
                                         }
                                         
@@ -144,10 +145,10 @@ struct AppDiaryWriteView: View {
                                             Button(action: { isMedicationTaken.toggle() }) {
                                                 HStack {
                                                     Image(systemName: isMedicationTaken ? "checkmark.square.fill" : "square")
-                                                        .foregroundColor(isMedicationTaken ? .green : .gray)
+                                                        .foregroundColor(isMedicationTaken ? .mood4 : .hintText)
                                                     Text("복용 완료")
                                                         .font(.subheadline)
-                                                        .foregroundColor(.primary)
+                                                        .foregroundColor(.primaryText)
                                                 }
                                             }
                                         } else {
@@ -162,10 +163,10 @@ struct AppDiaryWriteView: View {
                                                 }) {
                                                     HStack {
                                                         Image(systemName: takenMeds.contains(med) ? "checkmark.square.fill" : "square")
-                                                            .foregroundColor(takenMeds.contains(med) ? .green : .gray)
+                                                            .foregroundColor(takenMeds.contains(med) ? .mood4 : .hintText)
                                                         Text(med)
                                                             .font(.subheadline)
-                                                            .foregroundColor(.primary)
+                                                            .foregroundColor(.primaryText)
                                                     }
                                                 }
                                             }
@@ -173,29 +174,31 @@ struct AppDiaryWriteView: View {
                                     }
                                     .padding()
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.white)
+                                    .background(Color.cardBg)
                                     .cornerRadius(16)
-                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
+                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
                                     
                                     // 날씨 확인/수정
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("오늘의 날씨")
-                                            .font(.caption)
-                                            .foregroundColor(.gray)
+                                            .font(.journalCaption)
+                                            .foregroundColor(.secondaryText)
                                         HStack {
                                             TextField("날씨", text: $weatherDesc)
-                                                .font(.headline)
+                                                .font(.journalHeading)
                                             Spacer()
                                             Text(String(format: "%.0f°", temp))
                                                 .font(.subheadline)
-                                                .foregroundColor(.secondary)
+                                                .foregroundColor(.secondaryText)
                                         }
                                     }
                                     .padding()
-                                    .frame(width: 140) // 날씨 영역 고정 너비
-                                    .background(Color.white)
+                                    .frame(minWidth: 120, maxWidth: 160) // [P2 Fix] 반응형 너비 (고정 140pt → 유동)
+                                    .background(Color.cardBg)
                                     .cornerRadius(16)
-                                    .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+                                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
+                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
                                 }
                                 
                                 // 질문 카드들
@@ -234,8 +237,11 @@ struct AppDiaryWriteView: View {
                     // [Keyboard Height Tracking] 키보드 높이 실시간 반영
                     .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
                         if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                            // safe area 하단 높이를 빼서 실제 가려지는 높이만 계산
-                            let safeBottom = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 0
+                            // [P2 Fix] deprecated `UIApplication.shared.windows` → connectedScenes API
+                            let safeBottom = UIApplication.shared.connectedScenes
+                                .compactMap { $0 as? UIWindowScene }
+                                .flatMap { $0.windows }
+                                .first(where: { $0.isKeyWindow })?.safeAreaInsets.bottom ?? 0
                             keyboardHeight = max(0, frame.height - safeBottom)
                         }
                     }
@@ -249,10 +255,10 @@ struct AppDiaryWriteView: View {
                         // ...
                         HStack {
                             Button(action: { isPresented = false }) {
-                                Text("닫기").foregroundColor(.gray)
+                                Text("닫기").foregroundColor(.secondaryText)
                             }
                             Spacer()
-                            Text(dateStringLocal(date)).font(.headline).foregroundColor(.gray)
+                            Text(dateStringLocal(date)).font(.journalHeading).foregroundColor(.secondaryText)
                             Spacer()
                             Button(action: {}) { Text("    ") }
                         }
@@ -264,7 +270,7 @@ struct AppDiaryWriteView: View {
                             Text(String(format: "%.1f°C", temp))
                         }
                         .font(.subheadline)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.accent)
                         .padding(.bottom, 20)
                         
                         // (생략: 기존 Insight 로직 유지)
@@ -272,37 +278,37 @@ struct AppDiaryWriteView: View {
                             VStack(spacing: 40) {
                                 Spacer()
                                 ZStack {
-                                    Circle().fill(Color.purple.opacity(0.1)).frame(width: 120, height: 120)
-                                    Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundColor(.purple)
+                                    Circle().fill(Color.accent.opacity(0.12)).frame(width: 120, height: 120)
+                                    Image(systemName: "wand.and.stars").font(.system(size: 50)).foregroundColor(.accent)
                                 }
                                 VStack(spacing: 20) {
                                     Text("마음 가이드를 준비하고 있어요")
-                                        .font(.title2).fontWeight(.bold).foregroundColor(.primary)
+                                        .font(.journalTitle).foregroundColor(.primaryText)
                                     Text("오늘의 날씨와 지난 감정 흐름을 연결하여\n당신만을 위한 특별한 조언을 만들고 있습니다.")
-                                        .font(.body).multilineTextAlignment(.center).foregroundColor(.gray).lineSpacing(6)
-                                    Text("잠시만 기다려주세요...").font(.subheadline).foregroundColor(.purple).padding(.top, 10)
+                                        .font(.journalBody).multilineTextAlignment(.center).foregroundColor(.secondaryText).lineSpacing(6)
+                                    Text("잠시만 기다려주세요...").font(.subheadline).foregroundColor(.accent).padding(.top, 10)
                                 }
-                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple)).scaleEffect(1.5)
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .accent)).scaleEffect(1.5)
                                 Spacer()
                             }
                         } else {
                             VStack(spacing: 30) {
                                 Spacer()
-                                Circle().fill(Color.purple.opacity(0.1)).frame(width: 80, height: 80)
-                                    .overlay(Image(systemName: "figure.mind.and.body").font(.largeTitle).foregroundColor(.blue))
-                                Text("오늘의 마음 가이드").font(.title3).fontWeight(.bold).foregroundColor(.purple)
+                                Circle().fill(Color.accent.opacity(0.12)).frame(width: 80, height: 80)
+                                    .overlay(Image(systemName: "figure.mind.and.body").font(.largeTitle).foregroundColor(.accent))
+                                Text("오늘의 마음 가이드").font(.journalHeading).foregroundColor(.accent)
                                 Text(insightMessage.isEmpty ? "오늘 하루도 수고 많으셨어요." : insightMessage)
-                                    .font(.body).multilineTextAlignment(.center).padding()
-                                    .frame(maxWidth: .infinity).background(Color.purple.opacity(0.05)).cornerRadius(15).padding(.horizontal)
+                                    .font(.journalBody).multilineTextAlignment(.center).padding()
+                                    .frame(maxWidth: .infinity).background(Color.softTan.opacity(0.3)).cornerRadius(15).padding(.horizontal)
                                 Button(action: { withAnimation { showForm = true } }) {
                                     Text("오늘의 감정 기록하기").fontWeight(.bold).foregroundColor(.white).padding()
-                                        .frame(maxWidth: .infinity).background(Color.black).cornerRadius(15)
+                                        .frame(maxWidth: .infinity).background(Color.accent).cornerRadius(15)
                                 }.padding(.horizontal, 40)
                                 Spacer()
                             }
                         }
                     }
-                    .background(Color.white)
+                    .background(Color.bgMain)
                     .transition(.opacity)
                 }
             }
@@ -384,7 +390,8 @@ struct AppDiaryWriteView: View {
                     if self.weatherDesc == "맑음" { self.fetchWeather() }
                 }
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 300) {
+                // [P0-3 Fix] 300초(5분) → 15초로 단축 — 사용자가 5분 대기하면 앱 삭제함
+                DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
                     if isLoadingInsight {
                         isLoadingInsight = false
                         if insightMessage.isEmpty { insightMessage = "오늘 하루도 수고 많으셨어요." }
@@ -429,13 +436,13 @@ struct AppDiaryWriteView: View {
         
         return VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(title).font(.headline).foregroundColor(Color.secondary)
+                Text(title).font(.journalHeading).foregroundColor(.secondaryText)
                 Spacer()
                 // 마이크 버튼
                 Button(action: { toggleRecording(for: fieldId, currentText: binding.wrappedValue) }) {
                     Image(systemName: (activeRecordingField == fieldId && voiceRecorder.isRecording) ? "stop.circle.fill" : "mic.circle.fill")
                         .font(.system(size: 30))
-                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .red : .blue)
+                        .foregroundColor((activeRecordingField == fieldId && voiceRecorder.isRecording) ? .mood1 : .accent)
                         .scaleEffect((activeRecordingField == fieldId && voiceRecorder.isRecording) ? 1.2 : 1.0)
                         .animation(.easeInOut(duration: 0.2), value: voiceRecorder.isRecording)
                 }
@@ -464,11 +471,11 @@ struct AppDiaryWriteView: View {
             .frame(minHeight: 100)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(focusedField == fieldId ? Color.blue.opacity(0.04) : Color.gray.opacity(0.08))
+                    .fill(focusedField == fieldId ? Color.accent.opacity(0.06) : Color.softTan.opacity(0.3))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(focusedField == fieldId ? Color.blue.opacity(0.6) : Color.clear, lineWidth: 2)
+                    .stroke(focusedField == fieldId ? Color.accent.opacity(0.6) : Color.clear, lineWidth: 2)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
             #else
@@ -479,9 +486,10 @@ struct AppDiaryWriteView: View {
             #endif
         }
         .padding()
-        .background(Color.white)
+        .background(Color.cardBg)
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.03), radius: 5, x: 0, y: 2)
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
+        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
     }
     
     // Logic: 녹음 토글
@@ -713,7 +721,7 @@ struct MedicationSettingView: View {
                 HStack {
                     TextField("약 이름 (예: 비타민, 혈압약)", text: $newMedName)
                         .padding()
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color.softTan.opacity(0.3))
                         .cornerRadius(10)
                     
                     Button(action: addMedication) {
@@ -721,7 +729,7 @@ struct MedicationSettingView: View {
                             .font(.title2)
                             .foregroundColor(.white)
                             .padding()
-                            .background(newMedName.isEmpty ? Color.gray : Color.blue)
+                            .background(newMedName.isEmpty ? Color.hintText : Color.accent)
                             .cornerRadius(10)
                     }
                     .disabled(newMedName.isEmpty)
@@ -733,7 +741,7 @@ struct MedicationSettingView: View {
                     ForEach(medications, id: \.self) { med in
                         HStack {
                             Image(systemName: "pills")
-                                .foregroundColor(.green)
+                                .foregroundColor(.mood4)
                             Text(med)
                                 .font(.body)
                         }
@@ -745,8 +753,8 @@ struct MedicationSettingView: View {
                 Spacer()
                 
                 Text("등록된 약들은 일기 작성 시\n확인할 수 있습니다.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(.journalCaption)
+                    .foregroundColor(.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding()
             }

@@ -480,7 +480,7 @@ struct RecipientDepthSettingsView: View {
                     
                     depthToggle(
                         systemIcon: "key.fill",
-                        iconColor: .purple,
+                        iconColor: .accent,
                         title: "감정 트리거 키워드",
                         description: "감정 변화를 유발한 키워드",
                         isOn: $shareTriggerKeywords
@@ -856,7 +856,7 @@ struct ShareHistoryView: View {
                                         Text("열람됨")
                                             .font(.system(size: 9))
                                     }
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                                 }
                             }
                         }

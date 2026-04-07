@@ -37,7 +37,7 @@ struct AppAssessmentView: View {
                     Text("Q\(currentStep + 1).")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.accent)
                     
                     Text(questions[currentStep])
                         .font(.title2)
@@ -83,11 +83,11 @@ struct AppAssessmentView: View {
             }
             .padding()
             .frame(maxWidth: .infinity)
-            .background(Color.gray.opacity(0.15))
+            .background(Color.hintText.opacity(0.15))
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                    .stroke(Color.accent.opacity(0.3), lineWidth: 1)
             )
         }
         .foregroundColor(.primary)

@@ -347,7 +347,7 @@ def generate_condition(user_id, db_session, Diary, crypto_decrypt=None, today=No
         'user_id': user_id,
         'analysis_date': analysis_date.strftime('%Y-%m-%d'),
         'condition': {
-            'score': composite_score,
+            'score': int(composite_score),
             'grade': grade_key,
             'icon': grade['icon'],
             'label': grade['label'],

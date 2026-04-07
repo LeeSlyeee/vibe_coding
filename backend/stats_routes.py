@@ -278,3 +278,148 @@ def submit_assessment():
         'risk_level': risk,
         'message': '감정 체크가 완료되었습니다.'
     }), 200
+
+
+# ─────────────────────────────────────────────
+# [Feature] 감성 무드 캘린더 (Emotional Mood Calendar)
+# ─────────────────────────────────────────────
+
+def _temperature_to_weather(temp):
+    """마음 온도 → 날씨 이모지/라벨/색상 매핑."""
+    if temp >= 40:
+        return {'emoji': '☀️', 'label': '화창', 'color': '#ff6b6b'}
+    elif temp >= 37.5:
+        return {'emoji': '🌤️', 'label': '맑음', 'color': '#ffa726'}
+    elif temp >= 35:
+        return {'emoji': '⛅', 'label': '구름살짝', 'color': '#66bb6a'}
+    elif temp >= 30:
+        return {'emoji': '🌥️', 'label': '흐림', 'color': '#42a5f5'}
+    else:
+        return {'emoji': '🌧️', 'label': '비', 'color': '#7e57c2'}
+
+
+def _calculate_daily_temperature(diaries_for_day, safe_decrypt):
+    """
+    특정 날짜의 일기 목록으로부터 마음 온도를 산출한다.
+    calculate_mood_temperature()의 일별 축소 버전.
+    """
+    if not diaries_for_day:
+        return None
+
+    # 1. 기분 레벨 점수 (60%) — 일별이므로 빈도/안정성 가중치 축소
+    mood_levels = [d.mood_level or 3 for d in diaries_for_day]
+    avg_mood = sum(mood_levels) / len(mood_levels)
+    mood_score = ((avg_mood - 1) / 4) * 100
+
+    # 2. 수면 점수 (40%)
+    sleep_positive = ["잘", "충분", "숙면", "편안", "좋"]
+    sleep_negative = ["못", "불면", "뒤척", "힘들", "나쁘", "잠을 못"]
+    sleep_scores = []
+    for d in diaries_for_day:
+        sleep_text = safe_decrypt(d.sleep_condition) if d.sleep_condition else ""
+        if not sleep_text:
+            sleep_scores.append(50)
+            continue
+        pos = sum(1 for kw in sleep_positive if kw in sleep_text)
+        neg = sum(1 for kw in sleep_negative if kw in sleep_text)
+        if pos > neg:
+            sleep_scores.append(80)
+        elif neg > pos:
+            sleep_scores.append(30)
+        else:
+            sleep_scores.append(50)
+    sleep_score = sum(sleep_scores) / len(sleep_scores) if sleep_scores else 50
+
+    raw_score = mood_score * 0.60 + sleep_score * 0.40
+    temperature = 20 + (raw_score / 100) * 25
+    return round(temperature, 1)
+
+
+@stats_bp.route('/api/mood-calendar', methods=['GET'])
+@jwt_required()
+def get_mood_calendar():
+    """
+    감성 무드 캘린더 API.
+    지정된 year/month에 해당하는 일별 마음 온도 + 날씨 이모지를 반환한다.
+    
+    Query Params:
+        year (int): 연도 (기본: 올해)
+        month (int): 월 (기본: 이번 달)
+    
+    Response:
+        {
+            "year": 2026, "month": 3,
+            "days": {
+                "2026-03-01": {"mood_level": 4, "temperature": 38.2, "emoji": "🌤️", ...},
+                "2026-03-02": null,  // 미기록
+                ...
+            }
+        }
+    """
+    user_id = int(get_jwt_identity())
+    now = datetime.utcnow()
+    year = request.args.get('year', now.year, type=int)
+    month = request.args.get('month', now.month, type=int)
+
+    # 유효성 검증
+    if not (2020 <= year <= 2100) or not (1 <= month <= 12):
+        return jsonify({'error': '유효하지 않은 연/월입니다.'}), 400
+
+    safe_decrypt = _get_safe_decrypt()
+
+    # 해당 월의 일기 전부 조회
+    month_start = f"{year:04d}-{month:02d}-01"
+    if month == 12:
+        month_end = f"{year + 1:04d}-01-01"
+    else:
+        month_end = f"{year:04d}-{month + 1:02d}-01"
+
+    diaries = Diary.query.filter(
+        Diary.user_id == user_id,
+        Diary.date >= month_start,
+        Diary.date < month_end
+    ).order_by(Diary.date.asc()).all()
+
+    # 날짜별 그룹핑
+    from collections import defaultdict
+    daily_map = defaultdict(list)
+    for d in diaries:
+        if d.date:
+            daily_map[d.date].append(d)
+
+    # 해당 월의 전체 일수
+    import calendar
+    _, days_in_month = calendar.monthrange(year, month)
+
+    days = {}
+    for day_num in range(1, days_in_month + 1):
+        date_str = f"{year:04d}-{month:02d}-{day_num:02d}"
+        day_diaries = daily_map.get(date_str, [])
+
+        if not day_diaries:
+            days[date_str] = None  # 미기록
+            continue
+
+        temp = _calculate_daily_temperature(day_diaries, safe_decrypt)
+        if temp is None:
+            days[date_str] = None
+            continue
+
+        weather = _temperature_to_weather(temp)
+        mood_levels = [d.mood_level for d in day_diaries if d.mood_level]
+        avg_mood = round(sum(mood_levels) / len(mood_levels), 1) if mood_levels else None
+
+        days[date_str] = {
+            'mood_level': avg_mood,
+            'temperature': temp,
+            'emoji': weather['emoji'],
+            'label': weather['label'],
+            'color': weather['color'],
+            'diary_count': len(day_diaries),
+        }
+
+    return jsonify({
+        'year': year,
+        'month': month,
+        'days': days,
+    }), 200

@@ -204,16 +204,16 @@ struct AppMainTabView: View {
                                              Text("D-\(info.dDay)")
                                                  .font(.caption)
                                                  .fontWeight(.bold)
-                                                 .foregroundColor(.blue)
+                                                 .foregroundColor(.accent)
                                                  .padding(.horizontal, 10)
                                                  .padding(.vertical, 6)
-                                                 .background(Color.blue.opacity(0.1))
+                                                 .background(Color.accent.opacity(0.10))
                                                  .cornerRadius(12)
                                          }
                                      }
                                      .padding(.horizontal, 16)
                                      .padding(.vertical, 12)
-                                     .background(Color.gray.opacity(0.05))
+                                     .background(Color.softTan.opacity(0.3))
                                      .cornerRadius(12)
                                  }
                              }
@@ -228,7 +228,7 @@ struct AppMainTabView: View {
                                      .foregroundColor(.white)
                                      .frame(maxWidth: .infinity)
                                      .padding(.vertical, 16)
-                                     .background(Color.orange)
+                                     .background(Color.accent)
                                      .cornerRadius(16)
                              }
                              .padding(.top, 10)
@@ -282,9 +282,11 @@ struct AppMainTabView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "chevron.left")
                                     Text("닫기")
-                                }.foregroundColor(.blue)
+                                }.foregroundColor(.accent)
                             })
                     }
+                case .safetyCheck(let username):
+                    SafetyCheckView(username: username)
                 }
             } // Close sheet block
             .onChange(of: activeFullScreen) { newValue in
@@ -327,9 +329,11 @@ struct AppMainTabView: View {
                                 HStack(spacing: 4) {
                                     Image(systemName: "chevron.left")
                                     Text("닫기")
-                                }.foregroundColor(.blue)
+                                }.foregroundColor(.accent)
                             })
                     }
+                case .safetyCheck(let username):
+                    SafetyCheckView(username: username)
                 }
             }
             #endif
@@ -514,15 +518,15 @@ struct AppMainTabView: View {
             if isEmergency {
                 return isSelected ? .red : .red.opacity(0.6)
             } else {
-                return isSelected ? .black : Color.gray.opacity(0.5)
+                return isSelected ? .primaryText : Color.hintText
             }
         }
         
         var textColor: Color {
             if isEmergency {
-                return isSelected ? .red : .gray
+                return isSelected ? .red : .hintText
             } else {
-                return isSelected ? .black : .gray
+                return isSelected ? .primaryText : .hintText
             }
         }
     }
@@ -710,7 +714,7 @@ struct GuideFeatureCard: View {
                     .lineSpacing(4)
             }
             Spacer()
-            Image(systemName: systemIcon).font(.system(size: 32)).foregroundColor(.blue)
+            Image(systemName: systemIcon).font(.system(size: 32)).foregroundColor(.accent)
         }
         .padding(24)
         .background(highlight ? Color.white : Color(hexString: "FBFBFD"))
@@ -748,7 +752,7 @@ struct KeyboardAwareTabBar: View {
         if shouldShow {
             VStack(spacing: 0) {
                 Divider()
-                    .background(Color.gray.opacity(0.1))
+                    .background(Color.hintText.opacity(0.1))
                 
                 HStack(spacing: 0) {
                     tabButton(index: 0, title: "캘린더", systemIcon: "calendar")
@@ -785,14 +789,14 @@ struct KeyboardAwareTabBar: View {
                     .frame(width: 24, height: 24)
                     .foregroundColor(isEmergency
                         ? (isSelected ? .red : .red.opacity(0.6))
-                        : (isSelected ? .black : Color.gray.opacity(0.5)))
+                        : (isSelected ? .primaryText : Color.hintText))
                 
                 Text(title)
                     .font(.caption)
                     .fontWeight(isSelected ? .bold : .regular)
                     .foregroundColor(isEmergency
-                        ? (isSelected ? .red : .gray)
-                        : (isSelected ? .black : .gray))
+                        ? (isSelected ? .red : .hintText)
+                        : (isSelected ? .primaryText : .hintText))
             }
         }
         .frame(maxWidth: .infinity)
@@ -806,7 +810,7 @@ struct KeyboardAwareTabBar: View {
     var body: some View {
         VStack(spacing: 0) {
             Divider()
-                .background(Color.gray.opacity(0.1))
+                .background(Color.hintText.opacity(0.1))
             
             HStack(spacing: 0) {
                 // macOS용 간단 탭바 (필요시 구현)

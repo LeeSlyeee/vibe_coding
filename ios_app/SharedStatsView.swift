@@ -37,7 +37,7 @@ struct SharedStatsView: View {
                         .padding(20)
                         .background(
                             LinearGradient(
-                                colors: [.blue, .purple],
+                                colors: [.accent, .accent.opacity(0.7)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -63,7 +63,7 @@ struct SharedStatsView: View {
                                         Text("\(String(format: "%.1f", avgInt))도")
                                             .font(.title2)
                                             .fontWeight(.bold)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(.accent)
                                     }
                                 }
                             }
@@ -74,10 +74,10 @@ struct SharedStatsView: View {
                             if let moodRestricted = stats.moodRestricted, moodRestricted {
                                 HStack {
                                     Image(systemName: "lock.fill")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                     Text("내담자가 감정 흐름을 비공개로 설정했습니다.")
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.vertical, 4)
@@ -109,7 +109,7 @@ struct SharedStatsView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     HStack {
                                         Image(systemName: "text.bubble.fill")
-                                            .foregroundColor(.purple)
+                                            .foregroundColor(.accent)
                                         Text("AI 분석 요약")
                                             .font(.caption)
                                             .foregroundColor(.secondary)
@@ -138,7 +138,7 @@ struct SharedStatsView: View {
                         VStack {
                             Text("총 기록일")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             Text("\(stats.totalEntries)일")
                                 .font(.title3)
                                 .fontWeight(.bold)
@@ -147,7 +147,7 @@ struct SharedStatsView: View {
                         VStack {
                             Text("연속 기록")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             Text("\(stats.writingStreak)일")
                                 .font(.title3)
                                 .fontWeight(.bold)
@@ -183,7 +183,7 @@ struct SharedStatsView: View {
                     
                 } else {
                     Text("데이터를 불러올 수 없습니다.")
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                         .padding(.top, 50)
                 }
             }

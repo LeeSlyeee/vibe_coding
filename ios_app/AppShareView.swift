@@ -32,9 +32,9 @@ struct AppShareView: View {
                     VStack {
                         Text("연결하기 (보호자)")
                             .fontWeight(selectedTab == 0 ? .bold : .regular)
-                            .foregroundColor(selectedTab == 0 ? .blue : .gray)
+                            .foregroundColor(selectedTab == 0 ? .accent : .hintText)
                         Rectangle()
-                            .fill(selectedTab == 0 ? Color.blue : Color.clear)
+                            .fill(selectedTab == 0 ? Color.accent : Color.clear)
                             .frame(height: 2)
                     }
                 }
@@ -44,9 +44,9 @@ struct AppShareView: View {
                     VStack {
                         Text("공유하기 (내담자)")
                             .fontWeight(selectedTab == 1 ? .bold : .regular)
-                            .foregroundColor(selectedTab == 1 ? .blue : .gray)
+                            .foregroundColor(selectedTab == 1 ? .accent : .hintText)
                         Rectangle()
-                            .fill(selectedTab == 1 ? Color.blue : Color.clear)
+                            .fill(selectedTab == 1 ? Color.accent : Color.clear)
                             .frame(height: 2)
                     }
                 }
@@ -106,9 +106,9 @@ struct AppShareView: View {
                                     shareManager.fetchList(role: "viewer")
                                 }) {
                                     Image(systemName: "arrow.clockwise")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.accent)
                                         .padding(8)
-                                        .background(Color.blue.opacity(0.1))
+                                        .background(Color.accent.opacity(0.1))
                                         .clipShape(Circle())
                                 }
                             }
@@ -116,7 +116,7 @@ struct AppShareView: View {
                             
                             if shareManager.connectedUsers.isEmpty {
                                 Text("연결된 사용자가 없습니다.")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                                     .padding()
                                     .frame(maxWidth: .infinity, alignment: .center)
                             } else {
@@ -129,11 +129,11 @@ struct AppShareView: View {
                                                     .foregroundColor(.primary)
                                                 Text("연결됨: \(formatConnDate(user.connectedAt))")
                                                     .font(.caption)
-                                                    .foregroundColor(.gray)
+                                                    .foregroundColor(.hintText)
                                             }
                                             Spacer()
                                             Image(systemName: "chevron.right")
-                                                .foregroundColor(.gray)
+                                                .foregroundColor(.hintText)
                                         }
                                         .padding()
                                         .background(Color(.systemBackground))
@@ -162,11 +162,11 @@ struct AppShareView: View {
                     VStack(spacing: 15) {
                         Text("내 공유 코드")
                             .font(.headline)
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                         
                         Text(shareManager.myCode.isEmpty ? "– – – – – – – –" : shareManager.myCode)
                             .font(.system(size: 28, weight: .heavy, design: .monospaced))
-                            .foregroundColor(.blue)
+                            .foregroundColor(.accent)
                             .tracking(3)
                         
                         if !shareManager.myCode.isEmpty {
@@ -189,7 +189,7 @@ struct AppShareView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue)
+                            .background(Color.accent)
                             .cornerRadius(14)
                     }
                     .padding(.horizontal, 40)
@@ -197,7 +197,7 @@ struct AppShareView: View {
                     Text("코드가 입력되면 별도의 승인 없이\n상대방과 즉시 연결됩니다.")
                         .multilineTextAlignment(.center)
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                     
                     // Connected Guardians List
                     VStack(alignment: .leading, spacing: 10) {
@@ -210,9 +210,9 @@ struct AppShareView: View {
                                 shareManager.fetchList(role: "sharer")
                             }) {
                                 Image(systemName: "arrow.clockwise")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                                     .padding(8)
-                                    .background(Color.blue.opacity(0.1))
+                                    .background(Color.accent.opacity(0.1))
                                     .clipShape(Circle())
                             }
                         }
@@ -222,7 +222,7 @@ struct AppShareView: View {
                             VStack {
                                 Text("아직 연결된 보호자가 없습니다.")
                                     .font(.subheadline)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                                     .multilineTextAlignment(.center)
                                     .padding()
                                 
@@ -239,9 +239,9 @@ struct AppShareView: View {
                                 }) {
                                     Text("새로고침 (Retry)")
                                         .font(.caption)
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.accent)
                                         .padding(8)
-                                        .background(Color.blue.opacity(0.1))
+                                        .background(Color.accent.opacity(0.1))
                                         .cornerRadius(8)
                                 }
                                 .padding(.top, 10)
@@ -258,11 +258,11 @@ struct AppShareView: View {
                                             
                                         Text("연결됨: \(formatConnDate(guardian.connectedAt))")
                                             .font(.caption)
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(.hintText)
                                     }
                                     Spacer()
                                     Image(systemName: "person.2.fill")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.accent)
                                         .padding(.trailing, 8)
                                     
                                     // [DELETE BUTTON]
@@ -297,7 +297,7 @@ struct AppShareView: View {
                             
                             Text("보호자에게 전달되는 정보의 범위를 설정합니다.")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                                 .padding(.horizontal)
                             
                             VStack(spacing: 0) {
@@ -315,7 +315,7 @@ struct AppShareView: View {
                                 
                                 ShareToggleRow(
                                     systemIcon: "chart.bar.fill",
-                                    iconColor: .blue,
+                                    iconColor: .accent,
                                     title: "분석 리포트",
                                     subtitle: "주간/월간 감정 분석을 공유합니다",
                                     isOn: $shareReport
@@ -401,7 +401,7 @@ struct AppShareView: View {
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                             .padding()
                             .background(Color(.systemBackground))
@@ -461,7 +461,7 @@ struct AppShareView: View {
                     Spacer()
                     Text("\(shareManager.guardianAlerts.count)건")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                 }
                 
                 ForEach(shareManager.guardianAlerts) { alert in
@@ -491,7 +491,7 @@ struct AppShareView: View {
                                     Text("대응 가이드")
                                 }
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                                 ForEach(guides, id: \.self) { guide in
                                     Text(guide)
                                         .font(.caption)
@@ -517,7 +517,7 @@ struct AppShareView: View {
         switch severity {
         case "high": return Color.red.opacity(0.05)
         case "medium": return Color.orange.opacity(0.05)
-        default: return Color.blue.opacity(0.05)
+        default: return Color.accent.opacity(0.05)
         }
     }
     
@@ -525,7 +525,7 @@ struct AppShareView: View {
         switch severity {
         case "high": return Color.red.opacity(0.3)
         case "medium": return Color.orange.opacity(0.3)
-        default: return Color.blue.opacity(0.3)
+        default: return Color.accent.opacity(0.3)
         }
     }
 
@@ -533,7 +533,7 @@ struct AppShareView: View {
         switch severity {
         case "high": return Color.red.opacity(0.2)
         case "medium": return Color.orange.opacity(0.2)
-        default: return Color.blue.opacity(0.2)
+        default: return Color.accent.opacity(0.2)
         }
     }
 
@@ -541,7 +541,7 @@ struct AppShareView: View {
         switch severity {
         case "high": return .red
         case "medium": return .orange
-        default: return .blue
+        default: return .accent
         }
     }
     
@@ -575,7 +575,7 @@ struct ShareToggleRow: View {
                     .fontWeight(.medium)
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(.hintText)
             }
             Spacer()
             Toggle("", isOn: $isOn)

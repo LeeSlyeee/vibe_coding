@@ -15,12 +15,12 @@ struct WeeklyLetterView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "envelope.open")
                         .font(.system(size: 40))
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                     Text("아직 도착한 주간 편지가 없어요.")
                         .foregroundColor(.secondary)
                     Text("일기를 꾸준히 쓰면 1주일마다 마음온 AI가 편지를 보내드려요!")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
@@ -150,10 +150,10 @@ struct LetterRowView: View {
         HStack {
             ZStack {
                 Circle()
-                    .fill(letter.isRead ? Color.gray.opacity(0.2) : Color.blue.opacity(0.1))
+                    .fill(letter.isRead ? Color.hintText.opacity(0.2) : Color.accent.opacity(0.1))
                     .frame(width: 50, height: 50)
                 Image(systemName: letter.isRead ? "envelope.open.fill" : "envelope.fill")
-                    .foregroundColor(letter.isRead ? .gray : .blue)
+                    .foregroundColor(letter.isRead ? .hintText : .accent)
                     .font(.title2)
             }
             
@@ -206,7 +206,7 @@ struct LetterDetailView: View {
                     VStack {
                         Image(systemName: "envelope.fill")
                             .font(.system(size: 60))
-                            .foregroundColor(.blue)
+                            .foregroundColor(.accent)
                             .offset(y: envelopeOffset)
                             .onAppear {
                                 withAnimation(Animation.easeInOut(duration: 1.0).repeatForever(autoreverses: true)) {
@@ -232,7 +232,7 @@ struct LetterDetailView: View {
                                 Spacer()
                                 Text(formatDate(full.createdAt) ?? "")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                             
                             Divider()

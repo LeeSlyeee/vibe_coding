@@ -1,6 +1,9 @@
 
 import Foundation
 import Combine
+#if os(iOS)
+import UIKit
+#endif
 
 class AuthManager: ObservableObject {
     @Published var isAuthenticated: Bool = false
@@ -226,6 +229,18 @@ class AuthManager: ObservableObject {
                         
                         self.token = token // This triggers isAuthenticated = true
                         
+                        // [APNs Fix] 로그인 후 serverAuthToken이 준비된 시점에 APNs 재등록
+                        // 첫 설치 시 didRegisterForRemoteNotificationsWithDeviceToken이 토큰 없을 때 실행됐을 수 있음
+                        #if os(iOS)
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            UIApplication.shared.registerForRemoteNotifications()
+                        }
+                        // [Push Fix] 로그인 후 pending FCM/APNs 토큰을 즉시 서버에 전송
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            AppDelegate.flushPendingTokens()
+                        }
+                        #endif
+                        
                         LocalDataManager.shared.syncWithServer()
                         completion(true, "로그인 성공")
                     }
@@ -238,6 +253,17 @@ class AuthManager: ObservableObject {
                     self.username = username
                     
                     self.token = token
+                    
+                    // [APNs Fix] 로그인 후 serverAuthToken이 준비된 시점에 APNs 재등록
+                    #if os(iOS)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        UIApplication.shared.registerForRemoteNotifications()
+                    }
+                    // [Push Fix] 로그인 후 pending FCM/APNs 토큰을 즉시 서버에 전송
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                        AppDelegate.flushPendingTokens()
+                    }
+                    #endif
                     
                     LocalDataManager.shared.syncWithServer()
                     completion(true, "로그인 성공")

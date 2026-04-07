@@ -72,65 +72,159 @@ struct AppStatsView: View {
         ZStack {
             Color.bgMain.edgesIgnoringSafeArea(.all) // 배경만 전체 채움
             
-            // [B2G] 무조건 연동해야만 통계 해금
+            // [P1-3 Fix] B2G 미연동 시에도 기본 무드 차트 제공
             if !b2gManager.isLinked {
-                VStack(spacing: 24) {
-                    Spacer()
-                    Image(systemName: "lock.shield.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(authManager.riskLevel >= 2 ? .red.opacity(0.6) : .gray.opacity(0.5))
-                    
-                    VStack(spacing: 8) {
-                        Text("전문 분석 기능 잠김")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        
-                        if authManager.riskLevel >= 2 {
-                            // 중증(위험) 사용자용 메시지
-                            Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/정신건강복지센터와 연동해주세요.")
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.red)
-                                .fontWeight(.semibold)
-                        } else {
-                            // 경증(일반) 사용자용 메시지
-                            Text("보건소/정신건강복지센터와 연동하시면\n심층 통계 분석 기능을 이용하실 수 있습니다.")
-                                .multilineTextAlignment(.center)
-                                .foregroundColor(.secondary)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Header
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("마음 분석")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundColor(.primaryText)
+                                Text("나의 감정 흐름을 확인해보세요")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondaryText)
+                            }
+                            Spacer()
                         }
-                    }
-                    
-                    Text("설정 > 기관 연동(B2G) 메뉴에서도\n언제든 연동할 수 있습니다.")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 10)
-                    
-                    // [New] Direct Connect Button
-                    Button(action: { showingConnectAlert = true }) {
-                        Text("지금 연동하기")
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 24)
-                            .background(Color.blue)
-                            .cornerRadius(12)
-                            .shadow(radius: 3)
-                    }
-                    .padding(.top, 20)
-                    .alert("기관 코드 입력", isPresented: $showingConnectAlert) {
-                        TextField("코드 (예: CENTER001)", text: $inputCode)
-                        Button("취소", role: .cancel) { }
-                        Button("연동") {
-                            connectToCenter()
-                        }
-                    } message: {
-                        Text("보건소나 정신건강복지센터에서 발급받은\n코드를 입력해주세요.")
-                    }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 20)
                         
-                    Spacer()
+                        // ━━━ 기본 무드 차트 (무료) ━━━
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "chart.line.uptrend.xyaxis")
+                                    .foregroundColor(.accent)
+                                Text("최근 감정 추이")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryText)
+                                Spacer()
+                                Text("최근 7일")
+                                    .font(.caption)
+                                    .foregroundColor(.hintText)
+                            }
+                            
+                            // 로컬 일기 데이터로 간단 차트 생성
+                            let recentDiaries = getRecentDiaries(days: 7)
+                            if recentDiaries.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "pencil.and.list.clipboard")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.hintText.opacity(0.5))
+                                    Text("아직 기록이 없어요.\n일기를 작성하면 감정 추이가 여기에 표시됩니다.")
+                                        .multilineTextAlignment(.center)
+                                        .font(.subheadline)
+                                        .foregroundColor(.hintText)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 30)
+                            } else {
+                                // 기분 수준 바 차트 (심플 버전)
+                                HStack(alignment: .bottom, spacing: 8) {
+                                    ForEach(recentDiaries, id: \.date) { diary in
+                                        VStack(spacing: 4) {
+                                            let level = diary.mood_level ?? 3
+                                            let asset = getMoodAsset(level: level)
+                                            
+                                            MoodFaceView(level: level, size: 20)
+                                            
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .fill(asset.color.opacity(0.6))
+                                                .frame(width: 28, height: CGFloat(level) * 16)
+                                            
+                                            Text(String(diary.date?.suffix(5) ?? ""))
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.hintText)
+                                        }
+                                    }
+                                }
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 130)
+                                .padding(.vertical, 8)
+                            }
+                        }
+                        .padding()
+                        .background(Color.cardBg)
+                        .cornerRadius(16)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
+                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal, 16)
+                        
+                        // ━━━ 심층 분석 잠금 안내 ━━━
+                        VStack(spacing: 16) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(authManager.riskLevel >= 2 ? .red.opacity(0.6) : .hintText.opacity(0.5))
+                            
+                            VStack(spacing: 6) {
+                                Text("심층 분석 기능")
+                                    .font(.title3)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.primary)
+                                
+                                if authManager.riskLevel >= 2 {
+                                    Text("⚠️ 주의가 필요한 상태입니다.\n전문가의 도움을 받기 위해\n보건소/정신건강복지센터와 연동해주세요.")
+                                        .multilineTextAlignment(.center)
+                                        .foregroundColor(.red)
+                                        .fontWeight(.semibold)
+                                        .font(.subheadline)
+                                } else {
+                                    Text("기관 연동 시 월별 분석, 기분 분포,\nAI 심층 리포트를 이용할 수 있습니다.")
+                                        .multilineTextAlignment(.center)
+                                        .foregroundColor(.secondary)
+                                        .font(.subheadline)
+                                }
+                            }
+                            
+                            // 잠긴 기능 미리보기 아이콘
+                            HStack(spacing: 20) {
+                                ForEach(["월별 통계", "기분 분포", "날씨 상관", "AI 리포트"], id: \.self) { feature in
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "lock.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.hintText.opacity(0.4))
+                                        Text(feature)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.hintText)
+                                    }
+                                }
+                            }
+                            .padding(.top, 4)
+                            
+                            Button(action: { showingConnectAlert = true }) {
+                                Text("기관 연동하고 전체 해금")
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 12)
+                                    .padding(.horizontal, 24)
+                                    .background(Color.accent)
+                                    .cornerRadius(12)
+                                    .shadow(radius: 3)
+                            }
+                            .alert("기관 코드 입력", isPresented: $showingConnectAlert) {
+                                TextField("코드 (예: CENTER001)", text: $inputCode)
+                                Button("취소", role: .cancel) { }
+                                Button("연동") {
+                                    connectToCenter()
+                                }
+                            } message: {
+                                Text("보건소나 정신건강복지센터에서 발급받은\n코드를 입력해주세요.")
+                            }
+                            
+                            Text("설정 > 기관 연동(B2G) 메뉴에서도 가능합니다.")
+                                .font(.caption)
+                                .foregroundColor(.hintText)
+                        }
+                        .padding()
+                        .background(Color.cardBg)
+                        .cornerRadius(16)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
+                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 30)
+                    }
                 }
-                .padding()
             } else {
                 // Full Feature for Severe (Level 2+) Users
                 VStack(spacing: 0) {
@@ -203,7 +297,7 @@ struct AppStatsView: View {
                     HStack(spacing: 14) {
                         ZStack {
                             Circle()
-                                .fill(Color.green.opacity(0.12))
+                                .fill(Color.mood4.opacity(0.12))
                                 .frame(width: 56, height: 56)
                             Text(conditionIcon)
                                 .font(.system(size: 28))
@@ -217,7 +311,7 @@ struct AppStatsView: View {
                                 Text("\(conditionScore)점")
                                     .font(.caption)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.mood4)
                             }
                             Text(conditionLabel)
                                 .font(.headline)
@@ -303,7 +397,7 @@ struct AppStatsView: View {
                                                 }
                                                 Spacer()
                                                 Image(systemName: "chevron.right")
-                                                    .foregroundColor(.gray)
+                                                    .foregroundColor(.hintText)
                                             }
                                             .modifier(CardModifier())
                                         }
@@ -323,7 +417,7 @@ struct AppStatsView: View {
                                                 }
                                                 Spacer()
                                                 Image(systemName: "chevron.right")
-                                                    .foregroundColor(.gray)
+                                                    .foregroundColor(.hintText)
                                             }
                                             .modifier(CardModifier())
                                         }
@@ -389,7 +483,7 @@ struct AppStatsView: View {
                             Image(systemName: "chevron.left")
                             Text("돌아가기")
                         }
-                        .foregroundColor(.blue)
+                        .foregroundColor(.accent)
                     })
             }
         }
@@ -475,7 +569,14 @@ struct AppStatsView: View {
             }
             
             DispatchQueue.main.async {
-                self.conditionScore = condition["score"] as? Int ?? 100
+                // score가 Float(76.2)로 올 수 있어 Int 캐스팅 실패 방지
+                if let scoreInt = condition["score"] as? Int {
+                    self.conditionScore = scoreInt
+                } else if let scoreDouble = condition["score"] as? Double {
+                    self.conditionScore = Int(scoreDouble)
+                } else {
+                    self.conditionScore = 50  // 파싱 실패 시 중간값
+                }
                 self.conditionGrade = condition["grade"] as? String ?? ""
                 self.conditionIcon = condition["icon"] as? String ?? "☀️"
                 self.conditionLabel = condition["label"] as? String ?? "측정 중"
@@ -508,6 +609,32 @@ struct AppStatsView: View {
                 self.kickInsightsLoaded = true
             }
         }.resume()
+    }
+    
+    // [P1-3] 최근 N일 일기 가져오기 (로컬 데이터 기반)
+    func getRecentDiaries(days: Int) -> [Diary] {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone.current
+        
+        let calendar = Calendar.current
+        let today = Date()
+        
+        // 최근 N일 날짜 목록 생성
+        var targetDates: Set<String> = []
+        for i in 0..<days {
+            if let d = calendar.date(byAdding: .day, value: -i, to: today) {
+                targetDates.insert(f.string(from: d))
+            }
+        }
+        
+        // 로컬 일기에서 해당 날짜 필터링 + 날짜순 정렬
+        return LocalDataManager.shared.diaries
+            .filter { diary in
+                guard let date = diary.date else { return false }
+                return targetDates.contains(date)
+            }
+            .sorted { ($0.date ?? "") < ($1.date ?? "") }
     }
     
     // [New] Connect Helper
@@ -928,7 +1055,7 @@ struct ReportView: View {
     var body: some View {
         VStack(spacing: 20) {
             HStack {
-                Image(systemName: "wand.and.stars").font(.title2).foregroundColor(.purple)
+                Image(systemName: "wand.and.stars").font(.title2).foregroundColor(.accent)
                 Text("AI 심층 리포트").font(.title3).fontWeight(.bold)
                 Spacer()
             }
@@ -937,9 +1064,9 @@ struct ReportView: View {
                 Button(action: startReport) {
                     HStack { Text("✨ 지금 바로 분석 시작하기"); Image(systemName: "arrow.right") }
                         .fontWeight(.bold).foregroundColor(.white).padding().frame(maxWidth: .infinity)
-                        .background(LinearGradient(colors: [.purple, .blue], startPoint: .leading, endPoint: .trailing))
+                        .background(LinearGradient(colors: [.accent, .mood5], startPoint: .leading, endPoint: .trailing))
                         .cornerRadius(16)
-                        .shadow(color: .purple.opacity(0.3), radius: 10, x: 0, y: 5)
+                        .shadow(color: .accent.opacity(0.3), radius: 10, x: 0, y: 5)
                 }
             } else if isGenerating {
                 VStack(spacing: 15) {
@@ -956,22 +1083,22 @@ struct ReportView: View {
                 if longContent.isEmpty && !isGeneratingLong {
                     Button(action: startLongTerm) {
                         Text("장기 기억 패턴 분석하기").fontWeight(.semibold).foregroundColor(.white).padding()
-                            .frame(maxWidth: .infinity).background(Color.green).cornerRadius(16)
+                            .frame(maxWidth: .infinity).background(Color.mood4).cornerRadius(16)
                     }
                 } else if isGeneratingLong {
                     ProgressView("장기 패턴 분석 중...")
                 } else {
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("메타 분석").font(.headline).foregroundColor(.green)
+                        Text("메타 분석").font(.headline).foregroundColor(.mood4)
                         Text(longContent).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
                     }.padding(20).background(Color(hexString: "F0FDF4")).cornerRadius(16)
                 }
-                Button(" 다시 분석") { startReport() }.font(.caption).foregroundColor(.gray).padding(.top, 10)
+                Button(" 다시 분석") { startReport() }.font(.caption).foregroundColor(.hintText).padding(.top, 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.hintText)
                     Text("⚠️ 위기 감지는 보조적 수단이며, 100% 정확성을 보장하지 않습니다.")
                         .font(.caption2)
                         .foregroundColor(.orange)

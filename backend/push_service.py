@@ -141,8 +141,8 @@ def _send_apns_direct(device_token: str, title: str, body: str, data: dict = Non
             headers={"alg": "ES256", "kid": KEY_ID}
         )
 
-        # sandbox 먼저 시도, 실패 시 production
-        for env, host in [("sandbox", "api.sandbox.push.apple.com"), ("production", "api.push.apple.com")]:
+        # production 먼저 시도, 실패 시 sandbox (production 빌드 앱 대응)
+        for env, host in [("production", "api.push.apple.com"), ("sandbox", "api.sandbox.push.apple.com")]:
             url = f"https://{host}/3/device/{device_token}"
             headers = {
                 "authorization": f"bearer {token}",
@@ -188,8 +188,8 @@ def notify_guardians_mood(sharer_user, mood_level: int):
     - share_mood=True인 보호자만 대상
     - mood_level에 따라 메시지 내용이 동적으로 변경됨
     """
-    if not _firebase_initialized:
-        return
+    # APNs 직접 발송 가능하므로 Firebase 미초기화 시에도 진행
+    pass
 
     from models import db, User, ShareRelationship
 
@@ -215,9 +215,9 @@ def notify_guardians_mood(sharer_user, mood_level: int):
 
         for rel in relationships:
             viewer = User.query.get(rel.viewer_id)
-            if viewer and viewer.fcm_token:
+            if viewer and (viewer.fcm_token or getattr(viewer, 'apns_token', None)):
                 send_push(
-                    fcm_token=viewer.fcm_token,
+                    fcm_token=viewer.fcm_token or '',
                     title=f"🌡️ {sharer_name}님의 마음 온도",
                     body=body_msg,
                     data={
@@ -244,8 +244,8 @@ def notify_guardians_crisis(sharer_user):
     - safety_flag=True 일기 저장 시 보호자에게 긴급 알림
     - share_crisis=True인 보호자만 대상
     """
-    if not _firebase_initialized:
-        return
+    # APNs 직접 발송 가능하므로 Firebase 미초기화 시에도 진행
+    pass
     
     from models import db, User, ShareRelationship
     
@@ -263,9 +263,9 @@ def notify_guardians_crisis(sharer_user):
         
         for rel in relationships:
             viewer = User.query.get(rel.viewer_id)
-            if viewer and viewer.fcm_token:
+            if viewer and (viewer.fcm_token or getattr(viewer, 'apns_token', None)):
                 send_push(
-                    fcm_token=viewer.fcm_token,
+                    fcm_token=viewer.fcm_token or '',
                     title="⚠️ 긴급: 위기 신호 감지",
                     body=body_msg,
                     data={
@@ -286,8 +286,8 @@ def notify_guardians_ai_report(sharer_id: int, ai_comment: str):
     - 일기 AI 분석 완료 시, 보호자(공유 설정된)에게 AI 요약 한 줄 코멘트와 함께 푸시 알림 발송
     - share_report=True (또는 share_mood=True) 인 보호자 대상
     """
-    if not _firebase_initialized:
-        return
+    # APNs 직접 발송 가능하므로 Firebase 미초기화 시에도 진행
+    pass
         
     from models import db, User, ShareRelationship
     import json
@@ -320,9 +320,9 @@ def notify_guardians_ai_report(sharer_id: int, ai_comment: str):
                 continue
                 
             viewer = User.query.get(rel.viewer_id)
-            if viewer and viewer.fcm_token:
+            if viewer and (viewer.fcm_token or getattr(viewer, 'apns_token', None)):
                 send_push(
-                    fcm_token=viewer.fcm_token,
+                    fcm_token=viewer.fcm_token or '',
                     title=f"✨ {sharer_name}님의 AI 마음 분석이 도착했어요",
                     body=f"{clean_comment}",
                     data={
@@ -351,9 +351,9 @@ def notify_guardians_ai_report(sharer_id: int, ai_comment: str):
 
         for rel in relationships:
             viewer = User.query.get(rel.viewer_id)
-            if viewer and viewer.fcm_token:
+            if viewer and (viewer.fcm_token or getattr(viewer, 'apns_token', None)):
                 send_push(
-                    fcm_token=viewer.fcm_token,
+                    fcm_token=viewer.fcm_token or '',
                     title=f"⚠️ 긴급: {sharer_name}님 위기 신호 감지",
                     body=f"{sharer_name}님에게서 위기 신호가 감지되었습니다. 지금 바로 확인해 주세요.",
                     data={
@@ -380,8 +380,8 @@ def notify_guardians_kick_flag(sharer_user, flags: list):
     - share_mood=True인 보호자에게 발송 (기분 관련 알림 설정 재활용)
     - 중복 방지: last_alert_at 기준 24시간 이내 동일 유형 재발송 안 함
     """
-    if not _firebase_initialized:
-        return
+    # APNs 직접 발송 가능하므로 Firebase 미초기화 시에도 진행
+    pass
 
     # medium/high만 필터
     alert_flags = [f for f in flags if f.get('severity') in ('medium', 'high')]
@@ -422,9 +422,9 @@ def notify_guardians_kick_flag(sharer_user, flags: list):
                     continue
 
             viewer = User.query.get(rel.viewer_id)
-            if viewer and viewer.fcm_token:
+            if viewer and (viewer.fcm_token or getattr(viewer, 'apns_token', None)):
                 send_push(
-                    fcm_token=viewer.fcm_token,
+                    fcm_token=viewer.fcm_token or '',
                     title=title,
                     body=body,
                     data={

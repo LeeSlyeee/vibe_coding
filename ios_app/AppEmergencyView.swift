@@ -45,17 +45,17 @@ struct AppEmergencyView: View {
                                         Text("가까운 정신건강복지센터 찾기")
                                             .font(.subheadline)
                                             .fontWeight(.medium)
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(.accent)
                                         Text("mentalhealth.go.kr")
                                             .font(.caption)
-                                            .foregroundColor(.gray)
+                                            .foregroundColor(.hintText)
                                     }
                                     Spacer()
                                     Image(systemName: "arrow.up.right.square")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.accent)
                                 }
                                 .padding()
-                                .background(Color.blue.opacity(0.05))
+                                .background(Color.accent.opacity(0.05))
                                 .cornerRadius(14)
                             }
                         }

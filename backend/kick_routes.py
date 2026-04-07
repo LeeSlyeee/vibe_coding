@@ -621,38 +621,195 @@ def get_my_weekly_letter_detail(letter_id):
 @kick_bp.route('/api/kick/relational/my-map', methods=['GET'])
 @jwt_required()
 def get_my_relational_map():
-    """사용자 본인의 관계 지형도 데이터(UI 렌더링용 JSON)"""
+    """사용자 본인의 관계 지형도 데이터(UI 렌더링용 JSON)
+    
+    iOS RelationalNode 모델에 맞춰 다음 필드를 포함:
+    - id, group, size, color
+    - mention_count: 30일간 전체 일기에서 등장 횟수
+    - last_seen: 마지막으로 언급된 날짜
+    - summary: 감정 기반 한 줄 요약
+    """
     user_id = int(get_jwt_identity())
     
-    # 30일 간의 데이터 모으기
-    result = analyze_relational(user_id, db.session, Diary, crypto_decrypt=_decrypt_func)
+    # 사용자 본인 이름 조회 (자기 자신을 별자리에서 제외하기 위함)
+    user = User.query.get(user_id)
+    self_names = set()
+    if user:
+        if user.username:
+            self_names.add(user.username)
+        if user.real_name:
+            self_names.add(user.real_name)
+            # 이름의 부분도 추가 (예: "이성희" → "성희"도 필터링)
+            if len(user.real_name) >= 3:
+                self_names.add(user.real_name[1:])  # 성 제외한 이름
+    
+    # 30일 간의 데이터 분석 (LLM NER 스킵 → 호칭사전 + Kiwi NNP + 패턴 매칭)
+    result = analyze_relational(user_id, db.session, Diary, crypto_decrypt=_decrypt_func, skip_llm_ner=True)
     
     if result.get('status') != 'completed':
         return jsonify({'nodes': [], 'links': []}), 200
         
     rel = result.get('relational', {})
     timeline = rel.get('social_density_timeline', [])
+    daily_analyses = rel.get('daily_analyses', [])
     
+    if not timeline:
+        return jsonify({'nodes': [], 'links': []}), 200
+    
+    # ─── 인물별 통계 집계 (전체 30일 데이터 기반) ───
+    from collections import defaultdict
+    
+    person_mention_count = defaultdict(int)   # 총 등장 횟수
+    person_last_seen = {}                      # 마지막 언급일
+    person_emotions_all = defaultdict(set)     # 전체 감정
+    person_group = {}                          # 관계 그룹
+    
+    # daily_analyses에서 인물별 등장 횟수 + 마지막 등장일 계산
+    for day in daily_analyses:
+        date_str = day.get('date', '')
+        for person_name in day.get('people', []):
+            # 사용자 본인 이름은 별자리에서 제외
+            if person_name in self_names:
+                continue
+            person_mention_count[person_name] += 1
+            # 날짜 비교: 더 최근 날짜로 갱신
+            if person_name not in person_last_seen or date_str > person_last_seen[person_name]:
+                person_last_seen[person_name] = date_str
+    
+    # timeline에서 인물별 감정 + 그룹 정보 수집
+    for week_data in timeline:
+        people_emotions = week_data.get('people_emotions', {})
+        for person, emo_info in people_emotions.items():
+            person_emotions_all[person].update(emo_info.get('emotions', []))
+    
+    # 호칭사전에서 그룹 매핑
+    from kick_analysis.relational import KINSHIP_DICT
+    for person_name in person_mention_count:
+        if person_name in KINSHIP_DICT:
+            person_group[person_name] = KINSHIP_DICT[person_name]
+    
+    # ─── 색상 팔레트 (그룹별 / 감정별) ───
+    GROUP_COLORS = {
+        "가족": "#FF6B9D",    # 핑크
+        "연인": "#FF4757",    # 로즈
+        "친구": "#45B7D1",    # 스카이블루
+        "직장": "#FFEAA7",    # 옐로우
+        "직장/학교": "#DDA0DD",  # 플럼
+        "학교": "#96CEB4",    # 민트
+        "의료": "#74B9FF",    # 소프트블루
+        "사회": "#A29BFE",    # 라벤더
+    }
+    VALENCE_COLORS = {
+        "positive": "#22C55E",  # 그린
+        "negative": "#A855F7",  # 퍼플
+        "neutral": "#9CA3AF",   # 그레이
+    }
+    
+    # ─── 감정 기반 요약 생성 ───
+    EMOTION_KR = {
+        "joy": "기쁨", "comfort": "편안함", "gratitude": "감사",
+        "sadness": "슬픔", "anger": "분노", "anxiety": "불안",
+        "fatigue": "피로", "loneliness": "외로움",
+    }
+    
+    def _build_summary(person_name, emotions, valence, mention_count, last_seen_date):
+        """인물별 한 줄 요약 생성"""
+        emotion_labels = [EMOTION_KR.get(e, e) for e in emotions if e in EMOTION_KR]
+        
+        # 감정이 없으면 기본 메시지
+        if not emotion_labels:
+            if mention_count >= 5:
+                return f"최근 일기에서 자주 등장하는 사람이에요."
+            else:
+                return f"일기에 {mention_count}번 등장했어요."
+        
+        emotion_str = ", ".join(emotion_labels[:3])
+        
+        if valence == "positive":
+            if mention_count >= 5:
+                return f"자주 떠올리는 소중한 사람이에요. 주로 {emotion_str}의 감정이 함께해요. ✨"
+            else:
+                return f"{emotion_str}의 감정과 함께 등장했어요. 좋은 에너지를 주는 관계네요."
+        elif valence == "negative":
+            if mention_count >= 5:
+                return f"자주 언급되지만 {emotion_str}의 감정이 동반돼요. 마음의 짐이 될 수 있어요."
+            else:
+                return f"{emotion_str}의 감정과 연결되어 있어요. 마음을 돌봐주세요."
+        else:
+            return f"일기에 {mention_count}번 등장했어요. {emotion_str}의 감정이 섞여 있어요."
+    
+    # ─── 노드 & 링크 구성 ───
     nodes = []
     links = []
     
-    if timeline:
-        # 가장 최근 주차의 감정 데이터 사용
-        recent_week = timeline[-1]
-        people_emotions = recent_week.get('people_emotions', {})
+    # 전체 인물 중 언급 횟수 순으로 정렬 (상위 N명만 표시)
+    MAX_NODES = 8  # 너무 많으면 UI가 복잡해지므로 제한
+    sorted_people = sorted(person_mention_count.items(), key=lambda x: -x[1])
+    top_people = sorted_people[:MAX_NODES]
+    
+    if not top_people:
+        return jsonify({'nodes': [], 'links': []}), 200
+    
+    # 최대 언급 횟수 (노드 크기 정규화용)
+    max_mentions = max(count for _, count in top_people) if top_people else 1
+    
+    # 중심 노드 (나)
+    total_people_count = len(person_mention_count)
+    me_summary = f"당신은 이 별자리의 중심이에요. {total_people_count}명의 소중한 사람들이 주변을 밝히고 있어요. 💛" if total_people_count > 0 else "아직 별자리가 형성되고 있어요. 일기에 주변 사람 이야기를 적어보세요. ✨"
+    nodes.append({
+        "id": "Me",
+        "group": 0,
+        "size": 35,
+        "color": "FFD700",
+        "mention_count": None,
+        "last_seen": None,
+        "summary": me_summary,
+    })
+    
+    # 그룹 인덱스 매핑
+    GROUP_INDEX = {"가족": 1, "연인": 1, "친구": 2, "직장": 3, "직장/학교": 3, "학교": 3, "의료": 4, "사회": 4}
+    
+    for person_name, mention_count in top_people:
+        # 감정 valence 계산
+        emotions = person_emotions_all.get(person_name, set())
+        pos = emotions & {"joy", "comfort", "gratitude"}
+        neg = emotions & {"sadness", "anger", "anxiety", "fatigue", "loneliness"}
+        valence = "positive" if len(pos) > len(neg) else "negative" if len(neg) > len(pos) else "neutral"
         
-        # '나(Me)' 중심 노드
-        nodes.append({"id": "Me", "group": 0, "size": 30, "color": "#6366f1"})
+        # 색상: 그룹 우선, 없으면 감정 기반
+        group = person_group.get(person_name)
+        color = GROUP_COLORS.get(group, VALENCE_COLORS.get(valence, "#9CA3AF"))
+        # '#' 제거 (iOS에서 Color(hexString:)이 '#' 없이 받을 수 있으므로)
+        color = color.lstrip('#')
         
-        for person, emo_info in people_emotions.items():
-            valence = emo_info.get('valence')
-            # 색상 매핑 (긍정=녹색/노랑, 부정=빨강/보라, 중립=파랑/회색)
-            color = "#a855f7" if valence == 'negative' else "#22c55e" if valence == 'positive' else "#9ca3af"
-            # 노드 크기 = 10 고정 (나중에 언급 빈도에 따라 가중치 가능)
-            nodes.append({"id": person, "group": 1, "size": 15, "color": color})
-            # 나와의 연결
-            links.append({"source": "Me", "target": person, "value": 1})
-            
+        # 노드 크기: 언급 횟수 비례 (16 ~ 28)
+        size = int(16 + (mention_count / max(max_mentions, 1)) * 12)
+        
+        # 그룹 인덱스
+        group_idx = GROUP_INDEX.get(group, 2)
+        
+        # 마지막 언급일
+        last_seen = person_last_seen.get(person_name)
+        
+        # 요약
+        summary = _build_summary(person_name, emotions, valence, mention_count, last_seen)
+        
+        nodes.append({
+            "id": person_name,
+            "group": group_idx,
+            "size": size,
+            "color": color,
+            "mention_count": mention_count,
+            "last_seen": last_seen,
+            "summary": summary,
+        })
+        
+        links.append({
+            "source": "Me",
+            "target": person_name,
+            "value": mention_count,
+        })
+    
     return jsonify({'nodes': nodes, 'links': links}), 200
 
 
@@ -894,3 +1051,56 @@ def get_self_narrative_summary():
         'by_type': type_counts,
         'by_severity': severity_counts
     })
+
+
+# ═════════════════════════════════════════════════
+# CBT 인지 왜곡 패턴 분석
+# ═════════════════════════════════════════════════
+
+@kick_bp.route('/api/kick/my-cbt-patterns', methods=['GET'])
+@jwt_required()
+def get_my_cbt_patterns():
+    """
+    로그인한 사용자 본인의 CBT 인지 왜곡 패턴 분석.
+    최근 30일 일기에서 12가지 인지 왜곡 패턴을 감지한다.
+    의료진 권한 불필요.
+    """
+    user_id = int(get_jwt_identity())
+
+    from kick_analysis.cbt_patterns import analyze_cbt_patterns
+    result = analyze_cbt_patterns(
+        user_id, db.session, Diary,
+        crypto_decrypt=_decrypt_func,
+    )
+
+    return jsonify(result)
+
+
+@kick_bp.route('/api/kick/cbt-patterns/<int:user_id>', methods=['GET'])
+@jwt_required()
+def get_cbt_patterns_for_user(user_id):
+    """
+    [의료진 전용] 특정 사용자의 CBT 인지 왜곡 패턴 분석.
+    """
+    current_user_id = int(get_jwt_identity())
+    current_user = User.query.filter_by(id=current_user_id).first()
+
+    if not current_user or current_user.role not in ('doctor', 'admin', 'staff', 'therapist'):
+        return jsonify({'error': '의료진 권한이 필요합니다.'}), 403
+
+    target_user = User.query.filter_by(id=user_id).first()
+    if not target_user:
+        return jsonify({'error': '사용자를 찾을 수 없습니다.'}), 404
+
+    from kick_analysis.cbt_patterns import analyze_cbt_patterns
+    result = analyze_cbt_patterns(
+        user_id, db.session, Diary,
+        crypto_decrypt=_decrypt_func,
+    )
+
+    # 의료진용: 사용자 이름 추가
+    result['username'] = target_user.username
+    result['real_name'] = target_user.real_name
+
+    return jsonify(result)
+

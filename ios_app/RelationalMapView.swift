@@ -1,8 +1,8 @@
 import SwiftUI
 
 struct RelationalMapView: View {
-    @State private var mapData: RelationalMapResponse? = RelationalMapView.demoMapData
-    @State private var isLoading = false
+    @State private var mapData: RelationalMapResponse?
+    @State private var isLoading = true
     
     @State private var offsets: [String: CGSize] = [:]
     @State private var selectedNode: RelationalNode?
@@ -285,10 +285,14 @@ struct RelationalMapView: View {
     }
     
     private func fetchRelationalMap() {
+        isLoading = true
         APIService.shared.fetchMyRelationalMap { result in
             DispatchQueue.main.async {
+                self.isLoading = false
                 if let result = result, !result.nodes.isEmpty {
                     self.mapData = result
+                } else {
+                    self.mapData = nil // 서버 데이터 없음 → 안내 표시
                 }
             }
         }

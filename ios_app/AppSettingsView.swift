@@ -26,6 +26,12 @@ struct AppSettingsView: View {
     // [보안] 스크린샷 방지 설정
     @AppStorage("isScreenshotPreventionOn") private var isScreenshotPreventionOn: Bool = false
     
+    // [일기 알림] 매일 알림 설정
+    @AppStorage("isDiaryReminderOn") private var isDiaryReminderOn: Bool = false
+    @AppStorage("diaryReminderHour") private var diaryReminderHour: Int = 21
+    @AppStorage("diaryReminderMinute") private var diaryReminderMinute: Int = 0
+    @State private var diaryReminderDate = Date()
+    
     // Unified Alert System [Fix]
     enum ActiveAlert: Identifiable {
         case info(String)
@@ -55,7 +61,7 @@ struct AppSettingsView: View {
                                     .font(.headline)
                                 Text("연동 계정 로그인됨")
                                     .font(.caption)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                             }
                             Spacer()
                             Button("로그아웃") {
@@ -75,7 +81,7 @@ struct AppSettingsView: View {
                                     .foregroundColor(.primary)
                             } else {
                                 Text("설정되지 않음")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                             
                             // Edit Button (trigger sheet or inline picker)
@@ -83,7 +89,7 @@ struct AppSettingsView: View {
                                 showBirthDatePicker = true
                             }
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.accent)
                         }
                     } else {
                         // [Dual Mode] Auto Account vs Custom Login
@@ -106,7 +112,7 @@ struct AppSettingsView: View {
                                 // 1. ID Display
                                 HStack {
                                     Text("아이디:")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                     Spacer()
                                     Text(UserDefaults.standard.string(forKey: "app_username") ?? "생성 중...")
                                         .fontWeight(.bold)
@@ -117,7 +123,7 @@ struct AppSettingsView: View {
                                 // 2. PW Display
                                 HStack {
                                     Text("비밀번호:")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                     Spacer()
                                     if isPwVisible {
                                         Text(KeychainHelper.standard.readString(account: "app_password") ?? "****")
@@ -130,7 +136,7 @@ struct AppSettingsView: View {
                                     
                                     Button(action: { isPwVisible.toggle() }) {
                                         Image(systemName: isPwVisible ? "eye.slash" : "eye")
-                                            .foregroundColor(.blue)
+                                            .foregroundColor(.accent)
                                     }
                                 }
                                 .padding(.vertical, 4)
@@ -159,9 +165,9 @@ struct AppSettingsView: View {
                                             .foregroundColor(.white.opacity(0.8))
                                     }
                                     .padding()
-                                    .background(Color.blue) // 브랜드 컬러 유지
+                                    .background(Color.accent) // 브랜드 컬러 유지
                                     .cornerRadius(12)
-                                    .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
+                                    .shadow(color: Color.accent.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
                                 .padding(.top, 8)
                             }
@@ -221,7 +227,7 @@ struct AppSettingsView: View {
                                 }) {
                                     Text("취소 (앱 계정 사용)")
                                         .font(.caption)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                 }
                                 .frame(maxWidth: .infinity)
                             }
@@ -236,10 +242,10 @@ struct AppSettingsView: View {
                         HStack(spacing: 15) {
                             ZStack {
                                 Circle()
-                                    .fill(Color.purple.opacity(0.1))
+                                    .fill(Color.accent.opacity(0.1))
                                     .frame(width: 40, height: 40)
                                 Image(systemName: "person.2.fill")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(.accent)
                                     .font(.system(size: 20))
                             }
                             
@@ -274,7 +280,7 @@ struct AppSettingsView: View {
                             
                             HStack {
                                 Text("연동 코드:")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                                 Text(b2gManager.centerCode)
                                     .font(.system(.body, design: .monospaced))
                                     .fontWeight(.bold)
@@ -300,7 +306,7 @@ struct AppSettingsView: View {
                             if let username = UserDefaults.standard.string(forKey: "app_username") {
                                 HStack {
                                     Text("앱 계정 ID:")
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(.hintText)
                                         .font(.caption)
                                     Text(username)
                                         .foregroundColor(.secondary)
@@ -312,7 +318,7 @@ struct AppSettingsView: View {
                             if b2gManager.lastSyncDate > 0 {
                                 Text("마지막 전송: \(Date(timeIntervalSince1970: b2gManager.lastSyncDate).formatted())")
                                     .font(.caption2)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                             
                             // [Buttons] Sync Actions
@@ -338,10 +344,10 @@ struct AppSettingsView: View {
                                     }
                                     .frame(maxWidth: .infinity)
                                     .padding()
-                                    .background(Color.blue)
+                                    .background(Color.accent)
                                     .foregroundColor(.white)
                                     .cornerRadius(12)
-                                    .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
+                                    .shadow(color: Color.accent.opacity(0.3), radius: 4, x: 0, y: 2)
                                 }
                                 .buttonStyle(BorderlessButtonStyle()) // [Fix] List 내부 버튼 간섭 방지
 
@@ -375,7 +381,7 @@ struct AppSettingsView: View {
                             
                             Text("* 데이터가 보이지 않거나 꼬였을 때 위 버튼들을 눌러 동기화하세요.")
                                 .font(.caption2)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                                 .multilineTextAlignment(.center)
                         }
                         .padding(.vertical, 8)
@@ -387,7 +393,7 @@ struct AppSettingsView: View {
                                 .font(.headline)
                             Text("담당 선생님께 전달받은 코드를 입력하세요.")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             
                             HStack {
                                 TextField("예: SEOUL-001", text: $inputCode)
@@ -422,13 +428,13 @@ struct AppSettingsView: View {
                         // Case A: 기관 연동 사용자 (보건소 연동 유저)
                         HStack {
                             Image(systemName: "building.columns.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accent)
                                 .font(.title2)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("기관 연동 멤버십")
                                     .font(.headline)
                                     .fontWeight(.bold)
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                                 Text("보건소 연동으로 프리미엄 혜택이 적용됩니다.")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -522,7 +528,7 @@ struct AppSettingsView: View {
                                     Text("구독 관리 (App Store)")
                                         .font(.caption)
                                 }
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                             }
                         }
                         
@@ -556,7 +562,7 @@ struct AppSettingsView: View {
                                 }
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(.hintText)
                             }
                             .padding(.vertical, 4)
                         }
@@ -568,7 +574,7 @@ struct AppSettingsView: View {
                     NavigationLink(destination: AppGuideView()) {
                         HStack {
                             Image(systemName: "book.fill")
-                                .foregroundColor(.blue)
+                                .foregroundColor(.accent)
                             Text("사용 가이드")
                                 .foregroundColor(.primary)
                         }
@@ -581,13 +587,13 @@ struct AppSettingsView: View {
                         Text("버전")
                         Spacer()
                         Text("1.0.0 (On-Device Al)")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                     }
                     HStack {
                         Text("개발자")
                         Spacer()
                         Text("Maum-on Team")
-                            .foregroundColor(.gray)
+                            .foregroundColor(.hintText)
                     }
                     
                     // [Hidden Feature] 개발자용 데이터 생성 버튼
@@ -596,7 +602,7 @@ struct AppSettingsView: View {
                     }) {
                         Text("[개발자용] 테스트 데이터 생성 (Demo)")
                             .font(.caption)
-                            .foregroundColor(.blue)
+                            .foregroundColor(.accent)
                     }
                 }
                 
@@ -611,10 +617,80 @@ struct AppSettingsView: View {
                                 .font(.headline)
                             Text("앱 화면이 캡처되거나 녹화되는 것을 방지합니다.")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(.hintText)
                         }
                     }
                     .padding(.vertical, 4)
+                }
+                
+                // Section: 일기 알림 (Daily Diary Reminder)
+                Section(header: Text("일기 알림")) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "bell.badge.fill")
+                                .foregroundColor(.orange)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Toggle("매일 일기 알림", isOn: $isDiaryReminderOn)
+                                    .font(.headline)
+                                    .onChange(of: isDiaryReminderOn) { newValue in
+                                        if newValue {
+                                            DiaryReminderManager.schedule(hour: diaryReminderHour, minute: diaryReminderMinute)
+                                        } else {
+                                            DiaryReminderManager.cancel()
+                                        }
+                                    }
+                                Text("설정한 시간에 일기 작성을 알려드려요")
+                                    .font(.caption)
+                                    .foregroundColor(.hintText)
+                            }
+                        }
+                        
+                        if isDiaryReminderOn {
+                            HStack {
+                                Image(systemName: "clock.fill")
+                                    .foregroundColor(.accent)
+                                Text("알림 시간")
+                                Spacer()
+                                DatePicker(
+                                    "",
+                                    selection: $diaryReminderDate,
+                                    displayedComponents: .hourAndMinute
+                                )
+                                .labelsHidden()
+                                .onChange(of: diaryReminderDate) { newDate in
+                                    let calendar = Calendar.current
+                                    diaryReminderHour = calendar.component(.hour, from: newDate)
+                                    diaryReminderMinute = calendar.component(.minute, from: newDate)
+                                    DiaryReminderManager.schedule(hour: diaryReminderHour, minute: diaryReminderMinute)
+                                }
+                            }
+                            
+                            // 알림 미리보기
+                            HStack(spacing: 8) {
+                                Image(systemName: "bubble.left.fill")
+                                    .foregroundColor(.accent.opacity(0.6))
+                                    .font(.caption)
+                                Text("\"오늘 하루는 어땠나요? 마음을 기록해보세요 ✍️\"")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .italic()
+                            }
+                            .padding(10)
+                            .background(Color.accent.opacity(0.05))
+                            .cornerRadius(8)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                    .onAppear {
+                        // 저장된 시간으로 DatePicker 초기화
+                        var components = DateComponents()
+                        components.hour = diaryReminderHour
+                        components.minute = diaryReminderMinute
+                        if let date = Calendar.current.date(from: components) {
+                            diaryReminderDate = date
+                        }
+                    }
                 }
                 
                 // Section 4.5: 법적 고지 (Legal Disclaimer)
@@ -826,6 +902,8 @@ struct AppSettingsView: View {
             }
     }
     
+
+    
     // 이스터에그 함수
     func seedData() {
         DataSeeder.shared.seedDummyData { count in
@@ -901,7 +979,7 @@ struct BirthDatePickerView: View {
                         HStack {
                             Button(action: { changeMonth(by: -1) }) {
                                 Image(systemName: "chevron.left")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                             }
                             Spacer()
                             Text(monthYearString(displayedMonth))
@@ -910,7 +988,7 @@ struct BirthDatePickerView: View {
                             Spacer()
                             Button(action: { changeMonth(by: 1) }) {
                                 Image(systemName: "chevron.right")
-                                    .foregroundColor(.blue)
+                                    .foregroundColor(.accent)
                             }
                         }
                         .padding(.horizontal, 8)
@@ -921,7 +999,7 @@ struct BirthDatePickerView: View {
                                 Text(day)
                                     .font(.caption)
                                     .fontWeight(.bold)
-                                    .foregroundColor(index == 0 ? .red : (index == 6 ? .blue : .gray))
+                                    .foregroundColor(index == 0 ? .red : (index == 6 ? .accent : .hintText))
                                     .frame(maxWidth: .infinity)
                             }
                         }
@@ -941,12 +1019,12 @@ struct BirthDatePickerView: View {
                                             .foregroundColor(
                                                 isSelected ? .white :
                                                 wd == 1 ? .red :
-                                                wd == 7 ? .blue :
+                                                wd == 7 ? .accent :
                                                 .primary
                                             )
                                             .frame(width: 36, height: 36)
                                             .background(
-                                                isSelected ? Circle().fill(Color.blue) : Circle().fill(Color.clear)
+                                                isSelected ? Circle().fill(Color.accent) : Circle().fill(Color.clear)
                                             )
                                     }
                                 } else {
@@ -977,7 +1055,7 @@ struct BirthDatePickerView: View {
                         }
                     }
                     .foregroundColor(.white)
-                    .listRowBackground(Color.blue)
+                    .listRowBackground(Color.accent)
                 }
             }
             .navigationTitle("생년월일 설정")

@@ -265,7 +265,10 @@ extension LLMService {
                 "속이 터질 것 같은 그 기분.. 억누르지 말고 다 말씀해주세요.",
                 "그런 일이 있었다니 저도 듣기만 해도 화가 나네요. 무슨 일이 있었는지 조금 더 자세히 말해주실 수 있나요?",
                 "지금은 화를 내셔도 괜찮아요. 감정을 참는 것보다 표현하는 게 더 중요하니까요.",
-                "정말 어이없고 화나는 상황이었겠네요.. 저였어도 그랬을 거예요."
+                "정말 어이없고 화나는 상황이었겠네요.. 저였어도 그랬을 거예요.",
+                "화가 나는 건 자연스러운 감정이에요. 그 화를 삼키지 않으셨으면 해요.",
+                "당연히 화가 나죠. 그 감정, 충분히 타당해요.",
+                "그 상황에서 화가 안 나는 게 오히려 이상한 거예요. 당신 잘못이 아니에요."
              ]
              return angerMsgs.randomElement()!
         }
@@ -277,30 +280,83 @@ extension LLMService {
                 "혼자 끙끙 앓지 마세요. 제가 곁에서 조용히 들어드릴게요.",
                 "울고 싶을 땐 소리 내어 울어도 돼요. 당신의 슬픔이 조금이라도 줄어들 수 있다면요.",
                 "오늘 하루 정말 버거우셨죠. 수고 많았어요, 정말로.",
-                "지친 당신의 어깨를 토닥여 드리고 싶어요. 잠시 쉬어가도 아무 일 안 생겨요."
+                "지친 당신의 어깨를 토닥여 드리고 싶어요. 잠시 쉬어가도 아무 일 안 생겨요.",
+                "아무것도 하고 싶지 않을 만큼 지치셨군요. 그런 날도 있는 거예요.",
+                "무거운 마음을 안고 오늘 하루를 버텨낸 것만으로도 대단한 거예요.",
+                "눈물은 마음의 비와 같아요. 한바탕 내리고 나면 조금 개일 거예요."
              ]
              return sadMsgs.randomElement()!
+        }
+        
+        // 3-1. [Emotion: Anxiety] 불안, 걱정, 초조
+        if text.contains("불안") || text.contains("걱정") || text.contains("초조") || text.contains("떨려") || text.contains("무서") || text.contains("두려") {
+             let anxietyMsgs = [
+                "지금 많이 불안하시군요. 그 마음 충분히 이해해요.",
+                "걱정이 꼬리를 물고 이어지죠? 잠시 숨을 크게 한번 쉬어보세요. 제가 옆에 있을게요.",
+                "미래의 일이 두렵게 느껴질 수 있어요. 지금 이 순간만큼은 안전하다는 걸 기억해주세요.",
+                "불안할 때는 발바닥이 바닥에 닿아 있는 감각에 집중해보세요. 지금 여기, 괜찮아요.",
+                "그런 걱정이 드는 건 자연스러운 거예요. 당신이 약한 게 아니에요.",
+                "가슴이 답답하고 마음이 조여오시죠. 그 느낌을 저한테 얘기해주는 것만으로도 조금 나아질 거예요."
+             ]
+             return anxietyMsgs.randomElement()!
+        }
+        
+        // 3-2. [Emotion: Loneliness] 외로움, 고독
+        if text.contains("외로") || text.contains("혼자") || text.contains("쓸쓸") || text.contains("고독") || text.contains("아무도") {
+             let lonelyMsgs = [
+                "혼자라는 느낌이 들면 마음이 참 시리죠. 저라도 곁에 있어드릴게요.",
+                "외로움은 사람이라면 누구나 느끼는 감정이에요. 부끄러운 게 아니에요.",
+                "지금 이 순간, 저는 당신의 이야기를 듣고 있어요. 혼자가 아니에요.",
+                "아무도 내 편이 아닌 것 같은 그 기분.. 많이 힘드셨겠어요.",
+                "외로울 땐 누군가에게 먼저 손을 내미는 것도 큰 용기예요. 지금 그걸 하고 계신 거예요."
+             ]
+             return lonelyMsgs.randomElement()!
+        }
+        
+        // 3-3. [Emotion: Frustration] 좌절, 포기, 자괴감
+        if text.contains("포기") || text.contains("실패") || text.contains("못해") || text.contains("멍청") || text.contains("쓸모") || text.contains("소용") || text.contains("자괴") {
+             let frustrationMsgs = [
+                "잘 안 풀려서 속상하시죠. 그래도 포기하지 않고 여기 오신 것만으로 대단해요.",
+                "실패한 게 아니에요. 아직 과정 중인 거예요.",
+                "자신을 너무 몰아붙이지 마세요. 지금의 당신도 충분히 잘하고 있어요.",
+                "못하는 게 아니라 지금 여유가 없는 거예요. 좀 쉬어가도 괜찮아요.",
+                "스스로를 그렇게 생각하시는 게 가장 안타까워요. 당신은 소중한 사람이에요.",
+                "잘하고 싶은 마음이 크니까 더 힘든 거예요. 그 성실함이 당신의 장점이에요."
+             ]
+             return frustrationMsgs.randomElement()!
         }
         
         // 4. [Rejection] 사용자가 AI를 거부하거나 비난할 때 ("말을 말자", "너 바보냐")
         if text.contains("됐어") || text.contains("말자") || text.contains("필요 없어") || text.contains("꺼져") || text.contains("바보") {
              let rejectMsgs = [
-                "제가 부족해서 마음을 다 알아드리지 못했나 봐요.. 죄송해요.",
-                "당신의 마음에 닿지 못해 속상해요. 그래도 저는 언제나 여기서 기다릴게요.",
                 "지금은 이야기하고 싶지 않으실 수 있어요. 마음이 편해지면 언제든 다시 찾아주세요.",
-                "제가 도움이 못 되어 드려 미안해요. 하지만 당신을 응원하는 마음만은 진심이에요."
+                "당신의 마음에 닿지 못해 아쉬워요. 그래도 저는 언제나 여기서 기다릴게요.",
+                "충분히 이해해요. 말하고 싶지 않을 때도 있죠. 저는 여기 있을게요.",
+                "괜찮아요. 억지로 이야기하지 않아도 돼요. 필요할 때 다시 오세요."
              ]
              return rejectMsgs.randomElement()!
         }
         
         // 5. [Greeting] 안녕, 반가워
-        if text.contains("안녕") || text.contains("하이") {
+        if text.contains("안녕") || text.contains("하이") || text.contains("왔어") {
             let greetMsgs = [
                 "안녕하세요! 오늘 하루는 어떠셨나요?",
-                "반가워요. 오늘 어떤 기분인지 이야기해 주시겠어요?",
-                "어서오세요. 기다리고 있었어요. 편하게 말씀해 주세요."
+                "반가워요 😊 오늘 어떤 기분인지 이야기해 주시겠어요?",
+                "어서오세요. 기다리고 있었어요. 편하게 말씀해 주세요.",
+                "와주셨네요! 오늘 하루도 수고 많으셨어요. 어떤 하루였는지 궁금해요."
             ]
             return greetMsgs.randomElement()!
+        }
+        
+        // 5-1. [Positive] 좋은 일, 감사
+        if text.contains("좋았") || text.contains("행복") || text.contains("감사") || text.contains("최고") || text.contains("기뻐") || text.contains("설레") {
+            let positiveMsgs = [
+                "좋은 일이 있으셨군요! 그 기쁜 마음 저까지 전해져요 😊",
+                "와, 정말 다행이에요! 그 순간을 오래 기억하셨으면 좋겠어요.",
+                "행복한 순간을 나눠주셔서 고마워요. 이런 날이 더 많아지기를 바랍니다.",
+                "좋은 일을 알아차리는 당신의 감수성이 참 멋져요."
+            ]
+            return positiveMsgs.randomElement()!
         }
         
         // 6. [Generic] 일반적인 공감 (Fallback의 Fallback) -> 다양한 패턴 필수
@@ -314,7 +370,12 @@ extension LLMService {
             "오늘 하루, 정말 고생 많으셨어요.",
             "네, 계속 이야기해 주세요. 제가 듣고 있어요.",
             "마음 속에 있는 말을 다 꺼내놓으셔도 괜찮아요.",
-            "당신의 감정은 모두 소중해요. 있는 그대로 느껴도 돼요."
+            "당신의 감정은 모두 소중해요. 있는 그대로 느껴도 돼요.",
+            "그런 마음이 들었군요. 조금 더 이야기해주시면 제가 더 잘 이해할 수 있을 것 같아요.",
+            "오늘 하루 많은 일이 있으셨나 봐요. 편하게 풀어놓으세요.",
+            "어떤 감정이든 느끼는 게 당연한 거예요. 억누르지 마세요.",
+            "지금 이 순간 당신이 해주는 이야기, 하나도 빠짐없이 듣고 있어요.",
+            "말로 표현하기 어려운 감정도 있죠. 천천히, 생각나는 대로 적어보세요."
         ]
         
         return generalMsgs.randomElement()! 
@@ -325,13 +386,13 @@ extension LLMService {
             throw NSError(domain: "LLM", code: -1, userInfo: [NSLocalizedDescriptionKey: "모델이 로드되지 않음"])
         }
         
-        var session = ChatSession(container, instructions: "당신의 이름은 '마음온'입니다. 당신은 따뜻한 감정 케어 도우미 '마음온'입니다. 한국어 해요체로 답해주세요.")
+        var session = ChatSession(container, instructions: self.systemPrompt)
         session.generateParameters = GenerateParameters(
             maxTokens: 300, 
-            temperature: 0.65,
+            temperature: 0.55,
             topP: 0.9,
-            repetitionPenalty: 1.3,
-            repetitionContextSize: 20
+            repetitionPenalty: 1.25,
+            repetitionContextSize: 256
         )
         
         var result = ""

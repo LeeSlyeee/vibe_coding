@@ -142,18 +142,28 @@ struct KeyboardDismissTapView: UIViewRepresentable {
 #endif
 
 // MARK: - Color Extensions
-// (Color Extension 코드는 유지)
+// ☕ Warm Journal 팔레트 (파스텔 + 어스톤)
 extension Color {
-    static let bgMain = Color(hexString: "F7F8FA")
-    static let cardBg = Color.white
-    static let primaryText = Color(hexString: "1D1D1F")
-    static let secondaryText = Color(hexString: "86868B")
-    static let accent = Color(hexString: "0071E3")
-    static let mood1 = Color(hexString: "FF6B6B")
-    static let mood2 = Color(hexString: "4D96FF")
-    static let mood3 = Color(hexString: "A0A0A0")
-    static let mood4 = Color(hexString: "6BCB77")
-    static let mood5 = Color(hexString: "FFD93D")
+    // --- 배경 ---
+    static let bgMain = Color(hexString: "FFF8F0")       // 웜 크림 (메인 배경)
+    static let cardBg = Color(hexString: "FDF6EE")       // 오트밀 (카드 배경)
+    static let softTan = Color(hexString: "E8D5C4")      // 소프트 탄 (선택/활성 배경)
+    
+    // --- 텍스트 ---
+    static let primaryText = Color(hexString: "3D2C1E")   // 에스프레소 (제목)
+    static let secondaryText = Color(hexString: "8D7B6E") // 라떼 (본문/보조)
+    static let hintText = Color(hexString: "C4B5A5")      // 밀크폼 (비활성/힌트)
+    
+    // --- 브랜드 ---
+    static let accent = Color(hexString: "C67D55")        // 테라코타 (액센트/CTA)
+    static let warmBorder = Color(hexString: "E0D5C9")    // 카드 테두리
+    
+    // --- 감정 (어스톤 파스텔) ---
+    static let mood1 = Color(hexString: "D4837A")  // 더스티 로즈 (화남)
+    static let mood2 = Color(hexString: "8FAABE")  // 뮤트 페리윙클 (우울)
+    static let mood3 = Color(hexString: "BEB0A0")  // 샌드 (보통)
+    static let mood4 = Color(hexString: "8FB996")  // 세이지 그린 (편안)
+    static let mood5 = Color(hexString: "E8A87C")  // 피치 코랄 (행복)
     
     init(hexString: String) {
         let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -178,6 +188,38 @@ extension Color {
             blue:  Double(b) / 255,
             opacity: Double(a) / 255
         )
+    }
+}
+
+// MARK: - ☕ Warm Journal 타이포그래피
+extension Font {
+    static let journalTitle   = Font.system(size: 24, weight: .bold, design: .rounded)
+    static let journalHeading = Font.system(size: 18, weight: .semibold, design: .rounded)
+    static let journalBody    = Font.system(size: 16, weight: .regular, design: .rounded)
+    static let journalCaption = Font.system(size: 12, weight: .medium, design: .rounded)
+}
+
+// MARK: - ☕ Warm Card 모디파이어
+struct WarmCardModifier: ViewModifier {
+    var cornerRadius: CGFloat = 16
+    
+    func body(content: Content) -> some View {
+        content
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.cardBg)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.warmBorder, lineWidth: 0.5)
+            )
+            .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 8, x: 0, y: 4)
+    }
+}
+
+extension View {
+    func warmCard(cornerRadius: CGFloat = 16) -> some View {
+        self.modifier(WarmCardModifier(cornerRadius: cornerRadius))
     }
 }
 
