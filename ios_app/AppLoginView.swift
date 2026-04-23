@@ -5,138 +5,147 @@ struct AppLoginView: View {
     @EnvironmentObject var authManager: AuthManager
     @State private var username = ""
     @State private var password = ""
-    @State private var name = "" // [New] 실명
-    @State private var centerCode = "" // [New] 기관 코드
+    @State private var name = "" // 실명
+    @State private var centerCode = "" // 기관 코드
     @State private var errorMessage = ""
     @State private var isLoading = false
-    @State private var isPasswordVisible = false // 비밀번호 기본 숨김 (눈 아이콘으로 토글)
-    
-    // ✅ 로컬 모드에서는 서버 URL 불필요
-    // let baseURL = "http://150.230.7.76"
+    @State private var isPasswordVisible = false
     
     init() {}
     
     var body: some View {
         ZStack {
+            // Geist: Pure White
             Color.white.ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 24) {
-                    Spacer().frame(height: 60) // Top spacing
+                VStack(spacing: 28) {
+                    Spacer().frame(height: 60)
                     
-                    VStack(spacing: 8) {
-                        Image(systemName: "moon.fill")
-                            .font(.system(size: 80))
-                            .foregroundColor(.yellow)
-                        Text("마음온(maumON)")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                        Text("로그인 및 시작하기")
-                            .font(.caption)
-                            .foregroundColor(.hintText)
-                            .padding(.top, 4)
-                    }
-                    .padding(.bottom, 20)
-                    
+                    // --- Header ---
                     VStack(spacing: 12) {
-                        TextField("이름 (실명)", text: $name)
-                            .keyboardType(.default)
-                            .padding(.horizontal, 16)
-                            .frame(height: 48)
-                            .background(Color.hintText.opacity(0.1))
-                            .cornerRadius(12)
-                            .tint(.accent)
-                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                        Image(systemName: "heart.text.clipboard")
+                            .font(.system(size: 56, weight: .thin))
+                            .foregroundColor(Color.gray900)
                         
-                        TextField("아이디 (닉네임)", text: $username)
-                            .keyboardType(.default)
-                            .padding(.horizontal, 16)
-                            .frame(height: 48)
-                            .background(Color.hintText.opacity(0.1))
-                            .cornerRadius(12)
-                            .tint(.accent)
-                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-
-                        // [Fix] SecureField을 완전히 제거 → iOS 로그인 폼 감지 방지 → 서드파티 키보드 유지
-                        // 비밀번호 마스킹은 시각적 오버레이로 처리
+                        Text("maumON")
+                            .font(.system(size: 32, weight: .semibold))
+                            .tracking(-1.28)
+                            .foregroundColor(Color.gray900)
+                        
+                        Text("로그인 및 시작하기")
+                            .font(.geistCaption)
+                            .foregroundColor(Color.gray400)
+                            .padding(.top, 2)
+                    }
+                    .padding(.bottom, 16)
+                    
+                    // --- Input Fields ---
+                    VStack(spacing: 10) {
+                        // Name
+                        geistTextField("이름 (실명)", text: $name)
+                        
+                        // Username
+                        geistTextField("아이디 (닉네임)", text: $username)
+                        
+                        // Password (visual masking)
                         HStack {
                             ZStack(alignment: .leading) {
                                 TextField("비밀번호", text: $password)
                                     .keyboardType(.default)
-                                    .tint(.accent)
+                                    .tint(Color.gray900)
                                     .foregroundColor(isPasswordVisible ? .primary : .clear)
                                 
                                 if !isPasswordVisible && !password.isEmpty {
                                     Text(String(repeating: "●", count: password.count))
-                                        .foregroundColor(.primary)
+                                        .foregroundColor(Color.gray900)
                                         .allowsHitTesting(false)
                                 }
                             }
                             
                             Button(action: { isPasswordVisible.toggle() }) {
                                 Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
-                                    .foregroundColor(.hintText)
+                                    .foregroundColor(Color.gray400)
+                                    .font(.system(size: 15))
                             }
                         }
+                        .font(.system(size: 15))
                         .padding(.horizontal, 16)
                         .frame(height: 48)
-                        .background(Color.hintText.opacity(0.1))
-                        .cornerRadius(12)
-                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                            
-                        TextField("기관 코드 (선택)", text: $centerCode)
-                            .keyboardType(.default)
-                            .padding(.horizontal, 16)
-                            .frame(height: 48)
-                            .background(Color(hexString: "f0fdf4"))
-                            .cornerRadius(12)
-                            .tint(.accent)
-                            .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
-                            )
+                        .background(Color.white)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.black.opacity(0.12), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
+                        
+                        // Center Code (optional)
+                        geistTextField("기관 코드 (선택)", text: $centerCode, isOptional: true)
                     }
                     .padding(.horizontal, 24)
                     
+                    // --- Error ---
                     if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.circle")
+                                .font(.system(size: 13))
+                            Text(errorMessage)
+                                .font(.geistCaption)
+                        }
+                        .foregroundColor(Color.geistRed)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                     }
                     
+                    // --- Login Button (Geist Primary: dark) ---
                     Button(action: performLogin) {
                         if isLoading {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
                         } else {
-                            Text("로그인 / 회원가입") // 자동 가입이므로
-                                .font(.headline)
-                                .fontWeight(.bold)
+                            Text("로그인 / 회원가입")
+                                .font(.system(size: 15, weight: .medium))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
                         }
                     }
-                    .background(Color.accent)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.gray900)
+                    )
                     .foregroundColor(.white)
-                    .cornerRadius(12)
+                    .cornerRadius(8)
                     .padding(.horizontal, 24)
-                    .disabled(isLoading || username.isEmpty || password.isEmpty || name.isEmpty) // 이름도 필수
+                    .disabled(isLoading || username.isEmpty || password.isEmpty || name.isEmpty)
+                    .opacity((isLoading || username.isEmpty || password.isEmpty || name.isEmpty) ? 0.5 : 1.0)
                     
                 }
                 .padding(.vertical)
             }
         }
-        // [Cursor Fix] UIKit 기반: 입력 필드 포커스 방해 없이 빈 영역 탭 시에만 키보드 닫기
         #if os(iOS)
         .dismissKeyboardOnTap()
         #endif
     }
     
-    // hideKeyboard() is now a global function in ViewExtensions.swift
+    // --- Geist-style TextField Component ---
+    @ViewBuilder
+    func geistTextField(_ placeholder: String, text: Binding<String>, isOptional: Bool = false) -> some View {
+        TextField(placeholder, text: text)
+            .keyboardType(.default)
+            .font(.system(size: 15))
+            .tint(Color.gray900)
+            .padding(.horizontal, 16)
+            .frame(height: 48)
+            .background(Color.white)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isOptional ? Color.black.opacity(0.06) : Color.black.opacity(0.12), lineWidth: 1)
+            )
+            .cornerRadius(8)
+    }
     
     func performLogin() {
         guard !username.isEmpty, !password.isEmpty, !name.isEmpty else { return }
@@ -148,13 +157,10 @@ struct AppLoginView: View {
         isLoading = true
         errorMessage = ""
         
-        // 이름(name)을 포함하여 로그인/가입 요청
         authManager.performLogin(username: username, password: password, name: name, centerCode: centerCode) { success, msg in
             self.isLoading = false
             if !success {
                 self.errorMessage = msg
-            } else {
-                // 성공 시 자동으로 뷰가 전환됨
             }
         }
     }

@@ -28,7 +28,7 @@ crypto = EncryptionManager(os.environ.get('ENCRYPTION_KEY'))
 RUNPOD_API_KEY = os.getenv('RUNPOD_API_KEY')
 RUNPOD_LLM_URL = os.getenv('RUNPOD_LLM_URL')
 
-def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
+def call_llm_hybrid(prompt, model="gemma4:2b", options=None):
     """
     Hybrid LLM Caller: RunPod (Priority) -> Local Ollama (Fallback)
     """
@@ -54,14 +54,24 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
                 "Content-Type": "application/json"
             }
             
-            payload = {
-                "input": {
+            payload_input = {
                     "prompt": prompt,
                     "max_tokens": options.get('num_predict', 512),
                     "temperature": options.get('temperature', 0.7),
                     "stream": False
-                }
             }
+            # [Fix] RunPod vLLM에도 JSON 강제 출력 적용
+            if options.get('format') == 'json':
+                payload_input["guided_json"] = {
+                    "type": "object",
+                    "properties": {
+                        "emotion": {"type": "string"},
+                        "comment": {"type": "string"},
+                        "score": {"type": "integer"}
+                    },
+                    "required": ["emotion", "comment", "score"]
+                }
+            payload = {"input": payload_input}
             
             res = requests.post(submit_url, json=payload, headers=headers, timeout=30)
             if res.status_code != 200:
@@ -199,13 +209,16 @@ def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
     # 2. Local Ollama (Fallback)
     try:
         logging.info("⏳ Sending request to Local Ollama...")
+        # [Fix] options에서 format을 분리 → top-level에만 전달 (Ollama 혼선 방지)
+        use_json_format = options.pop('format', None) == 'json'
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "format": "json" if options.get('format') == 'json' else "",
             "options": options
         }
+        if use_json_format:
+            payload["format"] = "json"
         # Increased timeout for CPU (Long generation needs more time)
         # 180 -> 300 seconds (5 minutes)
         res = requests.post("http://localhost:11434/api/generate", json=payload, timeout=300)
@@ -236,6 +249,20 @@ def generate_ai_analysis(content):
         '  "score": 5\n'
         "}"
     )
+
+    # [Fix] Garbage 판정 공통 패턴 (JSON 파싱 성공/실패 모두 적용)
+    GARBAGE_PATTERNS = [
+        "위로의 메시지", "핵심감정단어", "분위기 파악", "다음 분위기",
+        "감정단어하나", "메시지...", "example", "참고 예시",
+        "코드 작성", "코드 설명", "습관적 패턴", "목표임을 유의",
+        "지시사항", "### ", "아래 JSON", "형식으로만 답변"
+    ]
+
+    def _is_garbage_text(text):
+        """텍스트가 프롬프트 반복/쓰레기인지 판정"""
+        if not text or len(str(text).strip()) < 5:
+            return True
+        return any(p in str(text) for p in GARBAGE_PATTERNS)
     
     try:
         options = {"temperature": 0.7, "num_predict": 500, "format": "json"}
@@ -245,8 +272,14 @@ def generate_ai_analysis(content):
         if raw:
              # Make sure markdown wrappers are stripped
              clean_raw = raw.strip()
-             if clean_raw.startswith('```'):
-                 clean_raw = re.sub(r'^```(?:json)?\s*|\s*```$', '', clean_raw, flags=re.MULTILINE).strip()
+             # [Fix] 코드블록이 텍스트 시작/중간 어디에 있든 제거
+             if '```' in clean_raw:
+                 # 코드블록 내부 JSON 추출 시도
+                 code_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', clean_raw)
+                 if code_match:
+                     clean_raw = code_match.group(1).strip()
+                 else:
+                     clean_raw = re.sub(r'```(?:json)?\s*|\s*```', '', clean_raw, flags=re.MULTILINE).strip()
                  
              # Try parse JSON
              try:
@@ -261,19 +294,15 @@ def generate_ai_analysis(content):
                      score = 5
 
                  # [Fix] 프롬프트 예시 텍스트가 그대로 반환된 경우 garbage 판정 → fallback
-                 GARBAGE_PATTERNS = [
-                     "위로의 메시지", "핵심감정단어", "분위기 파악", "다음 분위기",
-                     "감정단어하나", "조언", "메시지...", "...", "example"
-                 ]
                  is_garbage = (
                      not comment or
                      not emotion or
-                     any(p in str(comment) for p in GARBAGE_PATTERNS) or
-                     any(p in str(emotion) for p in GARBAGE_PATTERNS) or
+                     _is_garbage_text(comment) or
+                     _is_garbage_text(emotion) or
                      len(str(comment).strip()) < 10
                  )
                  if is_garbage:
-                     print(f"⚠️ [GarbageFilter] AI가 프롬프트 예시를 그대로 반환했습니다. Fallback 적용. comment='{comment[:30]}', emotion='{emotion}'")
+                     print(f"⚠️ [GarbageFilter] AI가 프롬프트 예시를 그대로 반환했습니다. Fallback 적용. comment='{str(comment)[:30]}', emotion='{emotion}'")
                      return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5
 
                  # [Fix] Fallback for empty emotion
@@ -286,11 +315,11 @@ def generate_ai_analysis(content):
                  
                  return comment, emotion, score
              except Exception as e:
-                 print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {clean_raw}")
-                 # Try to salvage raw text if it looks like a comment
-                 if len(clean_raw) > 10 and "{" not in clean_raw:
-                     return clean_raw, "분석중", 5
-                 return clean_raw, "분석중", 5
+                 print(f"⚠️ JSON Parse Failed. Error: {e} | Raw: {clean_raw[:100]}")
+                 
+                 # [Fix] JSON을 요청했으나 JSON이 아닌 응답 = 100% 쓰레기 → 무조건 안전한 fallback
+                 print(f"⚠️ [GarbageFilter] JSON 파싱 실패. 안전한 Fallback 적용.")
+                 return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5
     except Exception as e:
         print(f"❌ AI Gen Error: {e}")
     return "당신의 마음을 깊이 응원합니다. (AI 분석 지연)", "대기중", 5

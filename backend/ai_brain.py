@@ -260,7 +260,7 @@ class EmotionAnalysis:
     
     def generate_pre_write_insight(self, recent_diaries, weather=None, weather_stats=None):
         """
-        Generates a warm insight using Local Gemma 2 (Ollama).
+        Generates a warm insight using Local Gemma 4 (Ollama).
         """
         import requests
         import json
@@ -296,7 +296,7 @@ class EmotionAnalysis:
 
             # Ollama Payload
             payload = {
-                "model": "maumON-gemma", # Use Custom Model Name
+                "model": "gemma4:2b", # Use Custom Model Name
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {
@@ -330,7 +330,7 @@ class EmotionAnalysis:
             return None
 
     def analyze_diary_with_local_llm(self, text, history_context=None, user_risk_level=1):
-        # [Local AI Mode] Uses Local Ollama (Gemma 2) for Analysis.
+        # [Local AI Mode] Uses Local Ollama (Gemma 4) for Analysis.
         import requests
         import json
         
@@ -408,7 +408,7 @@ class EmotionAnalysis:
             )
             
             payload = {
-                "model": "maumON-gemma",
+                "model": "gemma4:2b",
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {
@@ -658,7 +658,7 @@ class EmotionAnalysis:
             print("🦙 [Brain] Fallback to Local Ollama...")
             url = "http://localhost:11434/api/generate"
             payload = {
-                "model": options.get('model', 'gemma2:2b'),
+                "model": options.get('model', 'gemma4:2b'),
                 "prompt": prompt,
                 "stream": False,
                 "options": options
@@ -702,7 +702,7 @@ class EmotionAnalysis:
         
         try:
             options = {
-                "model": "gemma2:2b", # For fallback
+                "model": "gemma4:2b", # For fallback
                 "temperature": 0.7,
                 "num_predict": 4096, # Max length for report
                 "repeat_penalty": 1.1,
@@ -721,12 +721,14 @@ class EmotionAnalysis:
             print(f"❌ Report Generation Error: {e}")
             return "리포트 생성 시스템에 오류가 발생했습니다."
 
-    def generate_long_term_insight(self, report_history):
+    def generate_long_term_insight(self, report_history, user_name=None):
         """
         [Meta-Analysis] Analyzes multiple past reports to find long-term patterns.
+        user_name: 내담자의 실제 이름 (주변 인물과 혼동 방지)
         """
         import requests
-        print(f"🧠 [Brain] Generating Long-Term Insight from {len(report_history)} reports...")
+        display_name = user_name or "내담자"
+        print(f"🧠 [Brain] Generating Long-Term Insight from {len(report_history)} reports for {display_name}...")
         
         if not report_history:
             return "분석할 과거 리포트 데이터가 충분하지 않습니다."
@@ -744,6 +746,9 @@ class EmotionAnalysis:
             prompt_text = (
                 "## SYSTEM: You represent a wise psychologist specializing in long-term therapy. Answer in KOREAN ONLY.\n"
                 "당신은 내담자의 '과거 감정 분석 리포트들'을 종합하여 장기적인 변화와 흐름을 분석하는 '메타 분석가'입니다.\n"
+                f"### [중요] 본 분석의 내담자(일기를 작성한 사람)의 이름은 '{display_name}'입니다.\n"
+                "리포트에 등장하는 다른 인물의 이름은 내담자의 '주변 인물'이지, 내담자 본인이 아닙니다. "
+                f"반드시 '{display_name}씨' 또는 '내담자'라고만 지칭하세요.\n\n"
                 "아래 제공된 과거 리포트 기록들을 읽고, 내담자의 감정 상태가 시간의 흐름에 따라 어떻게 변화했는지 분석해주세요.\n\n"
                 f"{history_context}\n"
                 "### [작성 지침]\n"
@@ -757,7 +762,7 @@ class EmotionAnalysis:
             )
             
             payload = {
-                "model": "gemma2:2b",
+                "model": "gemma4:2b",
                 "prompt": prompt_text,
                 "stream": False,
                 "options": {

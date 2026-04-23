@@ -93,10 +93,9 @@ struct AppMainTabView: View {
                          Color.black.opacity(0.4).edgesIgnoringSafeArea(.all)
                          
                          VStack(spacing: 24) {
-                             // ✨ 케이크 이모지 효과
                              ZStack {
                                  Circle()
-                                     .fill(Color.yellow.opacity(0.2))
+                                     .fill(Color.gray50)
                                      .frame(width: 100, height: 100)
                                  
                                  Text("🎂")
@@ -106,13 +105,12 @@ struct AppMainTabView: View {
                              
                              VStack(spacing: 8) {
                                  Text("생일 축하해요! 🎉")
-                                     .font(.title2)
-                                     .fontWeight(.bold)
-                                     .foregroundColor(Color.primary)
+                                     .font(.geistTitle)
+                                     .foregroundColor(Color.gray900)
                                  
                                  Text("세상에서 가장 특별하고\n따뜻한 하루가 되기를 바랄게요!")
-                                     .font(.body)
-                                     .foregroundColor(Color.secondary)
+                                     .font(.geistBody)
+                                     .foregroundColor(Color.gray500)
                                      .multilineTextAlignment(.center)
                                      .lineSpacing(4)
                              }
@@ -121,19 +119,14 @@ struct AppMainTabView: View {
                                  withAnimation { showBirthdayToast = false }
                              }) {
                                  Text("고마워요")
-                                     .font(.headline)
-                                     .fontWeight(.bold)
+                                     .font(.system(size: 15, weight: .medium))
                                      .foregroundColor(.white)
                                      .frame(maxWidth: .infinity)
-                                     .padding(.vertical, 16)
+                                     .padding(.vertical, 14)
                                      .background(
-                                         LinearGradient(
-                                             colors: [Color.pink.opacity(0.8), Color.orange.opacity(0.6)],
-                                             startPoint: .leading,
-                                             endPoint: .trailing
-                                         )
+                                         RoundedRectangle(cornerRadius: 8)
+                                             .fill(Color.gray900)
                                      )
-                                     .cornerRadius(16)
                              }
                              .padding(.top, 10)
                              .padding(.horizontal, 20)
@@ -141,13 +134,17 @@ struct AppMainTabView: View {
                          .padding(.vertical, 40)
                          .padding(.horizontal, 20)
                          .background(
-                            RoundedRectangle(cornerRadius: 24)
+                            RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white)
-                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                          )
+                         .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                         )
+                         .shadow(color: Color.black.opacity(0.12), radius: 20, x: 0, y: 10)
                          .padding(30)
                      }
-                     .zIndex(200) // Top Priority
+                     .zIndex(200)
                      .transition(.scale.combined(with: .opacity))
                 }
                 
@@ -159,7 +156,7 @@ struct AppMainTabView: View {
                          VStack(spacing: 24) {
                              ZStack {
                                  Circle()
-                                     .fill(Color.yellow.opacity(0.2))
+                                     .fill(Color.gray50)
                                      .frame(width: 80, height: 80)
                                  
                                  Text("🎉")
@@ -168,23 +165,21 @@ struct AppMainTabView: View {
                              
                              VStack(spacing: 8) {
                                  Text("다가오는 생일이 있어요!")
-                                     .font(.title3)
-                                     .fontWeight(.bold)
-                                     .foregroundColor(Color.primary)
+                                     .font(.system(size: 20, weight: .semibold))
+                                     .foregroundColor(Color.gray900)
                                  
                                  Text("소중한 사람에게 따뜻한 축하를 전해보세요.")
-                                     .font(.subheadline)
-                                     .foregroundColor(Color.secondary)
+                                     .font(.system(size: 14))
+                                     .foregroundColor(Color.gray500)
                                      .multilineTextAlignment(.center)
                              }
                              
-                             // List of Birthdays
-                             VStack(spacing: 12) {
+                             VStack(spacing: 10) {
                                  ForEach(upcomingBirthdays) { info in
                                      HStack {
                                          Text(info.name)
-                                             .font(.headline)
-                                             .foregroundColor(Color.primary)
+                                             .font(.system(size: 15, weight: .medium))
+                                             .foregroundColor(Color.gray900)
                                          
                                          Spacer()
                                          
@@ -193,28 +188,31 @@ struct AppMainTabView: View {
                                                  Text("🎂")
                                                  Text("오늘 생일!") 
                                              }
-                                             .font(.caption)
-                                             .fontWeight(.bold)
+                                             .font(.geistCaption)
+                                             .fontWeight(.medium)
                                              .foregroundColor(.white)
                                              .padding(.horizontal, 10)
-                                             .padding(.vertical, 6)
-                                             .background(Color.pink)
-                                             .cornerRadius(12)
+                                             .padding(.vertical, 5)
+                                             .background(
+                                                 Capsule().fill(Color.gray900)
+                                             )
                                          } else {
                                              Text("D-\(info.dDay)")
-                                                 .font(.caption)
-                                                 .fontWeight(.bold)
-                                                 .foregroundColor(.accent)
+                                                 .font(.geistCaption)
+                                                 .fontWeight(.medium)
+                                                 .foregroundColor(Color.gray900)
                                                  .padding(.horizontal, 10)
-                                                 .padding(.vertical, 6)
-                                                 .background(Color.accent.opacity(0.10))
-                                                 .cornerRadius(12)
+                                                 .padding(.vertical, 5)
+                                                 .background(
+                                                     Capsule()
+                                                         .fill(Color.gray50)
+                                                 )
                                          }
                                      }
                                      .padding(.horizontal, 16)
                                      .padding(.vertical, 12)
-                                     .background(Color.softTan.opacity(0.3))
-                                     .cornerRadius(12)
+                                     .background(Color.gray50)
+                                     .cornerRadius(8)
                                  }
                              }
                              .padding(.horizontal, 8)
@@ -223,25 +221,30 @@ struct AppMainTabView: View {
                                  withAnimation { showFriendBirthdayToast = false }
                              }) {
                                  Text("확인했어요")
-                                     .font(.headline)
-                                     .fontWeight(.bold)
+                                     .font(.system(size: 15, weight: .medium))
                                      .foregroundColor(.white)
                                      .frame(maxWidth: .infinity)
-                                     .padding(.vertical, 16)
-                                     .background(Color.accent)
-                                     .cornerRadius(16)
+                                     .padding(.vertical, 14)
+                                     .background(
+                                         RoundedRectangle(cornerRadius: 8)
+                                             .fill(Color.gray900)
+                                     )
                              }
                              .padding(.top, 10)
                          }
                          .padding(24)
                          .background(
-                            RoundedRectangle(cornerRadius: 24)
+                            RoundedRectangle(cornerRadius: 16)
                                 .fill(Color.white)
-                                .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: 10)
                          )
+                         .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                         )
+                         .shadow(color: Color.black.opacity(0.12), radius: 20, x: 0, y: 10)
                          .padding(30)
                      }
-                     .zIndex(190) // Slightly lower than My Birthday
+                     .zIndex(190)
                      .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -575,20 +578,20 @@ struct AppGuideView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        // Removed NavigationView wrapper to avoid nested navigation when pushed from Settings
         ZStack {
-            Color(hexString: "F5F5F7").edgesIgnoringSafeArea(.all)
+            Color.white.edgesIgnoringSafeArea(.all)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
                     // Header
                     VStack(alignment: .leading, spacing: 10) {
-                        Text(" 사용 설명서")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(Color(hexString: "1D1D1F"))
+                        Text("사용 설명서")
+                            .font(.system(size: 28, weight: .semibold))
+                            .tracking(-0.5)
+                            .foregroundColor(Color.gray900)
                         Text("마음온(maumON)을 100% 활용하는 방법을 알려드려요.")
                             .font(.system(size: 15))
-                            .foregroundColor(Color(hexString: "86868B"))
+                            .foregroundColor(Color.gray400)
                     }
                     .padding(.top, 20)
                     
@@ -609,7 +612,7 @@ struct AppGuideView: View {
                         GuideSectionHeader(title: "AI 감정 분석 & 코멘트", desc: "AI가 당신의 마음을 따뜻하게 읽어드립니다.")
                         
                         GuideFeatureCard(systemIcon: "brain.head.profile", title: "60가지 섬세한 감정의 언어", desc: "단순히 '좋다/나쁘다'가 아닌, **60가지의 세분화된 감정**으로 당신의 마음을 정확하게 읽어냅니다.")
-                        GuideFeatureCard(systemIcon: "bubble.left.and.bubble.right.fill", title: "AI 감정 분석 코멘트 (Gemma 2)", desc: "구글의 최신 모델 **Gemma 2 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
+                        GuideFeatureCard(systemIcon: "bubble.left.and.bubble.right.fill", title: "AI 감정 분석 코멘트 (Gemma 4)", desc: "구글의 최신 모델 **Gemma 4 (2b)**가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다.")
                     }
                     
                     // Section 3: 프라이버시 & 심층 분석
@@ -644,12 +647,11 @@ struct GuideSectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(Color(hexString: "1D1D1F"))
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundColor(Color.gray900)
             Text(desc)
-                .font(.subheadline)
-                .foregroundColor(Color(hexString: "666666"))
+                .font(.system(size: 14))
+                .foregroundColor(Color.gray500)
         }
     }
 }
@@ -663,32 +665,30 @@ struct GuideStepCard: View {
         HStack(alignment: .top, spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color(hexString: "1D1D1F"))
+                    .fill(Color.gray900)
                     .frame(width: 28, height: 28)
-                    .shadow(color: Color.black.opacity(0.15), radius: 4, x: 0, y: 4)
                 Text(num)
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(.white)
             }
             
             VStack(alignment: .leading, spacing: 6) {
                 Text(title)
-                    .font(.custom("Pretendard-Bold", size: 16)) // Fallback to system bold if custom font missing
-                    .fontWeight(.bold)
-                    .foregroundColor(Color(hexString: "1D1D1F"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.gray900)
                 Text(desc)
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hexString: "555555"))
+                    .foregroundColor(Color.gray500)
                     .lineSpacing(4)
             }
             Spacer()
         }
         .padding(20)
-        .background(Color(hexString: "FBFBFD"))
-        .cornerRadius(16)
+        .background(Color.white)
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hexString: "F2F2F7"), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
     }
 }
@@ -703,34 +703,33 @@ struct GuideFeatureCard: View {
         HStack(alignment: .top, spacing: 16) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(Color(hexString: "1D1D1F"))
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Color.gray900)
                 
-                // Simple Markdown-like bold parsing manually or just Text
                 Text(parseBold(desc))
                     .font(.system(size: 14))
-                    .foregroundColor(Color(hexString: "555555"))
+                    .foregroundColor(Color.gray500)
                     .lineSpacing(4)
             }
             Spacer()
-            Image(systemName: systemIcon).font(.system(size: 32)).foregroundColor(.accent)
+            Image(systemName: systemIcon)
+                .font(.system(size: 28, weight: .thin))
+                .foregroundColor(Color.gray900)
         }
         .padding(24)
-        .background(highlight ? Color.white : Color(hexString: "FBFBFD"))
-        .cornerRadius(20)
+        .background(Color.white)
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(highlight ? Color(hexString: "34C759") : Color(hexString: "F0F0F5"), lineWidth: highlight ? 2 : 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(highlight ? Color.gray900 : Color.black.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: highlight ? Color.green.opacity(0.05) : Color.clear, radius: 10, x: 0, y: 5)
     }
     
     func parseBold(_ text: String) -> AttributedString {
         if let attrStr = try? AttributedString(markdown: text) {
             return attrStr
         }
-        return AttributedString(stringLiteral: text) // 파싱 실패 시 원본 문자열 반환
+        return AttributedString(stringLiteral: text)
     }
 }
 
@@ -751,8 +750,10 @@ struct KeyboardAwareTabBar: View {
     var body: some View {
         if shouldShow {
             VStack(spacing: 0) {
-                Divider()
-                    .background(Color.hintText.opacity(0.1))
+                // Geist: shadow-as-border for top edge
+                Rectangle()
+                    .fill(Color.black.opacity(0.08))
+                    .frame(height: 1)
                 
                 HStack(spacing: 0) {
                     tabButton(index: 0, title: "캘린더", systemIcon: "calendar")
@@ -763,7 +764,6 @@ struct KeyboardAwareTabBar: View {
                 .padding(.top, 10)
                 .padding(.bottom, 20)
                 .background(Color.white)
-                .shadow(color: Color.black.opacity(0.05), radius: 10, y: -5)
             }
             .transition(.move(edge: .bottom).combined(with: .opacity))
         }
@@ -826,22 +826,21 @@ struct GuideSmallFeatureCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(Color(hexString: "1D1D1F"))
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(Color.gray900)
             Text(desc)
-                .font(.caption)
-                .foregroundColor(Color(hexString: "555555"))
+                .font(.geistCaption)
+                .foregroundColor(Color.gray500)
                 .lineSpacing(2)
             Spacer()
         }
         .padding(16)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(hexString: "FBFBFD"))
-        .cornerRadius(16)
+        .background(Color.white)
+        .cornerRadius(12)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(hexString: "F0F0F5"), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.black.opacity(0.08), lineWidth: 1)
         )
     }
 }

@@ -226,13 +226,7 @@ struct AppShareView: View {
                                     .multilineTextAlignment(.center)
                                     .padding()
                                 
-                                // [DEBUG UI] to see why list is empty
-                                if !shareManager.lastErrorMessage.isEmpty {
-                                    Text("⚠️ 에러: \(shareManager.lastErrorMessage)")
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                        .padding(.top, 5)
-                                }
+
                                 
                                 Button(action: {
                                     shareManager.fetchList(role: "sharer")
@@ -368,7 +362,7 @@ struct AppShareView: View {
                                     Circle()
                                         .fill(
                                             LinearGradient(
-                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                colors: [Color.gray900, Color.gray600],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             )
@@ -384,14 +378,14 @@ struct AppShareView: View {
                                         Text("감정 리포트 공유")
                                             .font(.headline)
                                             .fontWeight(.bold)
-                                            .foregroundColor(Color(hexString: "6366f1"))
+                                            .foregroundColor(Color.gray900)
                                         if !SubscriptionManager.shared.hasMindBridgeAccess {
                                             Text("PRO")
                                                 .font(.system(size: 9, weight: .bold))
                                                 .foregroundColor(.white)
                                                 .padding(.horizontal, 6)
                                                 .padding(.vertical, 2)
-                                                .background(Color(hexString: "6366f1"))
+                                                .background(Color.gray900)
                                                 .cornerRadius(4)
                                         }
                                     }
@@ -487,7 +481,7 @@ struct AppShareView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 HStack {
                                     Image(systemName: "lightbulb.fill")
-                                        .foregroundColor(.yellow)
+                                        .foregroundColor(.mood5)
                                     Text("대응 가이드")
                                 }
                                 .font(.caption)

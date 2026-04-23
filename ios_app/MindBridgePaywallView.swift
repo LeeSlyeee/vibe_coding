@@ -31,13 +31,13 @@ struct MindBridgePaywallView: View {
                         Circle()
                             .fill(
                                 LinearGradient(
-                                    colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                    colors: [Color.gray900, Color.gray600],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
                             .frame(width: 80, height: 80)
-                            .shadow(color: Color(hexString: "6366f1").opacity(0.3), radius: 12, x: 0, y: 6)
+                            .shadow(color: Color.gray900.opacity(0.3), radius: 12, x: 0, y: 6)
                         
                         Image(systemName: "heart.text.clipboard")
                             .font(.system(size: 36))
@@ -61,7 +61,7 @@ struct MindBridgePaywallView: View {
                 VStack(spacing: 0) {
                     BridgeFeatureRow(
                         icon: "person.2.fill",
-                        iconColor: Color(hexString: "6366f1"),
+                        iconColor: Color.gray900,
                         title: "가족/보호자 안심 공유",
                         description: "매일 또는 매주, 감정 상태를 카카오톡으로 안전하게 전달",
                         delay: 0.1
@@ -71,7 +71,7 @@ struct MindBridgePaywallView: View {
                     
                     BridgeFeatureRow(
                         icon: "stethoscope",
-                        iconColor: Color(hexString: "10b981"),
+                        iconColor: Color.mood4,
                         title: "상담사 전용 대시보드",
                         description: "AI 분석 리포트를 상담사에게 공유, 더 깊은 상담 가능",
                         delay: 0.2
@@ -81,7 +81,7 @@ struct MindBridgePaywallView: View {
                     
                     BridgeFeatureRow(
                         icon: "slider.horizontal.3",
-                        iconColor: Color(hexString: "f59e0b"),
+                        iconColor: Color.mood5,
                         title: "공유 깊이 직접 설정",
                         description: "누구에게, 어디까지 보여줄지 내가 직접 결정",
                         delay: 0.3
@@ -91,7 +91,7 @@ struct MindBridgePaywallView: View {
                     
                     BridgeFeatureRow(
                         icon: "lock.shield.fill",
-                        iconColor: Color(hexString: "ef4444"),
+                        iconColor: Color.mood1,
                         title: "일기 원문은 절대 공유 안 됨",
                         description: "AI가 분석한 결과만 공유, 프라이버시 100% 보장",
                         delay: 0.4
@@ -108,20 +108,20 @@ struct MindBridgePaywallView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("보건소/정신건강복지센터 안내")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(Color(hexString: "15803d"))
+                            .foregroundColor(Color.gray900)
                         Text("관할 보건소나 정신건강복지센터에서 서비스를 받으면 무료 업그레이드가 가능합니다.")
                             .font(.system(size: 13))
-                            .foregroundColor(Color(hexString: "15803d"))
+                            .foregroundColor(Color.gray900)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer()
                 }
                 .padding(15)
-                .background(Color(hexString: "f0fdf4"))
+                .background(Color.gray50)
                 .cornerRadius(12)
                 .overlay(
                     RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hexString: "dcfce7"), lineWidth: 1)
+                        .stroke(Color.gray100, lineWidth: 1)
                 )
                 
                 // MARK: - 가격 & 구매
@@ -132,8 +132,8 @@ struct MindBridgePaywallView: View {
                         .fontWeight(.bold)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color(hexString: "6366f1").opacity(0.1))
-                        .foregroundColor(Color(hexString: "6366f1"))
+                        .background(Color.gray900.opacity(0.1))
+                        .foregroundColor(Color.gray900)
                         .cornerRadius(20)
                     
                     // 가격
@@ -171,14 +171,14 @@ struct MindBridgePaywallView: View {
                         .padding(.vertical, 16)
                         .background(
                             LinearGradient(
-                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                colors: [Color.gray900, Color.gray600],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
                         .foregroundColor(.white)
                         .cornerRadius(14)
-                        .shadow(color: Color(hexString: "6366f1").opacity(0.3), radius: 8, x: 0, y: 4)
+                        .shadow(color: Color.gray900.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
                     .disabled(subscriptionManager.isLoading)
                     

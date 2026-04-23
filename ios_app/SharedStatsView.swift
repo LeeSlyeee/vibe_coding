@@ -231,12 +231,12 @@ struct SharedStatsView: View {
     
     func getTrendColor(_ level: Int) -> Color {
         switch level {
-        case 1: return .red
-        case 2: return .orange
-        case 3: return .yellow
-        case 4: return .green
-        case 5: return .blue
-        default: return .gray
+        case 1: return .mood1
+        case 2: return .mood2
+        case 3: return .mood3
+        case 4: return .mood4
+        case 5: return .mood5
+        default: return .gray400
         }
     }
 }

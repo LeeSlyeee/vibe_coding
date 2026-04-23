@@ -98,7 +98,7 @@ def generate_weekly_letter_for_user(user_id, db_session, User, Diary, crypto_dec
         res = requests.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "maumON-gemma:latest",
+                "model": "gemma4:2b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.5, "num_predict": 500}

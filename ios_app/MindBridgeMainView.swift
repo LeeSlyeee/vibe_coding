@@ -108,7 +108,7 @@ struct MindBridgeMainView: View {
             Text("안전하게 전해보세요")
                 .font(.title3)
                 .fontWeight(.bold)
-                .foregroundColor(Color(hexString: "6366f1"))
+                .foregroundColor(Color.gray900)
             Text("일기 원문은 절대 공유되지 않습니다")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -121,7 +121,7 @@ struct MindBridgeMainView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: type == .family ? "person.2.fill" : "stethoscope")
-                    .foregroundColor(type == .family ? Color(hexString: "6366f1") : Color(hexString: "10b981"))
+                    .foregroundColor(type == .family ? Color.gray900 : Color.mood4)
                 Text(title)
             }
             .font(.headline)
@@ -157,7 +157,7 @@ struct MindBridgeMainView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 6)
-                    .background(Color(hexString: "6366f1"))
+                    .background(Color.gray900)
                     .cornerRadius(8)
             }
         }
@@ -173,8 +173,8 @@ struct MindBridgeMainView: View {
                 .fill(
                     LinearGradient(
                         colors: recipient.type == .family
-                            ? [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")]
-                            : [Color(hexString: "10b981"), Color(hexString: "059669")],
+                            ? [Color.gray900, Color.gray600]
+                            : [Color.mood4, Color.gray600],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -213,10 +213,10 @@ struct MindBridgeMainView: View {
             Button(action: { selectedRecipient = recipient }) {
                 Text("관리")
                     .font(.caption)
-                    .foregroundColor(Color(hexString: "6366f1"))
+                    .foregroundColor(Color.gray900)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(Color(hexString: "6366f1").opacity(0.1))
+                    .background(Color.gray900.opacity(0.1))
                     .cornerRadius(8)
             }
             
@@ -231,7 +231,7 @@ struct MindBridgeMainView: View {
                     .padding(8)
                     .background(
                         LinearGradient(
-                            colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                            colors: [Color.gray900, Color.gray600],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -249,16 +249,16 @@ struct MindBridgeMainView: View {
         Button(action: { showAddRecipient = true }) {
             HStack {
                 Image(systemName: "plus.circle.fill")
-                    .foregroundColor(Color(hexString: "6366f1"))
+                    .foregroundColor(Color.gray900)
                 Text("새 수신자 추가")
                     .fontWeight(.medium)
-                    .foregroundColor(Color(hexString: "6366f1"))
+                    .foregroundColor(Color.gray900)
             }
             .frame(maxWidth: .infinity)
             .padding()
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color(hexString: "6366f1").opacity(0.3), style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+                    .strokeBorder(Color.gray900.opacity(0.3), style: StrokeStyle(lineWidth: 1.5, dash: [6]))
             )
         }
     }
@@ -413,8 +413,8 @@ struct RecipientDepthSettingsView: View {
                             .fill(
                                 LinearGradient(
                                     colors: recipient.type == .family
-                                        ? [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")]
-                                        : [Color(hexString: "10b981"), Color(hexString: "059669")],
+                                        ? [Color.gray900, Color.gray600]
+                                        : [Color.mood4, Color.gray600],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
@@ -456,7 +456,7 @@ struct RecipientDepthSettingsView: View {
                     
                     depthToggle(
                         systemIcon: "chart.bar.fill",
-                        iconColor: Color(hexString: "6366f1"),
+                        iconColor: Color.gray900,
                         title: "감정 변화 그래프",
                         description: "7일간 감정 추이 차트",
                         isOn: $shareMoodGraph
@@ -464,7 +464,7 @@ struct RecipientDepthSettingsView: View {
                     
                     depthToggle(
                         systemIcon: "sparkles",
-                        iconColor: .yellow,
+                        iconColor: .mood5,
                         title: "AI 분석 요약 (한 줄)",
                         description: "오늘의 감정을 AI가 요약",
                         isOn: $shareAISummary
@@ -524,7 +524,7 @@ struct RecipientDepthSettingsView: View {
                         .disabled(bridgeManager.isSharing)
                         .listRowBackground(
                             LinearGradient(
-                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                colors: [Color.gray900, Color.gray600],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -537,7 +537,7 @@ struct RecipientDepthSettingsView: View {
                     Button(action: { showPreview = true }) {
                         HStack {
                             Image(systemName: "eye.fill")
-                                .foregroundColor(Color(hexString: "6366f1"))
+                                .foregroundColor(Color.gray900)
                             Text("수신자가 볼 화면 미리보기")
                         }
                     }
@@ -667,7 +667,7 @@ struct RecipientPreviewView: View {
                     VStack(spacing: 8) {
                         Text("마음온 마음 브릿지")
                             .font(.headline)
-                            .foregroundColor(Color(hexString: "6366f1"))
+                            .foregroundColor(Color.gray900)
                         
                         let userName = UserDefaults.standard.string(forKey: "userNickname") ?? "사용자"
                         Text("\(userName)님의 오늘 마음 상태")
@@ -718,7 +718,7 @@ struct RecipientPreviewView: View {
                             HStack(alignment: .bottom, spacing: 8) {
                                 ForEach(0..<7, id: \.self) { _ in
                                     RoundedRectangle(cornerRadius: 4)
-                                        .fill(Color(hexString: "6366f1").opacity(0.6))
+                                        .fill(Color.gray900.opacity(0.6))
                                         .frame(width: 28, height: CGFloat.random(in: 20...60))
                                 }
                             }
@@ -740,7 +740,7 @@ struct RecipientPreviewView: View {
                                 ForEach(["원인 분석", "감정 깊이", "감정 패턴", "신체 반응", "관계 영향", "자기 자각", "미래 전망"], id: \.self) { item in
                                     HStack {
                                         Text("•")
-                                            .foregroundColor(Color(hexString: "6366f1"))
+                                            .foregroundColor(Color.gray900)
                                         Text(item)
                                             .font(.caption)
                                     }
@@ -757,7 +757,7 @@ struct RecipientPreviewView: View {
                                         .font(.caption)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 4)
-                                        .background(Color(hexString: "6366f1").opacity(0.1))
+                                        .background(Color.gray900.opacity(0.1))
                                         .cornerRadius(12)
                                 }
                             }

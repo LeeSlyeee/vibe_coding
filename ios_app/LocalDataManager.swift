@@ -216,34 +216,48 @@ class LocalDataManager: ObservableObject {
     func syncWithServer(force: Bool = false) {
         // [Standard Architecture] Strict Auth Check
         guard let username = UserDefaults.standard.string(forKey: "authUsername"), !username.isEmpty else {
+            print("🔴 [SYNC] authUsername 없음 - Push/Pull 건너뜀")
             return
         }
         
+        print("🟡 [SYNC] syncWithServer 시작 (force=\(force), diaries=\(diaries.count)개)")
         
         APIService.shared.ensureAuth { [weak self] authSuccess in
-            guard let self = self else { return }
-            if !authSuccess { return }
+            guard let self = self else { print("🔴 [SYNC] self nil"); return }
+            if !authSuccess { print("🔴 [SYNC] ensureAuth 실패"); return }
             
             // 1. Push Phase: Identify & Upload Dirty Items
             // We push BEFORE fetching to ensure we don't overwrite our own recent changes with stale server data.
             let outputGroup = DispatchGroup()
             let itemsToPush = self.diaries.filter { $0.isSynced == false || force }
             
+            print("🟢 [SYNC] Push 대상: \(itemsToPush.count)개 (전체 \(self.diaries.count)개, force=\(force))")
+            
             if !itemsToPush.isEmpty {
-                for diary in itemsToPush {
-                    outputGroup.enter()
+                outputGroup.enter()
+                
+                // [Fix] 순차 실행: 동시에 24개 요청 → 네트워크 병목 방지
+                func pushNext(index: Int) {
+                    guard index < itemsToPush.count else {
+                        print("🟢 [SYNC] Push 완료: \(itemsToPush.count)개 전송 시도")
+                        outputGroup.leave()
+                        return
+                    }
+                    let diary = itemsToPush[index]
+                    print("📤 [SYNC] Push \(index+1)/\(itemsToPush.count): date=\(diary.date ?? "nil"), med=\(diary.medication_taken)")
                     APIService.shared.syncDiary(diary) { success in
                         if success {
-                            // Optimistic Update
                             DispatchQueue.main.async {
-                                if let index = self.diaries.firstIndex(where: { $0.id == diary.id }) {
-                                    self.diaries[index].isSynced = true
+                                if let idx = self.diaries.firstIndex(where: { $0.id == diary.id }) {
+                                    self.diaries[idx].isSynced = true
                                 }
                             }
                         }
-                        outputGroup.leave()
+                        // 다음 항목 처리
+                        pushNext(index: index + 1)
                     }
                 }
+                pushNext(index: 0)
             } else {
             }
             

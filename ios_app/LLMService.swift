@@ -39,11 +39,11 @@ class LLMService: ObservableObject {
     @Published var isGenerating = false
     @Published var modelLoadingProgress: Double = 0.0
     
-    let modelName = "slyeee/maum-on-eeve-2.8b-4bit"
+    let modelName = "mlx-community/gemma-4-e2b-it-4bit"
     var modelContainer: ModelContainer?
     var chatSession: ChatSession? // [New] Persistent session for native ChatML history
     
-    // [System Persona] EEVE-Korean-2.8B Optimized — 심리상담 전문 페르소나 (v2.0)
+    // [System Persona] Gemma-4-E2B MLX 4-bit — 심리상담 전문 페르소나 (v3.0)
     let systemPrompt = """
     당신의 이름은 '마음이'이고, 사용자의 감정을 돌보는 따뜻한 심리 케어 파트너입니다.
     당신은 마음온(maumON) 앱의 AI 도우미입니다.
@@ -89,7 +89,7 @@ class LLMService: ObservableObject {
     
 
     // Remote Config
-    var huggingFaceRepoID = "slyeee/maum-on-eeve-2.8b-4bit" // Local EEVE Model
+    var huggingFaceRepoID = "mlx-community/gemma-4-e2b-it-4bit" // Gemma 4 E2B MLX 4-bit (On-Device)
     var huggingFaceToken = ""
     
     // URL 관리 → APIService.swift > ServerConfig
@@ -99,7 +99,9 @@ class LLMService: ObservableObject {
         "model.safetensors",
         "model.safetensors.index.json",
         "tokenizer.json",
-        "tokenizer_config.json"
+        "tokenizer_config.json",
+        "generation_config.json",
+        "processor_config.json"
     ]
     
     // MARK: - Remote Config

@@ -37,7 +37,7 @@ def generate_ai_comment_for_text(diary_dict):
         )
         
         payload = {
-            "model": "maumON-gemma",
+            "model": "gemma4:2b",
             "prompt": prompt_text,
             "stream": False,
             "options": {

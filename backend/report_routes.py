@@ -10,7 +10,7 @@ import threading
 from datetime import datetime
 from flask import Blueprint, jsonify, request, make_response, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from models import db, Diary
+from models import db, Diary, User
 
 report_bp = Blueprint('report', __name__)
 
@@ -68,7 +68,16 @@ def run_async_analysis(user_id, mode='daily'):
         with app.app_context():
             safe_decrypt = _get_safe_decrypt()
             
-            print(f"🧵 [Analysis] Starting {mode} analysis for user {user_id}...")
+            # [Fix] 사용자 이름을 조회하여 프롬프트에 명시 (LLM이 주변 인물을 내담자로 오인하는 버그 방지)
+            user_display_name = "내담자"
+            try:
+                user_obj = User.query.get(user_id)
+                if user_obj:
+                    user_display_name = user_obj.real_name or user_obj.nickname or "내담자"
+            except Exception as name_err:
+                print(f"⚠️ [Analysis] 사용자 이름 조회 실패: {name_err}")
+            
+            print(f"🧵 [Analysis] Starting {mode} analysis for user {user_id} ({user_display_name})...")
             
             # Fetch Data
             limit = 30 if mode == 'longterm' else 10
@@ -96,6 +105,9 @@ def run_async_analysis(user_id, mode='daily'):
                 system_prompt = (
                     "당신은 20년 이상 임상 경험을 가진 저명한 감정 분석 전문가이자 데이터 분석 전문가입니다. "
                     "내담자의 지난 30일간의 일기 데이터를 정밀 분석하여, 전문적이고 깊이 있는 '월간 심층 감정 분석 보고서'를 작성해야 합니다.\n\n"
+                    f"### [중요] 본 보고서의 내담자(일기를 작성한 사람)의 이름은 '{user_display_name}'입니다.\n"
+                    "일기 내용이나 관계 분석에 등장하는 다른 인물(예: 친구, 가족, 동료 등)의 이름은 내담자가 아닌 '주변 인물'입니다. "
+                    f"반드시 '{user_display_name}씨' 또는 '내담자'라고만 지칭하십시오. 주변 인물의 이름을 내담자로 착각하지 마십시오.\n\n"
                     "### 보고서 작성 지침:\n"
                     "1. **형식**: 줄글이 아닌, 아래의 섹션별로 명확히 구분하여 작성하십시오.\n"
                     "   - **1. [종합 소견]**: 내담자의 한 달간의 감정 상태를 3~4문장으로 요약하고, 핵심 키워드를 제시하십시오.\n"
@@ -110,6 +122,9 @@ def run_async_analysis(user_id, mode='daily'):
                 system_prompt = (
                     "당신은 통찰력 있고 섬세한 AI 감정 분석 전문가입니다. "
                     "내담자의 최근 일기 기록(최근 10건)을 바탕으로, 현재의 감정 상태를 분석하는 '주간 감정 케어 리포트'를 작성해주세요.\n\n"
+                    f"### [중요] 본 리포트의 내담자(일기를 작성한 사람)의 이름은 '{user_display_name}'입니다.\n"
+                    "일기에 등장하는 다른 인물의 이름은 내담자의 '주변 인물'이지, 내담자 본인이 아닙니다. "
+                    f"반드시 '{user_display_name}씨' 또는 '내담자'라고만 지칭하세요.\n\n"
                     "### 리포트 구성:\n"
                     "1. **[현재 마음 날씨]**: 최근 내담자의 감정을 날씨에 비유하여 표현하고, 그 이유를 설명하십시오.\n"
                     "2. **[주요 감정 이슈]**: 최근 반복적으로 나타나는 고민이나 감정의 원인을 분석하십시오.\n"
@@ -154,9 +169,9 @@ def run_async_analysis(user_id, mode='daily'):
                     timeline = rel_data.get('social_density_timeline', [])
                     if timeline:
                         recent = timeline[-1]
-                        kick_context += f"\n[관계 지형도]\n"
-                        kick_context += f"- 30일간 등장 인물: 총 {total}명\n"
-                        kick_context += f"- 최근 주 등장 인물: {recent['unique_people']}명 ({', '.join(recent.get('people_names', [])[:5])})\n"
+                        kick_context += f"\n[관계 지형도 — 내담자의 '주변 인물' 목록 (이 사람들은 내담자가 아님)]\n"
+                        kick_context += f"- 30일간 일기에 등장한 주변 인물: 총 {total}명\n"
+                        kick_context += f"- 최근 주 등장 주변 인물: {recent['unique_people']}명 ({', '.join(recent.get('people_names', [])[:5])})\n"
                 if rl.get('flags'):
                     for f in rl['flags']:
                         kick_context += f"- ⚠️ {f['message']}\n"

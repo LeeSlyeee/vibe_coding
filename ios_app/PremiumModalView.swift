@@ -42,20 +42,20 @@ struct PremiumModalView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("보건소/정신건강복지센터 안내")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Color(hexString: "15803d"))
+                        .foregroundColor(Color.gray900)
                     Text("관할 보건소나 정신건강복지센터에서 서비스를 받으면 무료 업그레이드가 가능합니다.")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hexString: "15803d"))
+                        .foregroundColor(Color.gray900)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
             }
             .padding(15)
-            .background(Color(hexString: "f0fdf4"))
+            .background(Color.gray50)
             .cornerRadius(12)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(hexString: "dcfce7"), lineWidth: 1)
+                    .stroke(Color.gray100, lineWidth: 1)
             )
             
             // Price
@@ -124,7 +124,7 @@ struct FeatureRow: View {
                 .font(.system(size: 20))
                 .foregroundColor(.black)
                 .frame(width: 40, height: 40)
-                .background(Color(hexString: "F5F5F7"))
+                .background(Color.white)
                 .cornerRadius(10)
             
             VStack(alignment: .leading, spacing: 4) {

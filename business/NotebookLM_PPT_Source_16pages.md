@@ -112,7 +112,7 @@ On-Device AI 기반 감정 케어 플랫폼
 - 네트워크 연결 없이도 완전한 기능 작동
 - 감정 데이터의 물리적 외부 유출 원천 차단
 
-**탑재 엔진: Google Gemma 2 (2b)**
+**탑재 엔진: Google Gemma 4 (2b)**
 
 - Apple Silicon(MLX) 및 MediaPipe 기반 최적화 완료
 - iPhone 15 Pro 이상: 즉시 로컬 분석 (로딩 2~3초)
@@ -120,7 +120,7 @@ On-Device AI 기반 감정 케어 플랫폼
 
 **하이브리드 AI 아키텍처**
 
-- 1순위: On-Device AI (폰 내 Gemma 2) — 프라이버시 최고
+- 1순위: On-Device AI (폰 내 Gemma 4) — 프라이버시 최고
 - 2순위: 자사 서버 AI (EXAONE / Gemma) — 암호화 통신
 - Fallback: 로컬 Ollama 서버 — 자동 전환, 사용자 무감지
 
@@ -352,8 +352,8 @@ On-Device AI 기반 감정 케어 플랫폼
 
 | 플랫폼          | 기술 스택                       | 완성도 | 주요 기능                                             |
 | :-------------- | :------------------------------ | :----: | :---------------------------------------------------- |
-| iOS 앱          | SwiftUI + MLX (Gemma 2)         |  100%  | 감정 일기, AI 채팅, 마음 온도, 위기 감지, 보호자 공유 |
-| Android 앱      | Kotlin + MediaPipe (Gemma 2)    |  100%  | iOS와 동일 기능 완전 대칭                             |
+| iOS 앱          | SwiftUI + MLX (Gemma 4)         |  100%  | 감정 일기, AI 채팅, 마음 온도, 위기 감지, 보호자 공유 |
+| Android 앱      | Kotlin + MediaPipe (Gemma 4)    |  100%  | iOS와 동일 기능 완전 대칭                             |
 | 웹 프론트       | Vue.js 3                        |  100%  | 캘린더, 통계, AI 채팅, 리포트, 설정                   |
 | 백엔드 서버     | Flask + PostgreSQL              |  100%  | 사용자 관리, 일기 CRUD, AI 분석, 공유 시스템          |
 | AI 서버         | EXAONE (RunPod) + Ollama (로컬) |  100%  | 서버 AI 분석, 하이브리드 Fallback                     |
@@ -363,7 +363,7 @@ On-Device AI 기반 감정 케어 플랫폼
 
 - OCI(Oracle Cloud) Ubuntu 서버 — 217.142.253.35.nip.io
 - Nginx + SSL(Let's Encrypt) + Flask
-- Ollama 로컬 AI (maumON-gemma, gemma2:2b)
+- Ollama 로컬 AI (gemma4:2b, gemma4:2b)
 - RunPod Serverless EXAONE (클라우드 AI 보조)
 
 **안전 기능 구현 완료 (6단계 전체 완료):**

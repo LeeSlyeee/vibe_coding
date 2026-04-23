@@ -10,12 +10,12 @@ struct RelationalMapView: View {
     
     var body: some View {
         ZStack {
-            // 우주 배경
+            // Geist Dark: 별자리 컨셉 다크 배경
             LinearGradient(
                 gradient: Gradient(colors: [
-                    Color(hexString: "0F0C29"),
-                    Color(hexString: "1A1A3E"),
-                    Color(hexString: "24243E")
+                    Color(hexString: "111111"),
+                    Color(hexString: "171717"),
+                    Color(hexString: "111111")
                 ]),
                 startPoint: .top,
                 endPoint: .bottom

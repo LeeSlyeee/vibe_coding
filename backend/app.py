@@ -540,6 +540,16 @@ def safe_extract_ai_comment(raw_text):
     if text.startswith('[{"choices"') or '"tokens"' in text and '"usage"' in text:
         return ''
 
+    # 1.5 [Fix] 프롬프트 반복/쓰레기 텍스트 감지 → 빈 문자열 (사용자 노출 방지)
+    _GARBAGE_HINTS = [
+        "코드 작성", "코드 설명", "습관적 패턴", "목표임을 유의",
+        "참고 예시", "지시사항", "핵심감정단어", "위로의 메시지",
+        "분위기 파악", "형식으로만 답변", "아래 JSON", "감정단어하나",
+        "### ", "```json"
+    ]
+    if any(hint in text for hint in _GARBAGE_HINTS):
+        return ''
+
     # 2. JSON 파싱 시도 → comment 키 추출
     import json as _json
     json_start = text.find('{')

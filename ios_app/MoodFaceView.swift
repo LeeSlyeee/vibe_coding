@@ -13,8 +13,8 @@ struct MoodFaceView: View {
         getMoodAsset(level: level).color
     }
     
-    // 짙은 갈색 #654D31
-    private let lineColor = Color(red: 101/255, green: 77/255, blue: 49/255)
+    // Geist Dark Gray #171717
+    private let lineColor = Color(red: 23/255, green: 23/255, blue: 23/255)
     
     var body: some View {
         ZStack {

@@ -23,10 +23,15 @@ extension LLMService {
         let repoFolderName = huggingFaceRepoID.replacingOccurrences(of: "/", with: "_")
         let modelDir = docURL.appendingPathComponent(repoFolderName)
         
-        // [Migration] 기존 haru-on-model 폴더가 있으면 자동 이전
-        let legacyDir = docURL.appendingPathComponent("haru-on-model")
-        if FileManager.default.fileExists(atPath: legacyDir.path) && !FileManager.default.fileExists(atPath: modelDir.path) {
-            try? FileManager.default.moveItem(at: legacyDir, to: modelDir)
+        // [Migration] 기존 모델 폴더 자동 정리 (haru-on-model, EEVE)
+        let legacyDirs = [
+            docURL.appendingPathComponent("haru-on-model"),
+            docURL.appendingPathComponent("slyeee_maum-on-eeve-2.8b-4bit")
+        ]
+        for legacyDir in legacyDirs {
+            if FileManager.default.fileExists(atPath: legacyDir.path) {
+                try? FileManager.default.removeItem(at: legacyDir)
+            }
         }
         
         // [Hot-Patch] chat_template 누락 자동 복구 (앱 재설치 없이 수정)

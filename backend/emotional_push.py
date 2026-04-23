@@ -82,7 +82,7 @@ def _generate_nudge_message(user_id, db_session, Diary, safe_decrypt=None):
             )
 
             payload = {
-                "model": "maumON-gemma",
+                "model": "gemma4:2b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.8, "num_predict": 80}

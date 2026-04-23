@@ -11,7 +11,7 @@ if 'GEMINI_API_KEY' in os.environ:
     del os.environ['GEMINI_API_KEY']
 
 def batch_process_user(username="test"):
-    print(f"🚀 Starting Local AI (Gemma 2) Batch Update for user: {username}")
+    print(f"🚀 Starting Local AI (Gemma 4) Batch Update for user: {username}")
     
     # 1. Connect DB
     client = MongoClient(Config.MONGO_URI)

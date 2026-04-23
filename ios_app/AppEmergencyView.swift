@@ -7,7 +7,7 @@ struct AppEmergencyView: View {
     var body: some View {
         NavigationView { // Wrap in NavigationView for title support if needed, or just ZStack
             ZStack {
-                Color(hexString: "F5F5F7").edgesIgnoringSafeArea(.all)
+                Color.white.edgesIgnoringSafeArea(.all)
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -103,7 +103,7 @@ struct ContactRow: View {
                     .foregroundColor(.white)
                     .padding(.vertical, 8)
                     .padding(.horizontal, 16)
-                    .background(isHighlight ? Color(hexString: "E74C3C") : Color(hexString: "212529")) // 웹 스타일 적용
+                    .background(isHighlight ? Color.geistRed : Color.gray900) // 웹 스타일 적용
                     .cornerRadius(20)
             }
             .padding(20)
@@ -112,7 +112,7 @@ struct ContactRow: View {
             .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 5)
             .overlay(
                 RoundedRectangle(cornerRadius: 20)
-                    .stroke(isHighlight ? Color(hexString: "FFC9C9") : Color.clear, lineWidth: 1)
+                    .stroke(isHighlight ? Color.gray100 : Color.clear, lineWidth: 1)
             )
         }
     }

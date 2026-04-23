@@ -18,7 +18,10 @@ const resetSuccess = ref(false);
 const handleLogin = async () => {
     try {
         await authStore.login(username.value, password.value);
-        router.push('/');
+        const redirect = typeof router.currentRoute.value.query.redirect === 'string'
+            ? router.currentRoute.value.query.redirect
+            : '/admin/dashboard';
+        router.push(redirect);
     } catch (err) {
         errorMsg.value = '로그인이 실패했습니다. 아이디와 비밀번호를 확인해주세요.';
     }

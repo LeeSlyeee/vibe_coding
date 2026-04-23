@@ -83,7 +83,7 @@ struct MindBridgeExportView: View {
             .padding(20)
             .background(
                 LinearGradient(
-                    colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                    colors: [Color.gray900, Color.gray600],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -95,7 +95,7 @@ struct MindBridgeExportView: View {
                     HStack(spacing: 12) {
                         Text(viewModel.todayEmoji)
                             .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(Color(hexString: "6366f1"))
+                            .foregroundColor(Color.gray900)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("오늘의 감정")
                                 .font(.caption)
@@ -170,7 +170,7 @@ struct MindBridgeExportView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "sparkles")
-                                .foregroundColor(Color(hexString: "6366f1"))
+                                .foregroundColor(Color.gray900)
                             Text("AI 분석 요약")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -202,7 +202,7 @@ struct MindBridgeExportView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "slider.horizontal.3")
-                    .foregroundColor(Color(hexString: "6366f1"))
+                    .foregroundColor(Color.gray900)
                 Text("공유할 항목 선택")
                     .font(.headline)
             }
@@ -253,13 +253,13 @@ struct MindBridgeExportView: View {
             .padding(.vertical, 16)
             .background(
                 LinearGradient(
-                    colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                    colors: [Color.gray900, Color.gray600],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
             )
             .cornerRadius(14)
-            .shadow(color: Color(hexString: "6366f1").opacity(0.3), radius: 8, x: 0, y: 4)
+            .shadow(color: Color.gray900.opacity(0.3), radius: 8, x: 0, y: 4)
         }
     }
     
@@ -306,11 +306,11 @@ struct MindBridgeExportView: View {
     // 감정 점수에 따른 색상
     func moodColor(_ score: Int) -> Color {
         switch score {
-        case 0..<30: return .red
-        case 30..<50: return .orange
-        case 50..<70: return .yellow
-        case 70..<85: return Color(hexString: "10b981")
-        default: return Color(hexString: "6366f1")
+        case 0..<30: return .mood1
+        case 30..<50: return .mood2
+        case 50..<70: return .mood3
+        case 70..<85: return .mood4
+        default: return .mood5
         }
     }
 }

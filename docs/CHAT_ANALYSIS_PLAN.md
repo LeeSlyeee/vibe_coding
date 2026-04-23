@@ -26,7 +26,7 @@
 
 - **Step 1 (Sync): 즉시 응답**
   - `App` -> `Server`: 메시지 전송
-  - `Server` -> `Gemma 2 (AI)`: "공감하는 답변 생성해줘"
+  - `Server` -> `Gemma 4 (AI)`: "공감하는 답변 생성해줘"
   - `Server` -> `App`: 답변 반환 (사용자는 바로 답변을 봄)
 
 - **Step 2 (Async): 심층 분석 (백그라운드 스레드)**

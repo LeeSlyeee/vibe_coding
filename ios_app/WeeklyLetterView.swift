@@ -200,7 +200,7 @@ struct LetterDetailView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(hexString: "F8F9FE").edgesIgnoringSafeArea(.all)
+                Color.white.edgesIgnoringSafeArea(.all)
                 
                 if isLoading {
                     VStack {
@@ -241,7 +241,7 @@ struct LetterDetailView: View {
                                 .font(.body)
                                 .lineSpacing(8)
                                 .padding(.vertical, 10)
-                                .foregroundColor(Color(hexString: "2C3E50"))
+                                .foregroundColor(Color.gray900)
                             
                             Spacer()
                         }

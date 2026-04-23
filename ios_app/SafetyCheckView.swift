@@ -10,13 +10,8 @@ struct SafetyCheckView: View {
     
     var body: some View {
         ZStack {
-            // 배경
-            LinearGradient(
-                colors: [Color(hexString: "FFF8E1"), Color(hexString: "FFF3E0")],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .edgesIgnoringSafeArea(.all)
+            // Geist: Pure White background
+            Color.white.edgesIgnoringSafeArea(.all)
             
             VStack(spacing: 0) {
                 Spacer()
@@ -24,9 +19,8 @@ struct SafetyCheckView: View {
                 // 아이콘
                 ZStack {
                     Circle()
-                        .fill(Color.white.opacity(0.8))
+                        .fill(Color.gray50)
                         .frame(width: 120, height: 120)
-                        .shadow(color: Color.orange.opacity(0.15), radius: 20, x: 0, y: 10)
                     
                     Text("💛")
                         .font(.system(size: 60))
@@ -35,13 +29,14 @@ struct SafetyCheckView: View {
                 
                 // 제목
                 Text("안녕하세요, 잘 지내고 계신가요?")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(Color(hexString: "1D1D1F"))
+                    .font(.system(size: 24, weight: .semibold))
+                    .tracking(-0.5)
+                    .foregroundColor(Color.gray900)
                     .multilineTextAlignment(.center)
                 
                 Text("며칠째 일기가 없어서\n마음온이 걱정하고 있었어요")
                     .font(.system(size: 16))
-                    .foregroundColor(Color(hexString: "86868B"))
+                    .foregroundColor(Color.gray400)
                     .multilineTextAlignment(.center)
                     .lineSpacing(6)
                     .padding(.top, 12)
@@ -70,14 +65,10 @@ struct SafetyCheckView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 20)
                         .background(
-                            LinearGradient(
-                                colors: [Color(hexString: "4CAF50"), Color(hexString: "66BB6A")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.gray900)
                         )
-                        .cornerRadius(20)
-                        .shadow(color: Color.green.opacity(0.3), radius: 10, x: 0, y: 5)
+                        .cornerRadius(12)
                     }
                     .disabled(isLoading)
                     
@@ -101,14 +92,10 @@ struct SafetyCheckView: View {
                         .padding(.horizontal, 24)
                         .padding(.vertical, 20)
                         .background(
-                            LinearGradient(
-                                colors: [Color(hexString: "E53935"), Color(hexString: "EF5350")],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.geistRed)
                         )
-                        .cornerRadius(20)
-                        .shadow(color: Color.red.opacity(0.3), radius: 10, x: 0, y: 5)
+                        .cornerRadius(12)
                     }
                     .disabled(isLoading)
                 }
@@ -118,7 +105,7 @@ struct SafetyCheckView: View {
                 VStack(spacing: 8) {
                     Text("즉시 도움이 필요하시면")
                         .font(.system(size: 13))
-                        .foregroundColor(Color(hexString: "999999"))
+                        .foregroundColor(Color.gray400)
                     
                     HStack(spacing: 20) {
                         emergencyButton(label: "자살예방상담", number: "1393")
@@ -221,7 +208,7 @@ struct SafetyCheckView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(Color(hexString: "1D1D1F"))
+                        .background(Color.gray900)
                         .cornerRadius(16)
                 }
                 .padding(.horizontal, 20)
@@ -253,10 +240,10 @@ struct SafetyCheckView: View {
                     .foregroundColor(.red)
                 Text(label)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Color(hexString: "666666"))
+                    .foregroundColor(Color.gray500)
                 Text(number)
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(Color(hexString: "E53935"))
+                    .foregroundColor(Color.geistRed)
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)

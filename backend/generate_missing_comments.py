@@ -35,7 +35,7 @@ def generate_ai_comment_batch(diary_data):
     
     try:
         payload = {
-            "model": "maumON-gemma",
+            "model": "gemma4:2b",
             "prompt": prompt_text,
             "stream": False,
             "options": {

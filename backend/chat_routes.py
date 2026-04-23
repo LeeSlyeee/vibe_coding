@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from models import User
 import re
 import ast
 
@@ -90,6 +91,16 @@ def analysis_report():
     diaries = data['diaries']
     mode = data.get('mode', 'short')
     
+    # [Fix] 사용자 이름 조회 (LLM이 주변 인물을 내담자로 오인하는 버그 방지)
+    current_user_id = int(get_jwt_identity())
+    user_display_name = "내담자"
+    try:
+        user_obj = User.query.get(current_user_id)
+        if user_obj:
+            user_display_name = user_obj.real_name or user_obj.nickname or "내담자"
+    except Exception as name_err:
+        print(f"⚠️ [Analysis Report] 사용자 이름 조회 실패: {name_err}")
+    
     # 일기 데이터를 텍스트로 변환
     diary_text_parts = []
     for d in diaries[:30]:
@@ -105,7 +116,10 @@ def analysis_report():
     if mode == 'long':
         prompt = (
             "너는 다정하고 통찰력 있는 감정 케어 AI '마음온'이야.\n"
-            f"아래는 내담자의 최근 일기 기록이야:\n\n{diary_summary}\n\n"
+            f"현재 분석 대상 내담자(일기를 쓴 사람)의 이름은 '{user_display_name}'이야.\n"
+            "일기에 등장하는 다른 사람 이름은 내담자의 '주변 인물'이지 내담자 본인이 아니야. "
+            f"반드시 '{user_display_name}씨' 또는 '내담자'라고만 지칭해.\n"
+            f"아래는 {user_display_name}씨의 최근 일기 기록이야:\n\n{diary_summary}\n\n"
             "### 지시사항:\n"
             "1. 장기적인 감정 패턴과 변화 추세를 분석해줘.\n"
             "2. 반복되는 감정 트리거(요일, 날씨, 사건 등)를 찾아줘.\n"
@@ -117,7 +131,10 @@ def analysis_report():
     else:
         prompt = (
             "너는 다정하고 통찰력 있는 감정 케어 AI '마음온'이야.\n"
-            f"아래는 내담자의 최근 일기 기록이야:\n\n{diary_summary}\n\n"
+            f"현재 분석 대상 내담자(일기를 쓴 사람)의 이름은 '{user_display_name}'이야.\n"
+            "일기에 등장하는 다른 사람 이름은 내담자의 '주변 인물'이지 내담자 본인이 아니야. "
+            f"반드시 '{user_display_name}씨' 또는 '내담자'라고만 지칭해.\n"
+            f"아래는 {user_display_name}씨의 최근 일기 기록이야:\n\n{diary_summary}\n\n"
             "### 지시사항:\n"
             "1. 전반적인 감정 상태를 요약해줘.\n"
             "2. 특히 눈에 띄는 감정 변화나 사건을 짚어줘.\n"
@@ -416,7 +433,7 @@ def guided_start():
             )
 
             payload = {
-                "model": "maumON-gemma",
+                "model": "gemma4:2b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.8, "num_predict": 100}

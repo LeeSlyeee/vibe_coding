@@ -204,7 +204,7 @@ def _extract_people_llm(text):
         res = requests.post(
             "http://localhost:11434/api/generate",
             json={
-                "model": "maumON-gemma:latest",
+                "model": "gemma4:2b",
                 "prompt": prompt,
                 "stream": False,
                 "options": {"temperature": 0.1, "num_predict": 100}

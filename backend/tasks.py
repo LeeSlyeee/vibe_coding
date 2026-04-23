@@ -115,8 +115,8 @@ def analyze_diary_logic(diary_id_str, update_progress_callback=None):
         except Exception as e:
             print(f"⚠️ [Analysis] Failed to fetch history context: {e}")
 
-        # 3. Analyze (Gemma 2 Local Priority)
-        print(f"🦙 [Analysis] Diary {diary_id}: Requesting Gemma 2 Analysis (Level {user_risk_level})...")
+        # 3. Analyze (Gemma 4 Local Priority)
+        print(f"🦙 [Analysis] Diary {diary_id}: Requesting Gemma 4 Analysis (Level {user_risk_level})...")
         
         # Use local instance to ensure freshness or global if preferred. 
         ai = EmotionAnalysis() 

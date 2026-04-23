@@ -51,7 +51,7 @@ def generate_analysis_reaction_standalone(user_text, mode='reaction', history=No
 
     try:
         payload = {
-            "model": "maumON-gemma",
+            "model": "gemma4:2b",
             "prompt": prompt_text,
             "stream": False,
             "options": {
@@ -128,7 +128,7 @@ def analyze_chat_sentiment_background(user_text, ai_reaction):
     
     try:
         payload = {
-            "model": "maumON-gemma",
+            "model": "gemma4:2b",
             "prompt": prompt_text,
             "stream": False,
             "options": {

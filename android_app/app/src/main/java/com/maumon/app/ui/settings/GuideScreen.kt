@@ -116,7 +116,7 @@ fun GuideScreen(onBack: () -> Unit) {
                 GuideFeatureCard(
                     icon = "💬",
                     title = "AI 감정 분석 코멘트",
-                    desc = "구글의 최신 모델 Gemma 2 (2b)가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다."
+                    desc = "구글의 최신 모델 Gemma 4 (2b)가 문맥과 숨겨진 의미를 파악하여 따뜻한 위로를 건넵니다."
                 )
             }
 

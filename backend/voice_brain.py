@@ -58,7 +58,7 @@ class VoiceBrain:
 
     def structure_diary_text(self, text):
         """
-        Uses Local LLM (Gemma 2) to split the transcribed text into diary fields.
+        Uses Local LLM (Gemma 4) to split the transcribed text into diary fields.
         Returns a dict with keys: event, emotion, meaning, comfort.
         """
         import requests
@@ -68,7 +68,7 @@ class VoiceBrain:
         if not text or len(text) < 5:
             return None
 
-        print(f"🧠 [VoiceBrain] Structuring text with Gemma 2...")
+        print(f"🧠 [VoiceBrain] Structuring text with Gemma 4...")
         
         try:
             url = "http://localhost:11434/api/generate"
@@ -94,7 +94,7 @@ class VoiceBrain:
             )
 
             payload = {
-                "model": "gemma2:2b",
+                "model": "gemma4:2b",
                 "prompt": prompt_text,
                 "stream": False,
                 "format": "json", # Enforce structured mode

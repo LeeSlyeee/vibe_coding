@@ -135,7 +135,7 @@ android_app/
 ### Step 4: Phase 3 개발 (AI)
 
 - [ ] MediaPipe LLM 통합
-- [ ] Gemma 2 모델 번들링
+- [ ] Gemma 4 모델 번들링
 - [ ] 하이브리드 AI (온디바이스 + 서버 폴백)
 
 ### Step 5: 배포

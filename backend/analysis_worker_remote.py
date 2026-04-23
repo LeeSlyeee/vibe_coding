@@ -44,7 +44,7 @@ crypto = SimpleCrypto(ENCRYPTION_KEY)
 RUNPOD_API_KEY = os.getenv('RUNPOD_API_KEY')
 RUNPOD_LLM_URL = os.getenv('RUNPOD_LLM_URL')
 
-def call_llm_hybrid(prompt, model="maumON-gemma:latest", options=None):
+def call_llm_hybrid(prompt, model="gemma4:2b", options=None):
     """
     Hybrid LLM Caller: RunPod (Priority) -> Local Ollama (Fallback)
     """

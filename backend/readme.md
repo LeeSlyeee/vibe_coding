@@ -83,8 +83,8 @@ python app.py
 
 ### 4. 로컬 AI 성능 최적화 (2026.01.17 ~ 2026.01.18)
 
-- **로컬 LLM 통합 분석 (Gemma 2)**:
-- 기존 로컬 LSTM 분석과 함께 **Gemma 2 (2B)**를 이용한 통합 분석(감정 분류 + 코멘트 생성)을 도입했습니다.
+- **로컬 LLM 통합 분석 (Gemma 4)**:
+- 기존 로컬 LSTM 분석과 함께 **Gemma 4 (2B)**를 이용한 통합 분석(감정 분류 + 코멘트 생성)을 도입했습니다.
 - **성능 향상**: 외부 API 호출 없이 로컬 자원만으로 빠르고 안전하게 분석합니다.
 - **로컬 최적화**: 메모리 효율성을 위해 모델을 게으른 로딩(Lazy Loading) 방식으로 관리합니다.
 - **데이터 기반 통계 리포트 (Insight v2)**:
@@ -101,8 +101,8 @@ python app.py
 
 ### 5. 로컬 AI & OCI 성능 최적화 (2026.01.18)
 
-- **로컬 LLM 도입 (Gemma 2 - 2B)**:
-  - 구글의 최신 경량화 모델인 **Gemma 2 (2B)**를 로컬 서버(Ollama)에 탑재했습니다.
+- **로컬 LLM 도입 (Gemma 4 - 2B)**:
+  - 구글의 최신 경량화 모델인 **Gemma 4 (2B)**를 로컬 서버(Ollama)에 탑재했습니다.
   - **장점**: 외부 API 의존성 완전 제거, 데이터 프라이버시 100% 보장.
   - **비용**: 구글 API 과금 및 Quota 제한 없이 **평생 무료/무제한** 사용 가능.
   - **속도**: 9B 모델 대비 4배 빠른 추론 속도 (OCI ARM 서버 기준 1분 내외).
@@ -113,7 +113,7 @@ python app.py
   - **작동 방식**: 백그라운드(`nohup`)에서 실행하며, 처리된 항목은 `task_id`로 추적.
 
 - **설정 및 실행**:
-  - **필수**: 서버에 `Ollama` 설치 및 `ollama pull gemma2:2b` 필요.
+  - **필수**: 서버에 `Ollama` 설치 및 `ollama pull gemma4:2b` 필요.
   - **실행**: `./venv/bin/python batch_gemini_update.py` (배치 모드)
   - **운영**: API 키 불필요, 오직 서버의 로컬 컴퓨팅 파워만 사용.
 
@@ -140,7 +140,7 @@ python app.py
 - **이미지 분류**: `MobileNetV2` 기반의 미세 조정(Fine-tuning) 모델을 적용하여 분류 정확도 향상.
 - **감정 분석**:
   - `GoEmotions-Korean` 데이터셋을 활용하여 28가지 세부 감정을 5대 핵심 감정으로 매핑.
-  - 로컬 LLM (`Gemma 2`)을 활용한 심층 분석 및 문맥 인식 코멘트 생성 (`ai_brain.py`).
+  - 로컬 LLM (`Gemma 4`)을 활용한 심층 분석 및 문맥 인식 코멘트 생성 (`ai_brain.py`).
 
 ### 4. 프론트엔드 및 데이터 개선
 
@@ -155,7 +155,7 @@ python app.py
   - **효율성**: 별도의 외부 API 없이 로컬 서버 자원(CPU)만을 활용하여 운영 비용 절감.
 
 - **AI 분석 엔진 경량화 및 최적화**:
-  - **모델 다이어트**: 메모리 사용량이 높은 `Polyglot-Ko` 모델을 **완전히 제거**하고, 경량화된 `Gemma 2 (2B)` 모델과 키워드/라벨링 시스템으로 일원화했습니다.
+  - **모델 다이어트**: 메모리 사용량이 높은 `Polyglot-Ko` 모델을 **완전히 제거**하고, 경량화된 `Gemma 4 (2B)` 모델과 키워드/라벨링 시스템으로 일원화했습니다.
   - **자원 재사용 (Singleton)**: 분석 도구(`EmotionAnalysis`)를 매번 새로 생성하는 대신, 전역 인스턴스로 관리하여 반복적인 로딩 오버헤드를 제거했습니다.
   - **속도 개선 (Threading)**: 일기 저장 시 Redis/Celery와 같은 무거운 메시지 큐 시스템 대신 Python 내장 `Threading`을 사용하여 **저장 속도를 획기적으로 개선(즉시 저장)**했습니다.
 
@@ -166,7 +166,7 @@ python app.py
 
 ## 💎 '마음온' 온디바이스 AI 고도화 (2026.01.23)
 
-### 1. 전용 LLM 파인튜닝 (Gemma 2 - 2B)
+### 1. 전용 LLM 파인튜닝 (Gemma 4 - 2B)
 
 - **감정 케어 도우미 페르소나 구축**: 사용자의 감정에 깊이 공감하고 다뜻한 위로를 건네는 **'마음온' 전용 모델**을 학습시켰습니다.
 - **데이터 증강 (Data Augmentation)**: 기존 1.2만 건의 데이터셋을 GPT-4o를 활용해 고품질 공감 답변으로 업그레이드하여 학습에 사용했습니다.
@@ -397,7 +397,7 @@ python app.py
 ### 19. RunPod Serverless EXAONE 배포 및 Android 채팅 고도화 (2026.02.25 ~ 2026.02.26)
 
 - **RunPod Serverless EXAONE-3.5-7.8B 배포**:
-  - **모델 선정**: LG AI Research의 **EXAONE-3.5-7.8B-Instruct** 모델을 채택. 한국어 특화 대형 언어 모델로 기존 Ollama(maumON-gemma 2B) 대비 월등한 공감 상담 성능.
+  - **모델 선정**: LG AI Research의 **EXAONE-3.5-7.8B-Instruct** 모델을 채택. 한국어 특화 대형 언어 모델로 기존 Ollama(gemma4:2b 2B) 대비 월등한 공감 상담 성능.
   - **Docker 이미지**: `runpod/worker-v1-vllm:v2.13.0` (최신 vLLM 엔진 내장).
   - **핵심 해결 과제**:
     - `rope_scaling` KeyError: 구버전 vLLM(`stable-cuda12.1.0`)에서 EXAONE의 커스텀 rope_scaling 설정을 인식하지 못하는 호환성 문제 → **v2.13.0 이미지**로 해결.
@@ -408,7 +408,7 @@ python app.py
 - **하이브리드 AI 시스템 (`standalone_ai.py`)**:
   - **3단계 Fallback 아키텍처**:
     1. **RunPod EXAONE** (우선): 7.8B 파라미터 한국어 특화 모델로 고품질 공감 상담 응답.
-    2. **Ollama maumON-gemma** (Fallback): RunPod 장애 시 로컬 서버에서 즉시 응답.
+    2. **Ollama gemma4:2b** (Fallback): RunPod 장애 시 로컬 서버에서 즉시 응답.
     3. **고정 응답 메시지** (최종): 모든 AI 호출 실패 시 사전 정의된 위로 메시지 반환.
   - **자동 전환**: RunPod이 정상이면 EXAONE, 장애 시 자동으로 Ollama로 전환. 코드 수정 없이 동작.
   - **감정 분석 API**: `analyze_chat_sentiment_background()` 함수도 동일한 Fallback 구조 적용.

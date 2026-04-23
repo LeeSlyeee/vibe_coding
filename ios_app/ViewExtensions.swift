@@ -142,28 +142,42 @@ struct KeyboardDismissTapView: UIViewRepresentable {
 #endif
 
 // MARK: - Color Extensions
-// ☕ Warm Journal 팔레트 (파스텔 + 어스톤)
+// 🎨 Geist Design System — Vercel-inspired Achromatic Palette
 extension Color {
-    // --- 배경 ---
-    static let bgMain = Color(hexString: "FFF8F0")       // 웜 크림 (메인 배경)
-    static let cardBg = Color(hexString: "FDF6EE")       // 오트밀 (카드 배경)
-    static let softTan = Color(hexString: "E8D5C4")      // 소프트 탄 (선택/활성 배경)
+    // --- 배경 (Surface) ---
+    static let bgMain = Color(hexString: "FFFFFF")       // Pure White (메인 배경)
+    static let cardBg = Color(hexString: "FFFFFF")       // Pure White (카드 배경)
+    static let softTan = Color(hexString: "F5F5F5")      // Gray 50 (선택/활성 배경)
     
     // --- 텍스트 ---
-    static let primaryText = Color(hexString: "3D2C1E")   // 에스프레소 (제목)
-    static let secondaryText = Color(hexString: "8D7B6E") // 라떼 (본문/보조)
-    static let hintText = Color(hexString: "C4B5A5")      // 밀크폼 (비활성/힌트)
+    static let primaryText = Color(hexString: "171717")   // Vercel Black (제목)
+    static let secondaryText = Color(hexString: "4D4D4D") // Gray 600 (본문/보조)
+    static let hintText = Color(hexString: "808080")      // Gray 400 (비활성/힌트)
     
     // --- 브랜드 ---
-    static let accent = Color(hexString: "C67D55")        // 테라코타 (액센트/CTA)
-    static let warmBorder = Color(hexString: "E0D5C9")    // 카드 테두리
+    static let accent = Color(hexString: "171717")        // Vercel Black (액센트/CTA)
+    static let warmBorder = Color(hexString: "EBEBEB")    // Gray 100 (카드 테두리 — 폴백용)
     
-    // --- 감정 (어스톤 파스텔) ---
-    static let mood1 = Color(hexString: "D4837A")  // 더스티 로즈 (화남)
-    static let mood2 = Color(hexString: "8FAABE")  // 뮤트 페리윙클 (우울)
-    static let mood3 = Color(hexString: "BEB0A0")  // 샌드 (보통)
-    static let mood4 = Color(hexString: "8FB996")  // 세이지 그린 (편안)
-    static let mood5 = Color(hexString: "E8A87C")  // 피치 코랄 (행복)
+    // --- Geist 워크플로 악센트 ---
+    static let geistBlue = Color(hexString: "0A72EF")     // Develop Blue
+    static let geistPink = Color(hexString: "DE1D8D")     // Preview Pink
+    static let geistRed = Color(hexString: "FF5B4F")      // Ship Red
+    static let geistLink = Color(hexString: "0072F5")     // Link Blue
+    
+    // --- Geist Neutral Scale ---
+    static let gray50 = Color(hexString: "FAFAFA")
+    static let gray100 = Color(hexString: "EBEBEB")
+    static let gray400 = Color(hexString: "808080")
+    static let gray500 = Color(hexString: "666666")
+    static let gray600 = Color(hexString: "4D4D4D")
+    static let gray900 = Color(hexString: "171717")
+    
+    // --- 감정 (Geist-compatible Muted Tones) ---
+    static let mood1 = Color(hexString: "EF4444")  // Muted Red (화남)
+    static let mood2 = Color(hexString: "6366F1")  // Indigo (우울)
+    static let mood3 = Color(hexString: "9CA3AF")  // Cool Gray (보통)
+    static let mood4 = Color(hexString: "10B981")  // Emerald (편안)
+    static let mood5 = Color(hexString: "F59E0B")  // Amber (행복)
     
     init(hexString: String) {
         let hex = hexString.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
@@ -191,17 +205,33 @@ extension Color {
     }
 }
 
-// MARK: - ☕ Warm Journal 타이포그래피
+// MARK: - 🎨 Geist Typography System
+// Three weights: 400 (body/read), 500 (UI/interactive), 600 (headings/emphasis)
+// No .rounded design — Geist uses geometric sans-serif
 extension Font {
-    static let journalTitle   = Font.system(size: 24, weight: .bold, design: .rounded)
-    static let journalHeading = Font.system(size: 18, weight: .semibold, design: .rounded)
-    static let journalBody    = Font.system(size: 16, weight: .regular, design: .rounded)
-    static let journalCaption = Font.system(size: 12, weight: .medium, design: .rounded)
+    static let journalTitle   = Font.system(size: 24, weight: .semibold, design: .default)
+    static let journalHeading = Font.system(size: 18, weight: .semibold, design: .default)
+    static let journalBody    = Font.system(size: 16, weight: .regular, design: .default)
+    static let journalCaption = Font.system(size: 12, weight: .medium, design: .default)
+    
+    // Geist Display (큰 제목용)
+    static let geistDisplay   = Font.system(size: 32, weight: .semibold, design: .default)
+    static let geistTitle     = Font.system(size: 24, weight: .semibold, design: .default)
+    static let geistSubtitle  = Font.system(size: 20, weight: .regular, design: .default)
+    static let geistBody      = Font.system(size: 16, weight: .regular, design: .default)
+    static let geistBodyMedium = Font.system(size: 16, weight: .medium, design: .default)
+    static let geistButton    = Font.system(size: 14, weight: .medium, design: .default)
+    static let geistCaption   = Font.system(size: 12, weight: .medium, design: .default)
+    static let geistMono      = Font.system(size: 13, weight: .medium, design: .monospaced)
 }
 
-// MARK: - ☕ Warm Card 모디파이어
+// MARK: - 🎨 Geist Card Modifier (Shadow-as-Border)
+// Vercel의 시그니처: box-shadow로 border를 대체하는 multi-layer shadow stack
+// Level 1: Ring border (rgba(0,0,0,0.08) 0px 0px 0px 1px)
+// Level 2: Subtle elevation (rgba(0,0,0,0.04) 0px 2px 2px)
+// Inner: #fafafa ring for subtle inner glow
 struct WarmCardModifier: ViewModifier {
-    var cornerRadius: CGFloat = 16
+    var cornerRadius: CGFloat = 12
     
     func body(content: Content) -> some View {
         content
@@ -209,17 +239,91 @@ struct WarmCardModifier: ViewModifier {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(Color.cardBg)
             )
+            // Shadow-as-border: Level 1 Ring
+            .shadow(color: Color.black.opacity(0.08), radius: 0, x: 0, y: 0)
+            // Shadow-as-border: border ring via overlay
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.warmBorder, lineWidth: 0.5)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
             )
-            .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 8, x: 0, y: 4)
+            // Level 2: Subtle elevation
+            .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 2)
+            // Level 3: Ambient depth
+            .shadow(color: Color.black.opacity(0.04), radius: 8, x: 0, y: -8)
     }
 }
 
 extension View {
-    func warmCard(cornerRadius: CGFloat = 16) -> some View {
+    func warmCard(cornerRadius: CGFloat = 12) -> some View {
         self.modifier(WarmCardModifier(cornerRadius: cornerRadius))
+    }
+    
+    /// Geist Level 1: 가벼운 ring border만 적용
+    func geistRingBorder(cornerRadius: CGFloat = 8) -> some View {
+        self
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+    }
+    
+    /// Geist Level 2: Ring + 약간의 elevation
+    func geistSubtleCard(cornerRadius: CGFloat = 8) -> some View {
+        self
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.04), radius: 2, x: 0, y: 2)
+    }
+    
+    /// Geist Primary Button Style (Dark)
+    func geistPrimaryButton() -> some View {
+        self
+            .font(.geistButton)
+            .fontWeight(.medium)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.gray900)
+            )
+    }
+    
+    /// Geist Secondary Button Style (White with ring border)
+    func geistSecondaryButton() -> some View {
+        self
+            .font(.geistButton)
+            .fontWeight(.medium)
+            .foregroundColor(.gray900)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.white)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(hexString: "EBEBEB"), lineWidth: 1)
+            )
+    }
+    
+    /// Geist Pill Badge
+    func geistPillBadge(bgColor: Color = Color(hexString: "EBF5FF"), textColor: Color = Color(hexString: "0068D6")) -> some View {
+        self
+            .font(.system(size: 12, weight: .medium))
+            .foregroundColor(textColor)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(bgColor)
+            )
     }
 }
 

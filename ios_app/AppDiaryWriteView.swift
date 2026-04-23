@@ -80,7 +80,7 @@ struct AppDiaryWriteView: View {
                         }
                         .padding()
                         .background(Color.cardBg)
-                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 5)
+                        .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 5)
                         .zIndex(1)
                         
                         ScrollView {
@@ -95,7 +95,7 @@ struct AppDiaryWriteView: View {
                                                 VStack(spacing: 8) {
                                                     MoodFaceView(level: m, size: 40)
                                                     Text(asset.title)
-                                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                                        .font(.system(size: 11, weight: .medium))
                                                         .foregroundColor(.primaryText)
                                                         .lineLimit(1)
                                                         .minimumScaleFactor(0.8)
@@ -121,7 +121,7 @@ struct AppDiaryWriteView: View {
                                         RoundedRectangle(cornerRadius: 16)
                                             .stroke(Color.warmBorder, lineWidth: 0.5)
                                     )
-                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                                    .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
                                 }
                                 .padding(.top)
                                 
@@ -177,7 +177,7 @@ struct AppDiaryWriteView: View {
                                     .background(Color.cardBg)
                                     .cornerRadius(16)
                                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
-                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                                    .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
                                     
                                     // 날씨 확인/수정
                                     VStack(alignment: .leading, spacing: 4) {
@@ -198,7 +198,7 @@ struct AppDiaryWriteView: View {
                                     .background(Color.cardBg)
                                     .cornerRadius(16)
                                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
-                                    .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                                    .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
                                 }
                                 
                                 // 질문 카드들
@@ -489,7 +489,7 @@ struct AppDiaryWriteView: View {
         .background(Color.cardBg)
         .cornerRadius(16)
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
-        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+        .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
     }
     
     // Logic: 녹음 토글

@@ -94,11 +94,11 @@ struct AppChatView: View {
                     if !llmService.useServerAI && !llmService.isModelLoaded && llmService.modelLoadingProgress > 0 {
                         VStack(spacing: 8) {
                             Text(llmService.modelLoadingProgress > 0 ? "🔒 보안 캡슐 활성화 및 가중치 전송 완료! (준비 중...)" : "🔒 로컬 AI 엔진 기동 대기 중...")
-                                .font(.caption)
-                                .foregroundColor(.mood4)
+                                .font(.geistCaption)
+                                .foregroundColor(Color.gray500)
                             ProgressView(value: llmService.modelLoadingProgress)
                                 .progressViewStyle(LinearProgressViewStyle())
-                                .accentColor(.mood4)
+                                .accentColor(Color.gray900)
                                 .frame(height: 2)
                         }
                         .padding(.horizontal)
@@ -111,47 +111,54 @@ struct AppChatView: View {
                         HStack(spacing: 4) {
                             Image(systemName: "lock.shield.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(.mood4)
-                            Text("완벽히 단절된 안전지대 (데이터는 폰 안에만 머뭅니다)")
+                                .foregroundColor(Color.gray900)
+                            Text("완벽히 단절된 안전지대 (데이터는 폰 안에만 머묅니다)")
                                 .font(.system(size: 11))
-                                .foregroundColor(.hintText)
+                                .foregroundColor(Color.gray500)
                             Spacer()
                             Text("Off-Grid")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.system(size: 9, weight: .medium))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.mood4)
+                                .background(Color.gray900)
                                 .foregroundColor(.white)
                                 .cornerRadius(4)
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
-                        .background(Color.mood4.opacity(0.08))
-                        .cornerRadius(12)
+                        .background(Color.gray50)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
                         .padding(.top, 4)
                         .padding(.horizontal, 16)
                     } else {
-                        // 서버 모드 배지 (Opt-In & Anonymization)
                         HStack(spacing: 4) {
                             Image(systemName: "shield.righthalf.filled")
                                 .font(.system(size: 10))
-                                .foregroundColor(.accent)
+                                .foregroundColor(Color.gray900)
                             Text("전문가 심층 분석 (개인정보는 익명화되어 전송됩니다)")
                                 .font(.system(size: 11))
-                                .foregroundColor(.hintText)
+                                .foregroundColor(Color.gray500)
                             Spacer()
                             Text("Opt-In")
-                                .font(.system(size: 9, weight: .bold))
+                                .font(.system(size: 9, weight: .medium))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.accent)
+                                .background(Color.gray900)
                                 .foregroundColor(.white)
                                 .cornerRadius(4)
                         }
                         .padding(.vertical, 6)
                         .padding(.horizontal, 12)
-                        .background(Color.accent.opacity(0.08))
-                        .cornerRadius(12)
+                        .background(Color.gray50)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
+                        .cornerRadius(8)
                         .padding(.top, 4)
                         .padding(.horizontal, 16)
                     }
@@ -163,12 +170,13 @@ struct AppChatView: View {
                                 // Intro Message
                                 if messages.isEmpty {
                                     VStack(spacing: 10) {
-                                        Image(systemName: "hand.wave.fill").foregroundColor(.yellow)
-                                            .font(.system(size: 40))
+                                        Image(systemName: "hand.wave")
+                                            .font(.system(size: 36, weight: .thin))
+                                            .foregroundColor(Color.gray400)
                                         Text(llmService.useServerAI ? "마음이가 오늘 하루를 함께 돌아봐드릴게요.\n안내에 따라 답하다 보면 일기가 완성됩니다." : "마음이에게 어떤 감정이든 쏟아내세요.\n안전지대에서 함께 정리해볼까요?")
                                             .multilineTextAlignment(.center)
-                                            .font(.body)
-                                            .foregroundColor(.hintText)
+                                            .font(.system(size: 15))
+                                            .foregroundColor(Color.gray400)
                                     }
                                     .padding(.top, 40)
                                 }
@@ -299,19 +307,26 @@ struct AppChatView: View {
                             .focused($isInputFocused)
                             .keyboardType(.default)
                             .autocorrectionDisabled(false)
-                            .tint(.accent)
+                            .tint(Color.gray900)
+                            .font(.system(size: 15))
                             .padding(12)
-                            .background(Color.softTan.opacity(0.3))
-                            .cornerRadius(20)
+                            .background(Color.gray50)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                            .cornerRadius(8)
                             .disabled(showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode))
                         
                         Button(action: sendMessage) {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(inputText.isEmpty ? .hintText : .accent)
-                                .padding(10)
-                                .background(Color.accent.opacity(0.10))
-                                .clipShape(Circle())
+                            Image(systemName: "arrow.up")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(inputText.isEmpty ? Color.gray400 : .white)
+                                .frame(width: 36, height: 36)
+                                .background(
+                                    Circle()
+                                        .fill(inputText.isEmpty ? Color.gray100 : Color.gray900)
+                                )
                         }
                         .disabled(inputText.isEmpty || showModeSelection || (currentStepIndex >= 6 && !isFreeChatMode) || (!isFreeChatMode && isTyping))
                     }
@@ -325,7 +340,12 @@ struct AppChatView: View {
                     .padding(.bottom, 60)
                     #endif
                     .background(Color.white)
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: -5)
+                    .overlay(
+                        Rectangle()
+                            .fill(Color.black.opacity(0.08))
+                            .frame(height: 1),
+                        alignment: .top
+                    )
                 }
                 #if os(iOS)
                 .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -345,12 +365,16 @@ struct AppChatView: View {
                         }
                     }) {
                         Text(llmService.useServerAI ? "서버 AI" : "로컬 AI")
-                            .font(.system(size: 12, weight: .bold))
+                            .font(.system(size: 12, weight: .medium))
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(llmService.useServerAI ? Color.accent.opacity(0.15) : Color.mood4.opacity(0.15))
-                            .foregroundColor(llmService.useServerAI ? .accent : .mood4)
-                            .cornerRadius(8)
+                            .background(Color.gray50)
+                            .foregroundColor(Color.gray900)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                            )
+                            .cornerRadius(6)
                     }
                     .disabled(isTyping),
                     trailing: Button(action: { showSettings = true }) {
@@ -755,35 +779,39 @@ struct ChatBubble: View {
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
             if !message.isUser {
-                // [P1-2] "마음이" 캐릭터 아바타
                 VStack(spacing: 2) {
-                    Image(systemName: "heart.circle.fill")
+                    Image(systemName: "heart.circle")
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 32, height: 32)
-                        .foregroundColor(.accent)
+                        .frame(width: 30, height: 30)
+                        .foregroundColor(Color.gray900)
                         .background(Color.white)
                         .clipShape(Circle())
-                        .shadow(color: Color.accent.opacity(0.3), radius: 3)
+                        .overlay(
+                            Circle().stroke(Color.black.opacity(0.08), lineWidth: 1)
+                        )
                     Text("마음이")
                         .font(.system(size: 9, weight: .medium))
-                        .foregroundColor(.secondaryText)
+                        .foregroundColor(Color.gray500)
                 }
             } else {
                 Spacer()
             }
             
             Text(message.text)
-                .font(.system(size: 16))
+                .font(.system(size: 15))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 12)
-                .background(message.isUser ? Color.accent : Color.softTan.opacity(0.3))
-                .foregroundColor(message.isUser ? .white : .primaryText)
-                .cornerRadius(20)
+                .background(message.isUser ? Color.gray900 : Color.gray50)
+                .foregroundColor(message.isUser ? .white : Color.gray900)
+                .cornerRadius(16)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(message.isUser ? Color.clear : Color.black.opacity(0.06), lineWidth: 1)
+                )
                 .frame(maxWidth: 250, alignment: message.isUser ? .trailing : .leading)
             
             if message.isUser {
-                // Avatar place holder if needed
             } else {
                 Spacer()
             }
@@ -801,10 +829,10 @@ struct TypingIndicator: View {
             Circle().frame(width: 6, height: 6).offset(y: -offset)
             Circle().frame(width: 6, height: 6).offset(y: offset)
         }
-        .foregroundColor(.hintText)
+        .foregroundColor(Color.gray400)
         .padding(12)
-        .background(Color.softTan.opacity(0.3))
-        .cornerRadius(20)
+        .background(Color.gray50)
+        .cornerRadius(12)
         .onAppear {
             withAnimation(Animation.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
                 offset = 3
@@ -822,47 +850,53 @@ struct SOSView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header
                     VStack(spacing: 10) {
-                        Image(systemName: "heart.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.red)
+                        Image(systemName: "heart.circle")
+                            .font(.system(size: 52, weight: .thin))
+                            .foregroundColor(Color.gray900)
                         Text("당신은 혼자가 아닙니다")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundColor(Color.gray900)
                         Text("언제든 도움을 요청할 수 있어요.\n전문가와 이야기해보세요.")
-                        .multilineTextAlignment(.center)
-                        .foregroundColor(.hintText)
+                            .multilineTextAlignment(.center)
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.gray500)
                     }
                     .padding(.top, 20)
                     
-                    // Contact Buttons
-                    VStack(spacing: 16) {
-                        ContactButton(title: "자살예방 상담전화", number: "1393", color: .blue)
-                        ContactButton(title: "정신건강 위기상담", number: "1577-0199", color: .green)
-                        ContactButton(title: "생명의 전화", number: "1588-9191", color: .orange)
-                        ContactButton(title: "청소년 전화", number: "1388", color: .purple)
+                    VStack(spacing: 12) {
+                        ContactButton(title: "자살예방 상담전화", number: "1393", color: Color.gray900)
+                        ContactButton(title: "정신건강 위기상담", number: "1577-0199", color: Color.gray600)
+                        ContactButton(title: "생명의 전화", number: "1588-9191", color: Color.gray600)
+                        ContactButton(title: "청소년 전화", number: "1388", color: Color.gray600)
                     }
                     .padding()
                     
-                    // Near Center Info
                     VStack(alignment: .leading, spacing: 10) {
-                        HStack { Image(systemName: "cross.case.fill"); Text("가까운 정신건강복지센터 찾기") }
-                        .font(.headline)
+                        HStack {
+                            Image(systemName: "cross.case")
+                                .font(.system(size: 15, weight: .thin))
+                            Text("가까운 정신건강복지센터 찾기")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .foregroundColor(Color.gray900)
                         
                         Text("거주하시는 지역의 보건소나 정신건강복지센터에서 무료로 상담을 받으실 수 있습니다.")
-                        .font(.caption)
-                        .foregroundColor(.hintText)
+                            .font(.geistCaption)
+                            .foregroundColor(Color.gray500)
                         
                         Link("센터 찾기 (보건복지부)", destination: URL(string: "https://www.ncmh.go.kr")!)
-                        .font(.body)
-                        .foregroundColor(.accent)
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(Color.geistLink)
                     }
-                    .padding()
-                    .background(Color.softTan.opacity(0.3))
+                    .padding(16)
+                    .background(Color.white)
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.black.opacity(0.08), lineWidth: 1)
+                    )
                     .padding(.horizontal)
-                    
                 }
                 .padding(.bottom)
             }
@@ -890,19 +924,22 @@ struct ContactButton: View {
             }
         }) {
             HStack {
-                VStack(alignment: .leading) {
-                    Text(title).fontWeight(.bold)
-                    Text(number).font(.title3)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 14, weight: .medium))
+                    Text(number)
+                        .font(.system(size: 20, weight: .semibold))
                 }
                 Spacer()
-                Image(systemName: "phone.fill")
-                .font(.title2)
+                Image(systemName: "phone")
+                    .font(.system(size: 20, weight: .thin))
             }
-            .padding()
+            .padding(16)
             .foregroundColor(.white)
-            .background(color)
-            .cornerRadius(12)
-            .shadow(radius: 2)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(color)
+            )
         }
     }
 }

@@ -60,6 +60,12 @@ struct AppStatsView: View {
     
     
     
+    // ⚠️ [BETA] 구독(hasMindBridgeAccess) 또는 B2G 연동 시 전체 통계 접근
+    // 베타 기간: SubscriptionManager.isSubscribed = true 하드코딩 → 항상 true
+    private var hasFullStatsAccess: Bool {
+        SubscriptionManager.shared.hasMindBridgeAccess || b2gManager.isLinked
+    }
+    
     let tabs = [
         ("flow", "흐름"),
         ("monthly", "월별"),
@@ -72,8 +78,9 @@ struct AppStatsView: View {
         ZStack {
             Color.bgMain.edgesIgnoringSafeArea(.all) // 배경만 전체 채움
             
-            // [P1-3 Fix] B2G 미연동 시에도 기본 무드 차트 제공
-            if !b2gManager.isLinked {
+            // [P1-3 Fix] B2G 미연동 AND 구독 미가입 시에만 기본 무드 차트 제공
+            // ⚠️ [BETA] isSubscribed = true 하드코딩으로 전체 해금됨 (SubscriptionManager 참고)
+            if !hasFullStatsAccess {
                 ScrollView {
                     VStack(spacing: 20) {
                         // Header
@@ -148,7 +155,7 @@ struct AppStatsView: View {
                         .background(Color.cardBg)
                         .cornerRadius(16)
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
-                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                        .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
                         .padding(.horizontal, 16)
                         
                         // ━━━ 심층 분석 잠금 안내 ━━━
@@ -220,7 +227,7 @@ struct AppStatsView: View {
                         .background(Color.cardBg)
                         .cornerRadius(16)
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.warmBorder, lineWidth: 0.5))
-                        .shadow(color: Color(hexString: "3D2C1E").opacity(0.04), radius: 5, x: 0, y: 2)
+                        .shadow(color: Color.gray900.opacity(0.04), radius: 5, x: 0, y: 2)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 30)
                     }
@@ -1078,7 +1085,7 @@ struct ReportView: View {
                     HStack { Text("3줄 요약").font(.headline); Spacer() }
                     Text(content).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
                 }
-                .padding(20).background(Color(hexString: "F8F9FE")).cornerRadius(16)
+                .padding(20).background(Color.white).cornerRadius(16)
                 
                 if longContent.isEmpty && !isGeneratingLong {
                     Button(action: startLongTerm) {
@@ -1091,9 +1098,13 @@ struct ReportView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Text("메타 분석").font(.headline).foregroundColor(.mood4)
                         Text(longContent).lineSpacing(4).font(.system(size: 15)).foregroundColor(.primaryText)
-                    }.padding(20).background(Color(hexString: "F0FDF4")).cornerRadius(16)
+                    }.padding(20).background(Color.gray50).cornerRadius(16)
                 }
-                Button(" 다시 분석") { startReport() }.font(.caption).foregroundColor(.hintText).padding(.top, 10)
+                Button("🔄 다시 분석") {
+                    // [Fix] 메타 분석(장기 패턴)도 함께 초기화 → 재생성
+                    longContent = ""
+                    startReport()
+                }.font(.caption).foregroundColor(.hintText).padding(.top, 10)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("AI 분석은 참고용이며, 전문 의료 서비스를 대체하지 않습니다.")
@@ -1145,13 +1156,13 @@ struct KickInsightsSectionView: View {
                         .font(.system(size: 16))
                     Text(parsed.text)
                         .font(.system(size: 13))
-                        .foregroundColor(parsed.isWarning ? Color(hexString: "D32F2F") : .primaryText)
+                        .foregroundColor(parsed.isWarning ? Color.geistRed : .primaryText)
                         .fontWeight(parsed.isWarning ? .semibold : .regular)
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(parsed.isWarning ? Color(hexString: "FFF3F3") : parsed.bgColor)
+                .background(parsed.isWarning ? Color.gray50 : parsed.bgColor)
                 .cornerRadius(12)
             }
         }
@@ -1169,19 +1180,19 @@ struct KickInsightsSectionView: View {
         let isWarning = insight.contains("⚠️")
         
         if insight.contains("[시계열]") {
-            return ParsedInsight(icon: "📊", text: cleanTag(insight), bgColor: Color(hexString: "F0F4FF"), isWarning: isWarning)
+            return ParsedInsight(icon: "📊", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else if insight.contains("[언어]") {
-            return ParsedInsight(icon: "🔤", text: cleanTag(insight), bgColor: Color(hexString: "FFF8F0"), isWarning: isWarning)
+            return ParsedInsight(icon: "🔤", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else if insight.contains("[관계]") {
-            return ParsedInsight(icon: "🧑‍🤝‍🧑", text: cleanTag(insight), bgColor: Color(hexString: "F0FFF4"), isWarning: isWarning)
+            return ParsedInsight(icon: "🧑‍🤝‍🧑", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else if insight.contains("[감정흐름]") {
-            return ParsedInsight(icon: "🌊", text: cleanTag(insight), bgColor: Color(hexString: "F8F0FF"), isWarning: isWarning)
+            return ParsedInsight(icon: "🌊", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else if insight.contains("[수면]") {
-            return ParsedInsight(icon: "💤", text: cleanTag(insight), bgColor: Color(hexString: "F0FAFF"), isWarning: isWarning)
+            return ParsedInsight(icon: "💤", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else if insight.contains("[서사]") {
-            return ParsedInsight(icon: "📖", text: cleanTag(insight), bgColor: Color(hexString: "FFF0F5"), isWarning: isWarning)
+            return ParsedInsight(icon: "📖", text: cleanTag(insight), bgColor: Color.gray50, isWarning: isWarning)
         } else {
-            return ParsedInsight(icon: "📌", text: insight, bgColor: Color(hexString: "F5F5F7"), isWarning: isWarning)
+            return ParsedInsight(icon: "📌", text: insight, bgColor: Color.white, isWarning: isWarning)
         }
     }
     

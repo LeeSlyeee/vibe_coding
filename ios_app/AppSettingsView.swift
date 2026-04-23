@@ -13,8 +13,7 @@ struct AppSettingsView: View {
     @State private var loginPw = ""
     @State private var isLoggingIn = false
     
-    // Temporary Dev State
-    @State private var tempInputCode = ""
+
     @State private var showPremiumModal = false // New Modal State
     @State private var showExitAlert = false // Exit Confirmation
     @State private var showDisconnectAlert = false // Disconnect Confirmation [New]
@@ -321,68 +320,7 @@ struct AppSettingsView: View {
                                     .foregroundColor(.hintText)
                             }
                             
-                            // [Buttons] Sync Actions
-                            VStack(spacing: 12) {
-                                // 1. Force Sync (Push)
-                                Button(action: {
-                                    // [Haptic & Action]
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                    
-                                    // [Fix] Dual Sync: Sync Personal (Calendar) AND B2G (Center)
-                                    LocalDataManager.shared.syncWithServer(force: true)
-                                    b2gManager.syncData(force: true)
-                                    
-                                    activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.\n(개인 캘린더 및 센터 대시보드 동기화)")
-                                }) {
-                                    HStack {
-                                        Image(systemName: "arrow.up.circle.fill")
-                                            .font(.system(size: 18))
-                                        Text("데이터 강제 전송 (App → Server)")
-                                            .fontWeight(.bold)
-                                            .font(.system(size: 16))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.accent)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
-                                    .shadow(color: Color.accent.opacity(0.3), radius: 4, x: 0, y: 2)
-                                }
-                                .buttonStyle(BorderlessButtonStyle()) // [Fix] List 내부 버튼 간섭 방지
 
-                                // 2. Pull Data (Server -> App)
-                                Button(action: {
-                                    // [Haptic & Action]
-                                    let generator = UIImpactFeedbackGenerator(style: .medium)
-                                    generator.impactOccurred()
-                                    
-                                    b2gManager.pullDataFromServer { success, msg in
-                                        activeAlert = .info(msg)
-                                    }
-                                }) {
-                                    HStack {
-                                        Image(systemName: "arrow.down.circle.fill")
-                                            .font(.system(size: 18))
-                                        Text("서버 데이터 가져오기 (Server → App)")
-                                            .fontWeight(.bold)
-                                            .font(.system(size: 16))
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.green) // Distinct Color
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
-                                    .shadow(color: Color.green.opacity(0.3), radius: 4, x: 0, y: 2)
-                                }
-                                .buttonStyle(BorderlessButtonStyle()) // [Fix] List 내부 버튼 간섭 방지
-                            }
-                            .padding(.vertical, 8)
-                            
-                            Text("* 데이터가 보이지 않거나 꼬였을 때 위 버튼들을 눌러 동기화하세요.")
-                                .font(.caption2)
-                                .foregroundColor(.hintText)
-                                .multilineTextAlignment(.center)
                         }
                         .padding(.vertical, 8)
                         
@@ -422,6 +360,80 @@ struct AppSettingsView: View {
                     }
                 }
                 
+                // Section: 데이터 동기화 (B2G 연동 여부와 무관하게 항상 표시)
+                Section(header: Text("데이터 동기화")) {
+                    VStack(spacing: 12) {
+                        // 1. Force Sync (Push: App → Server)
+                        Button(action: {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                            
+                            LocalDataManager.shared.syncWithServer(force: true)
+                            if b2gManager.isLinked {
+                                b2gManager.syncData(force: true)
+                            }
+                            
+                            activeAlert = .info("모든 데이터를 서버로 다시 전송합니다.")
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.up.circle.fill")
+                                    .font(.system(size: 18))
+                                Text("데이터 강제 전송 (App → Server)")
+                                    .fontWeight(.bold)
+                                    .font(.system(size: 16))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.accent)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.accent.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
+                        
+                        // 2. Pull Data (Server → App)
+                        Button(action: {
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                            
+                            APIService.shared.fetchDiaries { serverData in
+                                if let data = serverData {
+                                    LocalDataManager.shared.mergeServerDiaries(data) {
+                                        DispatchQueue.main.async {
+                                            activeAlert = .info("서버에서 \(data.count)개의 데이터를 가져왔습니다.")
+                                        }
+                                    }
+                                } else {
+                                    DispatchQueue.main.async {
+                                        activeAlert = .info("데이터를 가져오지 못했습니다. (서버 응답 없음)")
+                                    }
+                                }
+                            }
+                        }) {
+                            HStack {
+                                Image(systemName: "arrow.down.circle.fill")
+                                    .font(.system(size: 18))
+                                Text("서버 데이터 가져오기 (Server → App)")
+                                    .fontWeight(.bold)
+                                    .font(.system(size: 16))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
+                            .shadow(color: Color.green.opacity(0.3), radius: 4, x: 0, y: 2)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
+                    }
+                    .padding(.vertical, 8)
+                    
+                    Text("* 데이터가 보이지 않거나 꼬였을 때 위 버튼들을 눌러 동기화하세요.")
+                        .font(.caption2)
+                        .foregroundColor(.hintText)
+                        .multilineTextAlignment(.center)
+                }
+                
                 // Section 3: 멤버십 (Membership)
                 Section(header: Text("멤버십")) {
                     if b2gManager.isLinked {
@@ -453,7 +465,7 @@ struct AppSettingsView: View {
                                     Circle()
                                         .fill(
                                             LinearGradient(
-                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                colors: [Color.gray900, Color.gray600],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             )
@@ -469,15 +481,15 @@ struct AppSettingsView: View {
                                         Text("마음 브릿지")
                                             .font(.headline)
                                             .fontWeight(.bold)
-                                            .foregroundColor(Color(hexString: "6366f1"))
+                                            .foregroundColor(Color.gray900)
                                         
                                         Text(SubscriptionManager.shared.isInTrialPeriod ? "체험 중" : "구독 중")
                                             .font(.caption2)
                                             .fontWeight(.bold)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
-                                            .background(Color(hexString: "6366f1").opacity(0.1))
-                                            .foregroundColor(Color(hexString: "6366f1"))
+                                            .background(Color.gray900.opacity(0.1))
+                                            .foregroundColor(Color.gray900)
                                             .cornerRadius(8)
                                     }
                                     
@@ -507,7 +519,7 @@ struct AppSettingsView: View {
                                 .padding(.vertical, 10)
                                 .background(
                                     LinearGradient(
-                                        colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                        colors: [Color.gray900, Color.gray600],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -540,7 +552,7 @@ struct AppSettingsView: View {
                                     Circle()
                                         .fill(
                                             LinearGradient(
-                                                colors: [Color(hexString: "6366f1"), Color(hexString: "8b5cf6")],
+                                                colors: [Color.gray900, Color.gray600],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             )
@@ -555,7 +567,7 @@ struct AppSettingsView: View {
                                     Text("마음 브릿지")
                                         .font(.headline)
                                         .fontWeight(.bold)
-                                        .foregroundColor(Color(hexString: "6366f1"))
+                                        .foregroundColor(Color.gray900)
                                     Text("가족·상담사에게 내 마음을 안전하게 전해보세요")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
@@ -595,15 +607,7 @@ struct AppSettingsView: View {
                         Text("Maum-on Team")
                             .foregroundColor(.hintText)
                     }
-                    
-                    // [Hidden Feature] 개발자용 데이터 생성 버튼
-                    Button(action: {
-                        seedData()
-                    }) {
-                        Text("[개발자용] 테스트 데이터 생성 (Demo)")
-                            .font(.caption)
-                            .foregroundColor(.accent)
-                    }
+
                 }
                 
                 // Section 4.5: 보안 설정
@@ -768,112 +772,7 @@ struct AppSettingsView: View {
                         )
                     }
                 }
-                
-                // Section 4: 개발자 임시 기능 (Requested Feature)
-                Section(header: HStack {
-                    Image(systemName: "hammer.fill")
-                    Text("개발자 임시 기능 (Remove Later)")
-                }) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("연동 코드 강제 변경")
-                            .font(.headline)
-                            .foregroundColor(.orange)
-                        
-                        Text("기존 연동을 무시하고 새로운 코드로 강제 재연동합니다.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        
-                        HStack {
-                            TextField("새 코드 (예: TEMP-001)", text: $tempInputCode)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                #if os(iOS)
-                                .textInputAutocapitalization(.characters)
-                                #endif
-                            
-                            Button(action: {
-                                guard !tempInputCode.isEmpty else { return }
-                                
-                                // Debug: Print Endpoint
-                                
-                                // APIService를 통한 직접 연동 시도
-                                APIService.shared.verifyCenterCode(tempInputCode) { res in
-                                    switch res {
-                                    case .success(let data):
-                                        // Handle both Int and String IDs (MongoDB ObjectId is String)
-                                        var targetId: Any? = data["center_id"]
-                                        
-                                        if let idInt = data["center_id"] as? Int {
-                                            targetId = idInt
-                                        } else if let idStr = data["center_id"] as? String {
-                                            targetId = idStr
-                                        }
-                                        
-                                        if let validId = targetId {
-                                            APIService.shared.connectToCenter(centerId: validId) { success in
-                                                DispatchQueue.main.async {
-                                                    if success {
-                                                        // B2GManager 상태 강제 동기화 (Updated for encapsulation)
-                                                        b2gManager.forceLink(code: tempInputCode.uppercased())
-                                                        activeAlert = .info("[성공] 강제 연동 성공!\n코드: \(tempInputCode.uppercased())")
-                                                        tempInputCode = ""
-                                                    } else {
-                                                        activeAlert = .info("[실패] 기관 연결(Connect) API 실패")
-                                                    }
-                                                }
-                                            }
-                                        } else {
-                                            DispatchQueue.main.async {
-                                                activeAlert = .info("[주의] 센터 ID를 찾을 수 없습니다 (응답 데이터 오류).")
-                                            }
-                                        }
-                                    case .failure(let err):
-                                        DispatchQueue.main.async {
-                                            activeAlert = .info("[오류] 오류 발생 (재빌드 필요?)\n\(err.localizedDescription)")
-                                        }
-                                    }
-                                }
-                            }) {
-                                Text("변경")
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(Color.orange)
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(BorderlessButtonStyle()) // [Fix] Touch Separation
-                        }
-                    }
-                    .padding(.vertical, 8)
-                    
-                    // [Recovery Tool] Tombstone Clear
-                    Button(action: {
-                        UserDefaults.standard.removeObject(forKey: "deleted_diary_ids")
-                        UserDefaults.standard.removeObject(forKey: "deleted_diary_dates")
-                        activeAlert = .info("[초기화] 차단 목록(Tombstone)이 초기화되었습니다.\n이제 서버에서 삭제된 일기도 다시 가져올 수 있습니다.")
-                    }) {
-                        HStack {
-                            Image(systemName: "trash.fill")
-                            Text("삭제/차단 기록 초기화 (Recover Deleted)")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    }
-                    .padding(.top, 4)
-                    
-                    // [New] Clean Today's Fake Data
-                    Button(action: {
-                        cleanTodayFakeData()
-                    }) {
-                        HStack {
-                            Image(systemName: "eraser.fill")
-                            Text("오늘 가짜 데이터 청소 (Clean Today's Fake)")
-                        }
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                    }
-                    .padding(.top, 4)
-                }
+
             } // End List
             .navigationTitle("설정")
             .alert(item: $activeAlert) { item in
@@ -896,6 +795,7 @@ struct AppSettingsView: View {
             }
             .sheet(isPresented: $showBirthDatePicker) {
                 BirthDatePickerView(isPresented: $showBirthDatePicker)
+                    .environmentObject(authManager)
             }
             .sheet(isPresented: $showMindBridgeMain) {
                 MindBridgeMainView()
@@ -903,60 +803,6 @@ struct AppSettingsView: View {
     }
     
 
-    
-    // 이스터에그 함수
-    func seedData() {
-        DataSeeder.shared.seedDummyData { count in
-            // [Test] 친구 데이터도 함께 생성
-            DataSeeder.shared.seedDummyFriends()
-            activeAlert = .info("테스트용 일기 \(count)개와\n가짜 친구(오늘 생일)가 생성되었습니다.\n앱을 재시작하거나 탭을 이동해보세요.")
-        }
-    }
-    
-    // [New] Clean Fake Data Logic
-    func cleanTodayFakeData() {
-        let today = Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        // [Safety] 명시적으로 2026-02-11 등 타겟팅 가능하지만 일단 오늘 날짜
-        let todayStr = formatter.string(from: today)
-        
-        // DataSeeder Patterns (Short Keywords)
-        let fakePatterns = ["직장", "실수", "친구", "말다툼", "평범", "산책", "프로젝트", "성공"]
-        
-        let allDiaries = LocalDataManager.shared.diaries
-        let todayDiaries = allDiaries.filter { $0.date == todayStr }
-        
-        // Filter & Delete
-        var toDeleteIds: [String] = []
-        for diary in todayDiaries {
-            let content = (diary.event ?? "") + (diary.emotion_desc ?? "")
-            for pattern in fakePatterns {
-                if content.contains(pattern), let id = diary.id {
-                    toDeleteIds.append(id)
-                    break
-                }
-            }
-        }
-        
-        if toDeleteIds.isEmpty {
-            activeAlert = .info("[검색] 검색 결과: 오늘(\(todayStr)) 작성된 일기 중\n'가짜 패턴'과 일치하는 항목이 없습니다.")
-            return
-        }
-        
-        // Count for alert
-        let deleteCount = toDeleteIds.count
-        
-        
-        for id in toDeleteIds {
-            LocalDataManager.shared.deleteDiary(id: id) { _ in }
-        }
-        
-        activeAlert = .info("[완료] 청소 완료!\n오늘 작성된 가짜 일기 \(deleteCount)개를 삭제했습니다.\n(진짜 일기는 안전합니다)")
-        
-        // Refresh Stats
-        NotificationCenter.default.post(name: NSNotification.Name("RefreshStats"), object: nil)
-    }
 }
 
 // [New] Birth Date Picker View
@@ -965,95 +811,47 @@ struct BirthDatePickerView: View {
     @EnvironmentObject var authManager: AuthManager
     
     @State private var selectedDate = Date()
-    @State private var displayedMonth = Date()
-    
-    private let calendar = Calendar.current
-    private let weekdays = ["일", "월", "화", "수", "목", "금", "토"]
+    @State private var isSaving = false
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("생일 선택")) {
-                    VStack(spacing: 12) {
-                        // 월 네비게이션
-                        HStack {
-                            Button(action: { changeMonth(by: -1) }) {
-                                Image(systemName: "chevron.left")
-                                    .foregroundColor(.accent)
-                            }
-                            Spacer()
-                            Text(monthYearString(displayedMonth))
-                                .font(.headline)
-                                .fontWeight(.bold)
-                            Spacer()
-                            Button(action: { changeMonth(by: 1) }) {
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.accent)
-                            }
-                        }
-                        .padding(.horizontal, 8)
-                        
-                        // 요일 헤더 (일=빨간, 토=파란)
-                        HStack {
-                            ForEach(Array(weekdays.enumerated()), id: \.offset) { index, day in
-                                Text(day)
-                                    .font(.caption)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(index == 0 ? .red : (index == 6 ? .accent : .hintText))
-                                    .frame(maxWidth: .infinity)
-                            }
-                        }
-                        
-                        // 날짜 그리드
-                        let days = calendarDays()
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
-                            ForEach(days.indices, id: \.self) { i in
-                                if let date = days[i] {
-                                    let day = calendar.component(.day, from: date)
-                                    let wd = calendar.component(.weekday, from: date)
-                                    let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-                                    
-                                    Button(action: { selectedDate = date }) {
-                                        Text("\(day)")
-                                            .font(.system(size: 16, weight: isSelected ? .bold : .regular))
-                                            .foregroundColor(
-                                                isSelected ? .white :
-                                                wd == 1 ? .red :
-                                                wd == 7 ? .accent :
-                                                .primary
-                                            )
-                                            .frame(width: 36, height: 36)
-                                            .background(
-                                                isSelected ? Circle().fill(Color.accent) : Circle().fill(Color.clear)
-                                            )
-                                    }
-                                } else {
-                                    Text("")
-                                        .frame(width: 36, height: 36)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.vertical, 8)
+                Section(header: Text("생년월일을 선택하세요")) {
+                    DatePicker(
+                        "생년월일",
+                        selection: $selectedDate,
+                        in: ...Date(),
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .environment(\.locale, Locale(identifier: "ko_KR"))
                 }
                 
                 Section {
                     Button(action: {
+                        isSaving = true
                         let formatter = DateFormatter()
                         formatter.dateFormat = "yyyy-MM-dd"
                         let dateStr = formatter.string(from: selectedDate)
                         
                         authManager.updateBirthDate(dateStr) { success in
+                            isSaving = false
                             isPresented = false
                         }
                     }) {
                         HStack {
                             Spacer()
-                            Text("저장하기")
-                                .fontWeight(.bold)
+                            if isSaving {
+                                ProgressView()
+                            } else {
+                                Text("저장하기")
+                                    .fontWeight(.bold)
+                            }
                             Spacer()
                         }
                     }
+                    .disabled(isSaving)
                     .foregroundColor(.white)
                     .listRowBackground(Color.accent)
                 }
@@ -1065,49 +863,17 @@ struct BirthDatePickerView: View {
                 formatter.dateFormat = "yyyy-MM-dd"
                 if let saved = authManager.birthDate, let date = formatter.date(from: saved) {
                     selectedDate = date
-                    displayedMonth = date
                 } else {
+                    // 기본값: 1986-03-11
                     var components = DateComponents()
                     components.year = 1986
                     components.month = 3
                     components.day = 11
-                    if let defaultDate = calendar.date(from: components) {
+                    if let defaultDate = Calendar.current.date(from: components) {
                         selectedDate = defaultDate
-                        displayedMonth = defaultDate
                     }
                 }
             }
         }
-    }
-    
-    private func changeMonth(by offset: Int) {
-        if let newMonth = calendar.date(byAdding: .month, value: offset, to: displayedMonth) {
-            displayedMonth = newMonth
-        }
-    }
-    
-    private func monthYearString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ko_KR")
-        formatter.dateFormat = "yyyy년 M월"
-        return formatter.string(from: date)
-    }
-    
-    private func calendarDays() -> [Date?] {
-        let comps = calendar.dateComponents([.year, .month], from: displayedMonth)
-        guard let firstOfMonth = calendar.date(from: comps) else { return [] }
-        let startWeekday = calendar.component(.weekday, from: firstOfMonth)
-        guard let range = calendar.range(of: .day, in: .month, for: firstOfMonth) else { return [] }
-        
-        var days: [Date?] = []
-        for _ in 0..<(startWeekday - 1) {
-            days.append(nil)
-        }
-        for day in range {
-            if let date = calendar.date(byAdding: .day, value: day - 1, to: firstOfMonth) {
-                days.append(date)
-            }
-        }
-        return days
     }
 }

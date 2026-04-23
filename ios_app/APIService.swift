@@ -57,16 +57,20 @@ class APIService: NSObject {
             return
         }
         
-        // [Fix] 토큰이 이미 있으면 재로그인 없이 바로 통과
-        // 토큰 만료 시 서버가 401을 반환하면 그때 실패 처리
+        // [Fix 2026-04-09] 토큰이 있더라도 만료 여부를 검증
+        // 만료된 토큰으로 요청 → 401 → 동기화 실패 연쇄 방지
         if let existingToken = self.token, !existingToken.isEmpty {
-            completion(true)
-            return
+            if !isTokenExpired(existingToken) {
+                completion(true)
+                return
+            }
+            // 만료된 토큰 → 무효화 후 재로그인 진행
+            self.token = nil
         }
         
-        // 토큰이 없는 경우에만 재로그인 시도
-        // [Fix] 사용자가 실제 입력한 비밀번호 사용 (랜덤 UUID 생성 제거)
-        guard let password = UserDefaults.standard.string(forKey: "app_password"), !password.isEmpty else {
+        // 토큰이 없거나 만료된 경우 재로그인 시도
+        // [Fix 2026-04-09] Keychain에서 비밀번호 읽기 (UserDefaults에는 저장된 적 없음)
+        guard let password = KeychainHelper.standard.readString(account: "app_password"), !password.isEmpty else {
             completion(false)
             return
         }
@@ -116,6 +120,31 @@ class APIService: NSObject {
                 completion(false)
             }
         }
+    }
+    
+    // [Fix 2026-04-09] JWT 만료 검증 (exp claim 디코딩)
+    // 만료 60초 전부터 "만료"로 판단하여 경계 조건 방지
+    private func isTokenExpired(_ token: String) -> Bool {
+        let segments = token.components(separatedBy: ".")
+        guard segments.count > 1 else { return true }
+        
+        var base64String = segments[1]
+        let requiredLength = Int(4 * ceil(Double(base64String.count) / 4.0))
+        let nbrPaddings = requiredLength - base64String.count
+        if nbrPaddings > 0 {
+            base64String += String(repeating: "=", count: nbrPaddings)
+        }
+        base64String = base64String.replacingOccurrences(of: "-", with: "+")
+        base64String = base64String.replacingOccurrences(of: "_", with: "/")
+        
+        guard let decodedData = Data(base64Encoded: base64String, options: .ignoreUnknownCharacters),
+              let json = try? JSONSerialization.jsonObject(with: decodedData) as? [String: Any],
+              let exp = json["exp"] as? Double else {
+            return true // 디코딩 실패 시 만료로 간주 → 재로그인 유도
+        }
+        
+        // 현재 시각 + 60초 여유로 비교 (네트워크 지연 대비)
+        return Date().timeIntervalSince1970 >= (exp - 60)
     }
     
     // [New] User Info Sync without Re-login
@@ -581,7 +610,7 @@ class APIService: NSObject {
         }
         
         // Use Shared Session
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
                 completion(.failure(error))
                 return
@@ -596,6 +625,19 @@ class APIService: NSObject {
             let responseData = data ?? Data()
             let responseString = String(data: responseData, encoding: .utf8) ?? "(No Body)"
             
+            // [Fix 2026-04-09] 401 자동 복구: 토큰 무효화 → 재인증 → 원래 요청 재시도
+            if httpResponse.statusCode == 401, requiresAuth, let self = self {
+                self.token = nil // 만료 토큰 폐기
+                self.ensureAuth { reAuthSuccess in
+                    if reAuthSuccess {
+                        // 새 토큰으로 동일 요청 재시도 (1회만)
+                        self.performRequest(baseURL: baseURL, endpoint: endpoint, method: method, body: body, requiresAuth: false, completion: completion)
+                    } else {
+                        completion(.failure(NSError(domain: "HTTP", code: 401, userInfo: [NSLocalizedDescriptionKey: "재인증 실패"])))
+                    }
+                }
+                return
+            }
             
             if !(200...299).contains(httpResponse.statusCode) {
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))
@@ -622,7 +664,7 @@ class APIService: NSObject {
     }
     
     // Array Response helper
-    func performRequestList(baseURL: String? = nil, endpoint: String, method: String, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
+    func performRequestList(baseURL: String? = nil, endpoint: String, method: String, isRetry: Bool = false, completion: @escaping (Result<[[String: Any]], Error>) -> Void) {
         let targetBase = baseURL ?? self.baseURL
         
         // [Fix] Ensure Endpoint Format (Add '/' if missing, Remove Trailing Slash)
@@ -659,7 +701,7 @@ class APIService: NSObject {
         }
         
         
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
             if let error = error { completion(.failure(error)); return }
             
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -669,6 +711,20 @@ class APIService: NSObject {
             
             // Should be optional, but if compiler complains, handle gracefully
             let responseData = data ?? Data()
+            
+            // [Fix 2026-04-09] 401 자동 복구: 토큰 무효화 → 재인증 → 원래 요청 재시도 (1회 제한)
+            if httpResponse.statusCode == 401, !isRetry, let self = self {
+                self.token = nil // 만료 토큰 폐기
+                self.ensureAuth { reAuthSuccess in
+                    if reAuthSuccess {
+                        // 새 토큰으로 동일 요청 재시도 (isRetry=true로 무한루프 방지)
+                        self.performRequestList(baseURL: baseURL, endpoint: endpoint, method: method, isRetry: true, completion: completion)
+                    } else {
+                        completion(.failure(NSError(domain: "HTTP", code: 401, userInfo: [NSLocalizedDescriptionKey: "재인증 실패"])))
+                    }
+                }
+                return
+            }
             
             if !(200...299).contains(httpResponse.statusCode) {
                 completion(.failure(NSError(domain: "HTTP", code: httpResponse.statusCode, userInfo: nil)))

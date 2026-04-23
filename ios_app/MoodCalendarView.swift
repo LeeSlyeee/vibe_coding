@@ -119,7 +119,7 @@ struct MoodCalendarView: View {
                                             let wd = Calendar.current.component(.weekday, from: date)
                                             let dayColor: Color = wd == 1 ? .mood1 : (wd == 7 ? .mood2 : (Calendar.current.isDateInToday(date) ? .accent : .primaryText))
                                             Text("\(Calendar.current.component(.day, from: date))")
-                                                .font(.system(size: 10, weight: diary != nil ? .bold : .regular, design: .rounded))
+                                                .font(.system(size: 10, weight: diary != nil ? .bold : .regular))
                                                 .foregroundColor(dayColor)
                                                 .padding(.top, 4)
                                             
@@ -147,14 +147,14 @@ struct MoodCalendarView: View {
                                                     let (label, percent) = parseAI(d.ai_prediction)
                                                     if !label.isEmpty {
                                                         Text(label)
-                                                            .font(.system(size: 8, weight: .bold, design: .rounded))
+                                                            .font(.system(size: 8, weight: .bold))
                                                             .foregroundColor(.primaryText)
                                                             .lineLimit(1)
                                                             .minimumScaleFactor(0.7)
                                                         
                                                         if !percent.isEmpty {
                                                             Text(percent)
-                                                                .font(.system(size: 7, design: .rounded))
+                                                                .font(.system(size: 7))
                                                                 .foregroundColor(.secondaryText)
                                                                 .lineLimit(1)
                                                                 .minimumScaleFactor(0.7)
@@ -202,7 +202,7 @@ struct MoodCalendarView: View {
                                     Circle()
                                         .fill(
                                             LinearGradient(
-                                                colors: [Color(hexString: "6366f1").opacity(0.15), Color(hexString: "8b5cf6").opacity(0.15)],
+                                                colors: [Color.gray900.opacity(0.15), Color.gray600.opacity(0.15)],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             )
@@ -247,13 +247,13 @@ struct MoodCalendarView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 14)
                                     .fill(Color(.systemBackground))
-                                    .shadow(color: Color(hexString: "6366f1").opacity(0.1), radius: 8, x: 0, y: 2)
+                                    .shadow(color: Color.gray900.opacity(0.1), radius: 8, x: 0, y: 2)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14)
                                     .stroke(
                                         LinearGradient(
-                                            colors: [Color(hexString: "6366f1").opacity(0.3), Color(hexString: "8b5cf6").opacity(0.15)],
+                                            colors: [Color.gray900.opacity(0.3), Color.gray600.opacity(0.15)],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
                                         ),
