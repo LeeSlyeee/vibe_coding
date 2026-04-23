@@ -63,3 +63,5 @@ eeve_env/
 mlx_libs/
 mlx_model/
 upload_eeve.py
+# MLX Swift Examples (독립 저장소, 서브모듈 아님)
+mlx-swift-examples/
